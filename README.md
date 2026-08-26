@@ -18,13 +18,23 @@ per-project copy to keep in sync.
 A future tool gets its own sibling directory (e.g. `codex/`) with whatever layout that
 tool expects, symlinked into its own config location the same way.
 
+## Setup on a new machine
+
+```bash
+git clone git@github.com:dfadler/agent-config.git ~/Development/agent-config
+~/Development/agent-config/setup.sh
+```
+
+`setup.sh` symlinks everything under `claude/` into `~/.claude/` in one pass. It's
+idempotent — re-run it any time after pulling to pick up new entries, and it leaves
+alone anything at the target that isn't already a symlink to this repo (so it won't
+clobber machine-local config it doesn't own).
+
 ## Adding something new
 
-1. Add the file under the right directory here, commit and push.
-2. Symlink it into the tool's config dir (matching the existing entries):
-   ```bash
-   ln -s ~/Development/agent-config/claude/agents/<name>.md ~/.claude/agents/<name>.md
-   ```
+1. Add the file (or directory, for a skill) under the right directory here, commit and
+   push.
+2. Run `./setup.sh` to symlink it into the tool's config dir.
 
 ## What belongs here vs. in a project
 
