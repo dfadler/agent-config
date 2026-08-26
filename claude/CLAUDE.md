@@ -5,6 +5,46 @@ Conventions and habits that apply across projects, not just one repo. Project-le
 names, label taxonomies); this file holds the general principle behind them so it
 doesn't need to be re-written per project.
 
+## Isolation: use git worktrees for non-trivial work
+
+When a repo can have more than one Claude Code session running against it at once —
+or even solo, to keep the main checkout clean and easy to reason about — use a **git
+worktree** for anything beyond a one-line edit: new features, multi-file changes,
+background or parallel tasks. Never commit directly to the main working copy.
+
+- **Create worktrees with the `EnterWorktree` tool, never raw `git worktree add`.**
+  The tool applies whatever worktree conventions the repo has configured
+  automatically — path/branch naming, locking (so a worktree in active use can't be
+  collided into by another session), and any `worktree.symlinkDirectories` set in
+  `.claude/settings.json` (e.g. a heavy `node_modules`/`vendor` directory), so a new
+  worktree doesn't need its own copy. Raw `git worktree add` bypasses all of that —
+  the tool exists because that bypass was a recurring source of pain: untracked
+  directories re-copied by hand, and worktrees created outside the convention that a
+  repo's own pruning tooling then can't find.
+- **Pick what to parallelize by file surface, not by ticket.** Two tasks that both
+  touch shared config (a lint config, `package.json`, a shared component) will
+  conflict at merge time even if the sessions never overlap in time — stagger those
+  instead of running them side by side.
+- **If the main checkout is already dirtied before you realize you should be in a
+  worktree, don't migrate the change with `git stash push -- <file>`** on any file a
+  concurrent session might also be editing (a shared README, a shared config) — stash
+  pathspec operates on the whole file, so it sweeps up their in-progress hunks too,
+  briefly removing their work and dragging it onto your branch. Instead, enter a
+  clean worktree from the up-to-date default branch and re-apply only your own hunks
+  there.
+- **After merging a PR that adds or tightens an enforcing CI rule** (a new lint rule,
+  a stricter type check), re-run that check against a fresh default branch and sweep
+  any stragglers in a follow-up — branches cut *before* the rule-adding PR merged
+  carry violations their own (pre-rule) CI never saw, so the default branch can go red
+  on merge despite every individual PR having been green. Watch the merge-timing race
+  too: pushing a new commit to a just-merged (and deleted) branch re-creates it, so a
+  final commit can *look* merged without actually being on the default branch —
+  verify against the merge commit's parent, or the PR's own state, not the branch name.
+- **Squash merges mean a merged branch's commits aren't reachable by SHA on the local
+  default branch** — cleanup tooling that checks reachability may warn a branch is
+  "unmerged" when it's actually merged. Verify against the PR itself (state: merged),
+  not a local branch-reachability check.
+
 ## Visual verification on PRs/issues that change rendered output
 
 When a change (PR or issue) alters what gets visually rendered — UI components, generated images/diagrams, styled documents, anything a human would look at rather than just read as code — provide before/after screenshots in the PR or issue description, not just a prose description of the change. Skip this for changes that don't affect rendered output: backend logic, config, migrations, scripts, tests, types, docs, tooling.
