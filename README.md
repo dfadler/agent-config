@@ -1,22 +1,29 @@
 # agent-config
 
-Version-controlled home for Claude Code configuration that's generic enough to apply
-across projects, not tied to any single repo. Symlinked into `~/.claude/` so every
-project's session picks it up automatically, with no per-project copy to keep in sync.
+Version-controlled home for agent configuration that's generic enough to apply across
+projects, not tied to any single repo. Each tool gets its own top-level directory
+(`claude/` today) so this can hold config for other agent CLIs later without the
+layouts colliding. Content is symlinked into the tool's own config dir — e.g.
+`~/.claude/` — so every project's session picks it up automatically, with no
+per-project copy to keep in sync.
 
 ## Layout
 
-- `CLAUDE.md` — global instructions (`~/.claude/CLAUDE.md` is a symlink to this file).
-- `agents/` — subagent definitions, symlinked individually into `~/.claude/agents/`.
-- `commands/` — slash commands, symlinked individually into `~/.claude/commands/`.
-- `skills/` — skills, symlinked individually into `~/.claude/skills/`.
+- `claude/` — Claude Code config.
+  - `CLAUDE.md` — global instructions (`~/.claude/CLAUDE.md` is a symlink to this file).
+  - `agents/` — subagent definitions, symlinked individually into `~/.claude/agents/`.
+  - `commands/` — slash commands, symlinked individually into `~/.claude/commands/`.
+  - `skills/` — skills, symlinked individually into `~/.claude/skills/`.
+
+A future tool gets its own sibling directory (e.g. `codex/`) with whatever layout that
+tool expects, symlinked into its own config location the same way.
 
 ## Adding something new
 
 1. Add the file under the right directory here, commit and push.
-2. Symlink it into `~/.claude/` (matching the existing entries):
+2. Symlink it into the tool's config dir (matching the existing entries):
    ```bash
-   ln -s ~/Development/agent-config/agents/<name>.md ~/.claude/agents/<name>.md
+   ln -s ~/Development/agent-config/claude/agents/<name>.md ~/.claude/agents/<name>.md
    ```
 
 ## What belongs here vs. in a project
