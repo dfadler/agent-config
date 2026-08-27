@@ -65,7 +65,7 @@ Do this proactively, without waiting to be asked — treat it as part of finishi
    img.crop((max(0, bbox[0]-pad), max(0, bbox[1]-pad), min(img.width, bbox[2]+pad), min(img.height, bbox[3]+pad))).save(path_out)
    ```
    Look at the actual cropped result before uploading — don't assume the crop worked.
-4. Upload both images and embed them via the `dfadler-agent-config-gh-attach-image` skill (`~/.claude/skills/dfadler-agent-config-gh-attach-image/`) — never commit screenshots to the repo and never use a Gist for this; the skill uses GitHub's own attachment upload endpoint, which needs neither.
+4. Upload both images and embed them via the `dfadler-agent-config-gh-attach-image` skill (`~/.claude/skills/generic-tools/skills/dfadler-agent-config-gh-attach-image/`) — never commit screenshots to the repo and never use a Gist for this; the skill uses GitHub's own attachment upload endpoint, which needs neither.
 5. Add a "Visual verification" section to the PR/issue body with a two-column before/after markdown table, plus a one-line caption saying what to look for.
 6. Verify the images actually resolve after saving the body (`curl -sI -L <url>` should return 200, not 404 — see the skill for why a fresh upload 404s until claimed).
 
