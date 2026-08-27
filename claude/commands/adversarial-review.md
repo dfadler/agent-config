@@ -1,8 +1,8 @@
 ---
-description: Tear the current changes apart — launches the hostile adversarial-reviewer subagent
+description: Tear the current changes apart — launches the hostile dfadler-agent-config-adversarial-reviewer subagent
 ---
 
-Launch the `adversarial-reviewer` subagent via the Agent tool to review the
+Launch the `dfadler-agent-config-adversarial-reviewer` subagent via the Agent tool to review the
 target below. It runs in isolated context, hunts for correctness/security/
 concurrency/edge-case/architecture defects with zero sycophancy, and reports
 findings with `file:line`, a concrete failure scenario, and a demanded fix.

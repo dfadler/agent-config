@@ -1,5 +1,5 @@
 ---
-name: pr-review-rubric
+name: dfadler-agent-config-pr-review-rubric
 description: |
   Methodology and output discipline for reviewing a pull request's diff: a rubric
   covering correctness, security, test coverage, edge cases, cross-file data-flow
