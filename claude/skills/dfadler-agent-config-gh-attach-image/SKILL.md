@@ -1,5 +1,5 @@
 ---
-name: gh-attach-image
+name: dfadler-agent-config-gh-attach-image
 description: |
   Upload local image files (screenshots, rendered diagrams, before/after
   comparisons) so they render inline in a GitHub PR description, issue
@@ -53,15 +53,15 @@ encoding, and the two usage patterns below.
 # Default: upload and print markdown lines — use this when the images need
 # to go in a specific spot in a hand-crafted body (a table, a particular
 # section) rather than a simple append.
-~/.claude/skills/gh-attach-image/scripts/upload.sh --repo OWNER/NAME before.png after.png
+~/.claude/skills/dfadler-agent-config-gh-attach-image/scripts/upload.sh --repo OWNER/NAME before.png after.png
 # -> ![before](https://github.com/user-attachments/assets/<uuid>)
 #    ![after](https://github.com/user-attachments/assets/<uuid>)
 
 # Convenience: upload AND append to an existing PR/issue body under a heading
-~/.claude/skills/gh-attach-image/scripts/upload.sh --repo OWNER/NAME --pr 42 screenshot.png
+~/.claude/skills/dfadler-agent-config-gh-attach-image/scripts/upload.sh --repo OWNER/NAME --pr 42 screenshot.png
 
 # Or post as a new comment instead of editing the body
-~/.claude/skills/gh-attach-image/scripts/upload.sh --repo OWNER/NAME --issue 7 --comment diagram.png
+~/.claude/skills/dfadler-agent-config-gh-attach-image/scripts/upload.sh --repo OWNER/NAME --issue 7 --comment diagram.png
 ```
 
 Run `scripts/upload.sh` with no arguments (or read the top of the file) for

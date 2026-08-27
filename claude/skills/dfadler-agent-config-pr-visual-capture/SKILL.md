@@ -1,5 +1,5 @@
 ---
-name: pr-visual-capture
+name: dfadler-agent-config-pr-visual-capture
 description: >
   How to actually produce screenshot (PNG) and walkthrough video (MP4) files
   for a PR/issue's visual-verification requirement, when an in-app/embedded
@@ -28,7 +28,7 @@ A computer-use-style or embedded browser tool (e.g. `mcp__*Browser__computer`
 `screenshot`) renders faithfully and is the right tool for *verifying* a
 change interactively — but it typically returns image data inline only,
 with no file written to disk. Attaching to a PR/issue (via a GitHub
-attachment upload, e.g. the `gh-attach-image` skill) needs a real file path.
+attachment upload, e.g. the `dfadler-agent-config-gh-attach-image` skill) needs a real file path.
 Drive the system Chrome binary headlessly instead.
 
 **macOS only below** — the Chrome binary path and video encoder are
@@ -249,10 +249,10 @@ has no libx264 — use `h264_videotoolbox` instead in that case. On Linux,
 ## Attaching to the PR/issue
 
 **Images:** use your repo's GitHub-attachment upload script/skill (e.g. the
-`gh-attach-image` skill) — don't re-derive the upload endpoint by hand.
+`dfadler-agent-config-gh-attach-image` skill) — don't re-derive the upload endpoint by hand.
 Never commit screenshots to the repo, never use a Gist.
 
-**Video:** most attachment scripts (including `gh-attach-image`) whitelist
+**Video:** most attachment scripts (including `dfadler-agent-config-gh-attach-image`) whitelist
 only image extensions, since that's the common case. GitHub's own
 attachment endpoint also accepts video — replicate the same call with
 `content_type=video/mp4` and the file bytes as the raw request body:
@@ -272,7 +272,7 @@ player.
 **Verify before considering it done either way:** `curl -sI -L <url>` should
 return `200`, not `404` — a freshly uploaded attachment 404s until the
 PR/issue body that references it is saved (GitHub "claims" the asset on
-save; see `gh-attach-image`'s SKILL.md for the full explanation of this
+save; see `dfadler-agent-config-gh-attach-image`'s SKILL.md for the full explanation of this
 behavior).
 
 ## Cropping to content (diagrams/SVGs specifically)
