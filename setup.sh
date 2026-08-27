@@ -37,6 +37,9 @@ link_dir_contents() {
 
 mkdir -p "$HOME/.claude"
 link "$REPO_ROOT/claude/CLAUDE.md" "$HOME/.claude/CLAUDE.md"
-link_dir_contents "$REPO_ROOT/claude/agents" "$HOME/.claude/agents"
 link_dir_contents "$REPO_ROOT/claude/commands" "$HOME/.claude/commands"
-link_dir_contents "$REPO_ROOT/claude/skills" "$HOME/.claude/skills"
+# Agents and skills moved under plugins/generic-tools/ when this repo became a
+# plugin marketplace (commit 89a34ce) - claude/agents and claude/skills no
+# longer exist.
+link_dir_contents "$REPO_ROOT/plugins/generic-tools/agents" "$HOME/.claude/agents"
+link_dir_contents "$REPO_ROOT/plugins/generic-tools/skills" "$HOME/.claude/skills"
