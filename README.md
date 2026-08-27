@@ -44,12 +44,13 @@ inside it, so they don't get linked separately.
 Loading it this way *does* namespace what it contains: the plugin's skills and agents
 are exposed as `generic-tools:<name>`, not under bare names — in a live session that's
 `generic-tools:dfadler-agent-config-pr-babysit`, and the agent as
-`generic-tools:dfadler-agent-config-adversarial-reviewer`. What *isn't* namespaced is a
-directory under `~/.claude/skills/` holding a `SKILL.md` at its own root instead of a
-`skills/` subdirectory — that's a single flat skill, not a plugin. So the
-`dfadler-agent-config-` prefix on skill and agent names is no longer what prevents
-collisions; it's kept as-is because renaming would churn every directory, every
-frontmatter `name:`, and any vendored copies in other repos.
+`generic-tools:dfadler-agent-config-adversarial-reviewer`. What decides this is the
+`skills/` subdirectory, not the manifest: a directory that keeps its `SKILL.md` at its
+own root loads as a single skill under a bare name even when it does carry a
+`.claude-plugin/plugin.json`. Only a `skills/` subdirectory produces the
+`<plugin>:<skill>` form. So the `dfadler-agent-config-` prefix on skill and agent names
+is no longer what prevents collisions; it's kept as-is because renaming would churn
+every directory, every frontmatter `name:`, and any vendored copies in other repos.
 
 Sharing the plugin with another machine or person would need a
 `.claude-plugin/marketplace.json` at the repo root; that isn't here yet, and adding it
