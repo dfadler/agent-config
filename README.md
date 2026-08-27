@@ -41,11 +41,19 @@ projected token cost, and `claude plugin validate plugins/generic-tools` checks 
 manifest and every skill/agent it contains. The plugin's `agents/` are discovered from
 inside it, so they don't get linked separately.
 
-What this setup does *not* give you is namespacing: skills-dir plugins expose their
-skills under their own flat names, not `generic-tools:<skill>`. That's why the naming
-convention below still matters. Sharing the plugin with another machine or person
-would need a `.claude-plugin/marketplace.json` at the repo root; that isn't here yet,
-and adding it later wouldn't change how this machine loads the plugin.
+Loading it this way *does* namespace what it contains: the plugin's skills and agents
+are exposed as `generic-tools:<name>`, not under bare names — in a live session that's
+`generic-tools:dfadler-agent-config-pr-babysit`, and the agent as
+`generic-tools:dfadler-agent-config-adversarial-reviewer`. What *isn't* namespaced is a
+directory under `~/.claude/skills/` holding a `SKILL.md` at its own root instead of a
+`skills/` subdirectory — that's a single flat skill, not a plugin. So the
+`dfadler-agent-config-` prefix on skill and agent names is no longer what prevents
+collisions; it's kept as-is because renaming would churn every directory, every
+frontmatter `name:`, and any vendored copies in other repos.
+
+Sharing the plugin with another machine or person would need a
+`.claude-plugin/marketplace.json` at the repo root; that isn't here yet, and adding it
+later wouldn't change how this machine loads the plugin.
 
 A future tool gets its own sibling directory (e.g. `codex/`) with whatever layout that
 tool expects, symlinked into its own config location the same way.
@@ -79,10 +87,11 @@ alongside the plugin.
      and `skills/`. Add a `link` line for it in `setup.sh`, which only knows about
      `generic-tools`.
 2. Name skills and agents `dfadler-agent-config-<name>` — both the directory/filename
-   and the frontmatter `name:`. A skills-dir plugin doesn't namespace what it contains,
-   so these land in the same flat namespace as every project's own skills, and the
-   prefix is what keeps them from colliding with an identically named local copy.
-   Commands stay unprefixed.
+   and the frontmatter `name:` — to match everything already here. The plugin namespaces
+   its contents as `generic-tools:<name>`, so the prefix isn't load-bearing for
+   collision avoidance; it's just the standing convention. Commands stay unprefixed, and
+   they really are flat: `claude/commands/` is linked entry-by-entry into
+   `~/.claude/commands/`, outside any plugin.
 3. Run `claude plugin validate plugins/generic-tools` — it checks the manifest and
    parses the frontmatter of every skill and agent inside.
 4. Commit and push. A new skill or agent inside an already-linked plugin needs no
