@@ -1,6 +1,6 @@
 {
   "$schema": "https://json.schemastore.org/claude-code-plugin-manifest.json",
-  "name": "generic-tools",
+  "name": "dfadler-agent-config",
   "version": "0.1.0",
   "description": "Cross-project agents and skills that aren't tied to any one repo: PR shepherding, a PR review rubric, visual capture for PRs, GitHub image attachment, and an adversarial code reviewer.",
   "author": {
