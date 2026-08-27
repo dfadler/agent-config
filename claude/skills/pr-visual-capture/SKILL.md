@@ -201,8 +201,20 @@ one agent session could be running on this machine at once:
 **Auth**, if the target route is login-gated:
 
 - *With a human available:* have them log into a dedicated, **persistent**
-  `--user-data-dir` in a headed window once. Use that same path as
-  `profile_dir` in step 1 with `owns_profile=0`, so step 10 never deletes it.
+  `--user-data-dir` in a headed window once. Scope that path uniquely to the
+  calling context — e.g. fold a worktree path/slug or another session-specific
+  identifier into the directory name — rather than a single shared fixed path.
+  Cookies aren't port-scoped (a cookie set for one `localhost:<port>` origin is
+  also sent to another `localhost:<port>` origin), so if more than one
+  concurrent context (parallel worktree sessions, each with its own dev-server
+  port and backing data) reuses one profile directory, an admin/login session
+  cookie captured in one context can get replayed against a different
+  context's server. Use that same path as `profile_dir` in step 1 with
+  `owns_profile=0`, so step 10 never deletes the directory — but step 10's
+  `kill "$chrome_pid"` still applies here too, unconditionally: stop the
+  Chrome process after the capture (success or failure) so a stale run isn't
+  left holding a live authenticated session. Only the profile *directory*
+  is meant to persist between runs, not the running process.
   A session cookie may be short-lived — capture promptly after login.
 - *Fully autonomous:* how you obtain a session (creating a throwaway
   account, a service-account token, a prod-safety guard) is specific to your
