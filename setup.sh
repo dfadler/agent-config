@@ -8,6 +8,8 @@
 set -euo pipefail
 
 REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+PLUGIN_SRC="$REPO_ROOT/plugins/dfadler-agent-config"
+PLUGIN_LINK="$HOME/.claude/skills/dfadler-agent-config"
 
 link() {
   local src="$1" dest="$2"
@@ -45,22 +47,28 @@ link_dir_contents() {
   done
 }
 
-# Earlier versions of this script linked the plugin's skills and agents into
-# ~/.claude/{skills,agents} one entry at a time. The plugin now supplies those
-# itself, so a leftover fanned-out symlink would load the same skill twice.
-# Only symlinks pointing *inside* plugins/generic-tools are removed; the link to
-# the plugin directory itself has no trailing path component and is left alone.
-prune_fanned_out_links() {
+# Remove links this repo created that are no longer canonical. Two generations
+# of those exist: earlier versions linked the plugin's skills and agents into
+# ~/.claude/{skills,agents} one entry at a time (the plugin now supplies those
+# itself, so a leftover would load the same skill twice), and the plugin used to
+# be named generic-tools (that link is left dangling by the rename). Anything
+# under these directories pointing into this repo's plugins/ that isn't the
+# current plugin link is stale by definition.
+prune_stale_plugin_links() {
   local dest_dir="$1"
   [[ -d "$dest_dir" ]] || return 0
   local entry target
   for entry in "$dest_dir"/*; do
     [[ -L "$entry" ]] || continue
     target="$(readlink "$entry")"
-    if [[ "$target" == "$REPO_ROOT/plugins/generic-tools/"* ]]; then
-      rm "$entry"
-      echo "Removed superseded symlink: $entry"
+    if [[ "$target" != "$REPO_ROOT/plugins/"* ]]; then
+      continue
     fi
+    if [[ "$entry" == "$PLUGIN_LINK" && "$target" == "$PLUGIN_SRC" ]]; then
+      continue
+    fi
+    rm "$entry"
+    echo "Removed superseded symlink: $entry"
   done
 }
 
@@ -68,15 +76,17 @@ mkdir -p "$HOME/.claude"
 link "$REPO_ROOT/claude/CLAUDE.md" "$HOME/.claude/CLAUDE.md"
 link_dir_contents "$REPO_ROOT/claude/commands" "$HOME/.claude/commands"
 
-prune_fanned_out_links "$HOME/.claude/skills"
-prune_fanned_out_links "$HOME/.claude/agents"
+prune_stale_plugin_links "$HOME/.claude/skills"
+prune_stale_plugin_links "$HOME/.claude/agents"
 
-# generic-tools is a plugin, so link the directory as a unit rather than its
-# contents. Claude Code auto-loads any directory under ~/.claude/skills/ that
-# carries a .claude-plugin/plugin.json as "<name>@skills-dir", and it follows
-# symlinks - so this keeps edits in this repo live (no install/update/restart
-# cycle) while still getting plugin identity: a version, `claude plugin
-# disable`, `claude plugin details` token accounting, `claude plugin validate`.
-# The plugin's agents/ are discovered from inside it; don't link them separately.
+# dfadler-agent-config is a plugin, so link the directory as a unit rather than
+# its contents. Claude Code auto-loads any directory under ~/.claude/skills/
+# that carries a .claude-plugin/plugin.json as "<name>@skills-dir", and it
+# follows symlinks - so this keeps edits in this repo live (no
+# install/update/restart cycle) while still getting plugin identity: a version,
+# `claude plugin disable`, `claude plugin details` token accounting, `claude
+# plugin validate`. The plugin's agents/ are discovered from inside it; don't
+# link them separately. The link basename must match the manifest name so the
+# skills it contains resolve as dfadler-agent-config:<skill>.
 mkdir -p "$HOME/.claude/skills"
-link "$REPO_ROOT/plugins/generic-tools" "$HOME/.claude/skills/generic-tools"
+link "$PLUGIN_SRC" "$PLUGIN_LINK"
