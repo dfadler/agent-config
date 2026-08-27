@@ -408,10 +408,15 @@ does.
 
 Some repos gate this class deterministically already — known-malware blocking at
 install time, SAST with supply-chain rules — in which case, per the False-Positive
-Exclusion List above, don't re-litigate what those catch. **Establish that such a gate
-exists before relying on it**: look for the workflow step or config that runs it, the
-same way you'd verify any other factual claim. Absent that evidence, review this
-dimension yourself; an assumed gate suppresses real findings.
+Exclusion List above, don't re-litigate what those catch. **The bar is not that a gate
+exists, it's that this gate would have caught this**, established the same way you'd
+verify any other factual claim. Existence is the weakest part of that: a gate can run
+only on a schedule or on the default branch and not on this PR, cover an ecosystem or
+path the diff doesn't touch, report advisorily without failing the build, or simply be
+blind to the shape in front of you. Check those before suppressing anything, and treat
+a gate that the diff under review also reconfigures as no gate at all — that is the
+infrastructure-tampering case above, not an exemption. Where you can't establish it,
+review the dimension yourself; an assumed gate suppresses real findings.
 
 Either way, spend judgment on the shape those tools are structurally blind to on a
 first sighting: a new or
