@@ -15,21 +15,22 @@ automatically, with no per-project copy to keep in sync.
   - `commands/` — slash commands, symlinked individually into `~/.claude/commands/`.
 - `plugins/` — one directory per plugin, in the layout Claude Code's plugin format
   expects.
-  - `dfadler-agent-config/` — the only plugin so far.
+  - `dfadler-agent-config/` — the only plugin so far. Its directory name matches the
+    `name` in its manifest, which is what makes its contents resolve as
+    `dfadler-agent-config:<skill>`.
     - `.claude-plugin/plugin.json` — the plugin manifest (name, version, description).
     - `agents/` — subagent definitions.
     - `skills/` — skills, a directory each containing a `SKILL.md` plus any scripts.
 
 Agents and skills used to live under `claude/`; they moved into the plugin in commit
 89a34ce. Nothing else moved — `CLAUDE.md` and `commands/` still sit under `claude/`.
-The plugin was called `generic-tools` until it was renamed to match the repo.
 
 ### How the plugin gets loaded
 
 Claude Code auto-loads any directory under `~/.claude/skills/` that carries a
 `.claude-plugin/plugin.json`, as `<name>@skills-dir` — no marketplace and no install
 step. It follows symlinks, so `setup.sh` links the whole
-`plugins/dfadler-agent-config/` directory to `~/.claude/skills/dfadler-agent-config`
+`plugins/dfadler-agent-config/` directory to `~/.claude/skills/dfadler-agent-config`,
 and the plugin loads straight out of this working copy. Edits here are live in the next
 session; there's nothing to commit, push, or update first.
 
@@ -38,15 +39,23 @@ individual symlinks, which is what `setup.sh` used to do) is what buys the plugi
 identity — `claude plugin list` shows it with a version, `claude plugin disable` turns
 it off, `claude plugin details dfadler-agent-config` prints its component inventory and
 projected token cost, and `claude plugin validate plugins/dfadler-agent-config` checks
-the manifest and every skill/agent it contains. The plugin's `agents/` are discovered
-from inside it, so they don't get linked separately.
+the manifest and every skill/agent it contains. The plugin's `agents/` are discovered from
+inside it, so they don't get linked separately.
 
-Skills and agents are addressed under the plugin's name —
-`dfadler-agent-config:<skill>`. An earlier version of this README claimed skills-dir
-plugins expose flat, un-namespaced names; that was wrong, and the per-entry
-`dfadler-agent-config-` prefix described below is redundant with the plugin namespace
-as a result. See [#52](https://github.com/dfadler/agent-config/issues/52) for whether
-to drop it.
+Loading it this way *does* namespace what it contains: the plugin's skills and agents
+are exposed as `dfadler-agent-config:<name>`, not under bare names — in a live session
+that's `dfadler-agent-config:pr-babysit`, and the agent as
+`dfadler-agent-config:adversarial-reviewer`. What decides this is the `skills/`
+subdirectory, not the manifest: a directory that keeps its `SKILL.md` at its own root
+loads as a single skill under a bare name even when it does carry a
+`.claude-plugin/plugin.json`. Only a `skills/` subdirectory produces the
+`<plugin>:<skill>` form.
+
+The namespace is the whole collision story, which is why skills and agents here are
+named plainly — `pr-babysit`, not `dfadler-agent-config-pr-babysit`. They used to carry
+that prefix, from back when they were linked in individually and shared a flat namespace
+with every project's own skills; inside a namespaced plugin it only produced
+`generic-tools:dfadler-agent-config-pr-babysit`, saying the same thing twice.
 
 Sharing the plugin with another machine or person would need a
 `.claude-plugin/marketplace.json` at the repo root; that isn't here yet, and adding it
@@ -63,15 +72,18 @@ git clone git@github.com:dfadler/agent-config.git ~/Development/agent-config
 ```
 
 `setup.sh` symlinks `claude/CLAUDE.md`, the contents of `claude/commands/`, and the
-`plugins/dfadler-agent-config/` directory into `~/.claude/` in one pass. It's
-idempotent — re-run it any time after pulling to pick up new entries. It only takes
-over a target this repo already owns, or a symlink that's already broken; a real file,
-or a live symlink pointing anywhere else, is reported and left alone. That matters most
-for `~/.claude/skills/`, since that directory is shared with every other skills-dir
-plugin. It also removes symlinks that point into this repo at a path that no longer
-exists — the per-entry skill and agent links older versions of the script created
-(which would otherwise load the same skills a second time alongside the plugin), and
-the plugin link under a previous name after a rename.
+`plugins/dfadler-agent-config/` directory into `~/.claude/` in one pass. It's idempotent
+— re-run it any time after pulling to pick up new entries. It only takes over a target
+this repo already owns, or a symlink that's already broken; a real file, or a live
+symlink pointing anywhere else, is reported and left alone. That matters most for
+`~/.claude/skills/`, since that directory is shared with every other skills-dir plugin.
+
+It also removes links this repo made that are no longer canonical: the per-entry skill
+and agent symlinks older versions created (which would load the same skills twice
+alongside the plugin), and the link under the plugin's old `generic-tools` name, which
+the rename would otherwise leave dangling. Anything under `~/.claude/{skills,agents}`
+pointing into this repo's `plugins/` that isn't the current plugin link is stale by
+definition; links pointing anywhere else are left alone.
 
 ## Adding something new
 
@@ -82,13 +94,15 @@ the plugin link under a previous name after a rename.
    - A **slash command** → a new `.md` file under `claude/commands/`.
    - A whole new **plugin** (a set of skills/agents that belong together) → a new
      directory under `plugins/`, with its own `.claude-plugin/plugin.json`, `agents/`,
-     and `skills/`. Add a `link` line for it in `setup.sh`, which only knows about
-     `dfadler-agent-config`.
-2. Match the existing `dfadler-agent-config-<name>` naming for now — both the
-   directory/filename and the frontmatter `name:` — so the set stays internally
-   consistent. The plugin namespace already prevents collisions, so the prefix is
-   redundant; [#52](https://github.com/dfadler/agent-config/issues/52) tracks dropping
-   it. Commands stay unprefixed.
+     and `skills/`. Give it a `PLUGIN_SRC`/`PLUGIN_LINK` pair and a `link` line in
+     `setup.sh`, which only knows about `dfadler-agent-config`. Keep the directory name
+     and the manifest `name` identical.
+2. Name skills and agents plainly — `pr-babysit`, not `dfadler-agent-config-pr-babysit`
+   — in both the directory/filename and the frontmatter `name:`. The plugin namespace
+   already prevents collisions with a project's own skills, so a prefix here would just
+   repeat it. Commands stay unprefixed for a different reason: `claude/commands/` is
+   linked entry-by-entry into `~/.claude/commands/`, outside any plugin, so those names
+   really are flat.
 3. Run `claude plugin validate plugins/dfadler-agent-config` — it checks the manifest
    and parses the frontmatter of every skill and agent inside.
 4. Commit and push. A new skill or agent inside an already-linked plugin needs no

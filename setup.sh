@@ -8,6 +8,8 @@
 set -euo pipefail
 
 REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+PLUGIN_SRC="$REPO_ROOT/plugins/dfadler-agent-config"
+PLUGIN_LINK="$HOME/.claude/skills/dfadler-agent-config"
 
 link() {
   local src="$1" dest="$2"
@@ -45,22 +47,22 @@ link_dir_contents() {
   done
 }
 
-# Remove symlinks that point into this repo at something no longer there. Two
-# kinds accumulate: the per-entry skill and agent links older versions of this
-# script fanned out (the plugin supplies those itself now, and a leftover would
-# load the same skill twice), and the whole-plugin link under the plugin's
-# previous name after a rename. Both are dangling once the checkout no longer
-# has the path, which is the only test needed - a link this repo owns whose
-# target is gone has no reason to stay. Live links are left alone, so the
-# current plugin link survives a re-run, as does anything another plugin owns.
+# Remove links this repo created that are no longer canonical. Two generations
+# of those exist: earlier versions linked the plugin's skills and agents into
+# ~/.claude/{skills,agents} one entry at a time (the plugin now supplies those
+# itself, so a leftover would load the same skill twice), and the plugin used to
+# be named generic-tools (that link is left dangling by the rename). Anything
+# under these directories pointing into this repo's plugins/ that isn't the
+# current plugin link is stale by definition.
 #
 # readlink reports the target exactly as stored, so a relative one has to be
 # made absolute before it can be compared against $REPO_ROOT - otherwise a
-# relative link into this repo reads as external and survives. The target is
-# gone by definition here, but its parent directory usually is not: cd'ing
-# there and asking for pwd normalizes any leading ../ without a realpath that
-# can handle missing paths (macOS's cannot). A target whose parent is missing
-# too can't be placed, so it's left alone.
+# relative link into plugins/ reads as pointing elsewhere and survives, and the
+# "isn't the current plugin link" test above can't recognize the current link
+# either. Resolving the target's parent directory and re-appending the basename
+# normalizes any leading ../ and works on a target that no longer exists, which
+# realpath cannot do portably (macOS has no realpath -m). A target whose parent
+# is also missing can't be placed, so it is left alone.
 resolve_target() {
   local target="$1" link_dir="$2" parent
   if [[ "$target" == /* ]]; then
@@ -72,18 +74,22 @@ resolve_target() {
   printf '%s/%s\n' "$parent" "$(basename "$target")"
 }
 
-prune_stale_links() {
+prune_stale_plugin_links() {
   local dest_dir="$1"
   [[ -d "$dest_dir" ]] || return 0
   local entry target resolved
   for entry in "$dest_dir"/*; do
-    [[ -L "$entry" && ! -e "$entry" ]] || continue
+    [[ -L "$entry" ]] || continue
     target="$(readlink "$entry")"
     resolved="$(resolve_target "$target" "$dest_dir")" || continue
-    if [[ "$resolved" == "$REPO_ROOT/"* ]]; then
-      rm "$entry"
-      echo "Removed stale symlink: $entry -> $target"
+    if [[ "$resolved" != "$REPO_ROOT/plugins/"* ]]; then
+      continue
     fi
+    if [[ "$entry" == "$PLUGIN_LINK" && "$resolved" == "$PLUGIN_SRC" ]]; then
+      continue
+    fi
+    rm "$entry"
+    echo "Removed superseded symlink: $entry -> $target"
   done
 }
 
@@ -91,16 +97,17 @@ mkdir -p "$HOME/.claude"
 link "$REPO_ROOT/claude/CLAUDE.md" "$HOME/.claude/CLAUDE.md"
 link_dir_contents "$REPO_ROOT/claude/commands" "$HOME/.claude/commands"
 
-prune_stale_links "$HOME/.claude/skills"
-prune_stale_links "$HOME/.claude/agents"
+prune_stale_plugin_links "$HOME/.claude/skills"
+prune_stale_plugin_links "$HOME/.claude/agents"
 
 # dfadler-agent-config is a plugin, so link the directory as a unit rather than
-# its contents. Claude Code auto-loads any directory under ~/.claude/skills/ that
-# carries a .claude-plugin/plugin.json as "<name>@skills-dir", and it follows
-# symlinks - so this keeps edits in this repo live (no install/update/restart
-# cycle) while still getting plugin identity: a version, `claude plugin
-# disable`, `claude plugin details` token accounting, `claude plugin validate`.
-# The plugin's agents/ are discovered from inside it; don't link them separately.
+# its contents. Claude Code auto-loads any directory under ~/.claude/skills/
+# that carries a .claude-plugin/plugin.json as "<name>@skills-dir", and it
+# follows symlinks - so this keeps edits in this repo live (no
+# install/update/restart cycle) while still getting plugin identity: a version,
+# `claude plugin disable`, `claude plugin details` token accounting, `claude
+# plugin validate`. The plugin's agents/ are discovered from inside it; don't
+# link them separately. The link basename must match the manifest name so the
+# skills it contains resolve as dfadler-agent-config:<skill>.
 mkdir -p "$HOME/.claude/skills"
-link "$REPO_ROOT/plugins/dfadler-agent-config" \
-  "$HOME/.claude/skills/dfadler-agent-config"
+link "$PLUGIN_SRC" "$PLUGIN_LINK"
