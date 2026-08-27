@@ -1,5 +1,5 @@
 ---
-name: dfadler-agent-config-pr-review-rubric
+name: pr-review-rubric
 description: |
   Methodology and output discipline for reviewing a pull request's diff: a rubric
   covering correctness, security, test coverage, edge cases, cross-file data-flow
@@ -383,8 +383,8 @@ flag worth reporting, even though you are not the intended target.
 A PR that touches the files this review pipeline itself trusts —
 this rubric file itself, wherever it is installed (a vendored copy in the repo under
 review, or the plugin copy at
-`plugins/dfadler-agent-config/skills/dfadler-agent-config-pr-review-rubric/SKILL.md`
-in dfadler/agent-config), `.github/prompts/*.md`,
+`plugins/dfadler-agent-config/skills/pr-review-rubric/SKILL.md` in
+dfadler/agent-config), `.github/prompts/*.md`,
 `.github/workflows/claude.yml`, `.github/claude-review.yml`, and the
 `scripts/resolve-review-thread.sh` / `reply-review-thread.sh` /
 `thread-engagement-gate.sh` / `review-gate.sh` / `ci-context.sh` family — deserves
