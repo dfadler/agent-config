@@ -12,10 +12,20 @@ REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 link() {
   local src="$1" dest="$2"
   if [[ -L "$dest" ]]; then
-    if [[ "$(readlink "$dest")" == "$src" ]]; then
+    local target
+    target="$(readlink "$dest")"
+    if [[ "$target" == "$src" ]]; then
       return 0
     fi
-    echo "Replacing stale symlink: $dest"
+    # Only take over a symlink this repo already owns, or one that is already
+    # broken (harmless to replace, and the case you get after moving the repo).
+    # ~/.claude/skills/ is shared with every other skills-dir plugin, so a live
+    # symlink pointing elsewhere belongs to someone else - leave it for them.
+    if [[ "$target" != "$REPO_ROOT/"* && -e "$dest" ]]; then
+      echo "Skipping $dest — symlink to $target, which this repo doesn't own" >&2
+      return 0
+    fi
+    echo "Replacing stale symlink: $dest -> $target"
     rm "$dest"
   elif [[ -e "$dest" ]]; then
     echo "Skipping $dest — already exists and isn't a symlink to this repo" >&2
