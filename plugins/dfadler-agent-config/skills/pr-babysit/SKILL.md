@@ -1,5 +1,5 @@
 ---
-name: dfadler-agent-config-pr-babysit
+name: pr-babysit
 description: |
   One pass of PR shepherding: snapshot every open PR (or one named PR) via a
   project-supplied snapshot script, act on whatever is actionable — fix
