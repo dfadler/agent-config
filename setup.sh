@@ -54,21 +54,42 @@ link_dir_contents() {
 # be named generic-tools (that link is left dangling by the rename). Anything
 # under these directories pointing into this repo's plugins/ that isn't the
 # current plugin link is stale by definition.
+#
+# readlink reports the target exactly as stored, so a relative one has to be
+# made absolute before it can be compared against $REPO_ROOT - otherwise a
+# relative link into plugins/ reads as pointing elsewhere and survives, and the
+# "isn't the current plugin link" test above can't recognize the current link
+# either. Resolving the target's parent directory and re-appending the basename
+# normalizes any leading ../ and works on a target that no longer exists, which
+# realpath cannot do portably (macOS has no realpath -m). A target whose parent
+# is also missing can't be placed, so it is left alone.
+resolve_target() {
+  local target="$1" link_dir="$2" parent
+  if [[ "$target" == /* ]]; then
+    printf '%s\n' "$target"
+    return 0
+  fi
+  parent="$(cd "$link_dir" 2>/dev/null && cd "$(dirname "$target")" 2>/dev/null && pwd)" || parent=""
+  [[ -n "$parent" ]] || return 1
+  printf '%s/%s\n' "$parent" "$(basename "$target")"
+}
+
 prune_stale_plugin_links() {
   local dest_dir="$1"
   [[ -d "$dest_dir" ]] || return 0
-  local entry target
+  local entry target resolved
   for entry in "$dest_dir"/*; do
     [[ -L "$entry" ]] || continue
     target="$(readlink "$entry")"
-    if [[ "$target" != "$REPO_ROOT/plugins/"* ]]; then
+    resolved="$(resolve_target "$target" "$dest_dir")" || continue
+    if [[ "$resolved" != "$REPO_ROOT/plugins/"* ]]; then
       continue
     fi
-    if [[ "$entry" == "$PLUGIN_LINK" && "$target" == "$PLUGIN_SRC" ]]; then
+    if [[ "$entry" == "$PLUGIN_LINK" && "$resolved" == "$PLUGIN_SRC" ]]; then
       continue
     fi
     rm "$entry"
-    echo "Removed superseded symlink: $entry"
+    echo "Removed superseded symlink: $entry -> $target"
   done
 }
 
