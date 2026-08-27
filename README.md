@@ -59,11 +59,13 @@ git clone git@github.com:dfadler/agent-config.git ~/Development/agent-config
 
 `setup.sh` symlinks `claude/CLAUDE.md`, the contents of `claude/commands/`, and the
 `plugins/generic-tools/` directory into `~/.claude/` in one pass. It's idempotent —
-re-run it any time after pulling to pick up new entries, and it leaves alone anything at
-the target that isn't already a symlink to this repo (so it won't clobber machine-local
-config it doesn't own). It also clears out the per-entry skill and agent symlinks that
-older versions of the script created, which would otherwise load the same skills a
-second time alongside the plugin.
+re-run it any time after pulling to pick up new entries. It only takes over a target
+this repo already owns, or a symlink that's already broken; a real file, or a live
+symlink pointing anywhere else, is reported and left alone. That matters most for
+`~/.claude/skills/generic-tools`, since that directory is shared with every other
+skills-dir plugin. It also clears out the per-entry skill and agent symlinks that older
+versions of the script created, which would otherwise load the same skills a second time
+alongside the plugin.
 
 ## Adding something new
 
