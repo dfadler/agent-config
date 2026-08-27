@@ -1,0 +1,19 @@
+{
+  "$schema": "https://json.schemastore.org/claude-code-plugin-manifest.json",
+  "name": "generic-tools",
+  "version": "0.1.0",
+  "description": "Cross-project agents and skills that aren't tied to any one repo: PR shepherding, a PR review rubric, visual capture for PRs, GitHub image attachment, and an adversarial code reviewer.",
+  "author": {
+    "name": "Dustin Fadler",
+    "url": "https://github.com/dfadler"
+  },
+  "homepage": "https://github.com/dfadler/agent-config",
+  "repository": "https://github.com/dfadler/agent-config",
+  "keywords": [
+    "github",
+    "pull-requests",
+    "code-review",
+    "screenshots",
+    "ci"
+  ]
+}

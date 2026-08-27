@@ -35,11 +35,38 @@ link_dir_contents() {
   done
 }
 
+# Earlier versions of this script linked the plugin's skills and agents into
+# ~/.claude/{skills,agents} one entry at a time. The plugin now supplies those
+# itself, so a leftover fanned-out symlink would load the same skill twice.
+# Only symlinks pointing *inside* plugins/generic-tools are removed; the link to
+# the plugin directory itself has no trailing path component and is left alone.
+prune_fanned_out_links() {
+  local dest_dir="$1"
+  [[ -d "$dest_dir" ]] || return 0
+  local entry target
+  for entry in "$dest_dir"/*; do
+    [[ -L "$entry" ]] || continue
+    target="$(readlink "$entry")"
+    if [[ "$target" == "$REPO_ROOT/plugins/generic-tools/"* ]]; then
+      rm "$entry"
+      echo "Removed superseded symlink: $entry"
+    fi
+  done
+}
+
 mkdir -p "$HOME/.claude"
 link "$REPO_ROOT/claude/CLAUDE.md" "$HOME/.claude/CLAUDE.md"
 link_dir_contents "$REPO_ROOT/claude/commands" "$HOME/.claude/commands"
-# Agents and skills moved under plugins/generic-tools/ when this repo became a
-# plugin marketplace (commit 89a34ce) - claude/agents and claude/skills no
-# longer exist.
-link_dir_contents "$REPO_ROOT/plugins/generic-tools/agents" "$HOME/.claude/agents"
-link_dir_contents "$REPO_ROOT/plugins/generic-tools/skills" "$HOME/.claude/skills"
+
+prune_fanned_out_links "$HOME/.claude/skills"
+prune_fanned_out_links "$HOME/.claude/agents"
+
+# generic-tools is a plugin, so link the directory as a unit rather than its
+# contents. Claude Code auto-loads any directory under ~/.claude/skills/ that
+# carries a .claude-plugin/plugin.json as "<name>@skills-dir", and it follows
+# symlinks - so this keeps edits in this repo live (no install/update/restart
+# cycle) while still getting plugin identity: a version, `claude plugin
+# disable`, `claude plugin details` token accounting, `claude plugin validate`.
+# The plugin's agents/ are discovered from inside it; don't link them separately.
+mkdir -p "$HOME/.claude/skills"
+link "$REPO_ROOT/plugins/generic-tools" "$HOME/.claude/skills/generic-tools"
