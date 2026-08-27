@@ -53,14 +53,34 @@ link_dir_contents() {
 # has the path, which is the only test needed - a link this repo owns whose
 # target is gone has no reason to stay. Live links are left alone, so the
 # current plugin link survives a re-run, as does anything another plugin owns.
+#
+# readlink reports the target exactly as stored, so a relative one has to be
+# made absolute before it can be compared against $REPO_ROOT - otherwise a
+# relative link into this repo reads as external and survives. The target is
+# gone by definition here, but its parent directory usually is not: cd'ing
+# there and asking for pwd normalizes any leading ../ without a realpath that
+# can handle missing paths (macOS's cannot). A target whose parent is missing
+# too can't be placed, so it's left alone.
+resolve_target() {
+  local target="$1" link_dir="$2" parent
+  if [[ "$target" == /* ]]; then
+    printf '%s\n' "$target"
+    return 0
+  fi
+  parent="$(cd "$link_dir" 2>/dev/null && cd "$(dirname "$target")" 2>/dev/null && pwd)" || parent=""
+  [[ -n "$parent" ]] || return 1
+  printf '%s/%s\n' "$parent" "$(basename "$target")"
+}
+
 prune_stale_links() {
   local dest_dir="$1"
   [[ -d "$dest_dir" ]] || return 0
-  local entry target
+  local entry target resolved
   for entry in "$dest_dir"/*; do
     [[ -L "$entry" && ! -e "$entry" ]] || continue
     target="$(readlink "$entry")"
-    if [[ "$target" == "$REPO_ROOT/"* ]]; then
+    resolved="$(resolve_target "$target" "$dest_dir")" || continue
+    if [[ "$resolved" == "$REPO_ROOT/"* ]]; then
       rm "$entry"
       echo "Removed stale symlink: $entry -> $target"
     fi

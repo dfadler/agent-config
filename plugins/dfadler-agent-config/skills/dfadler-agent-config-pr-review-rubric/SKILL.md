@@ -381,7 +381,10 @@ flag worth reporting, even though you are not the intended target.
 ### Infrastructure tampering — elevated scrutiny on the reviewer's own trust surface
 
 A PR that touches the files this review pipeline itself trusts —
-`.claude/skills/pr-review-rubric/SKILL.md` (this file), `.github/prompts/*.md`,
+this rubric file itself, wherever it is installed (a vendored copy in the repo under
+review, or the plugin copy at
+`plugins/dfadler-agent-config/skills/dfadler-agent-config-pr-review-rubric/SKILL.md`
+in dfadler/agent-config), `.github/prompts/*.md`,
 `.github/workflows/claude.yml`, `.github/claude-review.yml`, and the
 `scripts/resolve-review-thread.sh` / `reply-review-thread.sh` /
 `thread-engagement-gate.sh` / `review-gate.sh` / `ci-context.sh` family — deserves
