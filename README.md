@@ -170,10 +170,13 @@ skills:
   fictional convention across the other three.
 
 The real boundary is the one this repo's global `CLAUDE.md` and every session already
-operate under: the agent runs at the user's own permission mode regardless of what
-any skill's frontmatter claims. A skill-level allowlist that can't restrict anything
-would be a paper boundary layered on top of the real one — worth avoiding on those
-grounds even before the mechanism question above.
+operate under: Claude Code's permission rules, hooks, and the active permission mode
+enforce tool access, regardless of what any skill's frontmatter claims. `CLAUDE.md`
+and skill instructions — including a skill's own `allowed-tools` — are behavioral
+guidance the model follows, not an enforcement layer; only `settings.json`
+permission rules and hooks actually gate a tool call. A skill-level allowlist that
+can't restrict anything would be a paper boundary layered on top of the real one —
+worth avoiding on those grounds even before the mechanism question above.
 
 ## Checks
 
