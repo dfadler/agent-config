@@ -373,10 +373,14 @@ cmd_start() {
   assert_our_server
   ensure_state_dir
 
-  # All of this must happen in ONE tmux invocation. history-limit is read when
-  # a pane's grid is allocated, so it has to be global and set before the pane
-  # exists; and a server with no sessions exits immediately, so a separate
-  # `start-server` call would configure a server that is already gone.
+  # All of this must happen in ONE tmux invocation: a server with no sessions
+  # exits immediately, so a separate `start-server` call would configure a
+  # server that is already gone by the time new-session starts a fresh one.
+  #
+  # history-limit is set here, before the pane exists, because that is correct
+  # on every tmux version. (On 3.7c it would also work afterwards -- tmux
+  # applies it to existing panes and trims them retroactively as of Jan 2026 --
+  # but older builds only apply it to panes created later.)
   #
   # update-environment "" matters just as much: its default is non-empty and is
   # applied when a session is created OR ATTACHED, so without this the human's

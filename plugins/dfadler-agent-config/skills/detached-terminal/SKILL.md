@@ -300,14 +300,22 @@ enables `pipe-pane`, so nothing lands on disk. Don't add logging to a file:
 this repo is public, and anything written to disk can be committed by
 accident. Prefer `read` without `--history`, and scope what you capture.
 
-That clamp is fiddlier than it looks, and got it wrong once. `history-limit` is
-read when a pane's grid is allocated, so setting it on the session *after*
-`new-session` silently does nothing — the pane keeps the 2000-line default. It
-also has to be set in the *same* tmux invocation, because a server with no
-sessions exits immediately, so `start-server` followed by a separate
-`set-option` configures a server that's already gone. The script does both in
-one command chain, verified by emitting 500 lines and confirming the pane's
-`history_size` caps out around 200 rather than keeping all 500.
+That clamp is fiddlier than it looks, and this doc got the reason wrong once.
+It's set in the *same* tmux invocation as `new-session`, before the pane
+exists, because a server with no sessions exits immediately — so
+`start-server` followed by a separate `set-option` configures a server that's
+already gone. Verified by emitting 500 lines and confirming `history_size`
+caps around 200 rather than keeping all 500.
+
+An earlier version of this file claimed the option is read only when a pane's
+grid is allocated, so setting it afterwards "silently does nothing". That is
+false on tmux 3.7c: `set-option -g history-limit 200` applies to existing panes
+and *retroactively trims* them (measured: `history_size` 482 → 200). tmux
+gained that behaviour in January 2026; on older builds the original claim held.
+The real reason the first implementation failed was a bad target — `-t "=name"`
+doesn't resolve for `set-option`, so the option was never set at all. Setting
+it before the pane exists is correct on every version, so the code is
+unchanged; only the explanation was wrong.
 
 The script also passes `-f /dev/null` on every tmux call, so `~/.tmux.conf` is
 never loaded when *this script* starts the server. That closes the config-file
