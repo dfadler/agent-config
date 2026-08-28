@@ -90,6 +90,9 @@ setup() {
   mkdir -p "$FAKE_REPO/plugins/dfadler-agent-config/.claude-plugin"
   echo '{"name":"dfadler-agent-config"}' \
     > "$FAKE_REPO/plugins/dfadler-agent-config/.claude-plugin/plugin.json"
+  mkdir -p "$FAKE_REPO/scripts"
+  cp "$REPO_ROOT/scripts/git-identity.sh" "$FAKE_REPO/scripts/git-identity.sh"
+  chmod +x "$FAKE_REPO/scripts/git-identity.sh"
   # Default: an interpreter that already has pyte, so the link tests below
   # don't depend on whatever is installed on the machine running them.
   shim_python3 yes
@@ -226,6 +229,30 @@ run_setup_with() {
   run_setup
   assert_success
   [ "$(readlink "$HOME/.claude/skills/unrelated")" = "$SANDBOX/elsewhere" ]
+}
+
+# --- git identity check -----------------------------------------------------
+#
+# scripts/git-identity.sh is the actual check (see its own bats suite); these
+# tests just pin that setup.sh calls it and treats the result as a warning,
+# not a failure. HOME is sandboxed by make_sandbox, so there's no global
+# gitconfig here unless a test sets one.
+
+@test "warns when git identity is not configured" {
+  run_setup
+  assert_success
+  assert_output_contains "git identity (user.name/user.email) is not fully configured"
+  assert_output_contains "git config --global user.name"
+  [ "$(readlink "$HOME/.claude/CLAUDE.md")" = "$FAKE_REPO/claude/CLAUDE.md" ]
+}
+
+@test "confirms git identity when configured" {
+  git config --global user.name "Dev Name"
+  git config --global user.email "dev@example.com"
+  run_setup
+  assert_success
+  assert_output_contains "git identity is configured"
+  refute_output_contains "not fully configured"
 }
 
 # --- runtime dependency check (#88) ----------------------------------------
