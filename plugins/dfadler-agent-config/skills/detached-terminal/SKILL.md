@@ -72,23 +72,23 @@ whose `hardcopy` writes an empty file for a detached session.
 ## Usage
 
 ```bash
-scripts/agent_term.py start <name> [--cwd DIR] [--size WxH] [--ttl SECS] [--env VAR] -- CMD [ARG...]
-scripts/agent_term.py read  <name> [--lines N] [--history] [--raw]
-scripts/agent_term.py keys  <name> -- KEY [KEY...]
-scripts/agent_term.py list
-scripts/agent_term.py status <name>
-scripts/agent_term.py stop  <name>
-scripts/agent_term.py stop-all
+${CLAUDE_SKILL_DIR}/scripts/agent_term.py start <name> [--cwd DIR] [--size WxH] [--ttl SECS] [--env VAR] -- CMD [ARG...]
+${CLAUDE_SKILL_DIR}/scripts/agent_term.py read  <name> [--lines N] [--history] [--raw]
+${CLAUDE_SKILL_DIR}/scripts/agent_term.py keys  <name> -- KEY [KEY...]
+${CLAUDE_SKILL_DIR}/scripts/agent_term.py list
+${CLAUDE_SKILL_DIR}/scripts/agent_term.py status <name>
+${CLAUDE_SKILL_DIR}/scripts/agent_term.py stop  <name>
+${CLAUDE_SKILL_DIR}/scripts/agent_term.py stop-all
 ```
 
 A full drive-a-TUI cycle:
 
 ```bash
-scripts/agent_term.py start edit --cwd "$PWD" -- vim -u NONE notes.txt
-scripts/agent_term.py read edit
-scripts/agent_term.py keys edit -- G o 'a new line' Escape
-scripts/agent_term.py read edit
-scripts/agent_term.py keys edit -- Escape ':wq' Enter
+${CLAUDE_SKILL_DIR}/scripts/agent_term.py start edit --cwd "$PWD" -- vim -u NONE notes.txt
+${CLAUDE_SKILL_DIR}/scripts/agent_term.py read edit
+${CLAUDE_SKILL_DIR}/scripts/agent_term.py keys edit -- G o 'a new line' Escape
+${CLAUDE_SKILL_DIR}/scripts/agent_term.py read edit
+${CLAUDE_SKILL_DIR}/scripts/agent_term.py keys edit -- Escape ':wq' Enter
 ```
 
 Key names: `Enter`, `Escape`, `Tab`, `Up`/`Down`/`Left`/`Right`, `Home`, `End`,
