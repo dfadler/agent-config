@@ -472,13 +472,26 @@ def request(
     path = socket_path(name)
     conn = socket.socket(socket.AF_UNIX, socket.SOCK_STREAM)
     conn.settimeout(timeout)
+    # A daemon that is shutting down can drop the connection at any point in
+    # this exchange, not only at connect(). Linux reports that as ECONNRESET
+    # where macOS gave ECONNREFUSED, so the whole exchange is guarded and every
+    # variant is reported as "no session" -- callers already treat that as a
+    # stale socket to clean up. Found by CI; the macOS runs never hit it.
+    gone = (
+        FileNotFoundError,
+        ConnectionRefusedError,
+        ConnectionResetError,
+        BrokenPipeError,
+    )
     try:
         conn.connect(path)
-    except (FileNotFoundError, ConnectionRefusedError):
-        raise SystemExit(f"agent-term: no session {name!r} (try: agent_term.py list)")
-    with conn:
-        conn.sendall((json.dumps(payload) + "\n").encode())
-        raw = _recv_line(conn)
+        with conn:
+            conn.sendall((json.dumps(payload) + "\n").encode())
+            raw = _recv_line(conn)
+    except gone:
+        raise SystemExit(
+            f"agent-term: no session {name!r} (try: agent_term.py list)"
+        ) from None
     if not raw:
         raise SystemExit(f"agent-term: session {name!r} closed the connection")
     reply: dict[str, Any] = json.loads(raw)
