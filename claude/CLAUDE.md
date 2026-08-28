@@ -40,6 +40,19 @@ background or parallel tasks. Never commit directly to the main working copy.
   too: pushing a new commit to a just-merged (and deleted) branch re-creates it, so a
   final commit can *look* merged without actually being on the default branch —
   verify against the merge commit's parent, or the PR's own state, not the branch name.
+- **A coverage gate can fail a PR that only adds tests, never removes any**, the first
+  time it measures a file that had zero tests before. A trace-based coverage tool
+  (kcov, and others like it) treats never-executed code as invisible, not as a counted
+  zero — a file with no tests contributes nothing to the denominator. The first PR to
+  add *any* test for that file makes every line in it visible for the first time; if
+  those new tests only exercise part of the file, the rest now drags the aggregate
+  percentage down, and the floor can fail even though coverage strictly improved.
+  Real example: dfadler/agent-config#106 added 3 tests for a new branch in
+  `upload.sh`, a script the kcov gate had never measured before — that made the
+  script's untested `--pr`/`--issue`/`--comment`/validation paths visible for the
+  first time, dropping aggregate shell coverage from 70.24% to 56.90% and failing the
+  70% floor. The fix is to finish covering the newly-visible file, not to lower the
+  threshold.
 - **Squash merges mean a merged branch's commits aren't reachable by SHA on the local
   default branch** — cleanup tooling that checks reachability may warn a branch is
   "unmerged" when it's actually merged. Verify against the PR itself (state: merged),
