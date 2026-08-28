@@ -2,8 +2,9 @@
 # `make check` locally means the same thing a green PR does — the two can't
 # drift the way a hand-copied CI command list does.
 #
-# Requires: shellcheck, shfmt, bats. On macOS: brew install shellcheck shfmt bats-core
-# Optional: actionlint (for `make lint-actions`).
+# Requires: shellcheck, shfmt, bats, actionlint — all four, since `check`
+# depends on every one of them. On macOS:
+#   brew install shellcheck shfmt bats-core actionlint
 
 SHELL := /usr/bin/env bash
 

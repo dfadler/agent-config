@@ -34,6 +34,12 @@ fail() { errors+=("$1"); }
 #   key: ""   / key: ''  (explicit empty scalar)
 #   key: # comment       (a comment is not a value)
 #   key: |               (block opener with no indented body under it)
+#   key: null|Null|NULL|~   (the YAML Core schema's null spellings)
+#
+# The null match is deliberately case-SENSITIVE and exact. YAML Core resolves
+# only those four spellings to null, so `NuLl` and `nullable` are ordinary
+# strings and must still pass — matching case-insensitively, or on a prefix,
+# would reject valid descriptions.
 #
 # Only the flat `key: value` and block-scalar forms this repo uses are handled;
 # anything more structured belongs in a real YAML parser, not here.
@@ -59,6 +65,8 @@ frontmatter_has() {
       gsub(/^[[:space:]]+|[[:space:]]+$/, "", value)
       if (value ~ /^[|>][0-9+-]*$/) { in_block = 1; next }   # block opener
       if (value == "\"\"" || value == empty_sq) next         # explicit empty
+      # Exact, case-sensitive: YAML Core resolves only these to null.
+      if (value == "null" || value == "Null" || value == "NULL" || value == "~") next
       if (value != "" && value !~ /^#/) found = 1
     }
     END { exit found ? 0 : 1 }
