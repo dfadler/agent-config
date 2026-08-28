@@ -234,15 +234,25 @@ class TestHistoryRendering:
 
     @staticmethod
     def _session_with_history(cols: int = 20, rows: int = 3) -> Any:
-        class Stub:
-            pass
+        """A Session with a screen but no PTY.
 
-        stub = Stub()
+        Declared attributes rather than a bare namespace: mypy --strict rejects
+        assigning to an attribute a class never declares. Only the rendering
+        path is exercised, so nothing forks.
+        """
+
+        class ScreenOnlySession:
+            cols: int
+            screen: Any
+            stream: Any
+
+            render = agent_term.Session.render
+            _history_row = agent_term.Session._history_row
+
+        stub = ScreenOnlySession()
         stub.cols = cols
         stub.screen = agent_term.TolerantScreen(cols, rows, history=50)
         stub.stream = agent_term.pyte.ByteStream(stub.screen)
-        stub.render = agent_term.Session.render.__get__(stub)
-        stub._history_row = agent_term.Session._history_row.__get__(stub)
         return stub
 
     def test_history_preserves_character_order(self) -> None:
