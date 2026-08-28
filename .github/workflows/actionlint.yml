@@ -34,6 +34,13 @@ permissions:
 env:
   ACTIONLINT_VERSION: 1.7.12
   SHELLCHECK_VERSION: v0.11.0
+  # actionlint publishes its own checksums file, so this value is verified
+  # against an upstream manifest rather than recorded from a download — a
+  # stronger guarantee than the shellcheck/shfmt pins in shell.yml, which have
+  # no upstream checksums to check against. Taken from
+  # actionlint_1.7.12_checksums.txt.
+  ACTIONLINT_SHA256: 8aca8db96f1b94770f1b0d72b6dddcb1ebb8123cb3712530b08cc387b349a3d8
+  SHELLCHECK_SHA256: 8c3be12b05d5c177a04c29e3c78ce89ac86f1595681cab149b65b97c4e227198
 
 jobs:
   actionlint:
@@ -44,20 +51,26 @@ jobs:
         with:
           persist-credentials: false
 
+      # Verified before extraction, as in shell.yml: piping curl into tar would
+      # run the unverified payload first and check it never.
       - name: Install actionlint ${{ env.ACTIONLINT_VERSION }}
         run: |
-          curl -fsSL "https://github.com/rhysd/actionlint/releases/download/v${ACTIONLINT_VERSION}/actionlint_${ACTIONLINT_VERSION}_linux_amd64.tar.gz" \
-            | tar -xz actionlint
-          sudo install -m 0755 actionlint /usr/local/bin/actionlint
-          rm -f actionlint
+          curl -fsSL -o /tmp/actionlint.tar.gz \
+            "https://github.com/rhysd/actionlint/releases/download/v${ACTIONLINT_VERSION}/actionlint_${ACTIONLINT_VERSION}_linux_amd64.tar.gz"
+          echo "${ACTIONLINT_SHA256}  /tmp/actionlint.tar.gz" | sha256sum -c -
+          tar -xzf /tmp/actionlint.tar.gz -C /tmp actionlint
+          sudo install -m 0755 /tmp/actionlint /usr/local/bin/actionlint
+          rm -f /tmp/actionlint.tar.gz /tmp/actionlint
           actionlint --version
 
       - name: Install shellcheck ${{ env.SHELLCHECK_VERSION }}
         run: |
-          curl -fsSL "https://github.com/koalaman/shellcheck/releases/download/${SHELLCHECK_VERSION}/shellcheck-${SHELLCHECK_VERSION}.linux.x86_64.tar.xz" \
-            | tar -xJ
-          sudo install -m 0755 "shellcheck-${SHELLCHECK_VERSION}/shellcheck" /usr/local/bin/shellcheck
-          rm -rf "shellcheck-${SHELLCHECK_VERSION}"
+          curl -fsSL -o /tmp/shellcheck.tar.xz \
+            "https://github.com/koalaman/shellcheck/releases/download/${SHELLCHECK_VERSION}/shellcheck-${SHELLCHECK_VERSION}.linux.x86_64.tar.xz"
+          echo "${SHELLCHECK_SHA256}  /tmp/shellcheck.tar.xz" | sha256sum -c -
+          tar -xJf /tmp/shellcheck.tar.xz -C /tmp
+          sudo install -m 0755 "/tmp/shellcheck-${SHELLCHECK_VERSION}/shellcheck" /usr/local/bin/shellcheck
+          rm -rf /tmp/shellcheck.tar.xz "/tmp/shellcheck-${SHELLCHECK_VERSION}"
           shellcheck --version
 
       - name: Lint workflows (actionlint)

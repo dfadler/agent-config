@@ -25,19 +25,41 @@ errors=()
 
 fail() { errors+=("$1"); }
 
-# Extract one scalar from a Markdown file's YAML frontmatter. Only handles the
-# flat `key: value` and `key: |` block forms this repo uses; anything more
-# structured belongs in a real YAML parser, not here.
+# True when the frontmatter carries `key` with a non-empty EFFECTIVE value.
+#
+# "Effective" is the subtlety: several YAML spellings look like a value but
+# resolve to null, and an empty description is exactly the silent drift this
+# check exists to catch. Rejected accordingly:
+#   key:                 (nothing)
+#   key: ""   / key: ''  (explicit empty scalar)
+#   key: # comment       (a comment is not a value)
+#   key: |               (block opener with no indented body under it)
+#
+# Only the flat `key: value` and block-scalar forms this repo uses are handled;
+# anything more structured belongs in a real YAML parser, not here.
 frontmatter_has() {
   local file="$1" key="$2"
-  awk -v key="$key" '
+  # The empty-single-quote literal is passed in rather than written inline: it
+  # cannot appear inside a single-quoted awk program without unreadable escaping.
+  awk -v key="$key" -v empty_sq="''" '
     NR == 1 { if ($0 != "---") exit 1; next }
     /^---[[:space:]]*$/ { exit found ? 0 : 1 }
+
+    # Inside a block scalar: any indented, non-blank line is real content.
+    in_block {
+      if ($0 ~ /^[[:space:]]*$/) next
+      if ($0 ~ /^[[:space:]]+/) { found = 1; in_block = 0; next }
+      in_block = 0   # dedented back to a sibling key without any content
+    }
+
     $0 ~ "^" key ":" {
       value = substr($0, length(key) + 2)
+      # In YAML a " #" (space-hash) begins a comment in a plain scalar.
+      sub(/[[:space:]]+#.*$/, "", value)
       gsub(/^[[:space:]]+|[[:space:]]+$/, "", value)
-      # `key: |` opens a block scalar; the value is on the following lines.
-      if (value == "|" || value == ">" || value != "") found = 1
+      if (value ~ /^[|>][0-9+-]*$/) { in_block = 1; next }   # block opener
+      if (value == "\"\"" || value == empty_sq) next         # explicit empty
+      if (value != "" && value !~ /^#/) found = 1
     }
     END { exit found ? 0 : 1 }
   ' "$file"
@@ -57,6 +79,14 @@ frontmatter_value() {
   ' "$file"
 }
 
+# One Python call, with STATIC source and every filesystem-derived value passed
+# through argv.
+#
+# The first version interpolated "$manifest" into the source string. A plugin
+# directory containing a single quote closed that literal and the rest of the
+# path ran as Python — arbitrary code execution during what is meant to be
+# read-only validation. Caught in review on #60 and reproduced end to end.
+# Nothing derived from the filesystem may reach Python (or a shell) as source.
 check_manifest() {
   local plugin_dir="$1" manifest="$1/.claude-plugin/plugin.json"
   local plugin_name
@@ -66,27 +96,40 @@ check_manifest() {
     fail "$plugin_dir: missing .claude-plugin/plugin.json"
     return
   fi
-  if ! python3 -m json.tool "$manifest" >/dev/null 2>&1; then
-    fail "$manifest: not valid JSON"
-    return
-  fi
 
-  local key
-  for key in name version description; do
-    python3 -c "
+  # Assigned inside `if` on purpose: under `set -e` a bare assignment whose
+  # command substitution exits non-zero terminates the script, which would
+  # swallow this failure and every later plugin's.
+  local output
+  if ! output="$(python3 -c '
 import json, sys
-d = json.load(open('$manifest'))
-sys.exit(0 if d.get('$key') else 1)
-" 2>/dev/null || fail "$manifest: missing or empty '$key'"
-  done
 
-  local declared
-  declared="$(python3 -c "
-import json
-print(json.load(open('$manifest')).get('name', ''))
-" 2>/dev/null || echo "")"
-  [[ "$declared" == "$plugin_name" ]] ||
-    fail "$manifest: name '$declared' does not match plugin directory '$plugin_name'"
+path, expected = sys.argv[1], sys.argv[2]
+try:
+    with open(path) as fh:
+        data = json.load(fh)
+except (json.JSONDecodeError, UnicodeDecodeError):
+    print("not valid JSON")
+    sys.exit(1)
+except OSError as exc:
+    print("unreadable: %s" % exc.strerror)
+    sys.exit(1)
+
+if not isinstance(data, dict):
+    print("top level is not a JSON object")
+    sys.exit(1)
+
+for key in ("name", "version", "description"):
+    if not data.get(key):
+        print("missing or empty %r" % key)
+        sys.exit(1)
+
+if data["name"] != expected:
+    print("name %r does not match plugin directory %r" % (data["name"], expected))
+    sys.exit(1)
+' "$manifest" "$plugin_name" 2>&1)"; then
+    fail "$manifest: $output"
+  fi
 }
 
 check_frontmatter_doc() {

@@ -96,6 +96,61 @@ EOF
   assert_output_contains "non-empty 'description'"
 }
 
+# Several YAML spellings LOOK like a value but resolve to null. Each of these
+# passed the first version of frontmatter_has (caught in review on #60).
+@test "fails on an explicit empty double-quoted description" {
+  mkdir -p "$ROOT/plugins/demo/skills/dq"
+  printf -- '---\nname: dq\ndescription: ""\n---\n\nBody\n' \
+    > "$ROOT/plugins/demo/skills/dq/SKILL.md"
+  check
+  assert_failure
+  assert_output_contains "non-empty 'description'"
+}
+
+@test "fails on an explicit empty single-quoted description" {
+  mkdir -p "$ROOT/plugins/demo/skills/sq"
+  printf -- "---\nname: sq\ndescription: ''\n---\n\nBody\n" \
+    > "$ROOT/plugins/demo/skills/sq/SKILL.md"
+  check
+  assert_failure
+  assert_output_contains "non-empty 'description'"
+}
+
+@test "fails when the description is only a comment" {
+  mkdir -p "$ROOT/plugins/demo/skills/cmt"
+  printf -- '---\nname: cmt\ndescription: # TODO write this\n---\n\nBody\n' \
+    > "$ROOT/plugins/demo/skills/cmt/SKILL.md"
+  check
+  assert_failure
+  assert_output_contains "non-empty 'description'"
+}
+
+@test "fails on a block-scalar opener with no body under it" {
+  mkdir -p "$ROOT/plugins/demo/skills/empty-block"
+  printf -- '---\nname: empty-block\ndescription: |\n---\n\nBody\n' \
+    > "$ROOT/plugins/demo/skills/empty-block/SKILL.md"
+  check
+  assert_failure
+  assert_output_contains "non-empty 'description'"
+}
+
+@test "fails when a block opener is followed only by a sibling key" {
+  mkdir -p "$ROOT/plugins/demo/skills/block-then-key"
+  printf -- '---\nname: block-then-key\ndescription: |\nlicense: MIT\n---\n\nBody\n' \
+    > "$ROOT/plugins/demo/skills/block-then-key/SKILL.md"
+  check
+  assert_failure
+  assert_output_contains "non-empty 'description'"
+}
+
+@test "accepts a plain scalar that carries a trailing comment" {
+  mkdir -p "$ROOT/plugins/demo/skills/trailing"
+  printf -- '---\nname: trailing\ndescription: a real description # note\n---\n\nBody\n' \
+    > "$ROOT/plugins/demo/skills/trailing/SKILL.md"
+  check
+  assert_success
+}
+
 @test "accepts a block-scalar description (the form most skills use)" {
   mkdir -p "$ROOT/plugins/demo/skills/block-desc"
   printf -- '---\nname: block-desc\ndescription: |\n  Multi-line\n  description.\n---\n\nBody\n' \
@@ -147,4 +202,25 @@ EOF
 @test "the repo's own plugin tree is consistent" {
   run bash "$REPO_ROOT/scripts/check-plugin-structure.sh" "$REPO_ROOT"
   assert_success
+}
+
+# Regression for the injection caught in review on #60: the manifest path used
+# to be interpolated into Python source, so a plugin directory containing a
+# single quote closed the literal and the rest of the path executed.
+#
+# The payload sits AFTER `json.load(open('<prefix>'))` on the same line, so that
+# first call must succeed or the exception aborts the line before the payload
+# runs — hence the real JSON file at the truncated path. Without it this test
+# passes whether or not the bug is present.
+@test "a plugin directory name containing a quote cannot execute code" {
+  local marker="$BATS_TEST_TMPDIR/pwned.txt"
+  export PWNED="$marker"
+  echo '{}' > "$ROOT/plugins/x"
+
+  local evil="$ROOT/plugins/x'));import os;open(os.environ['PWNED'],'w').write('boom');#"
+  mkdir -p "$evil/.claude-plugin"
+  echo '{"name":"x","version":"1","description":"d"}' > "$evil/.claude-plugin/plugin.json"
+
+  run bash "$REPO_ROOT/scripts/check-plugin-structure.sh" "$ROOT"
+  [ ! -f "$marker" ]
 }
