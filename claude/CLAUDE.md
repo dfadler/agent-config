@@ -182,7 +182,7 @@ For any non-trivial bash script:
 - Use named, documented exit codes instead of bare `exit 1` — a shared, small
   taxonomy, not a bespoke one per script. Reuse this repo's numbering (skip the ones a
   script has no path for; don't invent new ones without extending this list):
-  ```
+  ```bash
   EXIT_OK=0            # success
   EXIT_FAILURE=1       # general failure — the check ran and found something wrong
   EXIT_USAGE=2         # missing/invalid arguments, including a bad path argument
