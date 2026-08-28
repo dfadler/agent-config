@@ -239,9 +239,21 @@ EOF
 }
 
 @test "-h prints usage and exits 0 without touching ROOT" {
+  local before after
+  before="$(find "$ROOT" | sort)"
+
   run bash "$REPO_ROOT/scripts/check-plugin-structure.sh" -h
   assert_success
   assert_output_contains "Usage: check-plugin-structure.sh"
+
+  after="$(find "$ROOT" | sort)"
+  [ "$before" = "$after" ]
+}
+
+@test "exits with EXIT_USAGE (2) when ROOT does not exist" {
+  run bash "$REPO_ROOT/scripts/check-plugin-structure.sh" "$ROOT/no-such-dir"
+  assert_status 2
+  assert_output_contains "ROOT does not exist"
 }
 
 @test "--help prints usage and exits 0" {

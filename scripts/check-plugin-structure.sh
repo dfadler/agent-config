@@ -23,6 +23,7 @@ set -euo pipefail
 # Exit-code taxonomy — see the hygiene baseline in claude/CLAUDE.md.
 readonly EXIT_OK=0
 readonly EXIT_FAILURE=1
+readonly EXIT_USAGE=2
 
 usage() {
   cat <<'USAGE'
@@ -43,6 +44,11 @@ case "${1:-}" in
 esac
 
 ROOT="${1:-.}"
+if [[ ! -d "$ROOT" ]]; then
+  echo "::error::ROOT does not exist: $ROOT" >&2
+  exit "$EXIT_USAGE"
+fi
+
 errors=()
 
 fail() { errors+=("$1"); }
