@@ -1,20 +1,21 @@
 ---
 name: gh-attach-image
 description: |
-  Upload local image files (screenshots, rendered diagrams, before/after
-  comparisons) so they render inline in a GitHub PR description, issue
-  description, or PR/issue comment — without committing the images to the
-  repo and without a browser session. Use this whenever a task calls for
-  attaching, embedding, or including a screenshot/image/diagram in a GitHub
-  PR or issue via `gh`, or when asked to "show" or "visually verify" a
-  change and the result needs to land in a PR/issue body. Also use this if
-  you're about to commit screenshot files into a repo just so they can be
-  referenced by a raw.githubusercontent.com URL in a PR description, or
-  about to create a gist for the same purpose — this skill is the correct,
-  lighter-weight alternative to both of those workarounds.
+  Upload local image or video files (screenshots, rendered diagrams,
+  before/after comparisons, walkthrough recordings) so they render inline in
+  a GitHub PR description, issue description, or PR/issue comment — without
+  committing the files to the repo and without a browser session. Use this
+  whenever a task calls for attaching, embedding, or including a
+  screenshot/image/diagram/video in a GitHub PR or issue via `gh`, or when
+  asked to "show" or "visually verify" a change and the result needs to land
+  in a PR/issue body. Also use this if you're about to commit screenshot or
+  video files into a repo just so they can be referenced by a
+  raw.githubusercontent.com URL in a PR description, or about to create a
+  gist for the same purpose — this skill is the correct, lighter-weight
+  alternative to both of those workarounds.
 license: MIT
 metadata:
-  version: "1.0.0"
+  version: "1.1.0"
 ---
 
 # Attaching images to GitHub PRs/issues via `gh`
@@ -73,6 +74,12 @@ the body (e.g. building a full body file with `Write`, then
 `gh pr edit N --repo OWNER/NAME --body-file file.md`) and saving it. See the
 gotcha below for why the save step isn't optional.
 
+**Video works too** — `.mp4`, `.mov`, and `.webm` are all recognized
+alongside the image extensions. For video the script prints a bare URL
+instead of `![alt](url)`, since that's what GitHub needs to render an
+inline `<video>` player (image markdown around a video URL shows a
+broken-image icon instead).
+
 ## The mechanics, if you need to do this by hand
 
 ```bash
@@ -87,10 +94,13 @@ curl -s "https://uploads.github.com/user-attachments/assets?name=<filename>&cont
 # -> {"url":"https://github.com/user-attachments/assets/<uuid>"}
 ```
 
-`content_type` is a standard image MIME type: `image/png`, `image/jpeg`,
-`image/gif`, `image/webp`, `image/svg+xml`. Match it to the actual file —
-verified working for PNG; the others follow the same upload path GitHub's
-own UI uses so there's no reason to expect them to differ.
+`content_type` is a standard MIME type: `image/png`, `image/jpeg`,
+`image/gif`, `image/webp`, `image/svg+xml`, `image/apng` for images, or
+`video/mp4`, `video/quicktime`, `video/webm` for video. Match it to the
+actual file — verified working for PNG and MP4; the others follow the same
+upload path GitHub's own UI uses so there's no reason to expect them to
+differ. For video, put the returned URL on its own line in the body rather
+than wrapping it in `![alt](url)` — see the "Quick path" section above.
 
 ## The one gotcha that looks like a bug but isn't
 
