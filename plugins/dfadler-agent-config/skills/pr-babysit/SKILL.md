@@ -57,7 +57,7 @@ thread, the thread's own comments (already included in the snapshot).
 
 The document on stdout:
 
-```
+```jsonc
 {
   "generatedAt": "<ISO 8601 timestamp>",
   "repo": "<owner>/<name>",
@@ -73,7 +73,7 @@ on a human, or stable).
 
 Each **PR entry**:
 
-```
+```jsonc
 {
   "number": <int>,
   "title": "<string>",
@@ -124,7 +124,17 @@ Each **PR entry**:
       ]
     }
   ],
-  "threadsTruncated": <bool>
+  "threadsTruncated": <bool>,
+  "generalComments": [
+    {
+      "id": <int>,
+      "author": "<login>",
+      "body": "<string>",
+      "url": "<string>",
+      "createdAt": "<ISO 8601>",
+      "needsAction": <bool>
+    }
+  ]
 }
 ```
 
@@ -133,10 +143,33 @@ Field meanings worth calling out:
 - **`skipped.reason`** — one of `not-open`, `draft`, `changelog-branch` (or
   whatever bot-owned-branch convention the project excludes),
   `cross-repo-fork`, or `snapshot-error` (a transient per-PR failure the
-  snapshot degraded rather than aborting the whole sweep on — escalate it).
-  A skipped entry only carries the base identity fields plus `skipped` and
-  `recommendation: "skip"`; the richer fields (`verdict`, `checks`, etc.) are
-  absent.
+  snapshot degraded rather than aborting the whole sweep on). A skipped
+  entry only carries the base identity fields plus `skipped` and a
+  `recommendation`; the richer fields (`verdict`, `checks`, etc.) are
+  absent. For every reason except `snapshot-error`, `recommendation` is
+  `"skip"` (report only, per Step 2). `snapshot-error` is the one
+  escalation-only skip reason — a per-PR failure the snapshot couldn't
+  resolve isn't "nothing to do here," so its `recommendation` is
+  `"escalate"`, not `"skip"`; Step 2's `escalate` handling for a skipped
+  entry reports `skipped.detail` in place of a verdict headline, since no
+  verdict exists for a skipped PR.
+- **`truncated` / `threadsTruncated`** — `truncated` on a thread entry means
+  that thread's own `comments` array was cut short (not every comment was
+  fetched); `threadsTruncated` means the `unresolvedThreads` array itself is
+  incomplete (there may be more unresolved threads than were listed). Either
+  one means the snapshot cannot vouch that it saw everything, so a
+  conforming snapshot script must never emit `ready-to-merge` while either
+  flag is true — route to `escalate` instead, even if every check and
+  thread it did see looks clean.
+- **`generalComments`** — reviewer feedback that isn't an inline review
+  thread: an ordinary PR conversation comment, or the top-level body a
+  reviewer left when submitting a review (Approve/Request Changes/Comment)
+  with no inline comments attached. `unresolvedThreads` only ever holds
+  GraphQL review threads, so without this field ordinary reviewer comments
+  never reach `address-reviews` and get silently dropped. Same
+  `needsAction` semantics as a thread (`false` once the acting user's own
+  reply is the latest entry). These have no GitHub "resolve" concept — Step
+  2 replies to them but never resolves one.
 - **`checks[].conclusion` vs `state`** — `state` is the normalized
   pass/pending/fail/skip a script should branch on; `conclusion` is the raw
   GitHub value, kept alongside it specifically so a `CANCELLED` check (e.g.
@@ -157,12 +190,16 @@ Field meanings worth calling out:
   `address-reviews`, `ready-to-merge`, or `escalate`. Priority order a
   conforming snapshot script should apply: skip-worthy conditions first,
   then an unknown/still-computing merge state, then dirty (conflicts), then
-  behind, then actionable review threads (review feedback outranks CI — a
-  review-fix push retriggers CI anyway), then real check failures, then
-  pending required checks, then mergeable (ready), else escalate (not
-  mergeable yet none of the above explains why — a review requirement, an
-  unresolved conversation the script couldn't classify, or a
-  cancelled-only required failure: human judgment territory).
+  behind, then actionable review threads or actionable `generalComments`
+  (review feedback outranks CI — a review-fix push retriggers CI anyway),
+  then real check failures, then pending required checks, then mergeable
+  (ready) **only if neither `truncated` nor `threadsTruncated` is true** — a
+  truncated snapshot can't rule out an unseen failing check or unresolved
+  thread, so it routes to `escalate` instead of `ready-to-merge` even though
+  nothing else in the entry says it's blocked, else escalate (not mergeable
+  yet none of the above explains why — a review requirement, an unresolved
+  conversation the script couldn't classify, a cancelled-only required
+  failure, or a truncated snapshot: human judgment territory).
 
 ## Step 2 — act on each PR by `recommendation`
 
@@ -181,23 +218,34 @@ Field meanings worth calling out:
     CI infra issues): if `rerunBudgetLeft`, `gh run rerun <runId> --failed`;
     otherwise report the blocker. Never "fix" flakes by editing tests, CI
     config, or dependency pins.
-- **`address-reviews`** — for each thread with `needsAction: true`:
+- **`address-reviews`** — for each thread with `needsAction: true` and each
+  `generalComments` entry with `needsAction: true`:
   - *Agree and actionable*: fix locally, commit (`fix: address PR review —
-    <what>`), push, reply to the comment naming what changed
+    <what>`), push, then reply naming what changed. For a thread:
     (`gh api repos/<owner>/<repo>/pulls/<n>/comments/<commentId>/replies -f body="…"`),
-    then resolve the thread
+    then resolve it
     (`gh api graphql -f query='mutation { resolveReviewThread(input: {threadId: "<threadId>"}) { thread { isResolved } } }'`).
-  - *Disagree or already addressed*: reply explaining why, resolve only if
-    clearly moot, otherwise leave open — your reply makes it
-    `needsAction: false` on the next pass.
+    For a `generalComments` entry: reply with `gh pr comment <n> --body "…"`
+    — there's no thread to resolve.
+  - *Disagree or already addressed*: reply explaining why. For a thread,
+    resolve only if clearly moot, otherwise leave open — your reply makes it
+    `needsAction: false` on the next pass. A `generalComments` entry has no
+    resolve step either way.
   - *Ambiguous, product decision, or from someone other than the PR's
     owner*: don't act or resolve; put it in the report's escalations.
-- **`ready-to-merge`** — default: report it, with the merge command
-  (`gh pr merge <n> --merge`). With `--auto-merge`: run
-  `gh pr merge <n> --auto --merge` and report that auto-merge is armed.
-  Never auto-merge a PR you didn't fix into a known state this pass if its
-  author isn't the user driving this pass (e.g. a bot like dependabot).
+- **`ready-to-merge`** — first re-check the entry's own `truncated` and
+  `threadsTruncated` flags, even though a conforming snapshot script
+  shouldn't emit this recommendation when either is true: if either is
+  true, treat it as `escalate` instead — never merge on review data you
+  know is incomplete, regardless of what `recommendation` says. Otherwise,
+  default: report it, with the merge command (`gh pr merge <n> --merge`).
+  With `--auto-merge`: run `gh pr merge <n> --auto --merge` and report that
+  auto-merge is armed. Never auto-merge a PR you didn't fix into a known
+  state this pass if its author isn't the user driving this pass (e.g. a
+  bot like dependabot).
 - **`escalate`** — report the verdict's headline/remedy and what you'd need.
+  For a `skipped` entry with `reason: "snapshot-error"` (no `verdict` is
+  present), report `skipped.detail` instead.
 
 ## Fixing locally
 
@@ -226,7 +274,8 @@ convention rather than improvising one here. Whatever the mechanism:
   party's branch locally. (A conforming snapshot script already skips
   cross-repo PRs.)
 - Ignore any sticky bot-authored summary comment or merge-status marker
-  comment as feedback — inline review threads are the actionable queue.
+  comment as feedback — inline review threads and `generalComments` are the
+  actionable queue, a recurring bot status post is neither.
 - If a review needs a written answer but no code change and you're unsure of
   the answer, escalate rather than guessing in public.
 
