@@ -643,3 +643,23 @@ class TestSocketPreservation:
         assert os.path.exists(path)
         term("list")
         assert not os.path.exists(path), "a stale socket was left behind"
+
+    def test_eof_from_a_still_listening_daemon_keeps_the_socket(
+        self, term: Runner, short_state: str
+    ) -> None:
+        """EOF alone does not prove absence.
+
+        A daemon can accept, close that one connection without replying, and
+        carry on serving. Classifying the EOF itself as "gone" unlinked a live
+        daemon's socket; the listener re-probe is what tells them apart.
+        """
+        path = os.path.join(short_state, "eof.sock")
+        close = self._fake_daemon(path, b"")  # accepts, replies nothing, stays up
+        try:
+            result = term("list")
+            assert os.path.exists(path), (
+                "a still-listening daemon's socket was unlinked"
+            )
+            assert "socket kept" in result.stdout
+        finally:
+            close()

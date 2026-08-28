@@ -548,46 +548,71 @@ class SessionGone(SystemExit):
     """
 
 
+def _listener_present(path: str) -> bool:
+    """Is anything still accepting connections on `path`?
+
+    The one question that actually decides whether a socket file is stale. A
+    connect() that succeeds proves a listener, whether or not the daemon then
+    answers; ECONNREFUSED or a missing file proves there is none. Anything else
+    is unclear, and unclear must read as present so cleanup stays conservative.
+    """
+    probe = socket.socket(socket.AF_UNIX, socket.SOCK_STREAM)
+    probe.settimeout(1.0)
+    try:
+        probe.connect(path)
+    except (FileNotFoundError, ConnectionRefusedError):
+        return False
+    except OSError:
+        return True
+    finally:
+        probe.close()
+    return True
+
+
 def request(
     name: str, payload: dict[str, Any], timeout: float = 10.0
 ) -> dict[str, Any]:
     path = socket_path(name)
     conn = socket.socket(socket.AF_UNIX, socket.SOCK_STREAM)
     conn.settimeout(timeout)
-    # A daemon that is shutting down can drop the connection at any point in
-    # this exchange, not only at connect(). Linux reports that as ECONNRESET
-    # where macOS gave ECONNREFUSED, so the whole exchange is guarded and every
-    # variant is reported as "no session". Found by CI; the macOS runs never
-    # hit it.
-    gone = (
-        FileNotFoundError,
-        ConnectionRefusedError,
-        ConnectionResetError,
-        BrokenPipeError,
-    )
     try:
+        # Only a connect() failure proves the socket has no listener. Every
+        # later failure is ambiguous: a daemon can accept, drop that one
+        # connection, and keep serving. Those fall through to _listener_present
+        # rather than being read as absence.
         conn.connect(path)
-        with conn:
-            conn.sendall((json.dumps(payload) + "\n").encode())
-            raw = _recv_line(conn)
-    except gone:
+    except (FileNotFoundError, ConnectionRefusedError):
         raise SessionGone(
             f"agent-term: no session {name!r} (try: agent_term.py list)"
         ) from None
+    try:
+        with conn:
+            conn.sendall((json.dumps(payload) + "\n").encode())
+            raw = _recv_line(conn)
+    except (ConnectionResetError, BrokenPipeError):
+        # A shutting-down daemon drops the connection mid-exchange, and Linux
+        # reports that as ECONNRESET where macOS gave ECONNREFUSED at connect
+        # time. Found by CI; the macOS runs never hit it. Whether the daemon is
+        # actually gone is settled below, not assumed here.
+        raw = None
     except TimeoutError:
-        # The daemon accepted the connection and then went quiet: busy, wedged,
-        # or paused. It is still there, so this is never a stale socket.
-        # Previously this escaped request() entirely and surfaced as a
-        # traceback, since it is an OSError but not one of `gone`.
+        # Accepted, then went quiet: busy, wedged, or paused. It is still
+        # there, so this is never a stale socket. Previously this escaped
+        # request() entirely and surfaced as a traceback, since it is an
+        # OSError but not one of the connection errors.
         raise SystemExit(
             f"agent-term: session {name!r} did not answer within {timeout:g}s "
             "— it is still running; retry, or 'stop' it if it is wedged"
         ) from None
     if not raw:
-        # EOF: the daemon closed without writing a reply, which is what a
-        # shutdown looks like from here. A daemon that is merely slow times out
-        # instead, and one that is alive but unhappy answers with ok=false, so
-        # this really is the socket going away.
+        # EOF or a mid-exchange drop. On its own this says nothing: a daemon
+        # shutting down looks exactly like one that closed a single connection
+        # and kept listening. Re-probe and let the socket answer.
+        if _listener_present(path):
+            raise SystemExit(
+                f"agent-term: session {name!r} dropped the connection but is "
+                "still listening — retry, or 'stop' it if it is wedged"
+            )
         raise SessionGone(f"agent-term: session {name!r} closed the connection")
     reply: dict[str, Any] = json.loads(raw)
     if not reply.get("ok"):
