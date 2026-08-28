@@ -85,6 +85,35 @@ the rename would otherwise leave dangling. Anything under `~/.claude/{skills,age
 pointing into this repo's `plugins/` that isn't the current plugin link is stale by
 definition; links pointing anywhere else are left alone.
 
+### Runtime dependency: `pyte`
+
+The `detached-terminal` skill's `agent_term.py` is `#!/usr/bin/env python3`, so it runs
+under whatever `python3` is first on `PATH` when an agent invokes it. Nothing activates
+this repo's `.venv` (the one `make venv` builds for CI) on the skill's behalf, so a green
+`make check` says nothing about whether the skill can start — [`pyte`](https://github.com/selectel/pyte)
+has to be importable by that *ambient* interpreter.
+
+`setup.sh` checks it at the end of a run. If it's missing, the run still succeeds (the
+symlinks are correct either way) but it names the interpreter and prints the command:
+
+```bash
+python3 -m pip install --user pyte
+```
+
+Or let `setup.sh` do it:
+
+```bash
+./setup.sh --install-deps
+```
+
+That's opt-in because installing into an interpreter this repo doesn't own is a bigger
+claim than symlinking config. On a PEP 668 externally-managed interpreter — a Homebrew or
+distro `python3` — `pip install --user` is refused; `setup.sh` detects that up front and
+prints the real options (the OS package, `--break-system-packages`, or putting an
+interpreter you own first on `PATH`) rather than letting pip fail confusingly. The skill
+still carries its own "pyte is not installed" error as the last line of defence for anyone
+who skips setup.
+
 ## Adding something new
 
 1. Put it in the right place:
