@@ -195,3 +195,10 @@ For any non-trivial bash script:
   Inline/review comment:
   `gh api repos/<owner>/<repo>/pulls/<pr>/comments/<comment-id>/replies -f body="<reply>"`.
   General PR-level comment: `gh pr comment <pr> --body "<reply>"`.
+- **`.github/` stays config-only.** Limit it to platform configuration: workflows
+  (`.github/workflows/`), CODEOWNERS, dependabot/release config, and a **generic**
+  PR/issue template. Feature- or product-specific docs, playbooks, or checklists
+  belong under the project's own docs directory, not `.github/`. If a specific
+  feature genuinely needs its own PR template, use an opt-in file under
+  `.github/PULL_REQUEST_TEMPLATE/<feature>.md` (or have tooling append content only
+  for those PRs) — never grow the generic template with feature-specific sections.
