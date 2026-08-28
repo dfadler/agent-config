@@ -115,20 +115,27 @@ definition; links pointing anywhere else are left alone.
 run locally means the same thing a green PR does.
 
 ```bash
-make check          # lint + structure + test
+make check          # lint + structure + typecheck + test + actionlint
 ```
 
 | Target | What it does |
 | --- | --- |
 | `make lint-sh` | `shellcheck`, `shfmt -i 2 -ci -d`, and the `set -uo pipefail` convention |
+| `make lint-py` | `ruff check` and `ruff format --check` |
+| `make typecheck` | `mypy --strict` over the Python sources |
 | `make structure` | Plugin manifests and skill/agent frontmatter agree with their directories |
-| `make test` | `bats` suites under `scripts/tests/` |
-| `make fmt` | Rewrites scripts to the repo's `shfmt` style |
+| `make test-sh` | `bats` suites under `scripts/tests/` |
+| `make test-py` | `pytest` suite under `scripts/tests/` |
+| `make fmt` | Rewrites sources to the repo's `shfmt` / `ruff` style |
 | `make lint-actions` | `actionlint` over `.github/workflows/` |
 
 ```bash
 brew install shellcheck shfmt bats-core actionlint
+make venv          # Python side: .venv from requirements-dev.txt
 ```
+
+`make check` uses `.venv` when it exists and otherwise falls back to whatever
+`python3` is on `PATH`, so a shell-only change doesn't require building one.
 
 Two checks exist because a linter can't express them. `check-shell-set-flags.sh`
 enforces the `set -uo pipefail` opener from the global `CLAUDE.md`, which shellcheck
@@ -139,7 +146,9 @@ loudly in review — which is exactly what the plugin rename could have caused.
 
 The `bats` suites are hermetic: `HOME` is redirected into a sandbox and the network
 binaries are shimmed to fail loudly, so a test can never touch your real `~/.claude`
-even though `setup.sh`'s whole job is writing symlinks into it.
+even though `setup.sh`'s whole job is writing symlinks into it. The `pytest` suite
+forks real PTYs, with `AGENT_TERM_STATE` redirected per test and every session torn
+down in a fixture, so it can't collide with a live session either.
 
 ## What belongs here vs. in a project
 
