@@ -144,7 +144,7 @@ who skips setup.
 run locally means the same thing a green PR does.
 
 ```bash
-make check          # lint + structure + typecheck + test + actionlint
+make check          # lint + structure + typecheck + test + actionlint + coverage
 ```
 
 | Target | What it does |
@@ -155,6 +155,7 @@ make check          # lint + structure + typecheck + test + actionlint
 | `make structure` | Plugin manifests and skill/agent frontmatter agree with their directories |
 | `make test-sh` | `bats` suites under `scripts/tests/` |
 | `make test-py` | `pytest` suite under `scripts/tests/` |
+| `make coverage` | Re-runs the `bats` suites under `kcov` and enforces the coverage floor (Linux only) |
 | `make fmt` | Rewrites sources to the repo's `shfmt` / `ruff` style |
 | `make lint-actions` | `actionlint` over `.github/workflows/` |
 
@@ -165,6 +166,14 @@ make venv          # Python side: .venv from requirements-dev.txt
 
 `make check` uses `.venv` when it exists and otherwise falls back to whatever
 `python3` is on `PATH`, so a shell-only change doesn't require building one.
+
+`make coverage` needs `kcov` and `jq` on top of the tools above. It only measures
+anything on Linux: kcov instruments bash by injecting a library into the traced
+shell, and macOS SIP strips that from `/bin/bash`, so on a Mac the target says so
+and skips rather than reporting a meaningless 0%. The floor it enforces is a
+measured baseline (see the `coverage` target in the `Makefile` for the number, how
+it was taken, and what is and isn't in the denominator) — a regression gate, not a
+target to design tests around.
 
 Two checks exist because a linter can't express them. `check-shell-set-flags.sh`
 enforces the `set -uo pipefail` opener from the global `CLAUDE.md`, which shellcheck
