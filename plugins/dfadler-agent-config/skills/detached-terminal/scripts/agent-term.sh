@@ -118,10 +118,15 @@ compute_owner() {
   else
     raw="${CLAUDE_CODE_SESSION_ID:-}"
   fi
-  [[ -n "$raw" ]] || {
-    echo "shared"
-    return 0
-  }
+  # Fail closed. The old fallback returned "shared", which put every ownerless
+  # invocation on one socket -- and a shared socket is exactly the credential
+  # donation this file exists to fix, since a tmux server hands its whole
+  # environment to every session it later creates. An unowned run also let
+  # stop-all tear down another ownerless agent's work.
+  [[ -n "$raw" ]] ||
+    die "no session owner: CLAUDE_CODE_SESSION_ID is unset.
+  Sessions are isolated per agent session by that value, and there is no safe
+  shared fallback. Set AGENT_TERM_OWNER with AGENT_TERM_TEST=1 for local runs."
   printf '%s' "$raw" | shasum -a 256 | cut -c1-8
 }
 
@@ -134,10 +139,24 @@ socket_dir() { printf '/tmp/tmux-%s' "$(id -u)"; }
 state_dir() { printf '%s/agent-term-%s' "$(socket_dir)" "$OWNER"; }
 
 ensure_state_dir() {
-  local d
+  local d parent
   d="$(state_dir)"
-  mkdir -p "$d" 2>/dev/null || die "cannot create state dir $d"
-  chmod 700 "$d" 2>/dev/null
+  parent="$(socket_dir)"
+  # Both levels, under a tight umask. mkdir -p applies the process umask to
+  # every directory it creates, so on a machine where tmux has not run yet this
+  # would create /tmp/tmux-$UID at 0755 -- and the permission story in SKILL.md
+  # rests on that directory being 0700. (tmux 3.7c does accept a 0755 socket
+  # dir, verified, so this is about the documented guarantee being true rather
+  # than about tmux refusing to start.)
+  #
+  # chmod failures are fatal: a directory we cannot secure is one we must not
+  # put a control socket in.
+  (
+    umask 077
+    mkdir -p "$d"
+  ) 2>/dev/null || die "cannot create state dir $d"
+  chmod 700 "$parent" 2>/dev/null || die "cannot secure $parent (mode 700)"
+  chmod 700 "$d" 2>/dev/null || die "cannot secure $d (mode 700)"
 }
 
 state_file() { printf '%s/%s.pane' "$(state_dir)" "$1"; }
@@ -203,12 +222,29 @@ session_id() {
 # server pid. The single-pane check is a tamper signal: this script never
 # creates a second pane, so if one appeared, something inside the session did
 # it, and "which pane did the agent mean" is no longer answerable.
+# The history limit this session was STARTED with, echoed for the caller.
+#
+# Deliberately a function rather than a global set inside pane_target: callers
+# invoke pane_target through a command substitution, which runs in a subshell,
+# so anything it assigns is discarded before the caller sees it. That is the
+# same trap that made `die` inside $( ) fail to abort earlier in this file.
+recorded_history() {
+  local file hist
+  file="$(state_file "$1")"
+  [[ -r "$file" ]] || return 1
+  # Fields are pane id, server pid, history limit; only the third is wanted.
+  read -r _ _ hist <"$file" 2>/dev/null
+  [[ "$hist" =~ ^[0-9]+$ ]] || return 1
+  printf '%s' "$hist"
+}
+
 pane_target() {
-  local name="$1" sid file recorded_pid recorded_spid live_spid panes
+  local name="$1" sid file recorded_pid recorded_spid recorded_hist live_spid panes
   file="$(state_file "$name")"
   [[ -r "$file" ]] || return 1
-  read -r recorded_pid recorded_spid <"$file" 2>/dev/null
+  read -r recorded_pid recorded_spid recorded_hist <"$file" 2>/dev/null
   [[ "$recorded_pid" =~ ^%[0-9]+$ && "$recorded_spid" =~ ^[0-9]+$ ]] || return 1
+  [[ "$recorded_hist" =~ ^[0-9]+$ ]] || return 1
 
   live_spid="$(tm display -p '#{pid}' 2>/dev/null)"
   [[ "$live_spid" == "$recorded_spid" ]] || return 2
@@ -407,7 +443,7 @@ cmd_start() {
   file="$(state_file "$name")"
   (
     umask 077
-    printf '%s %s\n' "$pane_id" "$spid" >"$file"
+    printf '%s %s %s\n' "$pane_id" "$spid" "$HISTORY_LIMIT" >"$file"
   ) || die "started '$name' but could not record its pane"
 
   echo "started '$name' (detached, ${size}, pane $pane_id, no window shown)"
@@ -451,11 +487,17 @@ cmd_read() {
   # can be prevented from here, but both are worth refusing to read across:
   # they mean the pane is no longer operating under the constraints the
   # scrollback story assumes.
-  local live_hist pipe_on
+  local live_hist pipe_on want_hist
   live_hist="$(tm display -p -t "$target" '#{history_limit}' 2>/dev/null)"
   pipe_on="$(tm display -p -t "$target" '#{pane_pipe}' 2>/dev/null)"
-  [[ "$live_hist" == "$HISTORY_LIMIT" ]] ||
-    die "pane history-limit is $live_hist, expected $HISTORY_LIMIT — the pane changed it; treat this session as compromised"
+  want_hist="$(recorded_history "$name")" ||
+    die "session '$name' has no recorded history limit — possible tampering; stop it and investigate"
+  # Against the value recorded at start. Comparing against this invocation's
+  # AGENT_TERM_HISTORY reported tampering for an untouched session whenever the
+  # variable differed between start and read, which would train everyone to
+  # ignore the one tripwire that matters.
+  [[ "$live_hist" == "$want_hist" ]] ||
+    die "pane history-limit is $live_hist, expected $want_hist (recorded at start) — the pane changed it; treat this session as compromised"
   [[ "$pipe_on" == "0" ]] ||
     die "pane has pipe-pane active — it is writing its output to a file; treat this session as compromised"
 
