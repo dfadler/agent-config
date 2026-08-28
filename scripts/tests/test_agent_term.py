@@ -10,8 +10,10 @@ than anything that reaches the network.
 from __future__ import annotations
 
 import argparse
+import contextlib
 import importlib.util
 import os
+import signal
 import stat
 import subprocess
 import sys
@@ -337,6 +339,17 @@ def term(short_state: str) -> Iterator[Runner]:
     run("stop-all", check=False)
 
 
+def _pid_alive(pid: int) -> bool:
+    """True while the process exists. Signal 0 checks without delivering."""
+    try:
+        os.kill(pid, 0)
+    except ProcessLookupError:
+        return False
+    except PermissionError:
+        return True  # exists, owned by someone else
+    return True
+
+
 def wait_for(run: Runner, name: str, needle: str, timeout: float = 10.0) -> str:
     deadline = time.time() + timeout
     screen = ""
@@ -393,12 +406,19 @@ class TestProcessGroupCleanup:
         pty.fork makes the child a process-group leader, so its own children
         share that group; signalling only the direct pid left them behind.
 
-        The descendant is deliberately `nohup`ed. The obvious fixture --
+        Two fixture details, both learned the hard way:
+
+        The descendant is `nohup`ed. The obvious fixture --
         `sh -c 'sleep 600 & wait'` -- does NOT distinguish the two
         implementations: closing the PTY master sends SIGHUP to the foreground
         process group, so that descendant dies either way. Measured, after the
         first version of this test passed against `os.kill` and proved nothing.
         A nohup'd child ignores the SIGHUP, so only killpg reaches it.
+
+        And it is tracked by PID, not by matching `sleep 600` in a process
+        list: any other process on the machine with that command line -- a
+        second copy of this suite, a developer's own shell -- would satisfy the
+        check, keep the poll spinning, or get killed by the cleanup.
         """
         marker = f"agentterm-pg-{os.getpid()}"
         term(
@@ -407,31 +427,28 @@ class TestProcessGroupCleanup:
             "--",
             "sh",
             "-c",
-            f"nohup sleep 600 >/dev/null 2>&1 & echo {marker}-up; wait",
+            f"nohup sleep 600 >/dev/null 2>&1 & echo {marker}-pid=$!; wait",
         )
-        wait_for(term, "pg", f"{marker}-up")
+        screen = wait_for(term, "pg", f"{marker}-pid=")
 
-        found = subprocess.run(
-            ["pgrep", "-f", "sleep 600"], capture_output=True, text=True, check=False
-        )
-        assert found.stdout.strip(), "fixture never started the descendant"
+        # The child shell reports $! so the assertions target exactly the
+        # process this test created.
+        line = next(ln for ln in screen.splitlines() if f"{marker}-pid=" in ln)
+        descendant = int(line.split(f"{marker}-pid=")[1].split()[0])
+
+        assert _pid_alive(descendant), "fixture never started the descendant"
 
         term("stop", "pg")
         try:
             deadline = time.time() + 10
             while time.time() < deadline:
-                still = subprocess.run(
-                    ["pgrep", "-f", "sleep 600"],
-                    capture_output=True,
-                    text=True,
-                    check=False,
-                )
-                if not still.stdout.strip():
+                if not _pid_alive(descendant):
                     return
                 time.sleep(0.2)
-            raise AssertionError("nohup'd descendant survived stop")
+            raise AssertionError(f"nohup'd descendant {descendant} survived stop")
         finally:
-            subprocess.run(["pkill", "-f", "sleep 600"], check=False)
+            with contextlib.suppress(ProcessLookupError, PermissionError):
+                os.kill(descendant, signal.SIGKILL)
 
 
 class TestStartupOrdering:
@@ -445,6 +462,23 @@ class TestStartupOrdering:
         term("start", "race", "--", "cat")
         result = term("read", "race", "--raw", check=False)
         assert result.returncode == 0, f"read raced start: {result.stderr}"
+
+
+# NOTE: there is deliberately no test for cmd_start's bind-failure cleanup.
+#
+# The child is forked before the socket is bound, so on paper a bind failure
+# could leave the command running. In practice the bind fails microseconds
+# after the fork -- before the child's shell has run a single line -- so the
+# child dies to the SIGHUP that follows the daemon closing the PTY master, with
+# or without the explicit terminate(). Two fixtures were tried (a nohup'd
+# grandchild, then a SIGHUP-ignoring child) and BOTH passed with the cleanup
+# deleted, which makes them worse than no test: green, and proving nothing.
+#
+# The cleanup is still correct and still worth having -- it is the difference
+# between a guarantee and an accident of timing. What it relies on,
+# terminate() reaching a SIGHUP-immune process group, is covered by
+# TestProcessGroupCleanup above. Only "cmd_start's except branch calls it" is
+# unverified, and that is a code-reading matter.
 
 
 class TestUntrustedFraming:

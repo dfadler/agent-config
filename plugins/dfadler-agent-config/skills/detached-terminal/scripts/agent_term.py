@@ -629,6 +629,13 @@ def cmd_start(args: argparse.Namespace) -> int:
     if os.fork() != 0:
         os._exit(0)
 
+    # Declared before the try so the failure path can tell "the child never
+    # started" from "the child started and the socket didn't". Binding after
+    # the fork means a bind failure would otherwise leave the command running
+    # with nothing able to reach it -- an orphan, and a second one if the
+    # caller retries. This is a regression the bind-before-ack change
+    # introduced; the child has to be torn down on that path.
+    session: Session | None = None
     try:
         session = Session(
             name=name,
@@ -646,6 +653,12 @@ def cmd_start(args: argparse.Namespace) -> int:
         # started perfectly well.
         server = bind_control_socket(session)
     except Exception as exc:  # noqa: BLE001
+        if session is not None:
+            session.terminate()
+            try:
+                os.unlink(path)
+            except OSError:
+                pass
         with os.fdopen(write_fd, "w") as pipe:
             pipe.write(str(exc))
         os._exit(1)
