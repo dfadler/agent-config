@@ -46,7 +46,7 @@ rm -f /path/to/out.png   # Chrome only creates this at capture time, so a leftov
                           # file from an earlier run would satisfy the poll below on
                           # iteration 1 and ship a stale screenshot instead of failing
 "/Applications/Google Chrome.app/Contents/MacOS/Google Chrome" \
-  --headless=old --disable-gpu \
+  --headless=new --disable-gpu \
   --window-size=1280,900 --force-device-scale-factor=2 \
   --screenshot=/path/to/out.png \
   "<your dev server URL>/some/page" &
@@ -65,14 +65,17 @@ kill -9 "$chrome_pid" 2>/dev/null   # the process lingers even after the file is
 
 - `--window-size=W,H` is the **CSS viewport**; with `--force-device-scale-factor=2`
   the output image is `2W×2H`. Desktop = `1280,900`; true mobile = `390,844`.
-- `--headless=old` reliably writes the file and exits zero (process lingers —
-  kill it after, as above). `--headless=new` has both hung and worked cleanly
-  on different Chrome versions — try it first, fall back to `=old` if it
-  hangs. Chrome's own changelog says legacy headless is being removed in
-  favor of the standalone `chrome-headless-shell` binary, but verify
-  empirically against the Chrome actually installed before assuming that;
-  if a Chrome update makes `--headless=old` error, switch to
-  `--headless=new`/`--headless`, or install `chrome-headless-shell` via
+- Try `--headless=new` first, as in the recipe above — it's Chrome's
+  supported direction (the changelog says legacy headless is being removed
+  in favor of the standalone `chrome-headless-shell` binary) and reliably
+  writes the file and exits zero (process lingers — kill it after, as
+  above). `--headless=new` has hung on some Chrome versions in the past —
+  if it hangs on the Chrome actually installed, fall back to
+  `--headless=old`; empirically (Chrome 151, byte-identical output on the
+  same fixture) `=old` still works fine and has not been removed, so it
+  remains a safe fallback rather than something you should expect to fail.
+  Verify against the installed Chrome rather than assuming either claim.
+  If neither works, install `chrome-headless-shell` via
   `npx @puppeteer/browsers install chrome-headless-shell@stable`.
 - Narrow (~390px) headless captures don't emulate a real mobile viewport and
   can show phantom overflow — verify actual responsiveness with an in-app
@@ -126,7 +129,7 @@ one agent session could be running on this machine at once:
                                               # otherwise read that dead port instead of
                                               # this launch's real one
    "/Applications/Google Chrome.app/Contents/MacOS/Google Chrome" \
-     --headless=old --disable-gpu --user-data-dir="$profile_dir" \
+     --headless=new --disable-gpu --user-data-dir="$profile_dir" \
      --remote-debugging-port=0 &
    chrome_pid=$!
    ```
@@ -235,7 +238,43 @@ one agent session could be running on this machine at once:
 
 ## Video
 
-Stitch captured stills into a walkthrough:
+Stitch captured stills into a walkthrough. First capture each frame as its
+own PNG — reuse the screenshot recipe above once per step, writing to a
+numbered path (`"$frames_dir/frame-001.png"`, `"$frames_dir/frame-002.png"`,
+…) so a plain sort orders them correctly.
+
+Then generate `frames.txt`, the concat-demuxer input list the `ffmpeg`
+command below reads. Each `file` line must follow the demuxer's own quoting
+rules (https://ffmpeg.org/ffmpeg-formats.html#concat) — wrap the path in
+single quotes and escape any embedded single quote as `'\''`
+(close-quote, escaped-quote, reopen-quote) — splicing a raw filename in
+unescaped breaks on any path containing a quote:
+
+```bash
+frame_seconds=1   # how long each still holds before the next one
+python3 - "$frames_dir" "$frame_seconds" > frames.txt <<'PY'
+import glob, os, sys
+
+frames_dir, duration = sys.argv[1], sys.argv[2]
+files = sorted(glob.glob(os.path.join(frames_dir, "frame-*.png")))
+if not files:
+    sys.exit(f"no frame-*.png files found in {frames_dir}")
+
+def esc(path):
+    # ffmpeg concat-demuxer quoting: wrap in single quotes, escape an
+    # embedded single quote as '\'' (close quote, escaped quote, reopen
+    # quote) -- https://ffmpeg.org/ffmpeg-formats.html#concat
+    return "'" + path.replace("'", "'\\''") + "'"
+
+for f in files:
+    print(f"file {esc(f)}")
+    print(f"duration {duration}")
+# The concat demuxer ignores the last entry's `duration` line, so the final
+# `file` line must be repeated once more with nothing after it -- a
+# documented quirk of the format, not a bug here.
+print(f"file {esc(files[-1])}")
+PY
+```
 
 ```bash
 ffmpeg -f concat -safe 0 -i frames.txt -vf "fps=30,format=yuv420p" \
