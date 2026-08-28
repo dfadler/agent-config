@@ -147,6 +147,11 @@ there's no way to tell which one did it. So:
   never displayed, which the human attaches to when they choose. For anything
   non-interactive, the headless `Bash` tool (with `run_in_background` for long jobs)
   already covers it and needs no terminal.
+- **Don't do privileged work in a terminal session an agent can drive.** sudo keeps
+  its timestamp per-tty by default, so authenticating in an attached agent pane
+  leaves a live sudo ticket on a tty the agent can send keystrokes to. Same for an
+  authenticated `ssh` session or an unlocked credential helper. Attach to watch and
+  read, not to `sudo`.
 - **Don't reach for capture-then-restore focus.** `osascript` to save the frontmost
   app, do the thing, and put it back needs broad automation entitlements that grant
   far more than restoring focus, and it races the user's own typing. Not taking focus
