@@ -59,7 +59,7 @@ KCOV_INCLUDE := $(CURDIR)/scripts,$(CURDIR)/plugins,$(CURDIR)/setup.sh
 KCOV_EXCLUDE := /scripts/tests
 
 .PHONY: help check lint lint-sh lint-py lint-actions fmt fmt-py test test-sh test-py \
-        structure typecheck venv coverage
+        structure typecheck venv coverage check-links
 
 help: ## Show available targets
 	@grep -E '^[a-z-]+:.*?## ' $(MAKEFILE_LIST) | awk -F':.*?## ' '{printf "  \033[36m%-14s\033[0m %s\n", $$1, $$2}'
@@ -141,3 +141,10 @@ coverage: ## Measure bats coverage with kcov and enforce the floor (Linux only)
 
 lint-actions: ## Lint .github/workflows with actionlint
 	@actionlint
+
+# Standalone on purpose, not part of `check` yet: verified low-noise against
+# this repo's real tree when added (#96), but it hasn't been proven against
+# CI's own checkout, and a broken-link false positive there would go straight
+# to a red default branch. Fold it into `check`/`lint` once that's confirmed.
+check-links: ## Verify relative markdown links resolve to real files
+	@bash scripts/check-markdown-links.sh --path .
