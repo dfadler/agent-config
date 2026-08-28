@@ -111,12 +111,16 @@ turns this from "drive a TUI" into the escalation surface described below.
 
 ## How the human finds a session you started
 
-Every session is named `agent-<name>` on a dedicated socket, so:
+Every session is named `agent-<owner>-<name>` on a dedicated socket, where
+`<owner>` is derived from the creating agent's session id, so:
 
 ```bash
-tmux -L claude-agent ls                        # what's running
-tmux -L claude-agent attach -t agent-<name>    # look at one
+tmux -L claude-agent ls                                  # what's running
+tmux -L claude-agent attach -t agent-<owner>-<name>      # look at one
 ```
+
+`agent-term.sh attach <name>` prints this command with the owner already
+filled in, which saves looking the id up.
 
 `agent-term.sh list` prints both, along with each session's age and what's
 running in it. Detach with the usual `C-b d`; the session keeps running.
