@@ -146,7 +146,9 @@ there's no way to tell which one did it. So:
   session via the `dfadler-agent-config:detached-terminal` skill — a real PTY that's
   never displayed, which the human attaches to when they choose. For anything
   non-interactive, the headless `Bash` tool (with `run_in_background` for long jobs)
-  already covers it and needs no terminal.
+  already covers it and needs no terminal. **A detached session is not a sandbox** —
+  tmux gives every pane a `$TMUX` handle back to the server that governs it, so only
+  run trusted programs there, never an untrusted build step or fetched script.
 - **Don't do privileged work in a terminal session an agent can drive.** sudo keeps
   its timestamp per-tty by default, so authenticating in an attached agent pane
   leaves a live sudo ticket on a tty the agent can send keystrokes to. Same for an
