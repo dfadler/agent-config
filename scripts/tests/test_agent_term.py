@@ -576,3 +576,70 @@ class TestChildIsolation:
             assert short_state not in screen, "the socket path reached the child"
         finally:
             run("stop-all")
+
+
+class TestSocketPreservation:
+    """A probe failure is not proof the daemon is gone.
+
+    Only a socket with nothing listening may be unlinked. A daemon that answers
+    with an error, or is merely too slow to answer, is still holding a live
+    session, and removing its socket would strand it with no way back in.
+    """
+
+    @staticmethod
+    def _fake_daemon(path: str, reply: bytes | None) -> Callable[[], None]:
+        """Serve one connection on `path`; send `reply`, or nothing at all."""
+        import socket as _socket
+        import threading
+
+        server = _socket.socket(_socket.AF_UNIX, _socket.SOCK_STREAM)
+        server.bind(path)
+        server.listen(1)
+
+        def serve() -> None:
+            with contextlib.suppress(OSError):
+                conn, _ = server.accept()
+                with conn:
+                    conn.recv(4096)
+                    if reply is None:
+                        time.sleep(5)  # outlast the 2s probe timeout
+                    else:
+                        conn.sendall(reply)
+
+        thread = threading.Thread(target=serve, daemon=True)
+        thread.start()
+        return server.close
+
+    def test_error_reply_keeps_the_socket(self, term: Runner, short_state: str) -> None:
+        path = os.path.join(short_state, "grumpy.sock")
+        close = self._fake_daemon(path, b'{"ok": false, "error": "nope"}\n')
+        try:
+            result = term("list")
+            assert os.path.exists(path), "a live daemon's socket was unlinked"
+            assert "socket kept" in result.stdout
+        finally:
+            close()
+
+    def test_slow_daemon_keeps_the_socket(self, term: Runner, short_state: str) -> None:
+        path = os.path.join(short_state, "slow.sock")
+        close = self._fake_daemon(path, None)
+        try:
+            result = term("list")
+            assert os.path.exists(path), "a slow daemon's socket was unlinked"
+            assert "socket kept" in result.stdout
+        finally:
+            close()
+
+    def test_socket_with_no_listener_is_unlinked(
+        self, term: Runner, short_state: str
+    ) -> None:
+        """The cleanup path still works: nothing listening means stale."""
+        import socket as _socket
+
+        path = os.path.join(short_state, "stale.sock")
+        server = _socket.socket(_socket.AF_UNIX, _socket.SOCK_STREAM)
+        server.bind(path)
+        server.close()  # file remains, nothing accepts on it
+        assert os.path.exists(path)
+        term("list")
+        assert not os.path.exists(path), "a stale socket was left behind"
