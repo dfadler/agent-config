@@ -37,6 +37,7 @@ import pty
 import select
 import signal
 import socket
+import stat
 import struct
 import sys
 import termios
@@ -416,10 +417,39 @@ SUN_PATH_MAX = 100
 
 
 def state_dir() -> str:
+    """The 0700 directory holding this user's control sockets.
+
+    The default lives directly in /tmp, which is world-writable, so the
+    directory is verified rather than assumed: another user could create the
+    name first, or leave a symlink pointing somewhere they control, and
+    `makedirs(exist_ok=True)` would happily accept either. Carried over from the
+    review of the tmux implementation (#68), where the same check was missing.
+    """
     base = os.environ.get("AGENT_TERM_STATE") or f"/tmp/agent-term-{os.getuid()}"
-    os.makedirs(base, mode=0o700, exist_ok=True)
-    # Re-assert: makedirs won't tighten a directory that already exists, and
-    # the 0700 is what keeps other users off the control sockets.
+    try:
+        os.makedirs(base, mode=0o700, exist_ok=True)
+    except OSError as exc:
+        # Notably FileExistsError when the path is a plain file: exist_ok only
+        # forgives an existing *directory*. Report it rather than surfacing a
+        # traceback from inside a helper.
+        raise SystemExit(
+            f"agent-term: cannot use state dir {base}: {exc.strerror}"
+        ) from exc
+
+    # lstat, not stat: a symlink must be rejected, not followed.
+    info = os.lstat(base)
+    if stat.S_ISLNK(info.st_mode):
+        raise SystemExit(f"agent-term: {base} is a symlink; refusing to use it")
+    if not stat.S_ISDIR(info.st_mode):
+        raise SystemExit(f"agent-term: {base} exists and is not a directory")
+    if info.st_uid != os.getuid():
+        raise SystemExit(
+            f"agent-term: {base} is owned by uid {info.st_uid}, not you "
+            f"({os.getuid()}); refusing to put a control socket in it"
+        )
+
+    # makedirs won't tighten a directory that already exists, and the 0700 is
+    # what keeps other users off the sockets.
     os.chmod(base, 0o700)
     return base
 

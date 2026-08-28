@@ -12,6 +12,7 @@ from __future__ import annotations
 import argparse
 import importlib.util
 import os
+import stat
 import subprocess
 import sys
 import time
@@ -180,6 +181,45 @@ class TestValidation:
         monkeypatch.setenv("AGENT_TERM_STATE", str(deep))
         with pytest.raises(SystemExit, match="too long"):
             agent_term.socket_path("session")
+
+
+class TestStateDir:
+    """/tmp is world-writable, so the directory is verified, not assumed.
+
+    Carried over from the review of the tmux implementation (#68), where the
+    same check was missing: another user can create the default name first, or
+    leave a symlink pointing somewhere they control, and makedirs(exist_ok=True)
+    accepts either without complaint.
+    """
+
+    def test_rejects_a_symlink(
+        self, monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+    ) -> None:
+        real = tmp_path / "real"
+        real.mkdir()
+        link = tmp_path / "link"
+        link.symlink_to(real)
+        monkeypatch.setenv("AGENT_TERM_STATE", str(link))
+        with pytest.raises(SystemExit, match="symlink"):
+            agent_term.state_dir()
+
+    def test_rejects_a_non_directory(
+        self, monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+    ) -> None:
+        plain = tmp_path / "afile"
+        plain.write_text("")
+        monkeypatch.setenv("AGENT_TERM_STATE", str(plain))
+        with pytest.raises(SystemExit):
+            agent_term.state_dir()
+
+    def test_accepts_and_tightens_our_own_directory(
+        self, monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+    ) -> None:
+        loose = tmp_path / "loose"
+        loose.mkdir(mode=0o755)
+        monkeypatch.setenv("AGENT_TERM_STATE", str(loose))
+        assert agent_term.state_dir() == str(loose)
+        assert stat.S_IMODE(os.stat(loose).st_mode) == 0o700
 
 
 class TestTolerantScreen:
