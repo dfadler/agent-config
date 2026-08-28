@@ -30,9 +30,16 @@ PY := $(shell test -x $(VENV_BIN)/python && echo $(VENV_BIN)/python || echo pyth
 help: ## Show available targets
 	@grep -E '^[a-z-]+:.*?## ' $(MAKEFILE_LIST) | awk -F':.*?## ' '{printf "  \033[36m%-14s\033[0m %s\n", $$1, $$2}'
 
-# lint-actions is included deliberately: CI runs it in actionlint.yml, so
-# leaving it out would let a workflow change pass `make check` and fail in CI —
-# exactly the local/CI drift this Makefile exists to prevent.
+# `check` must be the UNION of what every workflow runs, because that is the
+# promise the README makes. The split, so a new target lands in both places:
+#
+#   shell.yml      lint-sh, structure, test-sh
+#   python.yml     lint-py, typecheck, test-py
+#   actionlint.yml lint-actions
+#
+# Each workflow calls its own subset rather than `make check` — shell.yml has
+# no Python installed, and pointing it at an aggregate target that had grown a
+# pytest dependency is exactly how this broke once already.
 check: lint structure typecheck test lint-actions ## Everything CI runs
 
 venv: ## Create .venv from requirements-dev.txt
