@@ -287,26 +287,13 @@ has no libx264 — use `h264_videotoolbox` instead in that case. On Linux,
 
 ## Attaching to the PR/issue
 
-**Images:** use your repo's GitHub-attachment upload script/skill (e.g. the
-`dfadler-agent-config:gh-attach-image` skill) — don't re-derive the upload endpoint by hand.
-Never commit screenshots to the repo, never use a Gist.
-
-**Video:** most attachment scripts (including `dfadler-agent-config:gh-attach-image`) whitelist
-only image extensions, since that's the common case. GitHub's own
-attachment endpoint also accepts video — replicate the same call with
-`content_type=video/mp4` and the file bytes as the raw request body:
-
-```bash
-curl -sS --fail-with-body -X POST \
-  --data-binary @<file.mp4> \
-  -H "Authorization: Bearer $(gh auth token)" \
-  -H "Content-Type: video/mp4" \
-  "https://uploads.github.com/user-attachments/assets?name=<file.mp4>&content_type=video/mp4&repository_id=$(gh api repos/<owner>/<repo> --jq .id)"
-```
-
-Put the returned `https://github.com/user-attachments/assets/<uuid>` URL on
-its own line in the PR/issue body — GitHub renders it as an inline `<video>`
-player.
+**Images and video:** use your repo's GitHub-attachment upload script/skill
+(e.g. the `dfadler-agent-config:gh-attach-image` skill) — don't re-derive
+the upload endpoint by hand. `gh-attach-image`'s `upload.sh` recognizes
+`.mp4`/`.mov`/`.webm` alongside the image extensions and already prints a
+bare URL (not `![alt](url)`) for video, which is what GitHub needs to
+render an inline `<video>` player. Never commit screenshots or recordings
+to the repo, never use a Gist.
 
 **Verify before considering it done either way:** `curl -sI -L <url>` should
 return `200`, not `404` — a freshly uploaded attachment 404s until the

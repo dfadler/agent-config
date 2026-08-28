@@ -1,18 +1,20 @@
 #!/usr/bin/env bash
-# Upload local image files to GitHub's user-attachments endpoint and print
-# ready-to-paste markdown image lines. See ../SKILL.md for the full story.
+# Upload local image or video files to GitHub's user-attachments endpoint and
+# print ready-to-paste markdown lines. See ../SKILL.md for the full story.
 #
 # Usage:
 #   upload.sh --repo OWNER/NAME FILE [FILE...]
 #   upload.sh --repo OWNER/NAME --pr N [--comment] [--heading "## Screenshots"] FILE [FILE...]
 #   upload.sh --repo OWNER/NAME --issue N [--comment] [--heading "## Screenshots"] FILE [FILE...]
 #
-# Default mode (no --pr/--issue): uploads each file and prints one
-# "![alt](url)" line per file to stdout, in input order. Nothing is saved
-# anywhere on GitHub yet — the URLs won't resolve until a saved body
-# references them (see SKILL.md). Use this mode when the images need to go
-# in a specific spot in a hand-crafted body (a table, a particular section)
-# rather than a simple append.
+# Default mode (no --pr/--issue): uploads each file and prints one line per
+# file to stdout, in input order — "![alt](url)" for an image, a bare url
+# for a video (GitHub only renders a video player from a bare URL on its own
+# line; image markdown around a video URL shows a broken-image icon).
+# Nothing is saved anywhere on GitHub yet — the URLs won't resolve until a
+# saved body references them (see SKILL.md). Use this mode when the files
+# need to go in a specific spot in a hand-crafted body (a table, a
+# particular section) rather than a simple append.
 #
 # --pr N / --issue N: fetches the current body, appends a heading + the
 # markdown lines, and saves it back via `gh pr edit`/`gh issue edit`. Add
@@ -96,8 +98,11 @@ content_type_for() {
     webp) echo "image/webp" ;;
     svg) echo "image/svg+xml" ;;
     apng) echo "image/apng" ;;
+    mp4) echo "video/mp4" ;;
+    mov) echo "video/quicktime" ;;
+    webm) echo "video/webm" ;;
     *)
-      echo "Error: unrecognized image extension on '$1' (expected png/jpg/jpeg/gif/webp/svg/apng)" >&2
+      echo "Error: unrecognized extension on '$1' (expected png/jpg/jpeg/gif/webp/svg/apng/mp4/mov/webm)" >&2
       exit 1
       ;;
   esac
@@ -128,7 +133,14 @@ for f in "${FILES[@]}"; do
     exit 1
   fi
 
-  MARKDOWN_LINES+=("![${alt}](${url})")
+  # GitHub renders video from a bare URL on its own line, not image markdown
+  # (`![alt](url)` gives a broken-image icon for video, since it's not img
+  # markup GitHub knows how to embed as a player).
+  if [[ "$ctype" == video/* ]]; then
+    MARKDOWN_LINES+=("${url}")
+  else
+    MARKDOWN_LINES+=("![${alt}](${url})")
+  fi
   echo "Uploaded ${f} -> ${url}" >&2
 done
 
