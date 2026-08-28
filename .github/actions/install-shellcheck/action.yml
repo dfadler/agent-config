@@ -1,0 +1,35 @@
+name: Install shellcheck
+description: >
+  Downloads a pinned shellcheck release, verifies it against a recorded
+  SHA256, and installs it to /usr/local/bin.
+
+# shell.yml and actionlint.yml both need shellcheck (shell.yml to lint this
+# repo's scripts directly, actionlint.yml so actionlint can lint the `run:`
+# blocks embedded in workflow YAML) and both pinned it to the same version.
+# That was a byte-for-byte duplicated step in two workflow files, so it's
+# factored out here: one version/checksum pin instead of two copies that can
+# drift apart on the next bump.
+#
+# koalaman/shellcheck publishes no checksums file, so SHELLCHECK_SHA256 below
+# was recorded by downloading this exact release once — that PINS the
+# artifact (a later silent replacement, or a MITM on a future run, fails
+# loudly) but does not establish provenance the way a signed upstream
+# manifest would. On a version bump, re-record with:
+#   curl -fsSL <url> | shasum -a 256
+
+runs:
+  using: composite
+  steps:
+    - name: Install shellcheck ${{ env.SHELLCHECK_VERSION }}
+      shell: bash
+      env:
+        SHELLCHECK_VERSION: v0.11.0
+        SHELLCHECK_SHA256: 8c3be12b05d5c177a04c29e3c78ce89ac86f1595681cab149b65b97c4e227198
+      run: |
+        curl -fsSL -o /tmp/shellcheck.tar.xz \
+          "https://github.com/koalaman/shellcheck/releases/download/${SHELLCHECK_VERSION}/shellcheck-${SHELLCHECK_VERSION}.linux.x86_64.tar.xz"
+        echo "${SHELLCHECK_SHA256}  /tmp/shellcheck.tar.xz" | sha256sum -c -
+        tar -xJf /tmp/shellcheck.tar.xz -C /tmp
+        sudo install -m 0755 "/tmp/shellcheck-${SHELLCHECK_VERSION}/shellcheck" /usr/local/bin/shellcheck
+        rm -rf /tmp/shellcheck.tar.xz "/tmp/shellcheck-${SHELLCHECK_VERSION}"
+        shellcheck --version
