@@ -228,6 +228,19 @@ even though `setup.sh`'s whole job is writing symlinks into it. The `pytest` sui
 forks real PTYs, with `AGENT_TERM_STATE` redirected per test and every session torn
 down in a fixture, so it can't collide with a live session either.
 
+## GitHub operations
+
+This repo uses the `gh` CLI for all GitHub operations — issues and PRs, review
+comments, CI checks, labels, and repo settings changes like branch protection.
+Not the web UI, not raw `curl` against the REST API, not a GitHub MCP
+connector. When `gh` has no dedicated subcommand, `gh api` is the escape
+hatch — still authenticated and scriptable — rather than dropping to `curl`
+with a hand-managed token. Non-obvious ones worth knowing: `gh run view
+<run-id> --log-failed` to diagnose a CI failure without opening a browser,
+`gh api repos/<owner>/<repo>/pulls/<pr>/comments/<id>/replies` to reply to an
+inline review comment, and `gh api -X PUT .../branches/main/protection` for
+repo settings that have no `gh` subcommand.
+
 ## What belongs here vs. in a project
 
 If a rule/skill/agent only makes sense with a specific repo's paths, scripts, or stack
