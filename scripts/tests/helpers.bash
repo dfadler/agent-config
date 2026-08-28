@@ -105,6 +105,16 @@ assert_failure() {
   fi
 }
 
+# Pin an exact exit code, for the shared exit-code taxonomy in
+# claude/CLAUDE.md's hygiene baseline (EXIT_USAGE=2, EXIT_DEPENDENCY=4, etc.).
+assert_status() {
+  if [ "$status" -ne "$1" ]; then
+    echo "expected exit $1, got $status" >&2
+    echo "$output" >&2
+    return 1
+  fi
+}
+
 assert_output_contains() {
   if [[ "$output" != *"$1"* ]]; then
     echo "output does not contain: $1" >&2
