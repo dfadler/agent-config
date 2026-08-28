@@ -195,3 +195,16 @@ For any non-trivial bash script:
   Inline/review comment:
   `gh api repos/<owner>/<repo>/pulls/<pr>/comments/<comment-id>/replies -f body="<reply>"`.
   General PR-level comment: `gh pr comment <pr> --body "<reply>"`.
+- When `gh pr checks`/`gh run view --log-failed` (see above) doesn't explain a
+  failure, escalate in this order before giving up: `gh api
+  repos/<owner>/<repo>/actions/runs/<runId>/jobs` for per-step status/timing the
+  summary view collapses; `gh run rerun <runId> --debug --failed` to get verbose step
+  logs on just that one re-run — no need to set the `ACTIONS_STEP_DEBUG`/
+  `ACTIONS_RUNNER_DEBUG` repo secrets or variables unless you want debug logging on
+  *every* run; `gh run watch --compact` to follow an in-progress run instead of
+  polling. Local reproduction (`act`, via Docker) and SSH-into-the-runner
+  (`mxschmitt/action-tmate`) are real escalation options for a workflow-syntax problem
+  or a genuinely stuck failure, but skip them by default — `act` doesn't perfectly
+  match the hosted runner's environment/secrets, and action-tmate pauses the job and
+  burns runner minutes, so treat both as tools to reach for only when the above
+  doesn't resolve it, not habits to build into a workflow.
