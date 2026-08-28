@@ -538,34 +538,82 @@ def socket_path(name: str) -> str:
     return path
 
 
+class SessionGone(SystemExit):
+    """Nothing is listening on the socket, so the file is safe to unlink.
+
+    Distinct from a plain SystemExit, which every other failure raises. Callers
+    unlink a socket only for this class: a daemon that answers with an error,
+    or is merely too slow, is still holding a live session, and removing its
+    socket would strand it with no way back in.
+    """
+
+
+def _listener_present(path: str) -> bool:
+    """Is anything still accepting connections on `path`?
+
+    The one question that actually decides whether a socket file is stale. A
+    connect() that succeeds proves a listener, whether or not the daemon then
+    answers; ECONNREFUSED or a missing file proves there is none. Anything else
+    is unclear, and unclear must read as present so cleanup stays conservative.
+    """
+    probe = socket.socket(socket.AF_UNIX, socket.SOCK_STREAM)
+    probe.settimeout(1.0)
+    try:
+        probe.connect(path)
+    except (FileNotFoundError, ConnectionRefusedError):
+        return False
+    except OSError:
+        return True
+    finally:
+        probe.close()
+    return True
+
+
 def request(
     name: str, payload: dict[str, Any], timeout: float = 10.0
 ) -> dict[str, Any]:
     path = socket_path(name)
     conn = socket.socket(socket.AF_UNIX, socket.SOCK_STREAM)
     conn.settimeout(timeout)
-    # A daemon that is shutting down can drop the connection at any point in
-    # this exchange, not only at connect(). Linux reports that as ECONNRESET
-    # where macOS gave ECONNREFUSED, so the whole exchange is guarded and every
-    # variant is reported as "no session" -- callers already treat that as a
-    # stale socket to clean up. Found by CI; the macOS runs never hit it.
-    gone = (
-        FileNotFoundError,
-        ConnectionRefusedError,
-        ConnectionResetError,
-        BrokenPipeError,
-    )
     try:
+        # Only a connect() failure proves the socket has no listener. Every
+        # later failure is ambiguous: a daemon can accept, drop that one
+        # connection, and keep serving. Those fall through to _listener_present
+        # rather than being read as absence.
         conn.connect(path)
+    except (FileNotFoundError, ConnectionRefusedError):
+        raise SessionGone(
+            f"agent-term: no session {name!r} (try: agent_term.py list)"
+        ) from None
+    try:
         with conn:
             conn.sendall((json.dumps(payload) + "\n").encode())
             raw = _recv_line(conn)
-    except gone:
+    except (ConnectionResetError, BrokenPipeError):
+        # A shutting-down daemon drops the connection mid-exchange, and Linux
+        # reports that as ECONNRESET where macOS gave ECONNREFUSED at connect
+        # time. Found by CI; the macOS runs never hit it. Whether the daemon is
+        # actually gone is settled below, not assumed here.
+        raw = None
+    except TimeoutError:
+        # Accepted, then went quiet: busy, wedged, or paused. It is still
+        # there, so this is never a stale socket. Previously this escaped
+        # request() entirely and surfaced as a traceback, since it is an
+        # OSError but not one of the connection errors.
         raise SystemExit(
-            f"agent-term: no session {name!r} (try: agent_term.py list)"
+            f"agent-term: session {name!r} did not answer within {timeout:g}s "
+            "— it is still running; retry, or 'stop' it if it is wedged"
         ) from None
     if not raw:
-        raise SystemExit(f"agent-term: session {name!r} closed the connection")
+        # EOF or a mid-exchange drop. On its own this says nothing: a daemon
+        # shutting down looks exactly like one that closed a single connection
+        # and kept listening. Re-probe and let the socket answer.
+        if _listener_present(path):
+            raise SystemExit(
+                f"agent-term: session {name!r} dropped the connection but is "
+                "still listening — retry, or 'stop' it if it is wedged"
+            )
+        raise SessionGone(f"agent-term: session {name!r} closed the connection")
     reply: dict[str, Any] = json.loads(raw)
     if not reply.get("ok"):
         raise SystemExit(f"agent-term: {reply.get('error', 'request failed')}")
@@ -596,8 +644,8 @@ def cmd_start(args: argparse.Namespace) -> int:
     if os.path.exists(path):
         try:
             request(name, {"cmd": "status"}, timeout=2)
-        except SystemExit:
-            os.unlink(path)  # stale socket from a daemon that died
+        except SessionGone:
+            os.unlink(path)  # nothing listening; the daemon really is gone
         else:
             raise SystemExit(
                 f"agent-term: session {name!r} already exists "
@@ -720,13 +768,14 @@ def cmd_status(args: argparse.Namespace) -> int:
 def cmd_list(_args: argparse.Namespace) -> int:
     base = state_dir()
     rows = []
+    unreachable: list[tuple[str, str]] = []
     for entry in sorted(os.listdir(base)):
         if not entry.endswith(".sock"):
             continue
         name = entry[: -len(".sock")]
         try:
             status = request(name, {"cmd": "status"}, timeout=2)["status"]
-        except SystemExit:
+        except SessionGone:
             # Stale socket from a daemon that exited. Another invocation may be
             # cleaning up the same entry concurrently, so a missing file here
             # is the expected outcome, not an error worth crashing `list` over.
@@ -735,18 +784,27 @@ def cmd_list(_args: argparse.Namespace) -> int:
             except FileNotFoundError:
                 pass
             continue
+        except SystemExit as exc:
+            # Alive but unhappy: too slow to answer, or answering with an
+            # error. `list` is a read-only command, so it reports the session
+            # and leaves the socket alone rather than stranding a live daemon.
+            unreachable.append((name, str(exc).removeprefix("agent-term: ")))
+            continue
         rows.append(status)
-    if not rows:
+    if not rows and not unreachable:
         print("no agent sessions")
         return 0
-    print(f"{'NAME':<18}{'AGE':<8}{'IDLE':<8}{'ALIVE':<7}RUNNING")
-    for status in rows:
-        print(
-            f"{status['name']:<18}{str(status['age']) + 's':<8}"
-            f"{str(status['idle']) + 's':<8}"
-            f"{'yes' if status['alive'] else 'no':<7}"
-            f"{' '.join(status['command'])}"
-        )
+    if rows:
+        print(f"{'NAME':<18}{'AGE':<8}{'IDLE':<8}{'ALIVE':<7}RUNNING")
+        for status in rows:
+            print(
+                f"{status['name']:<18}{str(status['age']) + 's':<8}"
+                f"{str(status['idle']) + 's':<8}"
+                f"{'yes' if status['alive'] else 'no':<7}"
+                f"{' '.join(status['command'])}"
+            )
+    for name, why in unreachable:
+        print(f"{name:<18}unreachable, socket kept: {why}")
     return 0
 
 
@@ -760,6 +818,7 @@ def cmd_stop(args: argparse.Namespace) -> int:
 def cmd_stop_all(_args: argparse.Namespace) -> int:
     base = state_dir()
     stopped = 0
+    failed: list[tuple[str, str]] = []
     for entry in sorted(os.listdir(base)):
         if not entry.endswith(".sock"):
             continue
@@ -767,13 +826,20 @@ def cmd_stop_all(_args: argparse.Namespace) -> int:
         try:
             request(name, {"cmd": "stop"}, timeout=2)
             stopped += 1
-        except SystemExit:
+        except SessionGone:
             try:
                 os.unlink(os.path.join(base, entry))
             except FileNotFoundError:
                 pass
+        except SystemExit as exc:
+            # Refused or too slow to answer, so it is still live. Leave the
+            # socket in place: unlinking it would remove the only handle on a
+            # session this command failed to stop.
+            failed.append((name, str(exc).removeprefix("agent-term: ")))
     print(f"stopped {stopped} session(s)")
-    return 0
+    for name, why in failed:
+        print(f"could not stop {name}, socket kept: {why}")
+    return 1 if failed else 0
 
 
 def parse_size(value: str) -> tuple[int, int]:
