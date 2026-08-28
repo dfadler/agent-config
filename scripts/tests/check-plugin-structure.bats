@@ -143,6 +143,40 @@ EOF
   assert_output_contains "non-empty 'description'"
 }
 
+# YAML Core resolves exactly these four plain scalars to null.
+@test "fails on the YAML null spellings" {
+  local spelling
+  for spelling in null Null NULL '~'; do
+    rm -rf "$ROOT/plugins/demo/skills/nul"
+    mkdir -p "$ROOT/plugins/demo/skills/nul"
+    printf -- '---\nname: nul\ndescription: %s\n---\n\nBody\n' "$spelling" \
+      > "$ROOT/plugins/demo/skills/nul/SKILL.md"
+    run bash "$REPO_ROOT/scripts/check-plugin-structure.sh" "$ROOT"
+    if [ "$status" -eq 0 ]; then
+      echo "description: $spelling was accepted but resolves to null" >&2
+      return 1
+    fi
+  done
+}
+
+# The guard against over-correcting: only those exact spellings are null, so a
+# case-insensitive or prefix match would wrongly reject real descriptions.
+@test "accepts strings that merely look like null" {
+  local spelling
+  for spelling in NuLl nullable 'null and void'; do
+    rm -rf "$ROOT/plugins/demo/skills/nul"
+    mkdir -p "$ROOT/plugins/demo/skills/nul"
+    printf -- '---\nname: nul\ndescription: %s\n---\n\nBody\n' "$spelling" \
+      > "$ROOT/plugins/demo/skills/nul/SKILL.md"
+    run bash "$REPO_ROOT/scripts/check-plugin-structure.sh" "$ROOT"
+    if [ "$status" -ne 0 ]; then
+      echo "description: '$spelling' is a valid string but was rejected" >&2
+      echo "$output" >&2
+      return 1
+    fi
+  done
+}
+
 @test "accepts a plain scalar that carries a trailing comment" {
   mkdir -p "$ROOT/plugins/demo/skills/trailing"
   printf -- '---\nname: trailing\ndescription: a real description # note\n---\n\nBody\n' \
