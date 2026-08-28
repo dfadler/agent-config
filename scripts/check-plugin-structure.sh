@@ -20,6 +20,28 @@
 #     documents `scripts/foo.sh` is useless if the mode bit didn't survive.
 set -euo pipefail
 
+# Exit-code taxonomy — see the hygiene baseline in claude/CLAUDE.md.
+readonly EXIT_OK=0
+readonly EXIT_FAILURE=1
+
+usage() {
+  cat <<'USAGE'
+Usage: check-plugin-structure.sh [-h|--help] [ROOT]
+
+Validate plugin manifests, skill frontmatter, and agent frontmatter under
+ROOT/plugins (default: .).
+
+  -h, --help   Show this message and exit.
+USAGE
+}
+
+case "${1:-}" in
+  -h | --help)
+    usage
+    exit "$EXIT_OK"
+    ;;
+esac
+
 ROOT="${1:-.}"
 errors=()
 
@@ -161,7 +183,7 @@ shopt -s nullglob
 plugins=("$ROOT"/plugins/*/)
 if [[ ${#plugins[@]} -eq 0 ]]; then
   echo "::error::no plugins found under $ROOT/plugins/" >&2
-  exit 1
+  exit "$EXIT_FAILURE"
 fi
 
 for plugin_dir in "${plugins[@]}"; do
@@ -193,7 +215,7 @@ done
 if [[ ${#errors[@]} -gt 0 ]]; then
   echo "::error::Plugin structure validation failed:" >&2
   printf '  %s\n' "${errors[@]}" >&2
-  exit 1
+  exit "$EXIT_FAILURE"
 fi
 
 echo "✓ Plugin manifests, skill frontmatter, and agent frontmatter are consistent."
