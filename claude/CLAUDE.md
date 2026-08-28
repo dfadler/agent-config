@@ -160,6 +160,23 @@ there's no way to tell which one did it. So:
   far more than restoring focus, and it races the user's own typing. Not taking focus
   is strictly better than giving it back.
 
+## Answer shape for direct "why" questions
+
+When asked a direct root-cause question — "Why didn't you X?", "What caused Y?",
+"Where is W handled?" — lead with the cause, not a policy recap or a walk through
+everything that was tried. Answer in this shape:
+
+1. **Cause** — what happened and why, in one line.
+2. **Evidence** — the concrete signal that shows it: a file path, a log line, a
+   command's output.
+3. **Next step** — the smallest corrective action, or a single question that would
+   confirm or decide it.
+
+This is about the shape of the answer, not about pausing more often — it doesn't
+change the general bias toward proceeding rather than stopping to ask; it only
+applies once the user has already asked a direct question and wants the real answer,
+not a recap of what should have happened.
+
 ## Shell scripts: hygiene baseline
 
 For any non-trivial bash script:
@@ -192,6 +209,15 @@ partway through; manual scanning does both.
   If the autofix changes semantics or adds unwanted noise, revert it and fix by
   hand instead.
 
+## Cite sources for platform-capability claims
+
+When stating a platform or tool capability as fact — rate limits, model behavior,
+API surface, auth methods, size limits, what a product can or cannot do — cite the
+official docs rather than relying on memory or inference. Marketing copy and old
+training data go stale; a confident wrong answer here is worse than a slower correct
+one. If unsure, say so explicitly and point to where to check, rather than guessing
+confidently. This applies to any platform or tool, not just Claude/Anthropic.
+
 ## GitHub workflow habits
 
 - Prefer GitHub Issues/PRs as the tracker when a project uses GitHub — don't route
@@ -212,3 +238,10 @@ partway through; manual scanning does both.
   Inline/review comment:
   `gh api repos/<owner>/<repo>/pulls/<pr>/comments/<comment-id>/replies -f body="<reply>"`.
   General PR-level comment: `gh pr comment <pr> --body "<reply>"`.
+- **`.github/` stays config-only.** Limit it to platform configuration: workflows
+  (`.github/workflows/`), CODEOWNERS, dependabot/release config, and a **generic**
+  PR/issue template. Feature- or product-specific docs, playbooks, or checklists
+  belong under the project's own docs directory, not `.github/`. If a specific
+  feature genuinely needs its own PR template, use an opt-in file under
+  `.github/PULL_REQUEST_TEMPLATE/<feature>.md` (or have tooling append content only
+  for those PRs) — never grow the generic template with feature-specific sections.
