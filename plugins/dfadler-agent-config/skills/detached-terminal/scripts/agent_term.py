@@ -75,6 +75,10 @@ MIN_TTL = 60
 DEFAULT_SIZE = (120, 40)
 READ_CHUNK = 65536
 
+#: Longest a `keys` request will wait for the child to accept input before
+#: giving up. Bounded so one unresponsive program cannot park the daemon.
+WRITE_TIMEOUT = 5.0
+
 #: Environment handed to the child. An ALLOWLIST, not a denylist: the previous
 #: implementation enumerated known-sensitive names and inevitably missed some
 #: (connection URLs carrying passwords were the ones that got through review).
@@ -192,6 +196,9 @@ class Session:
         self.pid, self.fd = pty.fork()
         if self.pid == 0:  # pragma: no cover - child never returns
             self._exec_child(cwd, env_passthrough)
+        # Non-blocking: select() says "writable" for at least one byte, so a
+        # blocking fd could still stall mid-payload once the buffer fills.
+        os.set_blocking(self.fd, False)
         self._set_winsize()
 
     def _exec_child(self, cwd: str | None, passthrough: Iterable[str]) -> NoReturn:
@@ -217,6 +224,8 @@ class Session:
         """Drain pending PTY output into the screen. False when the child is gone."""
         try:
             data = os.read(self.fd, READ_CHUNK)
+        except BlockingIOError:
+            return True  # nothing pending; the child is still alive
         except OSError as exc:
             if exc.errno in (errno.EIO, errno.EBADF):
                 return False
@@ -228,8 +237,31 @@ class Session:
         return True
 
     def send(self, keys: list[str]) -> None:
+        """Write keystrokes to the PTY without stalling the daemon.
+
+        A single `os.write` was wrong twice over. It ignores the returned count,
+        so a payload larger than the PTY's input buffer was silently truncated;
+        and it blocks when the child isn't reading, which parks the one daemon
+        loop and makes every later `read` on this session time out. So: select
+        for writability, loop on the short-write count, and give up with an
+        error rather than hanging forever.
+        """
         payload = b"".join(encode_key(key) for key in keys)
-        os.write(self.fd, payload)
+        view = memoryview(payload)
+        deadline = time.time() + WRITE_TIMEOUT
+        while view:
+            if not select.select([], [self.fd], [], 0.2)[1]:
+                if time.time() > deadline:
+                    raise RuntimeError(
+                        f"timed out writing {len(view)} of {len(payload)} bytes; "
+                        "the program is not reading its input"
+                    )
+                continue
+            try:
+                written = os.write(self.fd, view)
+            except BlockingIOError:
+                continue
+            view = view[written:]
         self.last_activity = time.time()
 
     def reap_child(self) -> None:
@@ -251,14 +283,25 @@ class Session:
 
     # -- rendering ---------------------------------------------------------
 
+    def _history_row(self, row: Any) -> str:
+        """Render one scrollback row in COLUMN order.
+
+        pyte stores a history row as a sparse mapping of column -> Char, with
+        unwritten columns simply absent. The first version of this joined
+        `sorted(row.values())`, which sorts the Char objects themselves — so
+        "zebra 0 apple" came back as "  0aabeelpprz", alphabetised, with the
+        gaps dropped. Indexing by column is the only ordering that means
+        anything here.
+        """
+        if not hasattr(row, "get"):
+            return str(row)
+        return "".join(
+            (row[column].data if column in row else " ") for column in range(self.cols)
+        )
+
     def render(self, lines: int | None = None, history: bool = False) -> str:
         if history:
-            rows = [
-                "".join(char.data for char in sorted(row.values()))
-                if isinstance(row, dict)
-                else str(row)
-                for row in self.screen.history.top
-            ]
+            rows = [self._history_row(row) for row in self.screen.history.top]
             rows.extend(self.screen.display)
         else:
             rows = list(self.screen.display)
@@ -283,11 +326,23 @@ class Session:
     # -- teardown ----------------------------------------------------------
 
     def terminate(self) -> None:
+        """Signal the whole process group, not only the direct child.
+
+        pty.fork() makes the child a session and process-group leader, so its
+        own children share that group. Signalling self.pid alone left
+        descendants running -- `sh -c 'sleep 600 & wait'` outlived both `stop`
+        and TTL expiry, which is exactly the orphan this tool is supposed not
+        to create.
+        """
         if self.exit_status is None:
+            try:
+                pgid = os.getpgid(self.pid)
+            except ProcessLookupError:
+                pgid = self.pid
             for sig in (signal.SIGTERM, signal.SIGKILL):
                 try:
-                    os.kill(self.pid, sig)
-                except ProcessLookupError:
+                    os.killpg(pgid, sig)
+                except (ProcessLookupError, PermissionError):
                     break
                 for _ in range(20):
                     self.reap_child()
@@ -300,11 +355,16 @@ class Session:
             pass
 
 
-def serve(session: Session) -> None:
-    """Accept one control connection at a time until the session ends.
+def bind_control_socket(session: Session) -> socket.socket:
+    """Bind and listen, returning the ready server socket.
 
-    The socket is created with a 0600 mode inside a 0700 directory, and its
-    path is never exported into the child's environment.
+    Split out from serve() so `start` can report success only once the socket
+    is accepting connections. Acknowledging earlier meant a `read` issued
+    immediately after `start` could arrive before the bind and fail with "no
+    session" on a session that had in fact started fine.
+
+    The socket is created 0600 inside a 0700 directory, and its path is never
+    exported into the child's environment.
     """
     server = socket.socket(socket.AF_UNIX, socket.SOCK_STREAM)
     old_umask = os.umask(0o077)
@@ -315,6 +375,11 @@ def serve(session: Session) -> None:
     os.chmod(session.sock_path, 0o600)
     server.listen(4)
     server.settimeout(0.2)
+    return server
+
+
+def serve(session: Session, server: socket.socket) -> None:
+    """Accept one control connection at a time until the session ends."""
 
     def handle_read(req: dict[str, Any]) -> dict[str, Any]:
         return {
@@ -374,7 +439,14 @@ def serve(session: Session) -> None:
                 if handler is None:
                     _send_json(conn, {"ok": False, "error": f"unknown cmd {command!r}"})
                     continue
-                _send_json(conn, handler(request))
+                reply = handler(request)
+                # Any successful control request is activity. Without this a
+                # session an agent is actively watching with `read` still aged
+                # out at the TTL, contradicting the documented "no output and
+                # no client activity" policy. `keys` already refreshed it via
+                # send(); `read` and `status` did not.
+                session.last_activity = time.time()
+                _send_json(conn, reply)
             except Exception as exc:  # noqa: BLE001 - never let one client kill it
                 try:
                     _send_json(conn, {"ok": False, "error": str(exc)})
@@ -568,6 +640,11 @@ def cmd_start(args: argparse.Namespace) -> int:
             ttl=ttl,
             env_passthrough=args.env or (),
         )
+        # Bind BEFORE acknowledging. Reporting success first left a window in
+        # which a `read` issued straight after `start` arrived before the
+        # socket existed and failed with "no session" — on a session that had
+        # started perfectly well.
+        server = bind_control_socket(session)
     except Exception as exc:  # noqa: BLE001
         with os.fdopen(write_fd, "w") as pipe:
             pipe.write(str(exc))
@@ -580,7 +657,7 @@ def cmd_start(args: argparse.Namespace) -> int:
     os.dup2(devnull, 0)
     os.dup2(devnull, 1)
     os.dup2(devnull, 2)
-    serve(session)
+    serve(session, server)
     os._exit(0)
 
 
