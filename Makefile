@@ -16,7 +16,10 @@ SH_FIND := find scripts plugins setup.sh -type f -name '*.sh' -print0
 help: ## Show available targets
 	@grep -E '^[a-z-]+:.*?## ' $(MAKEFILE_LIST) | awk -F':.*?## ' '{printf "  \033[36m%-14s\033[0m %s\n", $$1, $$2}'
 
-check: lint structure test ## Everything CI runs
+# lint-actions is included deliberately: CI runs it in actionlint.yml, so
+# leaving it out would let a workflow change pass `make check` and fail in CI —
+# exactly the local/CI drift this Makefile exists to prevent.
+check: lint structure test lint-actions ## Everything CI runs
 
 lint: lint-sh ## Alias for lint-sh
 
