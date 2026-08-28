@@ -4,7 +4,7 @@ name: Shell
 # had no CI at all: setup.sh rewrites symlinks in the developer's ~/.claude, the
 # skills ship executable scripts, and nothing verified any of it before merge.
 #
-# Four checks, all run through the same `make` targets humans use locally, so
+# Five checks, all run through the same `make` targets humans use locally, so
 # CI and `make check` can never drift:
 #   * shellcheck  — correctness (quoting, fail-open pipelines, unset vars, ...)
 #   * shfmt       — formatting (`-i 2 -ci`, the repo's 2-space style)
@@ -17,6 +17,16 @@ name: Shell
 #   * bats        — unit tests, fully hermetic: HOME is redirected into a
 #                   sandbox and network binaries are shimmed to fail loudly,
 #                   so a test can never touch the real ~/.claude.
+#   * kcov + 70%  — line coverage of the repo's own scripts, enforced by
+#                   scripts/check-shell-coverage.sh (itself linted and bats-
+#                   tested like everything else here). The floor is 70%: the
+#                   first honest measurement, 70.24%, rounded DOWN, taken by
+#                   running `make coverage` on ubuntu-24.04 with the kcov and
+#                   bats pins below. It is a REGRESSION gate, not a target —
+#                   see the `coverage` target in the Makefile for what is and
+#                   isn't in that denominator, and for the number's provenance.
+#                   Linux only: kcov cannot instrument /bin/bash on macOS,
+#                   where the target says so and skips.
 #
 # Tools are pinned to exact versions so a newer shellcheck adding a check, or a
 # shfmt tweaking its output, can't turn a green main red without a bump here.
@@ -54,10 +64,16 @@ env:
   # bats is a git clone, so it gets a commit SHA instead: a tag is mutable and
   # can be repointed at different code under the same name.
   BATS_COMMIT: b640ec3cf2c7c9cfc9e6351479261186f76eeec8
+  # kcov publishes no prebuilt Linux binary and is not in noble's archive, so
+  # it is built from source — hence a commit SHA here too, for the same reason
+  # bats gets one. KCOV_VERSION is the human-readable name of that commit
+  # (tag v42) and is what the build cache keys on; bump both together.
+  KCOV_VERSION: 42
+  KCOV_COMMIT: 3a8c5464be2dd781988dca7ec30db679493ed9a8
 
 jobs:
   shell:
-    name: shellcheck + shfmt + structure + bats
+    name: shellcheck + shfmt + structure + bats + coverage
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v7
@@ -100,6 +116,57 @@ jobs:
           sudo /tmp/bats-core/install.sh /usr/local
           bats --version
 
+      # The clone + cmake + make below is by far the slowest step in this job (a
+      # full C++ compile), so the resulting binary is cached on the pinned
+      # version and a hit skips straight to installing it.
+      #
+      # The cached path is under $HOME, NOT /usr/local/bin: actions/cache runs
+      # as the unprivileged runner user, and a root-owned path fails SILENTLY
+      # on restore ("Cannot open: Permission denied") and falls through to a
+      # full rebuild every run — the cache looks configured and does nothing.
+      # Restore into a user-writable dir, then `sudo install` it into place.
+      - name: Cache kcov ${{ env.KCOV_VERSION }} binary
+        id: kcov-cache
+        uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: ~/.cache/kcov-bin/kcov
+          # "-v1" is this cache key's own generation, not a kcov version: bump
+          # it if the cached PATH ever changes, since a saved key is immutable
+          # and a stale entry for a moved path can never be corrected in place.
+          key: kcov-bin-v1-${{ runner.os }}-${{ env.KCOV_VERSION }}-${{ env.KCOV_COMMIT }}
+
+      # Unconditional even on a cache hit: apt is fast here, and while most of
+      # this list only builds kcov, several packages transitively supply the
+      # runtime shared libraries (libcurl, libelf, libdw) the cached binary
+      # still needs to RUN. python3 is a BUILD-time dependency — kcov generates
+      # one of its sources with a Python script, and the build dies with a bare
+      # "env: 'python3': No such file or directory" without it.
+      - name: Install kcov ${{ env.KCOV_VERSION }} build dependencies
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y -qq cmake g++ pkg-config python3 \
+            libcurl4-openssl-dev libssl-dev libelf-dev libdw-dev \
+            binutils-dev libiberty-dev
+
+      - name: Build kcov ${{ env.KCOV_VERSION }} from source
+        if: steps.kcov-cache.outputs.cache-hit != 'true'
+        run: |
+          git clone --filter=blob:none --no-checkout \
+            https://github.com/SimonKagstrom/kcov.git /tmp/kcov
+          git -C /tmp/kcov checkout --detach "$KCOV_COMMIT"
+          cmake -S /tmp/kcov -B /tmp/kcov/build
+          make -C /tmp/kcov/build
+          sudo make -C /tmp/kcov/build install
+          mkdir -p ~/.cache/kcov-bin
+          cp /usr/local/bin/kcov ~/.cache/kcov-bin/kcov
+
+      - name: Install cached kcov ${{ env.KCOV_VERSION }} binary
+        if: steps.kcov-cache.outputs.cache-hit == 'true'
+        run: sudo install -m 0755 ~/.cache/kcov-bin/kcov /usr/local/bin/kcov
+
+      - name: Verify kcov
+        run: kcov --version
+
       - name: Lint (shellcheck + shfmt + set-flags)
         run: make lint-sh
 
@@ -108,3 +175,11 @@ jobs:
 
       - name: Test (bats)
         run: make test-sh
+
+      # Re-runs the same suite under kcov and enforces the floor. Kept as its
+      # own step rather than folded into `make test-sh` so a plain test failure
+      # and a coverage regression are told apart at a glance in the run summary
+      # — and so an instrumentation problem can never be reported as a broken
+      # test suite.
+      - name: Coverage (kcov, 70% floor)
+        run: make coverage
