@@ -105,8 +105,41 @@ definition; links pointing anywhere else are left alone.
    really are flat.
 3. Run `claude plugin validate plugins/dfadler-agent-config` — it checks the manifest
    and parses the frontmatter of every skill and agent inside.
-4. Commit and push. A new skill or agent inside an already-linked plugin needs no
+4. Run `make check` (see below) before pushing.
+5. Commit and push. A new skill or agent inside an already-linked plugin needs no
    `setup.sh` re-run; anything under `claude/`, or a whole new plugin, does.
+
+## Checks
+
+`make check` runs everything CI runs, and CI calls these same targets — so a green
+run locally means the same thing a green PR does.
+
+```bash
+make check          # lint + structure + test
+```
+
+| Target | What it does |
+| --- | --- |
+| `make lint-sh` | `shellcheck`, `shfmt -i 2 -ci -d`, and the `set -uo pipefail` convention |
+| `make structure` | Plugin manifests and skill/agent frontmatter agree with their directories |
+| `make test` | `bats` suites under `scripts/tests/` |
+| `make fmt` | Rewrites scripts to the repo's `shfmt` style |
+| `make lint-actions` | `actionlint` over `.github/workflows/` |
+
+```bash
+brew install shellcheck shfmt bats-core actionlint
+```
+
+Two checks exist because a linter can't express them. `check-shell-set-flags.sh`
+enforces the `set -uo pipefail` opener from the global `CLAUDE.md`, which shellcheck
+has no rule for. `check-plugin-structure.sh` is the closest thing to a typechecker a
+shell-and-Markdown repo can have: this repo's *product* is declarative metadata, and a
+skill whose `name:` drifts from its directory fails silently at load time rather than
+loudly in review — which is exactly what the plugin rename could have caused.
+
+The `bats` suites are hermetic: `HOME` is redirected into a sandbox and the network
+binaries are shimmed to fail loudly, so a test can never touch your real `~/.claude`
+even though `setup.sh`'s whole job is writing symlinks into it.
 
 ## What belongs here vs. in a project
 
