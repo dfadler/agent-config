@@ -142,18 +142,19 @@ there's no way to tell which one did it. So:
   `chrome --headless` already take no focus, so the visual-verification flow above is
   fine as written — the rule is about not regressing it.
 - **Never `open -a Terminal` (or drive Terminal.app via `osascript`) to get a shell.**
-  For an interactive TUI/REPL an agent must drive and read back, use a detached tmux
-  session via the `dfadler-agent-config:detached-terminal` skill — a real PTY that's
-  never displayed, which the human attaches to when they choose. For anything
+  For an interactive TUI/REPL an agent must drive and read back, use the
+  `dfadler-agent-config:detached-terminal` skill — a real PTY that's never
+  displayed, with a screen model the agent can query. For anything
   non-interactive, the headless `Bash` tool (with `run_in_background` for long jobs)
-  already covers it and needs no terminal. **A detached session is not a sandbox** —
-  tmux gives every pane a `$TMUX` handle back to the server that governs it, so only
-  run trusted programs there, never an untrusted build step or fetched script.
+  already covers it and needs no terminal. **It is not a sandbox** — the program runs
+  as you, and anything read back from it is untrusted text entering your context. Run
+  trusted programs there, never an untrusted build step or fetched script.
 - **Don't do privileged work in a terminal session an agent can drive.** sudo keeps
-  its timestamp per-tty by default, so authenticating in an attached agent pane
-  leaves a live sudo ticket on a tty the agent can send keystrokes to. Same for an
-  authenticated `ssh` session or an unlocked credential helper. Attach to watch and
-  read, not to `sudo`.
+  its timestamp per-tty by default, so authenticating there leaves a live sudo ticket
+  on a tty the agent can send keystrokes to. Same for an authenticated `ssh` session
+  or an unlocked credential helper. Do that work in your own terminal; the agent's
+  session is for driving a program, and you inspect it with `read`, not by taking
+  it over.
 - **Don't reach for capture-then-restore focus.** `osascript` to save the frontmost
   app, do the thing, and put it back needs broad automation entitlements that grant
   far more than restoring focus, and it races the user's own typing. Not taking focus

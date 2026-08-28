@@ -16,7 +16,7 @@
 #   * every skills/*/SKILL.md has delimited frontmatter carrying `name` and a
 #     non-empty `description`, and `name` matches the skill directory.
 #   * every agents/*.md has the same, with `name` matching the filename.
-#   * every *.sh shipped under a skill's scripts/ is executable — a skill that
+#   * every *.sh or *.py shipped under a skill's scripts/ is executable — one that
 #     documents `scripts/foo.sh` is useless if the mode bit didn't survive.
 set -euo pipefail
 
@@ -178,7 +178,8 @@ for plugin_dir in "${plugins[@]}"; do
     fi
     check_frontmatter_doc "$skill_md" "$skill_name" "skill directory"
 
-    for script in "$skill_dir"/scripts/*.sh; do
+    for script in "$skill_dir"/scripts/*.sh "$skill_dir"/scripts/*.py; do
+      [[ -e "$script" ]] || continue
       [[ -x "$script" ]] || fail "$script: not executable (chmod +x)"
     done
   done

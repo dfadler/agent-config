@@ -1,0 +1,6 @@
+# Everything CI needs for the Python side. The detached-terminal skill needs
+# only `pyte` at runtime; the rest are the quality gate.
+pyte==0.8.2
+pytest==8.3.4
+ruff==0.9.6
+mypy==1.15.0
