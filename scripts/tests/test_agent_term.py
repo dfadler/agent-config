@@ -366,21 +366,27 @@ class TestChildIsolation:
 
         try:
             run("start", "iso", "--", "bash", "--norc")
+            # The marker is split so the string we wait for CANNOT appear in
+            # the echoed command line -- only in the shell's output. Without
+            # this the loop matched the echo immediately and asserted against a
+            # screen that had no result on it yet, so the security assertions
+            # passed vacuously. CI caught it; macOS was fast enough to hide it.
             run(
                 "keys",
                 "iso",
                 "--",
-                "echo TOK=${CLAUDE_CODE_MESSAGING_TOKEN:-absent} "
-                "DB=${DATABASE_URL:-absent}",
+                'printf "%s\\n" "TO""K=${CLAUDE_CODE_MESSAGING_TOKEN:-absent} "'
+                '"D""B=${DATABASE_URL:-absent}"',
                 "Enter",
             )
-            deadline = time.time() + 10
+            deadline = time.time() + 15
             screen = ""
             while time.time() < deadline:
                 screen = run("read", "iso", "--raw").stdout
-                if "TOK=" in screen and "\n" in screen:
+                if "TOK=" in screen:
                     break
                 time.sleep(0.2)
+            assert "TOK=" in screen, f"command never produced output:\n{screen}"
             assert "tok-secret" not in screen
             assert "postgres://" not in screen
             assert "TOK=absent" in screen
@@ -404,16 +410,18 @@ class TestChildIsolation:
 
         try:
             run("start", "handle", "--", "bash", "--norc")
-            run(
-                "keys", "handle", "--", "env | grep -ci sock; echo MARKER-DONE", "Enter"
-            )
-            deadline = time.time() + 10
+            # Sentinel split for the same reason as above: it must not be
+            # matchable in the echoed command line, or the loop breaks before
+            # `env` has produced anything and the assertion passes vacuously.
+            run("keys", "handle", "--", 'env; printf "%s\\n" "DONE""-MARKER"', "Enter")
+            deadline = time.time() + 15
             screen = ""
             while time.time() < deadline:
                 screen = run("read", "handle", "--raw").stdout
-                if "MARKER-DONE" in screen:
+                if "DONE-MARKER" in screen:
                     break
                 time.sleep(0.2)
+            assert "DONE-MARKER" in screen, f"env never ran:\n{screen}"
             assert short_state not in screen, "the socket path reached the child"
         finally:
             run("stop-all")
