@@ -13,10 +13,12 @@ import argparse
 import contextlib
 import importlib.util
 import os
+import re
 import signal
 import stat
 import subprocess
 import sys
+import threading
 import time
 from collections.abc import Callable, Iterator
 from pathlib import Path
@@ -292,6 +294,116 @@ class TestTolerantScreen:
         assert "hello" in screen.display[0]
 
 
+class TestSendWriteTimeout:
+    """`send` must give up on a child that never reads, not park the daemon.
+
+    Driven against the method directly rather than through the CLI, for a
+    measured reason: on macOS a PTY master silently DISCARDS input once the
+    line discipline's queue is full. Two megabytes went into one with no
+    reader, without a single EAGAIN, and select() called the master writable
+    throughout -- so no program under a real PTY can wedge the write on that
+    platform, and a test going through `keys` could never reach this branch at
+    all. A pipe nobody reads is the platform-independent form of the one
+    condition the branch cares about: an fd select() never calls writable.
+
+    What that leaves unproven is only that a PTY master can reach that state,
+    which it does on Linux, where the master write returns EAGAIN once the line
+    discipline's buffer fills.
+    """
+
+    class _StubSession:
+        """Only what send() touches: an fd to write to, and the idle clock."""
+
+        def __init__(self, fd: int) -> None:
+            self.fd = fd
+            self.last_activity = 0.0
+
+    @staticmethod
+    def _wedged_pipe() -> tuple[int, int]:
+        """A pipe filled to capacity: its write end is never writable again."""
+        read_fd, write_fd = os.pipe()
+        os.set_blocking(write_fd, False)
+        written = 0
+        while written < 8 << 20:
+            try:
+                written += os.write(write_fd, b"\0" * 4096)
+            except BlockingIOError:
+                return read_fd, write_fd
+        raise AssertionError("pipe never filled; it cannot wedge the write")
+
+    @staticmethod
+    def _send_in_thread(session: Any, keys: list[str]) -> Exception | None:
+        """Call Session.send off the main thread, so a hang is a failure.
+
+        A missing deadline does not raise -- it loops forever, and nothing in
+        the suite would interrupt that. So the call gets its own thread and the
+        first assertion is on the thread finishing at all.
+        """
+        box: dict[str, Exception | None] = {}
+
+        def target() -> None:
+            try:
+                agent_term.Session.send(session, keys)
+            except Exception as exc:
+                box["exc"] = exc
+            else:
+                box["exc"] = None
+
+        thread = threading.Thread(target=target, daemon=True)
+        thread.start()
+        thread.join(10.0)
+        assert not thread.is_alive(), (
+            "send() never returned: without the deadline it parks the one "
+            "daemon loop, and every later read on the session times out"
+        )
+        return box["exc"]
+
+    def test_gives_up_when_the_fd_never_accepts_input(
+        self, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        read_fd, write_fd = self._wedged_pipe()
+        try:
+            monkeypatch.setattr(agent_term, "WRITE_TIMEOUT", 0.3)
+            exc = self._send_in_thread(self._StubSession(write_fd), ["hi", "Enter"])
+            assert isinstance(exc, RuntimeError), (
+                f"expected a RuntimeError, got {exc!r}"
+            )
+            assert "not reading its input" in str(exc)
+        finally:
+            os.close(read_fd)
+            os.close(write_fd)
+
+    def test_reports_only_the_bytes_still_unwritten(
+        self, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        """The short-write loop must advance before the deadline is reported.
+
+        Ignoring the count os.write returns was the original bug: a payload
+        larger than the buffer was silently truncated. Draining part of the
+        pipe leaves room for exactly one partial write, so the numbers in the
+        timeout message tell a loop that advanced from one that did not.
+        """
+        read_fd, write_fd = self._wedged_pipe()
+        try:
+            os.read(read_fd, 4096)  # room for one short write, then wedged again
+            monkeypatch.setattr(agent_term, "WRITE_TIMEOUT", 0.3)
+            payload = "z" * (64 << 10)
+            exc = self._send_in_thread(self._StubSession(write_fd), [payload])
+            assert isinstance(exc, RuntimeError), (
+                f"expected a RuntimeError, got {exc!r}"
+            )
+            match = re.search(r"writing (\d+) of (\d+) bytes", str(exc))
+            assert match, f"no byte counts in {exc!r}"
+            remaining, total = int(match.group(1)), int(match.group(2))
+            assert total == len(payload)
+            assert 0 < remaining < total, (
+                f"partial write not accounted for ({remaining} of {total})"
+            )
+        finally:
+            os.close(read_fd)
+            os.close(write_fd)
+
+
 # --------------------------------------------------------- integration tests
 
 
@@ -464,21 +576,161 @@ class TestStartupOrdering:
         assert result.returncode == 0, f"read raced start: {result.stderr}"
 
 
-# NOTE: there is deliberately no test for cmd_start's bind-failure cleanup.
-#
-# The child is forked before the socket is bound, so on paper a bind failure
-# could leave the command running. In practice the bind fails microseconds
-# after the fork -- before the child's shell has run a single line -- so the
-# child dies to the SIGHUP that follows the daemon closing the PTY master, with
-# or without the explicit terminate(). Two fixtures were tried (a nohup'd
-# grandchild, then a SIGHUP-ignoring child) and BOTH passed with the cleanup
-# deleted, which makes them worse than no test: green, and proving nothing.
-#
-# The cleanup is still correct and still worth having -- it is the difference
-# between a guarantee and an accident of timing. What it relies on,
-# terminate() reaching a SIGHUP-immune process group, is covered by
-# TestProcessGroupCleanup above. Only "cmd_start's except branch calls it" is
-# unverified, and that is a code-reading matter.
+class TestBindFailureCleanup:
+    """A failed bind must take the already-forked child down with it.
+
+    The child is forked before the socket is bound, so a bind failure that did
+    not tear it down would leave the command running with nothing able to reach
+    it -- an orphan, and another one on every retry.
+
+    Two earlier fixtures (a nohup'd grandchild, then a shell running
+    `trap '' HUP`) both passed with the cleanup DELETED, which is worse than no
+    test at all. The reason was timing, not intent: the bind fails microseconds
+    after the fork, before the child's shell has run a single line, so the
+    child was still dying to the SIGHUP that follows the daemon closing the PTY
+    master -- an unrelated mechanism producing the same visible teardown.
+
+    The race is removed by making the child SIGHUP-immune from its first
+    instruction instead of asking it to install a trap in time. SIG_IGN
+    survives execve, so setting it on the CLI process propagates through both
+    forks and the exec into the program itself. That is the same immunity a
+    daemonising program gives itself, minus the window. The control arm asserts
+    the immunity on the running platform rather than assuming it, so the
+    failure arm cannot go quietly vacuous somewhere else.
+    """
+
+    #: `sh` writes its pid at once, waits, then leaves a marker. A child the
+    #: cleanup kills never reaches the marker; a survivor always does.
+    CHILD = "echo $$ > {pid}; sleep 0.5; : > {marker}; exec sleep 600"
+    GRACE = 3.0  # generous next to the 0.5s the fixture waits
+
+    @staticmethod
+    def _ignore_sighup() -> None:
+        """Runs between fork and exec; SIG_IGN then survives the exec."""
+        signal.signal(signal.SIGHUP, signal.SIG_IGN)
+
+    @staticmethod
+    def _runner(short_state: str) -> Runner:
+        """The `term` runner, plus the inherited SIGHUP disposition."""
+        env = dict(os.environ, AGENT_TERM_STATE=short_state)
+
+        def run(*args: str, check: bool = True) -> subprocess.CompletedProcess[str]:
+            result = subprocess.run(
+                [sys.executable, str(SCRIPT), *args],
+                capture_output=True,
+                text=True,
+                env=env,
+                timeout=30,
+                check=False,
+                preexec_fn=TestBindFailureCleanup._ignore_sighup,
+            )
+            if check and result.returncode != 0:
+                raise AssertionError(
+                    f"{args} failed ({result.returncode})\n"
+                    f"stdout: {result.stdout}\nstderr: {result.stderr}"
+                )
+            return result
+
+        return run
+
+    @staticmethod
+    def _wait_for_file(path: str, timeout: float) -> bool:
+        deadline = time.time() + timeout
+        while time.time() < deadline:
+            if os.path.exists(path):
+                return True
+            time.sleep(0.1)
+        return False
+
+    @staticmethod
+    def _read_pid(path: str, timeout: float) -> int | None:
+        """The pid the child wrote, once the write has landed. None if never.
+
+        `echo $$ > file` creates the file before it writes to it, so polling on
+        existence alone can read it back empty on a loaded machine.
+        """
+        deadline = time.time() + timeout
+        while True:
+            with contextlib.suppress(OSError, ValueError):
+                return int(Path(path).read_text().strip())
+            if time.time() > deadline:
+                return None
+            time.sleep(0.1)
+
+    def _assert_fixture_is_immune(self, run: Runner, state: str) -> None:
+        """Control arm: the child really runs, and really ignores SIGHUP.
+
+        Without this, a platform where SIG_IGN failed to propagate would leave
+        the failure arm asserting that a child died -- which it would have done
+        on its own, proving nothing about the cleanup.
+        """
+        pid_file = os.path.join(state, "control.pid")
+        marker = os.path.join(state, "control.marker")
+        run(
+            "start",
+            "control",
+            "--",
+            "sh",
+            "-c",
+            self.CHILD.format(pid=pid_file, marker=marker),
+        )
+        try:
+            pid = self._read_pid(pid_file, 10.0)
+            assert pid is not None, "the fixture child never ran"
+            os.kill(pid, signal.SIGHUP)
+            time.sleep(0.3)
+            assert _pid_alive(pid), (
+                f"fixture child {pid} died on SIGHUP; SIG_IGN did not survive "
+                "into it, so the failure arm below would prove nothing"
+            )
+            assert self._wait_for_file(marker, 5.0), (
+                "the fixture child never reached its marker"
+            )
+        finally:
+            run("stop", "control", check=False)
+
+    def test_a_failed_bind_does_not_leave_the_child_running(
+        self, short_state: str
+    ) -> None:
+        run = self._runner(short_state)
+        self._assert_fixture_is_immune(run, short_state)
+
+        # Force the bind to fail AFTER the fork. The socket path is a symlink
+        # into a directory that does not exist: os.path.exists() follows it and
+        # reports nothing there, so cmd_start's own staleness check waves it
+        # through, and only bind() -- past the fork -- trips over it.
+        sock = os.path.join(short_state, "orphan.sock")
+        os.symlink(os.path.join(short_state, "no-such-dir", "orphan.sock"), sock)
+        assert not os.path.exists(sock), "the fixture must be invisible to cmd_start"
+
+        pid_file = os.path.join(short_state, "orphan.pid")
+        marker = os.path.join(short_state, "orphan.marker")
+        result = run(
+            "start",
+            "orphan",
+            "--",
+            "sh",
+            "-c",
+            self.CHILD.format(pid=pid_file, marker=marker),
+            check=False,
+        )
+        try:
+            assert result.returncode != 0, "the bind was supposed to fail"
+            assert "failed to start" in result.stderr, result.stderr
+            assert not self._wait_for_file(marker, self.GRACE), (
+                "the child outlived the failed start: an orphan running with "
+                "no socket left to reach it"
+            )
+        finally:
+            # By pid, never by matching a command line: `sleep 600` belongs to
+            # plenty of processes that are not ours. getpgid fails first on a
+            # pid that is already gone, so a recycled group is never signalled.
+            orphan = self._read_pid(pid_file, 0.0)
+            if orphan is not None:
+                with contextlib.suppress(OSError):
+                    os.killpg(os.getpgid(orphan), signal.SIGKILL)
+                with contextlib.suppress(OSError):
+                    os.kill(orphan, signal.SIGKILL)
 
 
 class TestUntrustedFraming:
