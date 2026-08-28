@@ -134,8 +134,10 @@ category.
 
 ## Severity Taxonomy
 
-Every finding gets three tags. Bold the three labels for visual weight so the tag line
-reads as a distinct badge next to other bots' colored tags — but no image badges and no
+Every **actionable** finding gets three tags (a nitpick uses the plain `Nit:` prefix
+instead — see "Actionable vs. Nitpick" below, which is the authoritative statement of
+that exemption). Bold the three labels for visual weight so the tag line reads as a
+distinct badge next to other bots' colored tags — but no image badges and no
 emoji-as-severity: severity is stated in words, never implied by a color or icon that a
 reader would have to learn to decode.
 
