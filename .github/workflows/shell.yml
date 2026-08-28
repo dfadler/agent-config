@@ -1,0 +1,110 @@
+name: Shell
+
+# Lints, structure-checks and tests this repo's bash scripts. Until now the repo
+# had no CI at all: setup.sh rewrites symlinks in the developer's ~/.claude, the
+# skills ship executable scripts, and nothing verified any of it before merge.
+#
+# Four checks, all run through the same `make` targets humans use locally, so
+# CI and `make check` can never drift:
+#   * shellcheck  — correctness (quoting, fail-open pipelines, unset vars, ...)
+#   * shfmt       — formatting (`-i 2 -ci`, the repo's 2-space style)
+#   * set-flags   — every executable script opens with `set -uo pipefail`
+#                   (the CLAUDE.md convention; shellcheck has no rule for it)
+#   * structure   — plugin manifests and skill/agent frontmatter agree with
+#                   the directories they live in (bash has no typechecker;
+#                   this is the nearest equivalent for a repo whose product
+#                   IS declarative metadata)
+#   * bats        — unit tests, fully hermetic: HOME is redirected into a
+#                   sandbox and network binaries are shimmed to fail loudly,
+#                   so a test can never touch the real ~/.claude.
+#
+# Tools are pinned to exact versions so a newer shellcheck adding a check, or a
+# shfmt tweaking its output, can't turn a green main red without a bump here.
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+# One live run per target: a new push to the same PR (or to main) supersedes the
+# in-flight run for the old commit, which would otherwise bill to completion.
+# PRs key by number, pushes to main by ref; the workflow name keeps groups from
+# colliding across workflows.
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+# Least privilege: the job only needs to read the repo.
+permissions:
+  contents: read
+
+env:
+  SHELLCHECK_VERSION: v0.11.0
+  SHFMT_VERSION: v3.13.1
+  BATS_VERSION: v1.11.1
+  # Artifacts are verified before they run. Neither koalaman/shellcheck nor
+  # mvdan/sh publishes a checksums file, so these two values were recorded by
+  # downloading the pinned release once — that PINS the artifact (a later
+  # silent replacement, or a MITM on a future run, fails loudly) but it does
+  # not establish provenance the way a signed upstream manifest would. Say so
+  # plainly rather than implying a stronger guarantee. On a version bump,
+  # re-record with: curl -fsSL <url> | shasum -a 256
+  SHELLCHECK_SHA256: 8c3be12b05d5c177a04c29e3c78ce89ac86f1595681cab149b65b97c4e227198
+  SHFMT_SHA256: fb096c5d1ac6beabbdbaa2874d025badb03ee07929f0c9ff67563ce8c75398b1
+  # bats is a git clone, so it gets a commit SHA instead: a tag is mutable and
+  # can be repointed at different code under the same name.
+  BATS_COMMIT: b640ec3cf2c7c9cfc9e6351479261186f76eeec8
+
+jobs:
+  shell:
+    name: shellcheck + shfmt + structure + bats
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          # The job runs PR-controlled code and never needs authenticated git
+          # after checkout — don't leave the GITHUB_TOKEN in reach.
+          persist-credentials: false
+
+      # Pinned binaries from upstream releases. Each lands in /usr/local/bin,
+      # which precedes /usr/bin on PATH, so it wins over any preinstalled copy.
+      # Each artifact is downloaded to a file and checksum-verified BEFORE it is
+      # extracted or made executable — piping curl straight into tar would run
+      # the unverified payload first and check it never.
+      - name: Install shellcheck ${{ env.SHELLCHECK_VERSION }}
+        run: |
+          curl -fsSL -o /tmp/shellcheck.tar.xz \
+            "https://github.com/koalaman/shellcheck/releases/download/${SHELLCHECK_VERSION}/shellcheck-${SHELLCHECK_VERSION}.linux.x86_64.tar.xz"
+          echo "${SHELLCHECK_SHA256}  /tmp/shellcheck.tar.xz" | sha256sum -c -
+          tar -xJf /tmp/shellcheck.tar.xz -C /tmp
+          sudo install -m 0755 "/tmp/shellcheck-${SHELLCHECK_VERSION}/shellcheck" /usr/local/bin/shellcheck
+          rm -rf /tmp/shellcheck.tar.xz "/tmp/shellcheck-${SHELLCHECK_VERSION}"
+          shellcheck --version
+
+      - name: Install shfmt ${{ env.SHFMT_VERSION }}
+        run: |
+          curl -fsSL -o /tmp/shfmt \
+            "https://github.com/mvdan/sh/releases/download/${SHFMT_VERSION}/shfmt_${SHFMT_VERSION}_linux_amd64"
+          echo "${SHFMT_SHA256}  /tmp/shfmt" | sha256sum -c -
+          sudo install -m 0755 /tmp/shfmt /usr/local/bin/shfmt
+          rm -f /tmp/shfmt
+          shfmt --version
+
+      # Cloned then checked out at a pinned COMMIT: --branch takes a tag, and a
+      # tag can be moved to point at different code under the same name.
+      - name: Install bats ${{ env.BATS_VERSION }}
+        run: |
+          git clone --filter=blob:none --no-checkout \
+            https://github.com/bats-core/bats-core.git /tmp/bats-core
+          git -C /tmp/bats-core checkout --detach "$BATS_COMMIT"
+          sudo /tmp/bats-core/install.sh /usr/local
+          bats --version
+
+      - name: Lint (shellcheck + shfmt + set-flags)
+        run: make lint-sh
+
+      - name: Structure (plugin manifests + frontmatter)
+        run: make structure
+
+      - name: Test (bats)
+        run: make test

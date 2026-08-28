@@ -29,14 +29,39 @@ FILES=()
 
 while [[ $# -gt 0 ]]; do
   case "$1" in
-    --repo) REPO="$2"; shift 2 ;;
-    --pr) PR="$2"; shift 2 ;;
-    --issue) ISSUE="$2"; shift 2 ;;
-    --comment) AS_COMMENT=1; shift ;;
-    --heading) HEADING="$2"; shift 2 ;;
-    --) shift; FILES+=("$@"); break ;;
-    -*) echo "Unknown flag: $1" >&2; exit 1 ;;
-    *) FILES+=("$1"); shift ;;
+    --repo)
+      REPO="$2"
+      shift 2
+      ;;
+    --pr)
+      PR="$2"
+      shift 2
+      ;;
+    --issue)
+      ISSUE="$2"
+      shift 2
+      ;;
+    --comment)
+      AS_COMMENT=1
+      shift
+      ;;
+    --heading)
+      HEADING="$2"
+      shift 2
+      ;;
+    --)
+      shift
+      FILES+=("$@")
+      break
+      ;;
+    -*)
+      echo "Unknown flag: $1" >&2
+      exit 1
+      ;;
+    *)
+      FILES+=("$1")
+      shift
+      ;;
   esac
 done
 
@@ -66,12 +91,15 @@ REPO_ID="$(gh api "repos/${REPO}" --jq .id)" || {
 content_type_for() {
   case "${1##*.}" in
     png) echo "image/png" ;;
-    jpg|jpeg) echo "image/jpeg" ;;
+    jpg | jpeg) echo "image/jpeg" ;;
     gif) echo "image/gif" ;;
     webp) echo "image/webp" ;;
     svg) echo "image/svg+xml" ;;
     apng) echo "image/apng" ;;
-    *) echo "Error: unrecognized image extension on '$1' (expected png/jpg/jpeg/gif/webp/svg/apng)" >&2; exit 1 ;;
+    *)
+      echo "Error: unrecognized image extension on '$1' (expected png/jpg/jpeg/gif/webp/svg/apng)" >&2
+      exit 1
+      ;;
   esac
 }
 
@@ -118,7 +146,10 @@ if [[ -n "$ISSUE" ]]; then
   TARGET_NUM="$ISSUE"
 fi
 
-BLOCK="$(printf '%s\n\n' "$HEADING"; printf '%s\n' "${MARKDOWN_LINES[@]}")"
+BLOCK="$(
+  printf '%s\n\n' "$HEADING"
+  printf '%s\n' "${MARKDOWN_LINES[@]}"
+)"
 
 if [[ "$AS_COMMENT" -eq 1 ]]; then
   gh "$TARGET_KIND" comment "$TARGET_NUM" --repo "$REPO" --body "$BLOCK"
@@ -127,7 +158,7 @@ else
   CURRENT_BODY="$(gh "$TARGET_KIND" view "$TARGET_NUM" --repo "$REPO" --json body --jq .body)"
   TMP="$(mktemp)"
   trap 'rm -f "$TMP"' EXIT
-  printf '%s\n\n%s\n' "$CURRENT_BODY" "$BLOCK" > "$TMP"
+  printf '%s\n\n%s\n' "$CURRENT_BODY" "$BLOCK" >"$TMP"
   gh "$TARGET_KIND" edit "$TARGET_NUM" --repo "$REPO" --body-file "$TMP"
   echo "Appended to ${TARGET_KIND} #${TARGET_NUM}'s body in ${REPO} (this save is what makes the URLs above resolve)." >&2
 fi
