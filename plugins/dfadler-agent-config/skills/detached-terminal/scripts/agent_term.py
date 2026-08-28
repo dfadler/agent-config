@@ -50,7 +50,8 @@ try:
 except ModuleNotFoundError:  # pragma: no cover - exercised via the CLI path
     sys.stderr.write(
         "agent-term: pyte is not installed.\n"
-        "  pip install pyte    (or: pipx install --include-deps pyte)\n"
+        "  python3 -m pip install --user pyte\n"
+        "  or, from the agent-config repo: ./setup.sh --install-deps\n"
     )
     raise SystemExit(1)
 
