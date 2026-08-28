@@ -175,6 +175,15 @@ For any non-trivial bash script:
   external commands (`gh`, `curl`, `git` against a throwaway repo, etc.) via `PATH`
   rather than letting a test touch the real thing.
 
+## Cite sources for platform-capability claims
+
+When stating a platform or tool capability as fact — rate limits, model behavior,
+API surface, auth methods, size limits, what a product can or cannot do — cite the
+official docs rather than relying on memory or inference. Marketing copy and old
+training data go stale; a confident wrong answer here is worse than a slower correct
+one. If unsure, say so explicitly and point to where to check, rather than guessing
+confidently. This applies to any platform or tool, not just Claude/Anthropic.
+
 ## GitHub workflow habits
 
 - Prefer GitHub Issues/PRs as the tracker when a project uses GitHub — don't route
