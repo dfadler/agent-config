@@ -84,6 +84,7 @@ Each **PR entry**:
   "headSha": "<sha>",
   "isDraft": <bool>,
   "skipped": null | { "reason": "<see below>", "detail"?: "<string>" },
+  // "detail" is REQUIRED when reason is "snapshot-error" — see below.
   "recommendation": "<see below>",
 
   // present unless skipped:
@@ -134,7 +135,8 @@ Each **PR entry**:
       "createdAt": "<ISO 8601>",
       "needsAction": <bool>
     }
-  ]
+  ],
+  "generalCommentsTruncated": <bool>
 }
 ```
 
@@ -152,15 +154,23 @@ Field meanings worth calling out:
   resolve isn't "nothing to do here," so its `recommendation` is
   `"escalate"`, not `"skip"`; Step 2's `escalate` handling for a skipped
   entry reports `skipped.detail` in place of a verdict headline, since no
-  verdict exists for a skipped PR.
-- **`truncated` / `threadsTruncated`** — `truncated` on a thread entry means
-  that thread's own `comments` array was cut short (not every comment was
-  fetched); `threadsTruncated` means the `unresolvedThreads` array itself is
-  incomplete (there may be more unresolved threads than were listed). Either
-  one means the snapshot cannot vouch that it saw everything, so a
-  conforming snapshot script must never emit `ready-to-merge` while either
-  flag is true — route to `escalate` instead, even if every check and
-  thread it did see looks clean.
+  verdict exists for a skipped PR. Because that message is Step 2's only
+  signal for this reason, a conforming snapshot script MUST set
+  `skipped.detail` to the error whenever `reason` is `snapshot-error` — an
+  empty escalation defeats the point of escalating. `detail` stays optional
+  for every other skip reason, where the reason itself is self-explanatory.
+- **`truncated` / `threadsTruncated` / `generalCommentsTruncated`** —
+  `truncated` on a thread entry means that thread's own `comments` array was
+  cut short (not every comment was fetched); `threadsTruncated` means the
+  `unresolvedThreads` array itself is incomplete (there may be more
+  unresolved threads than were listed); `generalCommentsTruncated` is the
+  same idea for `generalComments` — without it, an incomplete fetch of
+  top-level PR comments had no signal at all, and a truncated
+  `generalComments` array could reach `ready-to-merge` looking exactly like
+  a complete one. Any one of the three being true means the snapshot cannot
+  vouch that it saw everything, so a conforming snapshot script must never
+  emit `ready-to-merge` while any flag is true — route to `escalate`
+  instead, even if every check and thread it did see looks clean.
 - **`generalComments`** — reviewer feedback that isn't an inline review
   thread: an ordinary PR conversation comment, or the top-level body a
   reviewer left when submitting a review (Approve/Request Changes/Comment)
@@ -193,9 +203,10 @@ Field meanings worth calling out:
   behind, then actionable review threads or actionable `generalComments`
   (review feedback outranks CI — a review-fix push retriggers CI anyway),
   then real check failures, then pending required checks, then mergeable
-  (ready) **only if neither `truncated` nor `threadsTruncated` is true** — a
-  truncated snapshot can't rule out an unseen failing check or unresolved
-  thread, so it routes to `escalate` instead of `ready-to-merge` even though
+  (ready) **only if none of `truncated`, `threadsTruncated`, or
+  `generalCommentsTruncated` is true** — a truncated snapshot can't rule out
+  an unseen failing check, unresolved thread, or unseen general comment, so
+  it routes to `escalate` instead of `ready-to-merge` even though
   nothing else in the entry says it's blocked, else escalate (not mergeable
   yet none of the above explains why — a review requirement, an unresolved
   conversation the script couldn't classify, a cancelled-only required
@@ -231,13 +242,18 @@ Field meanings worth calling out:
     resolve only if clearly moot, otherwise leave open — your reply makes it
     `needsAction: false` on the next pass. A `generalComments` entry has no
     resolve step either way.
-  - *Ambiguous, product decision, or from someone other than the PR's
-    owner*: don't act or resolve; put it in the report's escalations.
-- **`ready-to-merge`** — first re-check the entry's own `truncated` and
-  `threadsTruncated` flags, even though a conforming snapshot script
-  shouldn't emit this recommendation when either is true: if either is
-  true, treat it as `escalate` instead — never merge on review data you
-  know is incomplete, regardless of what `recommendation` says. Otherwise,
+  - *Ambiguous or a product decision*: don't act or resolve; put it in the
+    report's escalations. This is not "from a reviewer who isn't the PR's
+    owner" — that describes essentially every real review comment, and
+    escalating on that basis alone would route the entire normal review
+    flow here instead of through the *Agree*/*Disagree* paths above, which
+    are the intended path for an ordinary reviewer's feedback.
+- **`ready-to-merge`** — first re-check the entry's own `truncated`,
+  `threadsTruncated`, and `generalCommentsTruncated` flags, even though a
+  conforming snapshot script shouldn't emit this recommendation when any is
+  true: if any is true, treat it as `escalate` instead — never merge on
+  review data you know is incomplete, regardless of what `recommendation`
+  says. Otherwise,
   default: report it, with the merge command (`gh pr merge <n> --merge`).
   With `--auto-merge`: run `gh pr merge <n> --auto --merge` and report that
   auto-merge is armed. Never auto-merge a PR you didn't fix into a known
