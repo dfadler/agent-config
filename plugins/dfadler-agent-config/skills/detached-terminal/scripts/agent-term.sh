@@ -3,7 +3,10 @@
 #
 # Wraps tmux detached sessions. Nothing is ever shown on screen, so the
 # human's frontmost window never changes; they attach on their own schedule.
-# See ../SKILL.md for the design and threat model.
+#
+# NOT A SANDBOX. Every pane gets a TMUX env var pointing at the server that
+# governs it, so a hostile process inside a pane can rewrite this tool's own
+# control state. Run trusted programs here. See ../SKILL.md.
 #
 # Usage:
 #   agent-term.sh start <name> [--cwd DIR] [--size WxH] -- CMD [ARG...]
@@ -14,16 +17,15 @@
 #   agent-term.sh stop  <name>
 #   agent-term.sh stop-all
 #
-# Each agent session gets its OWN tmux server (socket claude-agent-<owner>).
-# That isolation is load-bearing: a tmux server copies the environment of
-# whichever process started it into its global environment, and hands that to
-# every session it later creates. A socket shared between agents would leak
-# the first caller's credentials into every other agent's panes.
+# Each agent session gets its own tmux server (socket claude-agent-<owner>),
+# because a tmux server copies the environment of whichever process started it
+# into every session it later creates -- a shared socket would donate the first
+# caller's credentials to every other agent's panes.
 
 set -uo pipefail
 
 usage() {
-  sed -n '2,17p' "$0" | sed 's/^# \{0,1\}//'
+  sed -n '2,19p' "$0" | sed 's/^# \{0,1\}//'
 }
 
 die() {
@@ -37,16 +39,17 @@ die() {
 # out of the 0700 directory the permission story depends on. Pin it.
 unset TMUX_TMPDIR
 
-# Vars scrubbed before any tmux call, so the server we start never captures
-# them and a compromised build step inside a pane can't read them back.
-# This is a denylist, not an allowlist: it covers the credentials this harness
-# is known to carry, not every secret a shell might hold. See SKILL.md.
+# Removed before any tmux call, so the server never captures them. A DENYLIST:
+# it covers what this harness is known to carry, not every secret a shell can
+# hold. Connection URLs and *PASS*/*KEY* shapes are included because they are
+# the likeliest real leak on a dev machine.
 SENSITIVE_VARS=(
   ANTHROPIC_API_KEY ANTHROPIC_AUTH_TOKEN ANTHROPIC_BASE_URL
   AWS_ACCESS_KEY_ID AWS_SECRET_ACCESS_KEY AWS_SESSION_TOKEN
   CLAUDE_CODE_HOST_SESSION_ID CLAUDE_CODE_MESSAGING_SOCKET
   CLAUDE_CODE_MESSAGING_TOKEN CLAUDE_CODE_OAUTH_SCOPES CLAUDE_CODE_SESSION_ID
-  GH_TOKEN GITHUB_TOKEN NPM_TOKEN SSH_AUTH_SOCK
+  DOCKER_AUTH_CONFIG GH_TOKEN GITHUB_TOKEN KUBECONFIG NETRC NPM_TOKEN
+  SSH_AUTH_SOCK
 )
 
 scrub_env() {
@@ -56,7 +59,10 @@ scrub_env() {
   done
   while IFS= read -r v; do
     case "$v" in
-      *TOKEN* | *SECRET* | *PASSWORD* | *CREDENTIAL* | *_KEY | *APIKEY*) unset "$v" ;;
+      *TOKEN* | *SECRET* | *PASS* | *CREDENTIAL* | *KEY* | *AUTH* | \
+        *_URL | *_URI | *_DSN | *WEBHOOK* | *_PAT)
+        unset "$v"
+        ;;
     esac
   done < <(compgen -e)
 }
@@ -64,6 +70,11 @@ scrub_env() {
 SOCKET_PREFIX="${AGENT_TERM_SOCKET:-claude-agent}"
 HISTORY_LIMIT="${AGENT_TERM_HISTORY:-200}"
 TTL="${AGENT_TERM_TTL:-28800}"
+# Foreign sockets are always swept on this fixed value. The caller's TTL is
+# never applied to another agent's server: AGENT_TERM_TTL=1 would otherwise let
+# any process destroy every concurrent agent's live work.
+FOREIGN_TTL=28800
+MAX_HISTORY=10000
 PREFIX="agent-"
 OWNER=""
 SOCKET=""
@@ -71,6 +82,11 @@ SOCKET=""
 validate_env() {
   [[ "$TTL" =~ ^[0-9]+$ ]] || die "AGENT_TERM_TTL must be a non-negative integer"
   [[ "$HISTORY_LIMIT" =~ ^[0-9]+$ ]] || die "AGENT_TERM_HISTORY must be a non-negative integer"
+  ((HISTORY_LIMIT <= MAX_HISTORY)) ||
+    die "AGENT_TERM_HISTORY must be <= $MAX_HISTORY (scrollback is a leak surface)"
+  if ((TTL < 300)) && [[ "${AGENT_TERM_TEST:-}" != "1" ]]; then
+    die "AGENT_TERM_TTL below 300s needs AGENT_TERM_TEST=1 (it reaps live work)"
+  fi
   [[ "$SOCKET_PREFIX" =~ ^[A-Za-z0-9_-]+$ ]] ||
     die "AGENT_TERM_SOCKET must be letters, digits, '-' and '_' only"
 }
@@ -79,9 +95,8 @@ require_tmux() {
   command -v tmux >/dev/null 2>&1 || die "tmux not found. Install it: brew install tmux"
 }
 
-# -f /dev/null: never load ~/.tmux.conf on our socket. A user config could
-# otherwise install hooks that pipe-pane scrollback to a file or raise
-# history-limit, both of which this script's guarantees depend on not happening.
+# -f /dev/null: never load ~/.tmux.conf when WE start the server. This does not
+# constrain a pane, which reaches the same server through $TMUX.
 tm() { tmux -f /dev/null -L "$SOCKET" "$@"; }
 tm_on() {
   local sock="$1"
@@ -91,9 +106,9 @@ tm_on() {
 
 # ---------------------------------------------------------------------- owner
 
-# Identifies the agent session that owns a socket. AGENT_TERM_OWNER is a
-# test-only override, gated so it can't be used casually to address another
-# agent's socket -- it is not, and never was, an authorization boundary.
+# A hash, not a prefix of the session id: the owner ends up in a socket
+# filename that persists in /tmp, and CLAUDE_CODE_SESSION_ID is on the denylist
+# above. Hashing keeps the name stable without writing the id to disk.
 compute_owner() {
   local raw=""
   if [[ -n "${AGENT_TERM_OWNER:-}" ]]; then
@@ -107,14 +122,29 @@ compute_owner() {
     echo "shared"
     return 0
   }
-  local clean
-  clean="$(printf '%s' "$raw" | tr -cd 'A-Za-z0-9' | cut -c1-8)"
-  [[ -n "$clean" ]] && printf '%s' "$clean" || echo "shared"
+  printf '%s' "$raw" | shasum -a 256 | cut -c1-8
 }
 
 socket_dir() { printf '/tmp/tmux-%s' "$(id -u)"; }
 
-# Every agent socket on this machine, for cross-owner list and reap.
+# Control state lives here rather than in tmux options, because a pane can
+# rewrite any tmux option through $TMUX. A file raises the bar -- tampering now
+# needs the path rather than a one-line tmux command -- but a process running
+# as you can still edit it. Detection, not prevention.
+state_dir() { printf '%s/agent-term-%s' "$(socket_dir)" "$OWNER"; }
+
+ensure_state_dir() {
+  local d
+  d="$(state_dir)"
+  mkdir -p "$d" 2>/dev/null || die "cannot create state dir $d"
+  chmod 700 "$d" 2>/dev/null
+}
+
+state_file() { printf '%s/%s.pane' "$(state_dir)" "$1"; }
+
+# Candidate sockets: every per-owner socket, plus the bare legacy name used
+# before sockets were split per owner, so pre-upgrade sessions still get reaped
+# instead of becoming permanently unreachable shells.
 list_sockets() {
   local dir entry
   dir="$(socket_dir)"
@@ -123,12 +153,14 @@ list_sockets() {
     [[ -S "$entry" ]] || continue
     basename "$entry"
   done
+  [[ -S "$dir/$SOCKET_PREFIX" ]] && basename "$dir/$SOCKET_PREFIX"
+  return 0
 }
 
 # ----------------------------------------------------------------- validation
 
-# Session names become tmux target strings, so keep them to a charset that
-# can't smuggle a target qualifier (tmux splits targets on ':' and '.').
+# Session names become tmux target strings and state filenames, so keep them to
+# a charset that can't smuggle a target qualifier or a path component.
 validate_name() {
   local n="$1"
   [[ -n "$n" ]] || die "session name required"
@@ -147,11 +179,10 @@ need_operand() {
 full_name() { printf '%s%s' "$PREFIX" "$1"; }
 
 # Resolve a name to its session id by exact comparison, one session at a time.
-# Name-based tmux targets are a minefield here: "=x" resolves for has-session
-# but not for set-option or capture-pane, a bare name prefix-matches, and a
-# name can contain spaces -- so ids are the only stable handle. Callers use
-# `x="$(session_id n)" || die ...`, because a `die` inside a command
-# substitution would exit only the subshell and let the caller continue.
+# Name-based tmux targets are a minefield: "=x" resolves for has-session but
+# not for set-option or capture-pane, a bare name prefix-matches, and a name
+# can contain spaces. Callers use `x="$(session_id n)" || die ...`, because a
+# `die` inside a command substitution exits only the subshell.
 session_id() {
   local want id name
   want="$(full_name "$1")"
@@ -165,16 +196,47 @@ session_id() {
   return 1
 }
 
-# The pane recorded at creation, not "whatever pane is active now". An
-# unqualified session target re-resolves on every call, so a program that
-# splits a window -- or a human who attaches and switches -- would silently
-# redirect keystrokes to a different process than the one we read from.
+# The pane recorded at creation, re-checked against the live server.
+#
+# Session and pane ids restart at $0/%0 whenever a server exits, so the id
+# alone is only meaningful within one server lifetime -- hence the recorded
+# server pid. The single-pane check is a tamper signal: this script never
+# creates a second pane, so if one appeared, something inside the session did
+# it, and "which pane did the agent mean" is no longer answerable.
 pane_target() {
-  local sid pid
-  sid="$(session_id "$1")" || return 1
-  pid="$(tm show-options -qv -t "$sid" @agent_pane 2>/dev/null)"
-  [[ "$pid" =~ ^%[0-9]+$ ]] || return 1
-  printf '%s' "$pid"
+  local name="$1" sid file recorded_pid recorded_spid live_spid panes
+  file="$(state_file "$name")"
+  [[ -r "$file" ]] || return 1
+  read -r recorded_pid recorded_spid <"$file" 2>/dev/null
+  [[ "$recorded_pid" =~ ^%[0-9]+$ && "$recorded_spid" =~ ^[0-9]+$ ]] || return 1
+
+  live_spid="$(tm display -p '#{pid}' 2>/dev/null)"
+  [[ "$live_spid" == "$recorded_spid" ]] || return 2
+
+  sid="$(session_id "$name")" || return 1
+  panes="$(tm list-panes -s -t "$sid" -F '#{pane_id}' 2>/dev/null)"
+  [[ "$panes" == "$recorded_pid" ]] || return 2
+
+  printf '%s' "$recorded_pid"
+}
+
+# Distinguish "the command finished" from "something tampered with the
+# session". Collapsing them trains everyone to ignore the only tamper signal
+# the tool has.
+resolve_pane_or_die() {
+  local name="$1" target status
+  target="$(pane_target "$name")"
+  status=$?
+  case $status in
+    0) printf '%s' "$target" ;;
+    2) die "session '$name' does not match its recorded pane — possible tampering; stop it and investigate" ;;
+    *)
+      if session_exists "$name"; then
+        die "session '$name' has no usable recorded pane (started outside this script?)"
+      fi
+      die "no session '$name' (it may have exited; try: agent-term.sh list)"
+      ;;
+  esac
 }
 
 session_exists() {
@@ -183,30 +245,37 @@ session_exists() {
 
 # ---------------------------------------------------------------------- reap
 
-# Kill sessions that produced no output for longer than the TTL, across every
-# agent socket -- an orphan is precisely a session whose owning agent is gone,
-# so a reaper scoped to live owners would skip exactly what needs reaping.
-# Matching on idle time rather than ownership is what makes that safe.
+# Kill sessions idle longer than the TTL, across every agent socket -- an
+# orphan is precisely a session whose owning agent is gone, so a reaper limited
+# to live owners would skip exactly what needs reaping.
 #
-# Idle time comes from window_activity, not session_activity: only the former
-# advances on pane output (verified).
+# Idle time is max(window_activity), which advances on pane OUTPUT only
+# (session_activity does not -- verified). A genuinely quiet job (a compiler
+# with no progress output, a TUI parked waiting for input) therefore looks
+# idle and will be reaped at the TTL. Documented in SKILL.md; raise
+# AGENT_TERM_TTL for such work.
 #
-# Every field is fetched one at a time, keyed on session id, rather than parsed
-# out of a single delimited line. Session names are attacker-influenced and can
-# contain spaces and '|' (verified), so a delimited row can be forged to shift
-# columns and make an arbitrary session look infinitely idle. Tabs are not an
-# escape from that: tmux rewrites a literal tab in a format string to '_'
-# (verified on 3.7c), so there is no safe in-band delimiter. Session ids are
-# '$N' and cannot be forged by naming, so they are both the key and the target.
+# Every field is fetched per session id rather than parsed from a delimited
+# row: names can contain spaces and '|', and tmux rewrites a literal tab in a
+# format string to '_' (verified on 3.7c), so there is no safe in-band
+# delimiter. Ids are '$N' and cannot be forged by naming.
 #
-# Best-effort by design: this runs only when an agent invokes the script, so
-# an orphan survives until the next invocation. There is no daemon -- a
-# background job keeping shells alive is the persistence shape being avoided.
+# Best-effort: this runs only when an agent invokes the script.
 reap() {
-  local now sock id name attached last age
+  local now sock ttl id name attached last age
   now="$(date +%s)"
   while read -r sock; do
     [[ -n "$sock" ]] || continue
+    if ! tm_on "$sock" has-session >/dev/null 2>&1 &&
+      ! tm_on "$sock" list-sessions >/dev/null 2>&1; then
+      # Server gone; tmux leaves the socket file behind. Unlink it so the
+      # candidate list can't grow without bound.
+      rm -f "$(socket_dir)/$sock" 2>/dev/null
+      continue
+    fi
+    # The caller's TTL applies only to their own server.
+    ttl="$FOREIGN_TTL"
+    [[ "$sock" == "$SOCKET" ]] && ttl="$TTL"
     while read -r id; do
       [[ "$id" =~ ^\$[0-9]+$ ]] || continue
       name="$(tm_on "$sock" display -p -t "$id" '#{session_name}' 2>/dev/null)"
@@ -217,14 +286,33 @@ reap() {
         sort -n | tail -1)"
       [[ "$last" =~ ^[0-9]+$ ]] || continue
       age=$((now - last))
-      ((age > TTL)) || continue
+      ((age > ttl)) || continue
+      # Re-check immediately before the kill: a human may have attached during
+      # the round-trips above, and killing a session out from under them is the
+      # one outcome worse than leaving an orphan.
+      attached="$(tm_on "$sock" display -p -t "$id" '#{session_attached}' 2>/dev/null)"
+      [[ "$attached" == "0" ]] || continue
       tm_on "$sock" kill-session -t "$id" 2>/dev/null &&
-        echo "agent-term: reaped $id on $sock (idle ${age}s, over TTL ${TTL}s)" >&2
+        echo "agent-term: reaped $id on $sock (idle ${age}s, over TTL ${ttl}s)" >&2
     done < <(tm_on "$sock" list-sessions -F '#{session_id}' 2>/dev/null)
   done < <(list_sockets)
 }
 
 # --------------------------------------------------------------- subcommands
+
+# Refuse to reuse a server this script didn't start. A human who types
+# `tmux -L claude-agent-<owner>` with no subcommand gets new-session, which
+# starts a server on our socket carrying THEIR full unscrubbed environment and
+# their ~/.tmux.conf -- and every later `start` would inherit it.
+assert_our_server() {
+  tm has-session >/dev/null 2>&1 || tm list-sessions >/dev/null 2>&1 || return 0
+  local marker
+  marker="$(tm show-options -gqv @agent_term 2>/dev/null)"
+  [[ "$marker" == "1" ]] ||
+    die "a tmux server is already running on $SOCKET but wasn't started by this script.
+  Its sessions may carry an unscrubbed environment. Inspect it with
+  'tmux -L $SOCKET ls', then 'tmux -L $SOCKET kill-server' before retrying."
+}
 
 cmd_start() {
   local name="" cwd="" size="120x40"
@@ -256,12 +344,24 @@ cmd_start() {
   ((width >= 20 && width <= 1000)) || die "--size width must be 20..1000"
   ((height >= 5 && height <= 1000)) || die "--size height must be 5..1000"
 
-  # tmux runs a *single* trailing argument through `sh -c`. Catching the
-  # quoting mistake here beats silently handing back a shell -- a shell is the
-  # state-accumulating surface SKILL.md tells you to avoid.
+  # tmux runs a *single* trailing argument through `sh -c`, so a quoted command
+  # string silently becomes a shell.
   if [[ $# -eq 1 && "$1" =~ [[:space:]] ]]; then
     die "pass the command as separate arguments (-- npm run dev), not one quoted string"
   fi
+  # An interactive shell is the state-accumulating surface: it is what turns a
+  # pane into somewhere sudo tickets and ssh agents accumulate. `sh -c ...` is
+  # fine; a bare shell is not. This is a guardrail against the obvious mistake,
+  # not a security boundary -- a pane can spawn whatever it likes once running.
+  local base="${1##*/}"
+  case "$base" in
+    sh | bash | zsh | fish | dash | ksh | csh | tcsh)
+      local has_c=0 a
+      for a in "$@"; do [[ "$a" == "-c" ]] && has_c=1; done
+      ((has_c)) ||
+        die "refusing to start a bare interactive shell ('$base'); run the program directly, or use '$base -c ...'"
+      ;;
+  esac
 
   if session_exists "$name"; then
     die "session '$name' already exists — use a different name, or 'stop $name' first"
@@ -270,33 +370,45 @@ cmd_start() {
     [[ -d "$cwd" ]] || die "--cwd '$cwd' is not a directory"
   fi
 
-  # history-limit is read when a pane's grid is allocated, so it must be set
-  # globally BEFORE the pane exists -- setting it on the session afterwards
-  # silently does nothing. It also has to happen in this SAME tmux invocation:
-  # a server with no sessions exits immediately, so `start-server` followed by
-  # a separate `set-option` call would set the option on a server that is gone
-  # by the time new-session starts a fresh one. Verified both ways.
-  local full created sid pane_id
+  assert_our_server
+  ensure_state_dir
+
+  # All of this must happen in ONE tmux invocation. history-limit is read when
+  # a pane's grid is allocated, so it has to be global and set before the pane
+  # exists; and a server with no sessions exits immediately, so a separate
+  # `start-server` call would configure a server that is already gone.
+  #
+  # update-environment "" matters just as much: its default is non-empty and is
+  # applied when a session is created OR ATTACHED, so without this the human's
+  # own SSH_AUTH_SOCK/XAUTHORITY get copied into the session the moment they
+  # attach -- straight past the scrub above.
+  local full created sid pane_id spid
   full="$(full_name "$name")"
-  local args=(set-option -g history-limit "$HISTORY_LIMIT" \;
+  local args=(set-option -g @agent_term 1 \;
+    set-option -g history-limit "$HISTORY_LIMIT" \;
     set-option -g remain-on-exit off \;
-    new-session -d -s "$full" -x "$width" -y "$height" -P -F '#{session_id} #{pane_id}')
+    set-option -g update-environment "" \;
+    new-session -d -s "$full" -x "$width" -y "$height" -P -F '#{session_id} #{pane_id} #{pid}')
   [[ -n "$cwd" ]] && args+=(-c "$cwd")
   # /usr/bin/env as argv[0] guarantees tmux sees multiple arguments and execs
   # directly instead of falling back to `sh -c`.
   created="$(tm "${args[@]}" -- /usr/bin/env "$@")" ||
     die "failed to start session '$name'"
-  sid="${created%% *}"
-  pane_id="${created##* }"
-  [[ "$sid" =~ ^\$[0-9]+$ && "$pane_id" =~ ^%[0-9]+$ ]] ||
-    die "started '$name' but tmux returned no usable session/pane id: $created"
-  # Keyed on the session id: a name-based target is ambiguous for set-option.
-  tm set-option -t "$sid" @agent_pane "$pane_id" >/dev/null 2>&1 ||
-    die "started '$name' but could not record its pane id"
+  read -r sid pane_id spid <<<"$created"
+  [[ "$sid" =~ ^\$[0-9]+$ && "$pane_id" =~ ^%[0-9]+$ && "$spid" =~ ^[0-9]+$ ]] ||
+    die "started '$name' but tmux returned no usable ids: $created"
+
+  # Written outside tmux, because a pane can rewrite any tmux option.
+  local file
+  file="$(state_file "$name")"
+  (
+    umask 077
+    printf '%s %s\n' "$pane_id" "$spid" >"$file"
+  ) || die "started '$name' but could not record its pane"
 
   echo "started '$name' (detached, ${size}, pane $pane_id, no window shown)"
   echo "  read:   agent-term.sh read $name"
-  echo "  human:  tmux -L $SOCKET attach -t =$full"
+  echo "  human:  tmux -f /dev/null -L $SOCKET attach -E -t =$full"
 }
 
 cmd_read() {
@@ -314,7 +426,6 @@ cmd_read() {
       --history)
         history=1
         shift
-        # optional count
         if [[ $# -gt 0 && "$1" =~ ^[0-9]+$ ]]; then
           lines="$1"
           shift
@@ -328,30 +439,38 @@ cmd_read() {
     esac
   done
   [[ -z "$lines" || "$lines" =~ ^[0-9]+$ ]] || die "--lines must be a positive integer"
-  session_exists "$name" || die "no session '$name' (try: agent-term.sh list)"
 
   local target out status
-  target="$(pane_target "$name")" ||
-    die "session '$name' has no recorded pane (started outside this script?)"
+  target="$(resolve_pane_or_die "$name")" || exit 1
+
+  # A pane can raise history-limit or turn on pipe-pane through $TMUX. Neither
+  # can be prevented from here, but both are worth refusing to read across:
+  # they mean the pane is no longer operating under the constraints the
+  # scrollback story assumes.
+  local live_hist pipe_on
+  live_hist="$(tm display -p -t "$target" '#{history_limit}' 2>/dev/null)"
+  pipe_on="$(tm display -p -t "$target" '#{pane_pipe}' 2>/dev/null)"
+  [[ "$live_hist" == "$HISTORY_LIMIT" ]] ||
+    die "pane history-limit is $live_hist, expected $HISTORY_LIMIT — the pane changed it; treat this session as compromised"
+  [[ "$pipe_on" == "0" ]] ||
+    die "pane has pipe-pane active — it is writing its output to a file; treat this session as compromised"
+
   if ((history)); then
-    # -S reaches back into scrollback; only --history does that.
     out="$(tm capture-pane -p -S "-${lines:-$HISTORY_LIMIT}" -t "$target" 2>&1)"
   else
     out="$(tm capture-pane -p -t "$target" 2>&1)"
   fi
   status=$?
   ((status == 0)) || die "capture failed for '$name' (session may have exited): $out"
-  # --lines trims the visible screen; it must not widen the capture, which is
-  # what passing it to -S would do.
+  # --lines trims the visible screen; only --history widens the capture.
   [[ -n "$lines" ]] && ((!history)) && out="$(printf '%s\n' "$out" | tail -n "$lines")"
 
   if ((raw)); then
     printf '%s\n' "$out"
     return 0
   fi
-  # A fixed marker is forgeable: anything printing in the pane could close the
-  # fence and make its own text look like it came from outside. The nonce makes
-  # that require guessing 64 bits.
+  # A fixed marker published in a public repo is forgeable: pane content could
+  # close the fence and make its own text look like it came from outside.
   local nonce
   nonce="$(od -An -tx1 -N8 /dev/urandom | tr -d ' \n')"
   echo "--- BEGIN UNTRUSTED TERMINAL OUTPUT ($name $nonce) ---"
@@ -368,14 +487,13 @@ cmd_keys() {
   [[ "${1:-}" == "--" ]] || die "keys needs '--' before the keys to send"
   shift
   [[ $# -gt 0 ]] || die "keys needs at least one key after '--'"
-  session_exists "$name" || die "no session '$name' (try: agent-term.sh list)"
+
+  local target
+  target="$(resolve_pane_or_die "$name")" || exit 1
 
   # Keys are taken only as literal argv — never from stdin, a file, or a
-  # variable this script expands. That is what lets the permission prompt for
-  # this command be the whole truth about what gets typed into a live shell.
-  local target
-  target="$(pane_target "$name")" ||
-    die "session '$name' has no recorded pane (started outside this script?)"
+  # variable this script expands — so the permission prompt for this command
+  # states exactly what will be typed. It does NOT prove where: see SKILL.md.
   printf 'agent-term: sending to %s (pane %s):' "$name" "$target" >&2
   printf ' [%s]' "$@" >&2
   printf '\n' >&2
@@ -394,15 +512,13 @@ cmd_list() {
     esac
   done
 
-  # Fields are fetched per session id for the same reason reap() does it: a
-  # session name can contain spaces and '|', so a delimited row is forgeable.
   local now sock sock_owner id name created attached command found=0
   now="$(date +%s)"
-  printf '%-18s %-10s %-9s %-9s %s\n' NAME AGE OWNER ATTACHED RUNNING
   while read -r sock; do
     [[ -n "$sock" ]] || continue
     sock_owner="${sock#"$SOCKET_PREFIX"-}"
-    ((all)) || [[ "$sock_owner" == "$OWNER" ]] || continue
+    [[ "$sock_owner" == "$SOCKET_PREFIX" ]] && sock_owner="legacy"
+    ((all)) || [[ "$sock" == "$SOCKET" ]] || continue
     while read -r id; do
       [[ "$id" =~ ^\$[0-9]+$ ]] || continue
       name="$(tm_on "$sock" display -p -t "$id" '#{session_name}' 2>/dev/null)"
@@ -411,30 +527,29 @@ cmd_list() {
       [[ "$created" =~ ^[0-9]+$ ]] || continue
       attached="$(tm_on "$sock" display -p -t "$id" '#{session_attached}' 2>/dev/null)"
       command="$(tm_on "$sock" display -p -t "$id" '#{pane_current_command}' 2>/dev/null)"
+      ((found)) || printf '%-16s %-8s %-9s %-5s %s\n' NAME AGE OWNER ATCH RUNNING
       found=1
-      printf '%-18s %-10s %-9s %-9s %s\n' \
+      printf '%-16s %-8s %-9s %-5s %s\n' \
         "${name#"$PREFIX"}" "$((now - created))s" "$sock_owner" \
         "$([[ "$attached" == "0" ]] && echo no || echo yes)" "$command"
+      # The fully substituted line, because hand-assembling it without '='
+      # lets tmux prefix-match a partial name into the wrong session.
+      printf '    attach: tmux -f /dev/null -L %s attach -E -t "=%s"\n' "$sock" "$name"
     done < <(tm_on "$sock" list-sessions -F '#{session_id}' 2>/dev/null)
   done < <(list_sockets)
 
-  ((found)) || {
-    echo "(none)"
-    return 0
-  }
-  echo
-  echo "human attaches with: tmux -L ${SOCKET_PREFIX}-<owner> attach -t =agent-<name>"
+  ((found)) || echo "no agent sessions"
 }
 
 cmd_attach() {
-  local name="${1:-}"
+  local name="${1:-}" sid
   validate_name "$name"
-  session_exists "$name" || die "no session '$name' (try: agent-term.sh list)"
-  # Deliberately prints rather than attaches: attaching from inside an agent's
-  # non-interactive shell would hang, and the point of this tool is that the
-  # human decides when to look. Read SKILL.md's threat model before doing
-  # privileged work (sudo, ssh, credential unlock) in an attached pane.
-  echo "tmux -L $SOCKET attach -t =$(full_name "$name")"
+  sid="$(session_id "$name")" || die "no session '$name' (try: agent-term.sh list)"
+  # Prints rather than attaches: attaching from an agent's non-interactive
+  # shell would hang, and the human decides when to look. -E suppresses
+  # update-environment so attaching can't copy the human's live credentials
+  # into the session. Read SKILL.md before doing privileged work in a pane.
+  echo "tmux -f /dev/null -L $SOCKET attach -E -t \"=$(full_name "$name")\""
 }
 
 cmd_stop() {
@@ -442,6 +557,7 @@ cmd_stop() {
   validate_name "$name"
   sid="$(session_id "$name")" || die "no session '$name'"
   tm kill-session -t "$sid" || die "failed to stop '$name'"
+  rm -f "$(state_file "$name")" 2>/dev/null
   echo "stopped '$name'"
 }
 
@@ -451,9 +567,9 @@ cmd_stop_all() {
     echo "no agent sessions to stop"
     return 0
   fi
-  # Safe now that the socket belongs to this owner alone: no other agent's
-  # sessions live on this server.
+  # Safe because this socket belongs to this owner alone.
   tm kill-server 2>/dev/null
+  rm -f "$(state_dir)"/*.pane 2>/dev/null
   echo "stopped all sessions owned by $OWNER"
 }
 
