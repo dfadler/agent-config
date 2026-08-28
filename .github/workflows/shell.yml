@@ -1,0 +1,88 @@
+name: Shell
+
+# Lints, structure-checks and tests this repo's bash scripts. Until now the repo
+# had no CI at all: setup.sh rewrites symlinks in the developer's ~/.claude, the
+# skills ship executable scripts, and nothing verified any of it before merge.
+#
+# Four checks, all run through the same `make` targets humans use locally, so
+# CI and `make check` can never drift:
+#   * shellcheck  — correctness (quoting, fail-open pipelines, unset vars, ...)
+#   * shfmt       — formatting (`-i 2 -ci`, the repo's 2-space style)
+#   * set-flags   — every executable script opens with `set -uo pipefail`
+#                   (the CLAUDE.md convention; shellcheck has no rule for it)
+#   * structure   — plugin manifests and skill/agent frontmatter agree with
+#                   the directories they live in (bash has no typechecker;
+#                   this is the nearest equivalent for a repo whose product
+#                   IS declarative metadata)
+#   * bats        — unit tests, fully hermetic: HOME is redirected into a
+#                   sandbox and network binaries are shimmed to fail loudly,
+#                   so a test can never touch the real ~/.claude.
+#
+# Tools are pinned to exact versions so a newer shellcheck adding a check, or a
+# shfmt tweaking its output, can't turn a green main red without a bump here.
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+# One live run per target: a new push to the same PR (or to main) supersedes the
+# in-flight run for the old commit, which would otherwise bill to completion.
+# PRs key by number, pushes to main by ref; the workflow name keeps groups from
+# colliding across workflows.
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+# Least privilege: the job only needs to read the repo.
+permissions:
+  contents: read
+
+env:
+  SHELLCHECK_VERSION: v0.11.0
+  SHFMT_VERSION: v3.13.1
+  BATS_VERSION: v1.11.1
+
+jobs:
+  shell:
+    name: shellcheck + shfmt + structure + bats
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          # The job runs PR-controlled code and never needs authenticated git
+          # after checkout — don't leave the GITHUB_TOKEN in reach.
+          persist-credentials: false
+
+      # Pinned binaries from upstream releases. Each lands in /usr/local/bin,
+      # which precedes /usr/bin on PATH, so it wins over any preinstalled copy.
+      - name: Install shellcheck ${{ env.SHELLCHECK_VERSION }}
+        run: |
+          curl -fsSL "https://github.com/koalaman/shellcheck/releases/download/${SHELLCHECK_VERSION}/shellcheck-${SHELLCHECK_VERSION}.linux.x86_64.tar.xz" \
+            | tar -xJ
+          sudo install -m 0755 "shellcheck-${SHELLCHECK_VERSION}/shellcheck" /usr/local/bin/shellcheck
+          rm -rf "shellcheck-${SHELLCHECK_VERSION}"
+          shellcheck --version
+
+      - name: Install shfmt ${{ env.SHFMT_VERSION }}
+        run: |
+          sudo curl -fsSL -o /usr/local/bin/shfmt \
+            "https://github.com/mvdan/sh/releases/download/${SHFMT_VERSION}/shfmt_${SHFMT_VERSION}_linux_amd64"
+          sudo chmod 0755 /usr/local/bin/shfmt
+          shfmt --version
+
+      - name: Install bats ${{ env.BATS_VERSION }}
+        run: |
+          git clone --depth 1 --branch "$BATS_VERSION" \
+            https://github.com/bats-core/bats-core.git /tmp/bats-core
+          sudo /tmp/bats-core/install.sh /usr/local
+          bats --version
+
+      - name: Lint (shellcheck + shfmt + set-flags)
+        run: make lint-sh
+
+      - name: Structure (plugin manifests + frontmatter)
+        run: make structure
+
+      - name: Test (bats)
+        run: make test
