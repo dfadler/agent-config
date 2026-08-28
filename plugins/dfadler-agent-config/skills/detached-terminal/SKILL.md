@@ -1,5 +1,5 @@
 ---
-name: dfadler-agent-config-detached-terminal
+name: detached-terminal
 description: |
   Run and drive a real interactive terminal — a TUI, a REPL, an
   alternate-screen app like vim/top/htop, an interactive prompt a plain
