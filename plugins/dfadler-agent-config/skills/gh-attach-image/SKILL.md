@@ -46,27 +46,27 @@ That's what this skill uses.
 
 ## Quick path: use the bundled script
 
-`scripts/upload.sh` implements the whole flow. Prefer it over reconstructing
-the curl calls by hand — it already handles content-type detection, URL
-encoding, and the two usage patterns below.
+`${CLAUDE_SKILL_DIR}/scripts/upload.sh` implements the whole flow. Prefer it
+over reconstructing the curl calls by hand — it already handles content-type
+detection, URL encoding, and the two usage patterns below.
 
 ```bash
 # Default: upload and print markdown lines — use this when the images need
 # to go in a specific spot in a hand-crafted body (a table, a particular
 # section) rather than a simple append.
-~/.claude/skills/dfadler-agent-config/skills/gh-attach-image/scripts/upload.sh --repo OWNER/NAME before.png after.png
+${CLAUDE_SKILL_DIR}/scripts/upload.sh --repo OWNER/NAME before.png after.png
 # -> ![before](https://github.com/user-attachments/assets/<uuid>)
 #    ![after](https://github.com/user-attachments/assets/<uuid>)
 
 # Convenience: upload AND append to an existing PR/issue body under a heading
-~/.claude/skills/dfadler-agent-config/skills/gh-attach-image/scripts/upload.sh --repo OWNER/NAME --pr 42 screenshot.png
+${CLAUDE_SKILL_DIR}/scripts/upload.sh --repo OWNER/NAME --pr 42 screenshot.png
 
 # Or post as a new comment instead of editing the body
-~/.claude/skills/dfadler-agent-config/skills/gh-attach-image/scripts/upload.sh --repo OWNER/NAME --issue 7 --comment diagram.png
+${CLAUDE_SKILL_DIR}/scripts/upload.sh --repo OWNER/NAME --issue 7 --comment diagram.png
 ```
 
-Run `scripts/upload.sh` with no arguments (or read the top of the file) for
-the full flag list — it also documents itself inline.
+Run `${CLAUDE_SKILL_DIR}/scripts/upload.sh` with no arguments (or read the
+top of the file) for the full flag list — it also documents itself inline.
 
 If the default mode is used (no `--pr`/`--issue`), the script prints the
 markdown lines and stops — you're then responsible for placing them into
