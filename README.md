@@ -138,6 +138,46 @@ who skips setup.
 5. Commit and push. A new skill or agent inside an already-linked plugin needs no
    `setup.sh` re-run; anything under `claude/`, or a whole new plugin, does.
 
+### Why skills here don't declare `allowed-tools`
+
+An automated reviewer (SkillSpector, via CodeRabbit on #51) flags every `SKILL.md`
+under `plugins/dfadler-agent-config/skills/` for "unrestricted tool access" and
+recommends adding `allowed-tools` frontmatter as a remediation. This was decided
+deliberately in #63, not overlooked — recorded here so it isn't re-litigated by the
+next bot or reviewer that runs the same check.
+
+`allowed-tools` doesn't do what the finding assumes. In Claude Code, it's a
+pre-approval list, not a restriction: tools it names skip the permission prompt for
+that turn, but every tool remains callable regardless of what's listed — governed by
+the user's own permission settings, the same as if the skill didn't exist. The field
+that actually removes tools from the pool is `disallowed-tools`, which the finding
+doesn't ask for and which doesn't fit here anyway (see below). Declaring
+`allowed-tools` in the spirit the finding wants — as a security boundary — would
+misrepresent what the field does to the next reader, which is worse than the current
+silence.
+
+Even setting the mechanism aside, an allowlist doesn't fit this plugin's actual
+skills:
+
+- **Advisory/methodology skills** (`pr-review-rubric`) don't call tools themselves —
+  they're guidance the orchestrating turn follows. An allowlist on a skill like this
+  describes nothing real; the tools in play belong to whatever task invoked it.
+- **Legitimately broad skills** (`pr-babysit`) read, edit, run `gh`, push, and rerun
+  CI as its actual job. A "minimal" list for it would just restate "most tools,"
+  adding a maintenance burden with no corresponding safety gain.
+- **Narrow skills** (`gh-attach-image`, `pr-visual-capture`) could carry an accurate
+  short list, but accuracy for two skills isn't worth an inconsistent, partially-
+  fictional convention across the other three.
+
+The real boundary is the one this repo's global `CLAUDE.md` and every session already
+operate under: Claude Code's permission rules, hooks, and the active permission mode
+enforce tool access, regardless of what any skill's frontmatter claims. `CLAUDE.md`
+and skill instructions — including a skill's own `allowed-tools` — are behavioral
+guidance the model follows, not an enforcement layer; only `settings.json`
+permission rules and hooks actually gate a tool call. A skill-level allowlist that
+can't restrict anything would be a paper boundary layered on top of the real one —
+worth avoiding on those grounds even before the mechanism question above.
+
 ## Checks
 
 `make check` runs everything CI runs, and CI calls these same targets — so a green
