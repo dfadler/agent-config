@@ -281,6 +281,31 @@ class TestHistoryRendering:
         assert first == "cba0"
         assert first != "".join(sorted(first))
 
+    def test_without_history_flag_only_the_visible_screen_is_returned(self) -> None:
+        # `read` without `--history` must never reach into scrollback: that
+        # flag is the documented boundary between the visible screen and
+        # retained output crossing into an agent's context (SKILL.md, "Only
+        # `--history` widens what you capture"). rows=3 here, so once more
+        # than 3 lines have been fed, the earliest ones exist only in
+        # `screen.history` -- render(history=False) must not surface them,
+        # no matter what `lines` is asked for.
+        stub = self._session_with_history(cols=20, rows=3)
+        for i in range(8):
+            stub.stream.feed(f"line-{i}\r\n".encode())
+        visible = stub.render(lines=20, history=False)
+        assert "line-0" not in visible, (
+            f"scrollback leaked without --history: {visible!r}"
+        )
+        assert "line-7" in visible
+
+    def test_history_flag_includes_the_scrolled_off_lines(self) -> None:
+        stub = self._session_with_history(cols=20, rows=3)
+        for i in range(8):
+            stub.stream.feed(f"line-{i}\r\n".encode())
+        with_history = stub.render(lines=20, history=True)
+        assert "line-0" in with_history
+        assert "line-7" in with_history
+
 
 class TestTolerantScreen:
     def test_private_sgr_does_not_raise(self) -> None:
@@ -509,6 +534,44 @@ class TestLifecycle:
         result = term("read", "nope", check=False)
         assert result.returncode != 0
         assert "no session" in result.stderr
+
+
+class TestHistoryGating:
+    """`read` without `--history` must not leak scrollback.
+
+    End-to-end version of TestHistoryRendering's unit tests, driven through
+    the actual CLI and socket protocol rather than calling Session.render()
+    directly -- proving the gate holds across the whole `read` path, not just
+    in the rendering helper.
+    """
+
+    def test_lines_without_history_excludes_scrolled_off_content(
+        self, term: Runner
+    ) -> None:
+        # The smallest height the CLI allows (--size enforces rows >= 5).
+        # `cat` echoes each typed line twice (tty echo, then cat's own
+        # output), so 12 input lines comfortably push the earliest ones off
+        # a 5-row screen and into scrollback.
+        term("start", "hg1", "--size", "20x5", "--history", "50", "--", "cat")
+        for i in range(12):
+            term("keys", "hg1", "--", f"line-{i}", "Enter")
+        wait_for(term, "hg1", "line-11")
+
+        result = term("read", "hg1", "--raw", "--lines", "20")
+        assert "line-11" in result.stdout
+        assert "line-0" not in result.stdout, (
+            f"read without --history leaked scrollback: {result.stdout!r}"
+        )
+
+    def test_history_flag_includes_scrolled_off_content(self, term: Runner) -> None:
+        term("start", "hg2", "--size", "20x5", "--history", "50", "--", "cat")
+        for i in range(12):
+            term("keys", "hg2", "--", f"line-{i}", "Enter")
+        wait_for(term, "hg2", "line-11")
+
+        result = term("read", "hg2", "--raw", "--history", "--lines", "50")
+        assert "line-0" in result.stdout
+        assert "line-11" in result.stdout
 
 
 class TestProcessGroupCleanup:
