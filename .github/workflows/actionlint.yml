@@ -10,9 +10,10 @@ name: Actionlint
 # Runs through the same `make lint-actions` entry point humans use locally
 # (`brew install actionlint`), matching shell.yml's pattern.
 #
-# shellcheck is pinned to the same version shell.yml uses — the runner image
-# preinstalls one, but the pinned copy in /usr/local/bin wins on PATH, and
-# actionlint picks it up for linting embedded run: scripts.
+# shellcheck comes from the shared install-shellcheck composite action (same
+# pin shell.yml uses) — the runner image preinstalls one, but the pinned copy
+# in /usr/local/bin wins on PATH, and actionlint picks it up for linting
+# embedded run: scripts.
 
 on:
   # This lints .github/workflows/** — it can't find anything in a diff that
@@ -33,21 +34,19 @@ permissions:
 
 env:
   ACTIONLINT_VERSION: 1.7.12
-  SHELLCHECK_VERSION: v0.11.0
   # actionlint publishes its own checksums file, so this value is verified
   # against an upstream manifest rather than recorded from a download — a
-  # stronger guarantee than the shellcheck/shfmt pins in shell.yml, which have
-  # no upstream checksums to check against. Taken from
-  # actionlint_1.7.12_checksums.txt.
+  # stronger guarantee than the shellcheck (install-shellcheck composite
+  # action) / shfmt (shell.yml) pins, which have no upstream checksums to
+  # check against. Taken from actionlint_1.7.12_checksums.txt.
   ACTIONLINT_SHA256: 8aca8db96f1b94770f1b0d72b6dddcb1ebb8123cb3712530b08cc387b349a3d8
-  SHELLCHECK_SHA256: 8c3be12b05d5c177a04c29e3c78ce89ac86f1595681cab149b65b97c4e227198
 
 jobs:
   actionlint:
     name: actionlint
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v7
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
 
@@ -63,15 +62,8 @@ jobs:
           rm -f /tmp/actionlint.tar.gz /tmp/actionlint
           actionlint --version
 
-      - name: Install shellcheck ${{ env.SHELLCHECK_VERSION }}
-        run: |
-          curl -fsSL -o /tmp/shellcheck.tar.xz \
-            "https://github.com/koalaman/shellcheck/releases/download/${SHELLCHECK_VERSION}/shellcheck-${SHELLCHECK_VERSION}.linux.x86_64.tar.xz"
-          echo "${SHELLCHECK_SHA256}  /tmp/shellcheck.tar.xz" | sha256sum -c -
-          tar -xJf /tmp/shellcheck.tar.xz -C /tmp
-          sudo install -m 0755 "/tmp/shellcheck-${SHELLCHECK_VERSION}/shellcheck" /usr/local/bin/shellcheck
-          rm -rf /tmp/shellcheck.tar.xz "/tmp/shellcheck-${SHELLCHECK_VERSION}"
-          shellcheck --version
+      - name: Install shellcheck
+        uses: ./.github/actions/install-shellcheck
 
       - name: Lint workflows (actionlint)
         run: make lint-actions
