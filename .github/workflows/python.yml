@@ -1,0 +1,59 @@
+name: Python
+
+# Lints, typechecks and tests the Python side — currently the detached-terminal
+# skill, which holds a PTY and a screen model for the agent to drive.
+#
+# It exists because that skill stopped being a shell wrapper. The previous
+# implementation drove tmux, and tmux hands every pane a $TMUX handle back to
+# the server governing it, so a process in the pane could rewrite the wrapper's
+# own state. Replacing it with a purpose-built PTY holder removed that channel
+# but moved the code into Python, which the Shell workflow cannot check.
+#
+# Same contract as shell.yml: CI calls the `make` targets humans run locally,
+# so `make check` and a green PR mean the same thing. Dependencies are pinned
+# in requirements-dev.txt.
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  python:
+    name: ruff + mypy + pytest
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          # The job runs PR-controlled code and never needs authenticated git
+          # after checkout — don't leave the GITHUB_TOKEN in reach.
+          persist-credentials: false
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: Install pinned dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements-dev.txt
+          pip list
+
+      - name: Lint (ruff check + format)
+        run: make lint-py
+
+      - name: Typecheck (mypy --strict)
+        run: make typecheck
+
+      # The integration tests fork real PTYs and start real daemons. They are
+      # hermetic — AGENT_TERM_STATE is redirected per test and torn down — but
+      # they do need a working pty(4), which the ubuntu runner provides.
+      - name: Test (pytest)
+        run: make test-py
