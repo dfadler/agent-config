@@ -222,6 +222,52 @@ class TestStateDir:
         assert stat.S_IMODE(os.stat(loose).st_mode) == 0o700
 
 
+class TestHistoryRendering:
+    """Scrollback must render in COLUMN order.
+
+    pyte stores a history row as a sparse column -> Char mapping. Joining
+    `sorted(row.values())` sorts the Char objects themselves, so
+    "zebra 0 apple" came back as "  0aabeelpprz" — alphabetised, gaps dropped.
+    `read --history` was returning scrambled text and nothing caught it,
+    because no test looked at history CONTENT.
+    """
+
+    @staticmethod
+    def _session_with_history(cols: int = 20, rows: int = 3) -> Any:
+        class Stub:
+            pass
+
+        stub = Stub()
+        stub.cols = cols
+        stub.screen = agent_term.TolerantScreen(cols, rows, history=50)
+        stub.stream = agent_term.pyte.ByteStream(stub.screen)
+        stub.render = agent_term.Session.render.__get__(stub)
+        stub._history_row = agent_term.Session._history_row.__get__(stub)
+        return stub
+
+    def test_history_preserves_character_order(self) -> None:
+        stub = self._session_with_history()
+        for i in range(8):
+            stub.stream.feed(f"zebra {i} apple\r\n".encode())
+        first = stub.render(history=True).splitlines()[0]
+        assert first == "zebra 0 apple", f"history scrambled: {first!r}"
+
+    def test_history_preserves_internal_spaces(self) -> None:
+        stub = self._session_with_history()
+        for i in range(8):
+            stub.stream.feed(f"a  b {i}\r\n".encode())
+        assert stub.render(history=True).splitlines()[0] == "a  b 0"
+
+    def test_history_is_not_alphabetised(self) -> None:
+        # The specific failure mode: a value sort produces sorted characters.
+        stub = self._session_with_history()
+        for i in range(8):
+            stub.stream.feed(f"cba{i}\r\n".encode())
+        first = stub.render(history=True).splitlines()[0]
+        assert first == "cba0"
+        assert first != "".join(sorted(first))
+
+
 class TestTolerantScreen:
     def test_private_sgr_does_not_raise(self) -> None:
         # pyte raises on CSI ? ... m, which vim emits on startup. A real
@@ -328,6 +374,67 @@ class TestLifecycle:
         result = term("read", "nope", check=False)
         assert result.returncode != 0
         assert "no session" in result.stderr
+
+
+class TestProcessGroupCleanup:
+    def test_descendants_are_killed_with_the_session(self, term: Runner) -> None:
+        """stop must not leave grandchildren running.
+
+        pty.fork makes the child a process-group leader, so its own children
+        share that group; signalling only the direct pid left them behind.
+
+        The descendant is deliberately `nohup`ed. The obvious fixture --
+        `sh -c 'sleep 600 & wait'` -- does NOT distinguish the two
+        implementations: closing the PTY master sends SIGHUP to the foreground
+        process group, so that descendant dies either way. Measured, after the
+        first version of this test passed against `os.kill` and proved nothing.
+        A nohup'd child ignores the SIGHUP, so only killpg reaches it.
+        """
+        marker = f"agentterm-pg-{os.getpid()}"
+        term(
+            "start",
+            "pg",
+            "--",
+            "sh",
+            "-c",
+            f"nohup sleep 600 >/dev/null 2>&1 & echo {marker}-up; wait",
+        )
+        wait_for(term, "pg", f"{marker}-up")
+
+        found = subprocess.run(
+            ["pgrep", "-f", "sleep 600"], capture_output=True, text=True, check=False
+        )
+        assert found.stdout.strip(), "fixture never started the descendant"
+
+        term("stop", "pg")
+        try:
+            deadline = time.time() + 10
+            while time.time() < deadline:
+                still = subprocess.run(
+                    ["pgrep", "-f", "sleep 600"],
+                    capture_output=True,
+                    text=True,
+                    check=False,
+                )
+                if not still.stdout.strip():
+                    return
+                time.sleep(0.2)
+            raise AssertionError("nohup'd descendant survived stop")
+        finally:
+            subprocess.run(["pkill", "-f", "sleep 600"], check=False)
+
+
+class TestStartupOrdering:
+    def test_read_immediately_after_start_succeeds(self, term: Runner) -> None:
+        """No sleep between start and read.
+
+        The daemon used to acknowledge startup before binding its socket, so a
+        request issued straight after `start` could arrive first and fail with
+        "no session" on a session that had started fine.
+        """
+        term("start", "race", "--", "cat")
+        result = term("read", "race", "--raw", check=False)
+        assert result.returncode == 0, f"read raced start: {result.stderr}"
 
 
 class TestUntrustedFraming:
