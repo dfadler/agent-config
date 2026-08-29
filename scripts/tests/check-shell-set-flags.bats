@@ -90,3 +90,27 @@ check() {
   run bash "$REPO_ROOT/scripts/check-shell-set-flags.sh"
   assert_success
 }
+
+@test "-h prints usage and exits 0" {
+  run bash "$REPO_ROOT/scripts/check-shell-set-flags.sh" -h
+  assert_success
+  assert_output_contains "Usage: check-shell-set-flags.sh"
+}
+
+@test "--help prints usage and exits 0, even with other args present" {
+  run bash "$REPO_ROOT/scripts/check-shell-set-flags.sh" --help "$FIXTURE_DIR"
+  assert_success
+  assert_output_contains "Usage: check-shell-set-flags.sh"
+}
+
+@test "an unrecognized option exits with EXIT_USAGE (2)" {
+  run bash "$REPO_ROOT/scripts/check-shell-set-flags.sh" --bogus
+  assert_status 2
+  assert_output_contains "Unknown option: --bogus"
+}
+
+@test "a violation exits with EXIT_FAILURE (1)" {
+  printf '#!/bin/bash\n\necho hi\n' > "$FIXTURE_DIR/missing.sh"
+  check
+  assert_status 1
+}
