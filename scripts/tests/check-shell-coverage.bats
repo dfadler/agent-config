@@ -132,6 +132,63 @@ write_coverage() {
 # entries under .files carry their own percent_covered, and picking one of
 # those (a `grep`-first-match implementation, say) would report a wildly
 # different number.
+@test "-h prints usage and exits 0" {
+  check -h
+  assert_success
+  assert_output_contains "Usage: check-shell-coverage.sh"
+}
+
+@test "--help prints usage and exits 0, even with no other args" {
+  check --help
+  assert_success
+  assert_output_contains "Usage: check-shell-coverage.sh"
+}
+
+@test "exits with EXIT_USAGE (2) when no threshold argument is given" {
+  write_coverage "99.00"
+  check "$COV_JSON"
+  assert_status 2
+}
+
+@test "exits with EXIT_USAGE (2) when the coverage file does not exist" {
+  check "$BATS_TEST_TMPDIR/absent.json" 40
+  assert_status 2
+}
+
+@test "exits with EXIT_USAGE (2) when the threshold is not numeric" {
+  write_coverage "12.00"
+  check "$COV_JSON" '$(COVERAGE_MIN)'
+  assert_status 2
+}
+
+@test "exits with EXIT_DEPENDENCY (4) when jq is not on PATH" {
+  write_coverage "99.00"
+  mkdir -p "$BATS_TEST_TMPDIR/nobin"
+  local bash_bin
+  bash_bin="$(command -v bash)"
+  run env PATH="$BATS_TEST_TMPDIR/nobin" \
+    "$bash_bin" "$REPO_ROOT/scripts/check-shell-coverage.sh" "$COV_JSON" 40
+  assert_status 4
+}
+
+@test "exits with EXIT_INTERNAL (20) when percent_covered is not numeric" {
+  printf '{"percent_covered": "n/a"}\n' > "$COV_JSON"
+  check "$COV_JSON" 40
+  assert_status 20
+}
+
+@test "exits with EXIT_INTERNAL (20) when percent_covered is absent" {
+  printf '{"covered_lines": 12, "total_lines": 40}\n' > "$COV_JSON"
+  check "$COV_JSON" 40
+  assert_status 20
+}
+
+@test "exits with EXIT_FAILURE (1) when coverage is below the threshold" {
+  write_coverage "38.90"
+  check "$COV_JSON" 40
+  assert_status 1
+}
+
 @test "reads the top-level percent_covered, not a per-file one" {
   cat > "$COV_JSON" <<'EOF'
 {
