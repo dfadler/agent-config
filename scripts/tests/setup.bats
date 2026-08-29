@@ -90,6 +90,10 @@ setup() {
   mkdir -p "$FAKE_REPO/plugins/dfadler-agent-config/.claude-plugin"
   echo '{"name":"dfadler-agent-config"}' \
     > "$FAKE_REPO/plugins/dfadler-agent-config/.claude-plugin/plugin.json"
+  mkdir -p "$FAKE_REPO/scripts"
+  cp "$REPO_ROOT/scripts/offer-safe-chain-permission.sh" \
+    "$FAKE_REPO/scripts/offer-safe-chain-permission.sh"
+  chmod +x "$FAKE_REPO/scripts/offer-safe-chain-permission.sh"
   # Default: an interpreter that already has pyte, so the link tests below
   # don't depend on whatever is installed on the machine running them.
   shim_python3 yes

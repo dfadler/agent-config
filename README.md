@@ -117,6 +117,30 @@ interpreter you own first on `PATH`) rather than letting pip fail confusingly. T
 still carries its own "pyte is not installed" error as the last line of defence for anyone
 who skips setup.
 
+### Optional: pre-approving the Aikido Safe Chain installer
+
+Some repos' `CONTRIBUTING.md` ask contributors to install
+[Aikido Safe Chain](https://github.com/AikidoSec/safe-chain) — a free, tokenless CLI that
+wraps `npm`/`pnpm`/`npx`/`yarn` and blocks installs of packages flagged as malware or
+published in the last 48 hours. Its documented installer is a `curl | sh` pipeline pinned
+to an exact version and verified against a published sha256 before it runs — but Claude
+Code's auto-mode classifier blocks any pipe-to-shell installer by default, checksum or not.
+
+At the end of a run, `setup.sh` asks (interactively, y/n) whether to add a Bash permission
+rule to `~/.claude/settings.json` that pre-approves exactly that pinned command, so a future
+agent session doesn't have to stop and ask. It's an exact-string match tied to one specific
+version and checksum — not a blanket `curl *` allow — and it only *allowlists* the command;
+it doesn't run the installer itself. The prompt is skipped cleanly (no hang) when there's no
+interactive terminal, e.g. in CI or a piped run.
+
+Answer no, or run non-interactively, and nothing is written. Add the rule later with:
+
+```bash
+./scripts/offer-safe-chain-permission.sh --yes
+```
+
+or remove it any time from `~/.claude/settings.json`'s `permissions.allow` array.
+
 ## Adding something new
 
 1. Put it in the right place:
