@@ -2,8 +2,9 @@
 
 Reference for writing, hardening, and debugging the workflows under
 `.github/workflows/`. Grew out of a deliberate investigation (issues #108–112)
-rather than accreting ad hoc — consult it before adding a workflow, changing an
-existing one, or chasing down a CI failure here.
+plus a real incident it documents (#106), rather than accreting ad hoc —
+consult it before adding a workflow, changing an existing one, or chasing down
+a CI failure here.
 
 ## Writing a workflow
 
@@ -35,14 +36,27 @@ existing one, or chasing down a CI failure here.
 
 ## Security hardening
 
-- **Pin every `uses:` reference to a full commit SHA, not a tag.** A tag like
-  `@v7` is mutable — the publisher (or a compromised publisher account) can
-  repoint it at different code without the workflow file changing at all.
-  GitHub's own hardening guide states SHA-pinning is "the only way to use an
-  action as an immutable release." Keep the resolved version as a trailing
-  comment for readability: `actions/checkout@3d3c42e... # v7.0.1`. Resolve the
-  SHA via `gh api repos/<owner>/<repo>/git/refs/tags/<tag>` (or the git ref
-  directly) — don't guess or hand-copy from a UI.
+- **Pin every *external* `uses:` reference to a full commit SHA, not a tag.**
+  This applies to third-party and other-repository actions/workflows
+  (`owner/repo@ref`) — a tag like `@v7` is mutable there, since the publisher
+  (or a compromised publisher account) can repoint it at different code
+  without the workflow file changing at all. GitHub's own hardening guide
+  states SHA-pinning is "the only way to use an action as an immutable
+  release." Keep the resolved version as a trailing comment for readability:
+  `actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1`.
+  It does **not** apply to a local action or a same-repository reusable
+  workflow referenced by relative path (`./.github/actions/<name>`,
+  `./.github/workflows/<file>.yml`) — those forms take no `@ref` at all
+  (GitHub rejects one) and always run at the calling commit, so there's
+  nothing to pin.
+  To resolve a tag to its commit SHA: `gh api
+  repos/<owner>/<repo>/git/refs/tags/<tag>` returns an `object`. If
+  `object.type` is `commit` (a lightweight tag), `object.sha` **is** the
+  commit SHA — use it directly. If `object.type` is `tag` (an annotated tag),
+  `object.sha` is the *tag object's* SHA, not the commit — dereference it
+  first via `gh api repos/<owner>/<repo>/git/tags/<that-sha>` and use the
+  nested `object.sha` from that response instead. Don't guess or hand-copy a
+  SHA from a UI either way.
 - **Declare least-privilege `permissions:`.** A top-level
   `permissions: contents: read` block, tightened per-job only where a job
   genuinely needs write, scores highest on OpenSSF Scorecard's
@@ -50,6 +64,12 @@ existing one, or chasing down a CI failure here.
   (`gh api repos/<owner>/<repo>/actions/permissions/workflow` —
   `default_workflow_permissions`) independently of what any single workflow
   file declares; both should be read-only unless something specific needs more.
+  A `permissions:` block at either level **replaces** the default entirely,
+  it doesn't add to it — any scope you don't name is set to `none`. So a job
+  that needs `pull-requests: write` must also re-declare `contents: read` in
+  that same job-level block if it (or a step in it, like `actions/checkout`)
+  still needs read access — adding one permission can silently take another
+  away.
 - **Verify third-party downloads, don't just fetch-and-run.** For any binary
   pulled from a release URL in a workflow step: download, verify its checksum
   against the publisher's own published manifest, *then* extract/install —
@@ -97,9 +117,10 @@ increasing cost:
    and timing (`started_at`/`completed_at`) the summary view collapses. (There
    is no Actions-runs "timeline" endpoint — that term is an Issues/PRs concept.
    This jobs endpoint is the actual equivalent.)
-3. `gh run rerun <run-id> --debug --failed` — re-runs just the failed jobs with
-   verbose step logging, with nothing persisted to repo secrets/variables
-   afterward. Prefer this over permanently setting `ACTIONS_STEP_DEBUG`/
+3. `gh run rerun <run-id> --debug --failed` — re-runs the failed jobs (and any
+   jobs that depend on them) with verbose step logging, with nothing persisted
+   to repo secrets/variables afterward. Prefer this over permanently setting
+   `ACTIONS_STEP_DEBUG`/
    `ACTIONS_RUNNER_DEBUG` as repo secrets — those apply to *every* run until
    someone remembers to unset them.
 4. `gh run watch <run-id> --compact --exit-status` — follow an in-progress run
@@ -143,14 +164,23 @@ increasing cost:
   on merge despite every individual PR having been green. Watch the
   merge-timing race too: pushing a new commit to a just-merged (and deleted)
   branch re-creates it, so a final commit can *look* merged without actually
-  being on the default branch — verify against the merge commit's parent, or
-  the PR's own state, not the branch name.
+  being on the default branch — verify against the PR's own state
+  (`gh pr view --json state,mergedAt`), not the branch name. (This repo merges
+  via ordinary merge commits, so "the merge commit's parent" is also a valid
+  check here; a repo using squash or rebase merges has no such merge commit to
+  check against, so the PR-state check is the one that generalizes.)
 
 ## What's deliberately not here
 
 No flaky-test-retry, dependency-drift, or timeout guidance yet — this repo has
-no real failure history for any of them (every external tool is pinned by
-exact version/SHA with checksum verification, permissions are already
-least-privilege, and concurrency groups already prevent racing runs, which
-forecloses several of these failure modes by construction). Add a section here
-when one of them actually happens, grounded in the real incident — not before.
+no real failure history for any of them, and the controls already in place
+mitigate specific causes rather than whole categories: every *shell-side*
+external tool (shellcheck, shfmt, bats, kcov, actionlint) is pinned by exact
+version/SHA with checksum verification, which rules out that tool silently
+changing under a workflow — it says nothing about Python's transitive
+dependency resolution (`requirements-dev.txt` pins direct packages; pip can
+still resolve different transitive versions run to run). `concurrency` with
+`cancel-in-progress: true` cancels a *superseded* run in the same group; it
+doesn't prevent a timeout or a flaky test in a run that isn't superseded.
+Add a section here when one of these actually happens, grounded in the real
+incident and naming the specific mechanism — not as a preventive guess.
