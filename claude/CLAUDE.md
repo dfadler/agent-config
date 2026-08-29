@@ -272,7 +272,10 @@ confidently. This applies to any platform or tool, not just Claude/Anthropic.
   so it survives a preceding-step failure, restricted to trusted workflows via
   `limit-access-to-actor: true` (or equivalent), and only ever added temporarily —
   it pauses the job and burns runner minutes, so treat it as a tool to reach for only
-  when the above doesn't resolve it, not a habit to build into a workflow.
+  when the above doesn't resolve it, not a habit to build into a workflow. Docs:
+  [`gh run rerun`](https://cli.github.com/manual/gh_run_rerun),
+  [status-check functions incl. `failure()`](https://docs.github.com/en/actions/reference/workflows-and-actions/expressions#status-check-functions),
+  [`action-tmate` incl. `limit-access-to-actor`](https://github.com/mxschmitt/action-tmate#readme).
 - **`.github/` stays config-only.** Limit it to platform configuration: workflows
   (`.github/workflows/`), CODEOWNERS, dependabot/release config, and a **generic**
   PR/issue template. Feature- or product-specific docs, playbooks, or checklists
