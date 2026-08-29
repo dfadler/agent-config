@@ -277,6 +277,86 @@ check_python_deps() {
   report_missing_pyte "$exe" "$managed"
 }
 
+# Purely informational: nothing in this repo depends on mattpocock-skills
+# being installed (see README's "Recommended companion" section, and #132's
+# decision to document rather than auto-install it) - unlike pyte or git
+# identity, there's no --install-deps for this, and there never should be.
+# `claude plugin list --json` is the stable, documented interface; grepping
+# its output avoids adding a jq dependency to setup.sh for one advisory
+# check. The id can be "mattpocock-skills@mattpocock" (the self-hosted
+# fallback marketplace) or "@claude-plugins-official" (the official one) -
+# either satisfies the check, so the marketplace suffix is deliberately not
+# matched.
+check_mattpocock_skills() {
+  command -v claude >/dev/null 2>&1 || return 0
+
+  local listing
+  listing="$(claude plugin list --json 2>/dev/null)" || return 0
+
+  # A grep window over the raw JSON isn't safe here: with more than one
+  # plugin installed, an "enabled" line belonging to a NEIGHBORING entry can
+  # fall inside the window and get attributed to mattpocock-skills instead -
+  # reported and reproduced in review on #134. Parsing properly with python3
+  # (already required elsewhere in this script, so not a new dependency)
+  # is immune to that by construction: json.load builds a dict keyed by
+  # field name, so neither a neighboring object nor field order within the
+  # matched object can be misread as belonging to a different entry.
+  # `if var=$(cmd)` rather than a plain assignment: this script runs under
+  # set -euo pipefail, and a plain `var="$(cmd)"` whose command exits
+  # non-zero (exactly what "not installed" and "unparseable" both are here)
+  # would abort setup.sh entirely instead of falling through to the case
+  # below. A command tested as an if-condition is the one place set -e
+  # doesn't trigger on failure, so this is the correct idiom, not a
+  # stylistic one.
+  local state rc
+  if state="$(printf '%s' "$listing" | python3 -c '
+import json, sys
+try:
+    data = json.load(sys.stdin)
+except Exception:
+    sys.exit(2)
+for entry in data:
+    if str(entry.get("id", "")).startswith("mattpocock-skills@"):
+        print("enabled" if entry.get("enabled") else "disabled")
+        sys.exit(0)
+sys.exit(1)
+' 2>/dev/null)"; then
+    rc=0
+  else
+    rc=$?
+  fi
+
+  case "$rc:$state" in
+    0:enabled)
+      echo "✓ mattpocock-skills is installed"
+      ;;
+    0:disabled)
+      {
+        echo
+        echo "⚠ mattpocock-skills is installed but disabled."
+        echo "  Re-enable it with: claude plugin enable mattpocock-skills"
+        echo
+      } >&2
+      ;;
+    1:*)
+      {
+        echo
+        echo "ℹ mattpocock-skills is not installed — a recommended companion plugin,"
+        echo "  not required by anything here. See README's \"Recommended companion\""
+        echo "  section. Install it with:"
+        echo "    claude plugin install mattpocock-skills"
+        echo
+      } >&2
+      ;;
+    *)
+      # python3 unusable, or claude printed something that isn't the JSON
+      # array the interface documents - can't determine, so stay silent
+      # rather than guess (same posture as an unreachable claude CLI).
+      return 0
+      ;;
+  esac
+}
+
 mkdir -p "$HOME/.claude"
 link "$REPO_ROOT/claude/CLAUDE.md" "$HOME/.claude/CLAUDE.md"
 link_dir_contents "$REPO_ROOT/claude/commands" "$HOME/.claude/commands"
@@ -297,8 +377,9 @@ mkdir -p "$HOME/.claude/skills"
 link "$PLUGIN_SRC" "$PLUGIN_LINK"
 
 # Last, so the linking work is already done and reported when these speak up.
-# Both are warnings, not failures: the symlinks are correct either way, and
-# `./setup.sh && something-else` shouldn't break over either one. An
+# All three are advisory, not failures: the symlinks are correct either way,
+# and `./setup.sh && something-else` shouldn't break over any of them. An
 # explicitly requested --install-deps that doesn't install is still a failure.
 check_git_identity
 check_python_deps
+check_mattpocock_skills
