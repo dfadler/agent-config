@@ -277,6 +277,46 @@ check_python_deps() {
   report_missing_pyte "$exe" "$managed"
 }
 
+# Purely informational: nothing in this repo depends on mattpocock-skills
+# being installed (see README's "Recommended companion" section, and #132's
+# decision to document rather than auto-install it) - unlike pyte or git
+# identity, there's no --install-deps for this, and there never should be.
+# `claude plugin list --json` is the stable, documented interface; grepping
+# its output avoids adding a jq dependency to setup.sh for one advisory
+# check. The id can be "mattpocock-skills@mattpocock" (the self-hosted
+# fallback marketplace) or "@claude-plugins-official" (the official one) -
+# either satisfies the check, so the marketplace suffix is deliberately not
+# matched.
+check_mattpocock_skills() {
+  command -v claude >/dev/null 2>&1 || return 0
+
+  local listing
+  listing="$(claude plugin list --json 2>/dev/null)" || return 0
+
+  if ! printf '%s\n' "$listing" | grep -q '"id": *"mattpocock-skills@'; then
+    {
+      echo
+      echo "ℹ mattpocock-skills is not installed — a recommended companion plugin,"
+      echo "  not required by anything here. See README's \"Recommended companion\""
+      echo "  section. Install it with:"
+      echo "    claude plugin install mattpocock-skills"
+      echo
+    } >&2
+    return 0
+  fi
+
+  if printf '%s\n' "$listing" | grep -A3 '"id": *"mattpocock-skills@' | grep -q '"enabled": *true'; then
+    echo "✓ mattpocock-skills is installed"
+  else
+    {
+      echo
+      echo "⚠ mattpocock-skills is installed but disabled."
+      echo "  Re-enable it with: claude plugin enable mattpocock-skills"
+      echo
+    } >&2
+  fi
+}
+
 mkdir -p "$HOME/.claude"
 link "$REPO_ROOT/claude/CLAUDE.md" "$HOME/.claude/CLAUDE.md"
 link_dir_contents "$REPO_ROOT/claude/commands" "$HOME/.claude/commands"
@@ -297,8 +337,9 @@ mkdir -p "$HOME/.claude/skills"
 link "$PLUGIN_SRC" "$PLUGIN_LINK"
 
 # Last, so the linking work is already done and reported when these speak up.
-# Both are warnings, not failures: the symlinks are correct either way, and
-# `./setup.sh && something-else` shouldn't break over either one. An
+# All three are advisory, not failures: the symlinks are correct either way,
+# and `./setup.sh && something-else` shouldn't break over any of them. An
 # explicitly requested --install-deps that doesn't install is still a failure.
 check_git_identity
 check_python_deps
+check_mattpocock_skills
