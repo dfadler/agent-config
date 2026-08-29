@@ -8,6 +8,45 @@
 # convention explicitly exempts those.
 set -euo pipefail
 
+# Exit-code taxonomy — see the hygiene baseline in claude/CLAUDE.md.
+readonly EXIT_OK=0
+readonly EXIT_FAILURE=1
+readonly EXIT_USAGE=2
+
+usage() {
+  cat <<'USAGE'
+Usage: check-shell-set-flags.sh [-h|--help] [DIR...]
+
+Verify every executable shell script under DIR (default: scripts plugins
+setup.sh) declares `set -uo pipefail` (or `set -euo pipefail`) as its first
+real statement.
+
+  -h, --help   Show this message and exit.
+USAGE
+}
+
+while [[ $# -gt 0 ]]; do
+  case "$1" in
+    -h | --help)
+      usage
+      exit "$EXIT_OK"
+      ;;
+    --)
+      shift
+      break
+      ;;
+    -*)
+      echo "Unknown option: $1" >&2
+      usage >&2
+      exit "$EXIT_USAGE"
+      ;;
+    *)
+      break
+      ;;
+  esac
+  shift
+done
+
 dirs=("$@")
 [ "${#dirs[@]}" -eq 0 ] && dirs=(scripts plugins setup.sh)
 
@@ -41,7 +80,7 @@ if [ "${#missing[@]}" -gt 0 ]; then
   echo "::error::Missing 'set -uo pipefail' (or -euo) as the first statement in:" >&2
   printf '  %s\n' "${missing[@]}" >&2
   echo "See the shell-script hygiene baseline in ~/.claude/CLAUDE.md." >&2
-  exit 1
+  exit "$EXIT_FAILURE"
 fi
 
 echo "✓ All executable shell scripts declare set -u.../pipefail as their first statement."
