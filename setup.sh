@@ -285,3 +285,10 @@ link "$PLUGIN_SRC" "$PLUGIN_LINK"
 # either way, and `./setup.sh && something-else` shouldn't break over it. An
 # explicitly requested --install-deps that doesn't install is a failure.
 check_python_deps
+
+# Also last, and independent of everything above: offers (opt-in, y/n) to
+# pre-approve Aikido Safe Chain's pinned installer command in Claude Code's
+# permission settings. See scripts/offer-safe-chain-permission.sh for why —
+# it decides on its own whether it's safe to prompt (skips cleanly under CI
+# or a non-interactive run) and never fails setup.sh's overall exit status.
+"$REPO_ROOT/scripts/offer-safe-chain-permission.sh"
