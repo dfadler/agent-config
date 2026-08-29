@@ -229,7 +229,7 @@ install_pyte() {
 }
 
 check_git_identity() {
-  if "$REPO_ROOT/scripts/git-identity.sh" > /dev/null 2>&1; then
+  if "$REPO_ROOT/scripts/git-identity.sh" >/dev/null 2>&1; then
     echo "✓ git identity is configured (scripts/git-identity.sh)"
   else
     {
