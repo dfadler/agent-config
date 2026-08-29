@@ -286,6 +286,27 @@ confidently. This applies to any platform or tool, not just Claude/Anthropic.
   Inline/review comment:
   `gh api repos/<owner>/<repo>/pulls/<pr>/comments/<comment-id>/replies -f body="<reply>"`.
   General PR-level comment: `gh pr comment <pr> --body "<reply>"`.
+- When `gh pr checks`/`gh run view --log-failed` (see above) doesn't explain a
+  failure, escalate in this order before giving up: `gh api
+  repos/<owner>/<repo>/actions/runs/<runId>/jobs` for per-step status/timing the
+  summary view collapses; `gh run rerun <runId> --debug --failed` to get verbose step
+  logs on just that one re-run — no need to set the `ACTIONS_STEP_DEBUG`/
+  `ACTIONS_RUNNER_DEBUG` repo secrets or variables unless you want debug logging on
+  *every* run; `gh run watch --compact` to follow an in-progress run instead of
+  polling. `make lint-actions`/`actionlint` remain the required check for a workflow-
+  syntax problem — neither of the two options below can diagnose one, since a syntax
+  error or a run that never reaches a runner never gets that far. For a genuinely
+  stuck failure that's already reaching a runner: local reproduction (`act`, via
+  Docker) — doesn't perfectly match the hosted runner's environment/secrets — or, as a
+  last resort, SSH-into-the-runner (`mxschmitt/action-tmate`), placed as its own step
+  immediately after the one being diagnosed and guarded with `if: ${{ failure() }}`
+  so it survives a preceding-step failure, restricted to trusted workflows via
+  `limit-access-to-actor: true` (or equivalent), and only ever added temporarily —
+  it pauses the job and burns runner minutes, so treat it as a tool to reach for only
+  when the above doesn't resolve it, not a habit to build into a workflow. Docs:
+  [`gh run rerun`](https://cli.github.com/manual/gh_run_rerun),
+  [status-check functions incl. `failure()`](https://docs.github.com/en/actions/reference/workflows-and-actions/expressions#status-check-functions),
+  [`action-tmate` incl. `limit-access-to-actor`](https://github.com/mxschmitt/action-tmate#readme).
 - **`.github/` stays config-only.** Limit it to platform configuration: workflows
   (`.github/workflows/`), CODEOWNERS, dependabot/release config, and a **generic**
   PR/issue template. Feature- or product-specific docs, playbooks, or checklists
