@@ -329,3 +329,7 @@ confidently. This applies to any platform or tool, not just Claude/Anthropic.
   feature genuinely needs its own PR template, use an opt-in file under
   `.github/PULL_REQUEST_TEMPLATE/<feature>.md` (or have tooling append content only
   for those PRs) — never grow the generic template with feature-specific sections.
+- In the `agent-config` repo specifically: before writing, changing, or debugging
+  anything under `.github/workflows/`, read `docs/github-actions.md` — SHA-pinning,
+  composite-action-vs-reusable-workflow judgment calls, the debugging escalation
+  order, and known failure patterns already hit and resolved here.
