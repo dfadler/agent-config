@@ -77,6 +77,58 @@ unshim_python3() {
   rm -f "$PY_SHIM_BIN/python3"
 }
 
+# A fake `claude` CLI, so check_mattpocock_skills never depends on (or is
+# blocked by) whatever the real binary would do inside the sandbox — it isn't
+# one of _make_shims' network blockers, since `plugin list --json` is a local
+# read, but stubbing it keeps the test independent of this machine's actual
+# installed plugins.
+#
+# Usage: shim_claude <enabled|disabled|other-plugin-only|broken>
+#
+# No "missing" mode: that would need removing claude from PATH resolution
+# entirely, but the sandbox only shims the network blockers in
+# _make_shims — a developer machine's own `claude` binary (needed for
+# real work outside these tests) stays reachable, so a shim can only ever
+# shadow it earlier on PATH, not prove absence. "broken" below exercises the
+# same "can't get useful data from it" code path this would have covered.
+shim_claude() {
+  CLAUDE_SHIM_BIN="$SANDBOX/claude-shim"
+  mkdir -p "$CLAUDE_SHIM_BIN"
+  local mode="$1" entry=""
+  case "$mode" in
+    enabled) entry='{"id":"mattpocock-skills@mattpocock","enabled":true}' ;;
+    disabled) entry='{"id":"mattpocock-skills@mattpocock","enabled":false}' ;;
+    other-plugin-only) entry='{"id":"dfadler-agent-config@skills-dir","enabled":true}' ;;
+    broken) entry="" ;;
+    *)
+      echo "shim_claude: unknown mode $mode" >&2
+      return 1
+      ;;
+  esac
+  if [ "$mode" = "broken" ]; then
+    cat > "$CLAUDE_SHIM_BIN/claude" <<'EOF'
+#!/usr/bin/env bash
+echo "fake claude: broken" >&2
+exit 1
+EOF
+  else
+    cat > "$CLAUDE_SHIM_BIN/claude" <<EOF
+#!/usr/bin/env bash
+if [ "\$1" = "plugin" ] && [ "\$2" = "list" ]; then
+  echo '[$entry]'
+  exit 0
+fi
+echo "fake claude: unexpected args: \$*" >&2
+exit 1
+EOF
+  fi
+  chmod +x "$CLAUDE_SHIM_BIN/claude"
+  case ":$PATH:" in
+    *":$CLAUDE_SHIM_BIN:"*) ;;
+    *) export PATH="$CLAUDE_SHIM_BIN:$PATH" ;;
+  esac
+}
+
 setup() {
   make_sandbox
   FAKE_REPO="$SANDBOX/repo"
@@ -96,6 +148,9 @@ setup() {
   # Default: an interpreter that already has pyte, so the link tests below
   # don't depend on whatever is installed on the machine running them.
   shim_python3 yes
+  # Same reasoning for claude: default to already-installed-and-enabled so
+  # unrelated tests aren't surprised by an advisory note they didn't ask for.
+  shim_claude enabled
 }
 
 teardown() {
@@ -362,6 +417,43 @@ run_setup_with() {
   run_setup
   assert_success
   assert_output_contains "Could not run python3"
+  [ "$(readlink "$HOME/.claude/CLAUDE.md")" = "$FAKE_REPO/claude/CLAUDE.md" ]
+}
+
+# --- companion plugin check (#134) ------------------------------------------
+#
+# Purely advisory — nothing here depends on mattpocock-skills, unlike pyte,
+# so every case below asserts linking still succeeds and there's no
+# --install-deps equivalent to test.
+
+@test "confirms mattpocock-skills when installed and enabled" {
+  shim_claude enabled
+  run_setup
+  assert_success
+  assert_output_contains "✓ mattpocock-skills is installed"
+}
+
+@test "warns when mattpocock-skills is installed but disabled" {
+  shim_claude disabled
+  run_setup
+  assert_success
+  assert_output_contains "installed but disabled"
+  assert_output_contains "claude plugin enable mattpocock-skills"
+}
+
+@test "notes when mattpocock-skills is not installed" {
+  shim_claude other-plugin-only
+  run_setup
+  assert_success
+  assert_output_contains "mattpocock-skills is not installed"
+  assert_output_contains "claude plugin install mattpocock-skills"
+}
+
+@test "stays silent about mattpocock-skills when the claude CLI errors" {
+  shim_claude broken
+  run_setup
+  assert_success
+  refute_output_contains "mattpocock-skills"
   [ "$(readlink "$HOME/.claude/CLAUDE.md")" = "$FAKE_REPO/claude/CLAUDE.md" ]
 }
 
