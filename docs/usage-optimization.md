@@ -98,21 +98,28 @@ GitHub workflow habits (`:301-352`) — 13 largely independent topics, additive.
 **Churn rate.** `git log --format=%ad --date=short -- claude/CLAUDE.md | sort |
 uniq -c` shows the file was created 2026-08-26 and has been touched on every
 day since: 3 commits (08-26), 5 (08-27), 22 (08-28), 18 (08-29) — 48 commits
-in 4 days. Within-session prompt caching (the thing that actually matters for
-cost — cache lifetime is "an hour on a subscription... five minutes by
-default" on API/usage-credits per the same docs page) isn't hurt by
-cross-day file changes, since a session's cache window is much shorter than a
-day regardless. The real cost of this churn rate is different from a caching
-problem: it means whichever session is actively editing `CLAUDE.md` is, by
-construction, generating one commit-sized diff read/write per iteration, and
-each of the 48 commits is a full `git diff`/read of a file that keeps
-growing — a self-inflicted, compounding editing cost distinct from the
-caching question the issue asked about.
+in 4 days. The 5-minute default / 1-hour extended TTL is an *inactivity*
+timeout, and every request that hits the cache resets it — so a session that
+stays active resets its own clock and can, in principle, stay warm across
+several days without ever going cold on that basis alone. Cross-day file
+changes to `CLAUDE.md` are not automatically harmless, then: whether they
+invalidate a long-lived cache depends on whether the changed content sits in
+the stable prefix a running session is still relying on, which this audit
+did not measure. What the commit count *does* establish, on its own: 48
+commits touching one file in 4 days is a lot of edit activity, and each edit
+is at minimum a write to that file. Whether each commit also required Claude
+to read or diff the *whole* file (rather than a targeted edit) isn't
+something `git log` can show — that would need session/tool telemetry this
+audit didn't have access to, so that stronger claim is marked Unmeasured
+rather than asserted.
 
 Confidence: line/byte counts and churn commit counts are Confirmed
-(direct tool output). The claim that 352 lines meaningfully raises
-per-session cost vs. a 200-line file, and that the TypeScript sections are
-"waste" in *this* repo specifically, are Confirmed as facts about this
+(direct tool output). Whether cross-day cache effects are actually being lost
+to this churn, and whether each commit cost a full-file read/diff, are
+Unmeasured — flagged above rather than asserted. The claim that 352 lines
+meaningfully raises per-session cost vs. a 200-line file, and that the
+TypeScript sections are "waste" in *this* repo specifically, are Confirmed as
+facts about this
 repo's content but Speculative as a claim about aggregate cost impact across
 this user's *other* (TS-containing) repos, where the same content is fully
 relevant every session.
@@ -142,7 +149,7 @@ this audit's visibility.
 rubric's *own* size. `claude plugin details dfadler-agent-config` (measured,
 not estimated by hand) reports:
 
-```
+```text
 Projected token cost
   Always-on:   ~1,243 tok   added to every session
 
@@ -166,11 +173,14 @@ every open PR pays that ~8.8k-token cost per reload, per PR, per push — that
 compounds fast in a busy repo, but the actual reload frequency lives in a
 CI config this repo doesn't contain, so the multiplier is unknown from here.
 
-Always-on cost across the whole plugin (~1,243 tokens, all 5 skill
-descriptions) is small in absolute terms — for comparison, it's about a
-fifth of `CLAUDE.md`'s own ~6,200-token footprint (§2) — and is the
-unavoidable cost of skill-triggering descriptions; skills are already the
-correct on-demand mechanism here (see §5).
+Always-on cost across the whole plugin (~1,243 tokens) is the sum of six
+component *descriptions* — the five skills' plus `adversarial-reviewer`'s
+agent description — not the six components' full content, which only loads
+on invoke (that's the ~1.5k–8.8k on-invoke column above). Small in absolute
+terms — for comparison, it's about a fifth of `CLAUDE.md`'s own ~6,200-token
+footprint (§2) — and is the unavoidable cost of triggering descriptions;
+skills (and agents) are already the correct on-demand mechanism here (see
+§5).
 
 Confidence: the plugin-details numbers are Confirmed (tool output, this
 session, this checkout). The claim about compounding cost from repeated
@@ -233,13 +243,15 @@ Confidence: Confirmed (exhaustive grep, all 5 hits inspected).
 
 ### 7. Subscription vs. API usage tradeoffs
 
-**Speculative, but grounded.** This repo itself defines no CI workflow that
-invokes Claude programmatically — `.github/workflows/{shell,python,actionlint}.yml`
-are conventional CI (shellcheck/shfmt/bats/pytest/actionlint), and grepping
-all three for "claude"/"anthropic" turns up nothing except a comment
-referencing the CLAUDE.md convention (`shell.yml:140`), not an actual
-invocation. So *this repo's own* CI runs entirely outside any Claude billing
-path.
+**Speculative, but grounded.** This repo's three workflows
+(`.github/workflows/{shell,python,actionlint}.yml`) contain no direct
+Claude or Anthropic invocation — they call pinned actions and `make`
+targets (shellcheck/shfmt/bats/pytest/actionlint), and grepping all three
+for "claude"/"anthropic" turns up nothing but a comment referencing the
+CLAUDE.md convention (`shell.yml:12`), not an actual invocation. That
+establishes no *direct* call; it doesn't rule out one of the pinned actions
+or `make` targets shelling out to Claude indirectly, which this audit
+didn't trace.
 
 The exported skills are a different story: `pr-review-rubric` and
 `pr-babysit` are both explicitly designed to be wired into *other* repos'
@@ -249,9 +261,11 @@ say so — this skill cannot run standalone"; `pr-review-rubric` needs an
 external `pr-review.md` orchestrator, per §3). Wherever a consuming repo
 wires either of these into a GitHub Actions bot (as the rubric's own
 "mention job"/"engage job"/"auto-review" terminology implies,
-`SKILL.md:448-450`), that automation almost certainly runs on API-key
-billing inside the Action, not the flat Claude subscription an interactive
-session uses — a materially different, per-token cost model, and one where
+`SKILL.md:448-450`), that automation runs on API-key billing inside the
+Action *if* the consuming Action authenticates with an API key — a repo
+outside this one's scope, so this audit can't confirm which. Either way it's
+a materially different cost model from the flat Claude subscription an
+interactive session uses, and one where
 `pr-review-rubric`'s ~8.8k-token on-invoke size (§3) and its documented
 "re-verify everything on every push, no human in the loop" push-path
 behavior (`SKILL.md:493-494`) directly multiply cost. This repo has no
