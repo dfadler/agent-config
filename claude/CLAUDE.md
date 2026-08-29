@@ -228,12 +228,17 @@ confidently. This applies to any platform or tool, not just Claude/Anthropic.
   logs on just that one re-run — no need to set the `ACTIONS_STEP_DEBUG`/
   `ACTIONS_RUNNER_DEBUG` repo secrets or variables unless you want debug logging on
   *every* run; `gh run watch --compact` to follow an in-progress run instead of
-  polling. Local reproduction (`act`, via Docker) and SSH-into-the-runner
-  (`mxschmitt/action-tmate`) are real escalation options for a workflow-syntax problem
-  or a genuinely stuck failure, but skip them by default — `act` doesn't perfectly
-  match the hosted runner's environment/secrets, and action-tmate pauses the job and
-  burns runner minutes, so treat both as tools to reach for only when the above
-  doesn't resolve it, not habits to build into a workflow.
+  polling. `make lint-actions`/`actionlint` remain the required check for a workflow-
+  syntax problem — neither of the two options below can diagnose one, since a syntax
+  error or a run that never reaches a runner never gets that far. For a genuinely
+  stuck failure that's already reaching a runner: local reproduction (`act`, via
+  Docker) — doesn't perfectly match the hosted runner's environment/secrets — or, as a
+  last resort, SSH-into-the-runner (`mxschmitt/action-tmate`), placed as its own step
+  immediately after the one being diagnosed and guarded with `if: ${{ failure() }}`
+  so it survives a preceding-step failure, restricted to trusted workflows via
+  `limit-access-to-actor: true` (or equivalent), and only ever added temporarily —
+  it pauses the job and burns runner minutes, so treat it as a tool to reach for only
+  when the above doesn't resolve it, not a habit to build into a workflow.
 - **`.github/` stays config-only.** Limit it to platform configuration: workflows
   (`.github/workflows/`), CODEOWNERS, dependabot/release config, and a **generic**
   PR/issue template. Feature- or product-specific docs, playbooks, or checklists
