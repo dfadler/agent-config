@@ -40,6 +40,21 @@ background or parallel tasks. Never commit directly to the main working copy.
   too: pushing a new commit to a just-merged (and deleted) branch re-creates it, so a
   final commit can *look* merged without actually being on the default branch —
   verify against the merge commit's parent, or the PR's own state, not the branch name.
+- **A coverage gate can fail a PR that only adds tests, never removes any**, the first
+  time it measures a file the coverage run had never executed before. A trace-based
+  coverage tool (kcov, and others like it) treats never-executed code as invisible,
+  not as a counted zero — a file the run never touches contributes nothing to the
+  denominator, whether or not it has a dedicated test (indirect execution via another
+  script's test counts too). The first PR to actually execute that file under
+  coverage makes every line in it visible for the first time; if that new execution
+  only exercises part of the file, the rest now drags the aggregate percentage down,
+  and the floor can fail even though coverage strictly improved.
+  Real example: dfadler/agent-config#106 added 3 tests for a new branch in
+  `upload.sh`, a script the kcov gate had never measured before — that made the
+  script's untested `--pr`/`--issue`/`--comment`/validation paths visible for the
+  first time, dropping aggregate shell coverage from 70.24% to 56.90% and failing the
+  70% floor. The fix is to finish covering the newly-visible file, not to lower the
+  threshold.
 - **Squash merges mean a merged branch's commits aren't reachable by SHA on the local
   default branch** — cleanup tooling that checks reachability may warn a branch is
   "unmerged" when it's actually merged. Verify against the PR itself (state: merged),
@@ -243,6 +258,22 @@ partway through; manual scanning can miss items and stop partway through.
   If the autofix changes semantics or adds unwanted noise, revert it and fix by
   hand instead.
 
+## Dependency changes: audit before done
+
+When a change adds or updates a dependency — a manifest or lockfile is touched
+(`package.json`, `requirements.txt`/`pyproject.toml`, `Cargo.toml`, `go.mod`, etc.) —
+run the audit tool for whichever ecosystem is in play before considering the change
+done: `npm audit` (or `yarn npm audit --all` under Yarn), `pip-audit`, `cargo audit`,
+`govulncheck`, or the project's own equivalent. Don't assume a new or bumped
+dependency is safe just because it installed cleanly — the same way a shell script
+gets run through shellcheck/shfmt before being considered finished.
+
+- This only fires when a dependency file is actually touched — most sessions in most
+  repos won't need it.
+- If the audit surfaces a new high/critical finding, say so in the commit/PR rather
+  than silently proceeding; whether that blocks the change is a per-repo call, not
+  a blanket rule here.
+
 ## Secrets handling
 
 Treat env vars, tokens, API keys, session IDs, and credentials as sensitive data in
@@ -287,6 +318,27 @@ confidently. This applies to any platform or tool, not just Claude/Anthropic.
   Inline/review comment:
   `gh api repos/<owner>/<repo>/pulls/<pr>/comments/<comment-id>/replies -f body="<reply>"`.
   General PR-level comment: `gh pr comment <pr> --body "<reply>"`.
+- When `gh pr checks`/`gh run view --log-failed` (see above) doesn't explain a
+  failure, escalate in this order before giving up: `gh api
+  repos/<owner>/<repo>/actions/runs/<runId>/jobs` for per-step status/timing the
+  summary view collapses; `gh run rerun <runId> --debug --failed` to get verbose step
+  logs on just that one re-run — no need to set the `ACTIONS_STEP_DEBUG`/
+  `ACTIONS_RUNNER_DEBUG` repo secrets or variables unless you want debug logging on
+  *every* run; `gh run watch --compact` to follow an in-progress run instead of
+  polling. `make lint-actions`/`actionlint` remain the required check for a workflow-
+  syntax problem — neither of the two options below can diagnose one, since a syntax
+  error or a run that never reaches a runner never gets that far. For a genuinely
+  stuck failure that's already reaching a runner: local reproduction (`act`, via
+  Docker) — doesn't perfectly match the hosted runner's environment/secrets — or, as a
+  last resort, SSH-into-the-runner (`mxschmitt/action-tmate`), placed as its own step
+  immediately after the one being diagnosed and guarded with `if: ${{ failure() }}`
+  so it survives a preceding-step failure, restricted to trusted workflows via
+  `limit-access-to-actor: true` (or equivalent), and only ever added temporarily —
+  it pauses the job and burns runner minutes, so treat it as a tool to reach for only
+  when the above doesn't resolve it, not a habit to build into a workflow. Docs:
+  [`gh run rerun`](https://cli.github.com/manual/gh_run_rerun),
+  [status-check functions incl. `failure()`](https://docs.github.com/en/actions/reference/workflows-and-actions/expressions#status-check-functions),
+  [`action-tmate` incl. `limit-access-to-actor`](https://github.com/mxschmitt/action-tmate#readme).
 - **`.github/` stays config-only.** Limit it to platform configuration: workflows
   (`.github/workflows/`), CODEOWNERS, dependabot/release config, and a **generic**
   PR/issue template. Feature- or product-specific docs, playbooks, or checklists
@@ -294,3 +346,7 @@ confidently. This applies to any platform or tool, not just Claude/Anthropic.
   feature genuinely needs its own PR template, use an opt-in file under
   `.github/PULL_REQUEST_TEMPLATE/<feature>.md` (or have tooling append content only
   for those PRs) — never grow the generic template with feature-specific sections.
+- In the `agent-config` repo specifically: before writing, changing, or debugging
+  anything under `.github/workflows/`, read `docs/github-actions.md` — SHA-pinning,
+  composite-action-vs-reusable-workflow judgment calls, the debugging escalation
+  order, and known failure patterns already hit and resolved here.
