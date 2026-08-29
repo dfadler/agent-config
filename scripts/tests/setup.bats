@@ -25,6 +25,14 @@ load helpers
 shim_python3() {
   PY_SHIM_BIN="$SANDBOX/py-shim"
   mkdir -p "$PY_SHIM_BIN"
+  # Resolved once, before this function's own directory ever reaches PATH -
+  # a second call within the same test must not re-resolve into the shim
+  # it already installed. The fake binary below only fakes answers shaped
+  # like the pyte probe; anything else (check_mattpocock_skills' JSON
+  # parse) is handed to this real interpreter, so that logic gets exercised
+  # for real rather than colliding with pyte-specific canned output.
+  : "${REAL_PYTHON3:=$(command -v python3)}"
+  export REAL_PYTHON3
   export FAKE_PY_EXE="/fake/bin/python3"
   export FAKE_PY_MARKER="$SANDBOX/pyte-installed"
   export FAKE_PIP_LOG="$SANDBOX/pip.log"
@@ -47,10 +55,17 @@ if [ "$FAKE_PY_BROKEN" = "yes" ]; then
 fi
 case "${1:-}" in
   -c)
-    echo "exe=$FAKE_PY_EXE"
-    if [ -e "$FAKE_PY_MARKER" ]; then echo "pyte=yes"; else echo "pyte=no"; fi
-    echo "managed=$FAKE_PY_MANAGED"
-    echo "venv=$FAKE_PY_VENV"
+    case "${2:-}" in
+      *EXTERNALLY-MANAGED*)
+        echo "exe=$FAKE_PY_EXE"
+        if [ -e "$FAKE_PY_MARKER" ]; then echo "pyte=yes"; else echo "pyte=no"; fi
+        echo "managed=$FAKE_PY_MANAGED"
+        echo "venv=$FAKE_PY_VENV"
+        ;;
+      *)
+        exec "$REAL_PYTHON3" -c "$2"
+        ;;
+    esac
     ;;
   -m)
     shift
@@ -94,12 +109,69 @@ unshim_python3() {
 shim_claude() {
   CLAUDE_SHIM_BIN="$SANDBOX/claude-shim"
   mkdir -p "$CLAUDE_SHIM_BIN"
-  local mode="$1" entry=""
+  # body is the full JSON array claude would print, per mode - not just one
+  # object - so a mode can place a neighboring entry or reorder fields to
+  # pin the parser against the grep-window bug found in review on #134.
+  # Pretty-printed, one field per line, matching the real CLI's actual
+  # `plugin list --json` output (confirmed on this machine) rather than a
+  # compact single line - that shape is what let the old id-then-enabled
+  # grep window get away with an "enabled" field ahead of "id" in a
+  # single-object array: on one line, the id match already covers the whole
+  # line regardless of field order, so a compact fixture wouldn't actually
+  # have exercised the bug that ordering case is meant to catch.
+  local mode="$1" body=""
   case "$mode" in
-    enabled) entry='{"id":"mattpocock-skills@mattpocock","enabled":true}' ;;
-    disabled) entry='{"id":"mattpocock-skills@mattpocock","enabled":false}' ;;
-    other-plugin-only) entry='{"id":"dfadler-agent-config@skills-dir","enabled":true}' ;;
-    broken) entry="" ;;
+    enabled)
+      body='[
+  {
+    "id": "mattpocock-skills@mattpocock",
+    "enabled": true
+  }
+]'
+      ;;
+    disabled)
+      body='[
+  {
+    "id": "mattpocock-skills@mattpocock",
+    "enabled": false
+  }
+]'
+      ;;
+    other-plugin-only)
+      body='[
+  {
+    "id": "dfadler-agent-config@skills-dir",
+    "enabled": true
+  }
+]'
+      ;;
+    # Regression for the exact case review reproduced: a disabled target
+    # sitting next to an unrelated ENABLED plugin. A window-based grep can
+    # attribute the neighbor's "enabled": true to mattpocock-skills; a real
+    # JSON parse can't, since it keys strictly by object.
+    disabled-with-enabled-neighbor)
+      body='[
+  {
+    "id": "mattpocock-skills@mattpocock",
+    "enabled": false
+  },
+  {
+    "id": "other-plugin@example",
+    "enabled": true
+  }
+]'
+      ;;
+    # Field order within the object shouldn't matter to a real parser,
+    # unlike a positional/window-based read.
+    enabled-field-before-id)
+      body='[
+  {
+    "enabled": true,
+    "id": "mattpocock-skills@mattpocock"
+  }
+]'
+      ;;
+    broken) body="" ;;
     *)
       echo "shim_claude: unknown mode $mode" >&2
       return 1
@@ -115,7 +187,7 @@ EOF
     cat > "$CLAUDE_SHIM_BIN/claude" <<EOF
 #!/usr/bin/env bash
 if [ "\$1" = "plugin" ] && [ "\$2" = "list" ]; then
-  echo '[$entry]'
+  echo '$body'
   exit 0
 fi
 echo "fake claude: unexpected args: \$*" >&2
@@ -439,6 +511,26 @@ run_setup_with() {
   assert_success
   assert_output_contains "installed but disabled"
   assert_output_contains "claude plugin enable mattpocock-skills"
+}
+
+# Regression (review on #134): the original implementation grepped a fixed
+# line window after the id line for "enabled": true, which could pick up a
+# NEIGHBORING plugin's field instead of the matched one's.
+@test "a disabled target isn't misread as enabled via a neighboring plugin" {
+  shim_claude disabled-with-enabled-neighbor
+  run_setup
+  assert_success
+  assert_output_contains "installed but disabled"
+  refute_output_contains "✓ mattpocock-skills is installed"
+}
+
+# Regression (review on #134): field order within the JSON object shouldn't
+# matter to a real parser, unlike a positional/window-based read.
+@test "field order within the plugin object doesn't confuse detection" {
+  shim_claude enabled-field-before-id
+  run_setup
+  assert_success
+  assert_output_contains "✓ mattpocock-skills is installed"
 }
 
 @test "notes when mattpocock-skills is not installed" {
