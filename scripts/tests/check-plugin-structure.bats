@@ -238,6 +238,43 @@ EOF
   assert_success
 }
 
+@test "-h prints usage and exits 0 without touching ROOT" {
+  local before after
+  before="$(find "$ROOT" | sort)"
+
+  run bash "$REPO_ROOT/scripts/check-plugin-structure.sh" -h
+  assert_success
+  assert_output_contains "Usage: check-plugin-structure.sh"
+
+  after="$(find "$ROOT" | sort)"
+  [ "$before" = "$after" ]
+}
+
+@test "exits with EXIT_USAGE (2) when ROOT does not exist" {
+  run bash "$REPO_ROOT/scripts/check-plugin-structure.sh" "$ROOT/no-such-dir"
+  assert_status 2
+  assert_output_contains "ROOT does not exist"
+}
+
+@test "--help prints usage and exits 0" {
+  run bash "$REPO_ROOT/scripts/check-plugin-structure.sh" --help
+  assert_success
+  assert_output_contains "Usage: check-plugin-structure.sh"
+}
+
+@test "exits with EXIT_FAILURE (1) when there are no plugins at all" {
+  rm -rf "$ROOT/plugins"
+  mkdir -p "$ROOT/plugins"
+  check
+  assert_status 1
+}
+
+@test "exits with EXIT_FAILURE (1) on a validation failure" {
+  rm "$ROOT/plugins/demo/.claude-plugin/plugin.json"
+  check
+  assert_status 1
+}
+
 # Regression for the injection caught in review on #60: the manifest path used
 # to be interpolated into Python source, so a plugin directory containing a
 # single quote closed the literal and the rest of the path executed.

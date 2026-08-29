@@ -15,9 +15,36 @@
 # in the Makefile rather than being inferred from a previous run.
 set -euo pipefail
 
+# Exit-code taxonomy — see the hygiene baseline in claude/CLAUDE.md.
+readonly EXIT_OK=0
+readonly EXIT_FAILURE=1
+readonly EXIT_USAGE=2
+readonly EXIT_DEPENDENCY=4
+readonly EXIT_INTERNAL=20
+
+usage() {
+  cat <<'USAGE'
+Usage: check-shell-coverage.sh [-h|--help] <coverage.json> <min-threshold>
+
+Enforce a floor on kcov-measured bats coverage. Reads `.percent_covered` from
+the given coverage.json (as produced by `make coverage`) and fails if it is
+below <min-threshold>, a percentage such as 70.
+
+  -h, --help   Show this message and exit.
+USAGE
+}
+
+case "${1:-}" in
+  -h | --help)
+    usage
+    exit "$EXIT_OK"
+    ;;
+esac
+
 if [ "$#" -lt 2 ]; then
   echo "::error::usage: $0 <coverage.json> <min-threshold>" >&2
-  exit 1
+  usage >&2
+  exit "$EXIT_USAGE"
 fi
 
 COVERAGE_FILE="$1"
@@ -25,7 +52,7 @@ MIN_THRESHOLD="$2"
 
 if [ ! -f "$COVERAGE_FILE" ]; then
   echo "::error::coverage file not found: $COVERAGE_FILE" >&2
-  exit 1
+  exit "$EXIT_USAGE"
 fi
 
 # Both sides of the comparison are validated as numbers before any arithmetic:
@@ -33,24 +60,24 @@ fi
 # coverage value must fail LOUDLY rather than silently compare as 0.
 if ! [[ "$MIN_THRESHOLD" =~ ^[0-9]+(\.[0-9]+)?$ ]]; then
   echo "::error::threshold value is not numeric: '$MIN_THRESHOLD'" >&2
-  exit 1
+  exit "$EXIT_USAGE"
 fi
 
 if ! command -v jq >/dev/null 2>&1; then
   echo "::error::jq is required to read $COVERAGE_FILE" >&2
-  exit 1
+  exit "$EXIT_DEPENDENCY"
 fi
 
 # -e so a missing or null `percent_covered` exits non-zero instead of printing
 # the string "null" and sailing on into the comparison.
 COVERAGE="$(jq -e -r '.percent_covered' "$COVERAGE_FILE" 2>/dev/null)" || {
   echo "::error::could not read coverage data from $COVERAGE_FILE" >&2
-  exit 1
+  exit "$EXIT_INTERNAL"
 }
 
 if ! [[ "$COVERAGE" =~ ^[0-9]+(\.[0-9]+)?$ ]]; then
   echo "::error::coverage value is not numeric: '$COVERAGE'" >&2
-  exit 1
+  exit "$EXIT_INTERNAL"
 fi
 
 echo "Shell script coverage: ${COVERAGE}%"
@@ -62,7 +89,7 @@ echo "Shell script coverage: ${COVERAGE}%"
 # coverage gate must never have.
 if awk -v c="$COVERAGE" -v m="$MIN_THRESHOLD" 'BEGIN { exit !(c < m) }'; then
   echo "::error::Coverage ${COVERAGE}% is below the ${MIN_THRESHOLD}% minimum threshold" >&2
-  exit 1
+  exit "$EXIT_FAILURE"
 fi
 
 echo "✓ Coverage ${COVERAGE}% meets the ${MIN_THRESHOLD}% baseline"
