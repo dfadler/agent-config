@@ -21,6 +21,9 @@ automatically, with no per-project copy to keep in sync.
     - `.claude-plugin/plugin.json` — the plugin manifest (name, version, description).
     - `agents/` — subagent definitions.
     - `skills/` — skills, a directory each containing a `SKILL.md` plus any scripts.
+- `docs/` — reference material specific to this repo's own tooling and CI, not
+  general enough for `claude/CLAUDE.md` (which is loaded globally, for every
+  project). `github-actions.md` is the first entry.
 
 Agents and skills used to live under `claude/`; they moved into the plugin in commit
 89a34ce. Nothing else moved — `CLAUDE.md` and `commands/` still sit under `claude/`.
