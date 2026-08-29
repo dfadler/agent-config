@@ -255,6 +255,25 @@ run_setup_with() {
   refute_output_contains "not fully configured"
 }
 
+# The check must reflect REPO_ROOT's git config, not whatever directory
+# setup.sh happens to be invoked from — otherwise running it via an absolute
+# path from elsewhere silently checks the wrong repo (or none at all).
+@test "git identity check reflects REPO_ROOT, not the caller's cwd" {
+  git -C "$FAKE_REPO" init -q
+  git -C "$FAKE_REPO" config user.name "Repo Name"
+  git -C "$FAKE_REPO" config user.email "repo@example.com"
+
+  mkdir -p "$SANDBOX/elsewhere"
+  git -C "$SANDBOX/elsewhere" init -q
+  # No identity here, and no global config either (HOME is sandboxed) — if
+  # the check ran relative to this directory it would report unconfigured.
+
+  run bash -c 'cd "$1" && bash "$2/setup.sh"' -- "$SANDBOX/elsewhere" "$FAKE_REPO"
+  assert_success
+  assert_output_contains "git identity is configured"
+  refute_output_contains "not fully configured"
+}
+
 # --- runtime dependency check (#88) ----------------------------------------
 #
 # detached-terminal's agent_term.py runs under whatever python3 is first on
