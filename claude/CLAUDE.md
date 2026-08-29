@@ -41,12 +41,14 @@ background or parallel tasks. Never commit directly to the main working copy.
   final commit can *look* merged without actually being on the default branch —
   verify against the merge commit's parent, or the PR's own state, not the branch name.
 - **A coverage gate can fail a PR that only adds tests, never removes any**, the first
-  time it measures a file that had zero tests before. A trace-based coverage tool
-  (kcov, and others like it) treats never-executed code as invisible, not as a counted
-  zero — a file with no tests contributes nothing to the denominator. The first PR to
-  add *any* test for that file makes every line in it visible for the first time; if
-  those new tests only exercise part of the file, the rest now drags the aggregate
-  percentage down, and the floor can fail even though coverage strictly improved.
+  time it measures a file the coverage run had never executed before. A trace-based
+  coverage tool (kcov, and others like it) treats never-executed code as invisible,
+  not as a counted zero — a file the run never touches contributes nothing to the
+  denominator, whether or not it has a dedicated test (indirect execution via another
+  script's test counts too). The first PR to actually execute that file under
+  coverage makes every line in it visible for the first time; if that new execution
+  only exercises part of the file, the rest now drags the aggregate percentage down,
+  and the floor can fail even though coverage strictly improved.
   Real example: dfadler/agent-config#106 added 3 tests for a new branch in
   `upload.sh`, a script the kcov gate had never measured before — that made the
   script's untested `--pr`/`--issue`/`--comment`/validation paths visible for the
