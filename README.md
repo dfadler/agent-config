@@ -121,9 +121,9 @@ who skips setup.
 
 [mattpocock/skills](https://github.com/mattpocock/skills) is a separately maintained
 Claude Code plugin (TDD, diagnosing bugs, domain modeling, code review, and more) that
-this repo has used as a prior-art reference for idiomatic skill authoring — see #15 and
-#132 for how and why. Nothing from it is vendored into this plugin; it's recommended as
-a standalone companion install, kept current by its own maintainer:
+this repo has used as a prior-art reference for idiomatic skill authoring — see issues #15
+and #132 for how and why. Nothing from it is vendored into this plugin; it's recommended
+as a standalone companion install, kept current by its own maintainer:
 
 ```bash
 claude plugin install mattpocock-skills
