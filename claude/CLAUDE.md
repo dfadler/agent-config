@@ -175,6 +175,23 @@ there's no way to tell which one did it. So:
   far more than restoring focus, and it races the user's own typing. Not taking focus
   is strictly better than giving it back.
 
+## Answer shape for direct "why" questions
+
+When asked a direct root-cause question — "Why didn't you X?", "What caused Y?",
+"Where is W handled?" — lead with the cause, not a policy recap or a walk through
+everything that was tried. Answer in this shape:
+
+1. **Cause** — what happened and why, in one line.
+2. **Evidence** — the concrete signal that shows it: a file path, a log line, a
+   command's output.
+3. **Next step** — the smallest corrective action, or a single question that would
+   confirm or decide it.
+
+This is about the shape of the answer, not about pausing more often — it doesn't
+change the general bias toward proceeding rather than stopping to ask; it only
+applies once the user has already asked a direct question and wants the real answer,
+not a recap of what should have happened.
+
 ## Shell scripts: hygiene baseline
 
 For any non-trivial bash script:
@@ -189,6 +206,49 @@ For any non-trivial bash script:
 - Keep script tests hermetic — no network, never a real/production system. Shim
   external commands (`gh`, `curl`, `git` against a throwaway repo, etc.) via `PATH`
   rather than letting a test touch the real thing.
+- Support `-h`/`--help`, printing at least a one-line usage summary before any other
+  argument handling runs. No need for shared help-printing machinery at this scale — a
+  `usage()` function with a heredoc, checked first in a plain `case` statement (or arg
+  loop), is enough; `setup.sh` is the style reference already in this repo. `--version`
+  isn't required unless a script actually has a version to report.
+- Use named, documented exit codes instead of bare `exit 1` — a shared, small
+  taxonomy, not a bespoke one per script. Reuse this repo's numbering (skip the ones a
+  script has no path for; don't invent new ones without extending this list):
+  ```bash
+  EXIT_OK=0            # success
+  EXIT_FAILURE=1       # general failure — the check ran and found something wrong
+  EXIT_USAGE=2         # missing/invalid arguments, including a bad path argument
+  EXIT_CONFIG=3        # bad config (reserved — no script needs this yet)
+  EXIT_DEPENDENCY=4    # a required external command isn't on PATH
+  EXIT_NETWORK=5       # network failure (reserved — no script needs this yet)
+  EXIT_TIMEOUT=6       # operation timed out (reserved — no script needs this yet)
+  EXIT_INTERNAL=20     # unexpected/assertion failure — should not happen
+  ```
+  Declare only the constants a given script actually uses (an unused `readonly`
+  triggers shellcheck's SC2034). The gap between 6 and 20 is deliberate headroom for
+  more specific codes later without renumbering `EXIT_INTERNAL`.
+
+## Testing: sabotage/mutation spot-check
+
+A test that passes today isn't proof it would catch a real regression — an
+implementation-coupled mock, a tautological assertion, or an existence-only check can
+pass vacuously forever. Spot-check a new or modified test by temporarily breaking the
+code under test (comment out the logic, early-return, flip a condition) and re-running
+it: the test should fail. Revert the breakage immediately after confirming — this is a
+manual verification step, not a change to ship. Apply it selectively (new/modified
+tests, or ones you're suspicious of), not as a blanket pass over an existing suite.
+This is cheap because it needs no mutation-testing tool, just the language's own
+runner; #93 and #120's kcov/`check-shell-coverage.sh` work both used exactly this
+technique to confirm bats coverage was real rather than incidental.
+
+## Cite sources for platform-capability claims
+
+When stating a platform or tool capability as fact — rate limits, model behavior,
+API surface, auth methods, size limits, what a product can or cannot do — cite the
+official docs rather than relying on memory or inference. Marketing copy and old
+training data go stale; a confident wrong answer here is worse than a slower correct
+one. If unsure, say so explicitly and point to where to check, rather than guessing
+confidently. This applies to any platform or tool, not just Claude/Anthropic.
 
 ## GitHub workflow habits
 
@@ -210,3 +270,10 @@ For any non-trivial bash script:
   Inline/review comment:
   `gh api repos/<owner>/<repo>/pulls/<pr>/comments/<comment-id>/replies -f body="<reply>"`.
   General PR-level comment: `gh pr comment <pr> --body "<reply>"`.
+- **`.github/` stays config-only.** Limit it to platform configuration: workflows
+  (`.github/workflows/`), CODEOWNERS, dependabot/release config, and a **generic**
+  PR/issue template. Feature- or product-specific docs, playbooks, or checklists
+  belong under the project's own docs directory, not `.github/`. If a specific
+  feature genuinely needs its own PR template, use an opt-in file under
+  `.github/PULL_REQUEST_TEMPLATE/<feature>.md` (or have tooling append content only
+  for those PRs) — never grow the generic template with feature-specific sections.
