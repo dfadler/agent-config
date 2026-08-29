@@ -228,6 +228,22 @@ install_pyte() {
   echo "✓ pyte installed and importable by $exe"
 }
 
+check_git_identity() {
+  if (cd "$REPO_ROOT" && ./scripts/git-identity.sh) >/dev/null 2>&1; then
+    echo "✓ git identity is configured (scripts/git-identity.sh)"
+  else
+    {
+      echo
+      echo "⚠ git identity (user.name/user.email) is not fully configured."
+      echo "  Tooling that relies on scripts/git-identity.sh (e.g. an automated"
+      echo "  commit) will fail loudly until this is set. Configure it with:"
+      echo "    git config --global user.name \"Your Name\""
+      echo "    git config --global user.email you@example.com"
+      echo
+    } >&2
+  fi
+}
+
 check_python_deps() {
   local probe have exe managed venv
   probe="$(run_probe)"
@@ -280,8 +296,9 @@ prune_stale_plugin_links "$HOME/.claude/agents"
 mkdir -p "$HOME/.claude/skills"
 link "$PLUGIN_SRC" "$PLUGIN_LINK"
 
-# Last, so the linking work is already done and reported when this speaks up.
-# A missing dependency is a warning, not a failure: the symlinks are correct
-# either way, and `./setup.sh && something-else` shouldn't break over it. An
-# explicitly requested --install-deps that doesn't install is a failure.
+# Last, so the linking work is already done and reported when these speak up.
+# Both are warnings, not failures: the symlinks are correct either way, and
+# `./setup.sh && something-else` shouldn't break over either one. An
+# explicitly requested --install-deps that doesn't install is still a failure.
+check_git_identity
 check_python_deps
