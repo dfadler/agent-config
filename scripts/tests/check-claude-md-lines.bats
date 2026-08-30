@@ -68,7 +68,13 @@ write_lines() {
 }
 
 @test "the repo's own claude/CLAUDE.md satisfies the current ceiling" {
-  run bash "$REPO_ROOT/scripts/check-claude-md-lines.sh" "$REPO_ROOT/claude/CLAUDE.md" 330
+  # Read CLAUDE_MD_MAX_LINES from the Makefile rather than hardcoding it here,
+  # so a threshold bump there can't silently leave this test checking a stale
+  # value.
+  local max_lines
+  max_lines="$(sed -nE 's/^CLAUDE_MD_MAX_LINES[[:space:]]*:=[[:space:]]*([0-9]+).*/\1/p' "$REPO_ROOT/Makefile")"
+  [ -n "$max_lines" ]
+  run bash "$REPO_ROOT/scripts/check-claude-md-lines.sh" "$REPO_ROOT/claude/CLAUDE.md" "$max_lines"
   assert_success
 }
 
