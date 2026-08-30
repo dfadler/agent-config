@@ -21,6 +21,25 @@ background or parallel tasks. Never commit directly to the main working copy.
   the tool exists because that bypass was a recurring source of pain: untracked
   directories re-copied by hand, and worktrees created outside the convention that a
   repo's own pruning tooling then can't find.
+- **A subagent whose cwd was pinned at launch can't call `EnterWorktree` itself** —
+  creating a worktree from inside one would mutate the parent session's process-wide
+  working directory, and switching to an *existing* worktree by path fails too unless
+  the subagent's own cwd already happens to be inside a worktree. Reproduced directly:
+  `EnterWorktree cannot create a worktree from a subagent with a cwd override
+  (isolation: "worktree" or explicit cwd) — it would mutate the parent session's
+  process-wide working directory. To work in a different directory (including a
+  worktree), spawn an Agent with cwd set to it.` So decide isolation at spawn time,
+  not mid-task: pass `isolation: "worktree"` on the `Agent`-tool call (or the
+  equivalent field in a persistent custom subagent's frontmatter) rather than having
+  the subagent call `EnterWorktree` itself once it's already running — that's exactly
+  the gap that pushes a subagent toward the raw-`git worktree add` fallback the bullet
+  above warns against.
+- **Glance at `git worktree list` periodically.** A worktree created via that raw-git
+  fallback — including one a subagent was forced into before the point above applied —
+  sits outside `EnterWorktree`'s bookkeeping, so it also sits outside Claude Code's
+  automatic stale-worktree sweep, regardless of age (see the sweep's documented
+  exceptions in the docs linked below). Nothing removes it but a manual
+  `git worktree remove`.
 - **Pick what to parallelize by file surface, not by ticket.** Two tasks that both
   touch shared config (a lint config, `package.json`, a shared component) will
   conflict at merge time even if the sessions never overlap in time — stagger those
@@ -59,6 +78,14 @@ background or parallel tasks. Never commit directly to the main working copy.
   default branch** — cleanup tooling that checks reachability may warn a branch is
   "unmerged" when it's actually merged. Verify against the PR itself (state: merged),
   not a local branch-reachability check.
+
+Several of the bullets above describe first-class, versioned tool behavior — isolation
+enforcement, automatic locking, the sweep and its documented exceptions — rather than
+conventions this repo invented. See the
+[official Claude Code worktrees docs](https://code.claude.com/docs/en/worktrees) for
+what the tool itself guarantees: that page carries roughly a dozen "Before v2.1.x"
+behavior-change notes across patches 2.1.198–2.1.247 alone, so treat this section as a
+convention layer on top of a target that keeps moving, not a snapshot of it.
 
 ## Visual verification on PRs/issues that change rendered output
 
