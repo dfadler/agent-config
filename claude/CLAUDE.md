@@ -83,8 +83,9 @@ Several of the bullets above describe first-class, versioned tool behavior — i
 enforcement, automatic locking, the sweep and its documented exceptions — rather than
 conventions this repo invented. See the
 [official Claude Code worktrees docs](https://code.claude.com/docs/en/worktrees) for
-what the tool itself guarantees, since Anthropic ships changes to this area every few
-weeks per that page.
+what the tool itself guarantees: that page carries roughly a dozen "Before v2.1.x"
+behavior-change notes across patches 2.1.198–2.1.247 alone, so treat this section as a
+convention layer on top of a target that keeps moving, not a snapshot of it.
 
 ## Visual verification on PRs/issues that change rendered output
 
