@@ -18,11 +18,13 @@ metadata:
 
 ## Avoid type assertions
 
-Don't reach for a type assertion — `as Foo`, `as unknown as Foo`, `as any`, or the
-non-null `!` operator — to make types line up. An assertion silences the compiler
-instead of proving the claim, so a wrong one becomes a runtime bug the types said
-couldn't happen. Never use `as any`. Prefer, in order: **narrow** with a type guard,
-**validate** at the boundary (a schema/parse), **fix the source** type or generic.
+Enable and follow `@typescript-eslint/no-explicit-any` and
+`consistent-type-assertions` — don't write a type assertion (`as Foo`,
+`as unknown as Foo`, `as any`, the non-null `!` operator) a lint fix would
+flag. An assertion silences the compiler instead of proving the claim, so a
+wrong one becomes a runtime bug the types said couldn't happen. When one is
+genuinely needed, prefer, in order: **narrow** with a type guard, **validate**
+at the boundary (a schema/parse), **fix the source** type or generic.
 `as const` is always fine.
 
 If a project enables `@typescript-eslint/consistent-type-assertions` and
