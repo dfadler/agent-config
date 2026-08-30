@@ -58,6 +58,16 @@ COVERAGE_MIN := 70
 KCOV_INCLUDE := $(CURDIR)/scripts,$(CURDIR)/plugins,$(CURDIR)/setup.sh
 KCOV_EXCLUDE := /scripts/tests
 
+# Ceiling for claude/CLAUDE.md (see scripts/check-claude-md-lines.sh). The
+# global CLAUDE.md loads into every session on this machine regardless of
+# project, so unrelated content belongs in a skill/doc instead of growing this
+# file — #137 trimmed it from 352 to 302 lines by relocating the TypeScript
+# sections into the typescript-conventions skill. 330 is that post-trim
+# measurement plus headroom for organic growth, not the exact count, so a
+# single small addition doesn't immediately trip the gate; raising it further
+# takes a deliberate commit, the same as COVERAGE_MIN above.
+CLAUDE_MD_MAX_LINES := 330
+
 .PHONY: help check lint lint-sh lint-py lint-actions fmt fmt-py test test-sh test-py \
         structure typecheck venv coverage check-links
 
@@ -84,10 +94,11 @@ venv: ## Create .venv from requirements-dev.txt
 
 lint: lint-sh lint-py ## Lint shell and Python
 
-lint-sh: ## shellcheck + shfmt (check only) + set-flags convention
+lint-sh: ## shellcheck + shfmt (check only) + set-flags convention + CLAUDE.md size
 	@$(SH_FIND) | xargs -0 shellcheck
 	@$(SH_FIND) | xargs -0 shfmt -i 2 -ci -d
 	@bash scripts/check-shell-set-flags.sh
+	@bash scripts/check-claude-md-lines.sh claude/CLAUDE.md $(CLAUDE_MD_MAX_LINES)
 
 lint-py: ## ruff check + ruff format --check
 	@$(PY) -m ruff check $(PY_SOURCES)
