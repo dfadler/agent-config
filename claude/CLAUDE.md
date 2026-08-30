@@ -350,3 +350,107 @@ confidently. This applies to any platform or tool, not just Claude/Anthropic.
   anything under `.github/workflows/`, read `docs/github-actions.md` — SHA-pinning,
   composite-action-vs-reusable-workflow judgment calls, the debugging escalation
   order, and known failure patterns already hit and resolved here.
+
+### Opening and maintaining a PR
+
+- **Sizing signal is "would this piece be mergeable and valuable standing alone,"
+  not a line-count threshold.** Real PR sizes here span two orders of magnitude —
+  #69 (1737+/-991 across 8 commits, ~2700 lines) is large but one coherent concern
+  (a PTY-holder rewrite) and was never split; #60→#93 split a CI gate from its
+  coverage floor because the two were independently mergeable and independently
+  valuable. Judge a PR by that test, not by size alone. The mechanics of splitting
+  an already-large PR (stacked branches, cherry-picking, sequencing the split) are
+  a separate concern — this states the sizing principle once rather than
+  duplicating it wherever that lands.
+- **Use a `## Sequencing` PR-body section when two or more PRs are in flight and
+  their merge order matters.** PR #69's body: "#68 was the stopgap that brings
+  `main` off the version with the live credential leak. If this merges first, #68
+  can be closed unmerged; otherwise merge #68 first and this rebases cleanly. #51
+  is superseded either way." Name every related PR, state what happens under each
+  possible merge order, and say explicitly what gets closed or superseded — don't
+  leave a reader to infer it from the diff.
+- **Merge via ordinary merge commits, not squash.** `allow_squash_merge` is enabled
+  on this repo, but every merge in its history (`git log --merges`) is a plain
+  `Merge pull request #N` commit — that's a deliberate, worth-stating choice, not
+  an oversight. Review-iteration commits like `7b9e801 fix: address review on #60`
+  and `4e912ee fix: address review on #69` become permanent, individually-visible
+  history, which is the right trade-off here: those commits are consistently
+  well-described and each one is independently referenced from a review reply (see
+  below) — squashing would erase that traceability for no compensating benefit.
+
+### Responding to and resolving review comments
+
+This repo's review loop is CodeRabbit plus the PR author self-triaging — not a
+second human reviewer. Across 105 sampled review submissions, zero were
+`APPROVED`/`CHANGES_REQUESTED`; every one was `COMMENTED`, and branch protection
+on `main` requires passing CI, not an approving review. Calibrate guidance to
+that reality rather than implying a review model this repo doesn't have.
+
+Beyond the reply convention above, this repo's actual practice — most fully on
+view in PR #103's thread history and body — sorts each finding into one of four
+outcomes, not a binary fixed-or-pushback:
+
+- **Fixed** — name the commit SHA in the reply: `Fixed in <sha>: <what changed
+  and why>` (real examples: `05e7445`, `a35a789`, `7b9e801`, `4e912ee`). Never
+  "done" alone — the SHA makes the reply independently verifiable against the
+  commit graph later.
+- **Refuted** — reproduce the claim against the real, current system and show the
+  output, not just prose disagreement. PR #103's `--headless=old` pushback ran the
+  actual flag against the actual installed Chrome (151.0.7922.175, exit 0,
+  byte-identical PNG) and posted the command and result.
+- **Confirmed real but deliberately deferred** — say so explicitly, with the
+  reason, instead of silently dropping it. #103: the `chrome-headless-shell`-pin
+  finding was real but left unpinned because it only matters on a fallback path
+  with no observed failure — stated as its own outcome, not folded into "fixed"
+  or "won't fix."
+- **Judged not real** — say what was checked (file plus full git history, in
+  #103's case) and that nothing matched.
+
+  When a PR's fate depends on findings that don't all resolve to Fixed or
+  Refuted, don't auto-close the tracking issue: #103 withheld `Closes #55`
+  because one finding was deferred, leaving the close decision to a human.
+
+**CodeRabbit-specific quirks**, verified directly against PR #103's thread
+history:
+
+- **It re-litigates a refuted finding until a second, independent repro
+  convinces it.** The first empirical refutation of the `--headless=old` finding
+  didn't make it withdraw; only a second, separately-run repro (same test, same
+  result, posted again) got the "I am withdrawing this finding" reply. Budget for
+  one extra round of fresh evidence on a bot pushback — the first repro may not be
+  the last word.
+- **Its own claimed thread-resolution outcome is not trustworthy.** Three of four
+  resolved threads on #103 carry CodeRabbit's own text — "I couldn't resolve this
+  review thread on the repository platform... Please retry or resolve it
+  manually" — yet all three show resolved today; the PR author (who has the
+  necessary permission under GitHub's write-access-or-author resolution model)
+  resolved them by hand after the bot's own resolve call silently failed. Never
+  treat a bot's "resolved"/"couldn't resolve" claim in a comment body as ground
+  truth — verify or drive resolution via the actual API/mutation instead.
+
+**Out-of-scope findings become a new issue, not scope creep on the current PR.**
+#55→#56 is the concrete precedent: #55's body states in one line why the finding
+needed its own issue ("everything dfadler.com-specific... that turned out to be
+a disclosure problem as well as a correctness one, and it needed its own
+scope"), and #56 closes with the reverse link ("Split out of #55"). Carry over:
+a synthesis (not a verbatim comment dump), a link back to the source PR/comment,
+the one-line why-out-of-scope, and — when there is one — a concrete acceptance
+bar (#89's "a test that demonstrably fails when the behaviour is removed, or a
+decision that the path stays untested with the reasoning recorded" is the
+model). The same mechanism applies whether the trigger is a human reviewer's
+comment or a CodeRabbit finding outside the diff range — the latter is exactly
+how #55 itself originated (12 outside-diff findings on #54 sat untriaged until a
+follow-up issue was opened after merge; triage them at review time instead where
+possible).
+
+mattpocock/skills' `triage` skill (`skills/engineering/triage/`, opt-in via
+`disable-model-invocation: true`) generalizes both of the above more formally
+than this repo currently does: its `.out-of-scope/` knowledge base is a durable,
+one-file-per-rejected-concept record checked automatically before a request gets
+re-litigated from scratch — a sharper version of what the #55/#56 split and
+CodeRabbit's own re-litigation-until-convinced pattern are both informally
+reaching for. Its "verify the claim" step (check out the diff, run the relevant
+tests, before triaging) is a stricter reviewer-side bar than this repo's
+self-review-only practice today. Reach for it if this repo starts tracking
+rejected proposals or external PRs at a volume where an ad hoc issue-per-
+rejection stops scaling.
