@@ -78,40 +78,26 @@ background or parallel tasks. Never commit directly to the main working copy.
   default branch** — cleanup tooling that checks reachability may warn a branch is
   "unmerged" when it's actually merged. Verify against the PR itself (state: merged),
   not a local branch-reachability check.
-- **Name the branch `issue-<N>-<slug>` when a GitHub issue is driving the work, or a
-  bare `<slug>` when there isn't one.** This is the pattern the most recent batch of
-  PRs already converged on organically (`issue-55-coderabbit-fixes`,
-  `issue-63-allowed-tools-decision`, and others) — codify it rather than inventing a
-  new one. Drop the `worktree-`/`worktree-agent-<hash>` prefix as the default: the
-  `.claude/worktrees/<name>/` path already namespaces "this is a worktree" on disk,
-  and a bare hash tells anyone skimming `git branch -a` or a PR list nothing.
-  Deliberately **not** adopting a Conventional-Branch `type/description` prefix
-  (`feat/`, `fix/`) — this repo already gets change-type information for free from
-  Conventional-Commit-style commit messages, so repeating it in the branch name would
-  be redundant; treat this as a considered non-adoption, not an oversight to "fix"
-  later. This is guidance, not enforcement, for now — a bad branch name costs
-  nothing, since branches vanish on merge. If enforcement is ever wanted, reach for
-  this repo's existing GitHub rulesets on `main`
-  (`gh api repos/dfadler/agent-config/rulesets`), which already support a native
-  `branch_name_pattern` rule, before adding a new hook or CI job. Leave
-  `dependabot/*` out of any such rule — it's an external tool's own convention. No
-  retroactive renaming of existing branches.
+- **Name the branch `issue-<N>-<slug>` when a GitHub issue drives the work, or a bare
+  `<slug>` otherwise** — the pattern the most recent PR batch already converged on
+  organically; codify it rather than inventing a new one. Drop the
+  `worktree-`/`worktree-agent-<hash>` prefix as the default — the
+  `.claude/worktrees/<name>/` path already namespaces "this is a worktree." Not
+  adopting a Conventional-Branch `type/description` prefix — redundant with this
+  repo's Conventional-Commit messages, a considered non-adoption rather than an
+  oversight. Guidance, not enforcement, for now; if that changes, this repo's
+  GitHub rulesets on `main` already support a native `branch_name_pattern` rule.
+  Exclude `dependabot/*`. No retroactive renaming.
 - **Once a branch has an open PR, catch it up to a moved `main` via merge, not
-  rebase.** Every merge in this repo's history is an ordinary merge commit; the
-  reasoning is the standard golden-rule-of-rebasing one — rewriting a branch under
-  active review invalidates the PR's diff view and detaches any review comments
-  already anchored to specific lines. Rebase freely on a branch that hasn't been
-  pushed yet, or has no open PR — it's still private history at that point.
-- **Before trusting a resolved conflict, or a PR that claims to carry a range of
-  commits forward intact, diff the result against the side (or branch) it's supposed
-  to match and name every delta that doesn't.** Commit `e5d2428` resolved a real
-  conflict this way — after merging, it diffed the merged tree against `origin/main`
-  directly and named the two deltas that legitimately survived, rather than trusting
-  a read-through of the diff. The same check catches a dropped commit when splitting:
-  `git diff <split-branch> <source-branch> -- <paths>` should come back empty for any
-  range a split PR claims to carry forward. This check is what was skipped in the
-  `#51 → #65 → #67 → #68` incident below, and would have caught the gap immediately
-  instead of two PRs later.
+  rebase** — every merge in this repo's history already is one. Rewriting a branch
+  under active review invalidates the PR's diff view and detaches anchored review
+  comments (the golden-rule-of-rebasing reasoning). Rebase freely before a PR exists.
+- **Before trusting a resolved conflict, or a PR claiming to carry a commit range
+  forward intact, diff the result against the side it's supposed to match and name
+  every surviving delta.** Commit `e5d2428` did exactly this — diffed a merged tree
+  against `origin/main` and named the two deltas that legitimately survived, rather
+  than trusting a read-through. The same check (`git diff <split-branch>
+  <source-branch> -- <paths>`, empty = safe) catches a dropped commit when splitting.
 
 Several of the bullets above describe first-class, versioned tool behavior — isolation
 enforcement, automatic locking, the sweep and its documented exceptions — rather than
@@ -123,54 +109,39 @@ convention layer on top of a target that keeps moving, not a snapshot of it.
 
 ### Conflict resolution: when to escalate
 
-Resolving a merge conflict — whether by hand or via `resolve-conflicts`-style
-automation — should branch the same three ways `pr-babysit`'s `address-reviews` step
-already does for review comments, rather than treating "merge, resolve, commit, push"
-as unconditional:
+Give conflict resolution the same three-way shape `pr-babysit`'s `address-reviews`
+step already uses for review comments, instead of treating "merge, resolve, commit,
+push" as unconditional:
 
-- **Resolve confidently** — the common case: both sides' intent is traceable to its
-  primary source (a commit message, PR, or issue) and reconcilable without inventing
-  behavior neither side specified.
-- **Resolve with a named trade-off** — when reconciling requires a judgment call
-  (e.g. one side wins because it matches the merge's stated goal), state that
-  trade-off explicitly in the commit message rather than leaving it implicit.
-- **Escalate** — only when neither side's intent is recoverable from history, or the
-  conflict is a genuine product/design decision rather than a text-reconciliation
-  problem. Leave the conflict markers in place with a written summary of what's
-  ambiguous, instead of guessing or backing out with `--abort` — a merge that's been
-  started should be carried to a finished state, resolved or explicitly escalated,
-  not abandoned mid-way.
+- **Resolve confidently** when both sides' intent traces to a primary source (a
+  commit, PR, or issue) and reconciles without inventing unspecified behavior.
+- **Resolve with a named trade-off**, stated in the commit message, when reconciling
+  needs a judgment call (e.g. one side wins because it matches the merge's goal).
+- **Escalate** — markers left in place, ambiguity summarized in writing, never
+  `--abort` — only when neither side's intent is recoverable, or it's a genuine
+  product decision rather than a text-reconciliation problem.
 
-See the bullet above on diffing a resolved conflict against its claimed source before
-trusting it — that check applies here regardless of which of the three outcomes a
-given conflict lands in.
+The diff-against-claimed-source check above applies to whichever of the three a
+conflict lands in.
 
 ### Splitting a large or already-written PR
 
-- **Default to sequential PRs against `main`, coordinated in prose.** This is what
-  already works here: when a PR depends on or precedes another, say so explicitly in
-  a `## Sequencing` section in the PR body — name every related PR, state what
-  happens under each possible merge order, and say what gets closed or superseded
-  rather than leaving it to be inferred from the diff.
-- **Reserve branch-off-branch PRs for the rare case where two split pieces need to be
-  in flight at the same time.** `gh pr create --base <other-pr-branch>` needs no
-  extra tooling, but carries a real, easy-to-forget cost: if the base PR is amended
-  or rebased, the dependent PR needs `git rebase --onto` before it can merge cleanly.
-- **Deliberately not adopting Graphite, `ghstack`, git-branchless, Sapling, or `jj`.**
-  No PR in this repo's history has ever used branch-level stacking, and the one real
-  splitting incident this repo has had (below) wasn't a tooling gap. Treat this as a
-  considered non-adoption; revisit only if concurrent-stack usage actually starts
-  happening.
+- **Default to sequential PRs against `main`, coordinated in prose** — a
+  `## Sequencing` section in the PR body naming every related PR and what happens
+  under each merge order, the pattern already in use here.
+- **Reserve branch-off-branch PRs (`gh pr create --base <other-pr-branch>`) for the
+  rare case of two split pieces in flight at once** — no extra tooling needed, but
+  the base PR moving means `git rebase --onto` before the dependent PR merges clean.
+- **Not adopting Graphite, `ghstack`, git-branchless, Sapling, or `jj`** — no PR here
+  has ever used branch-level stacking, and this repo's one splitting incident (below)
+  was a process gap, not a tooling one. Revisit only if concurrent-stack usage starts.
 - **When mechanically splitting an already-written diff, re-verify the claimed range
   against the source branch's live tip before opening the PR, and never cherry-pick
-  from a locked worktree** — a lock is a "still changing, don't snapshot" signal, not
-  a "safe to cherry-pick" one. This is the exact gap in the
-  `#51 → #65 → #67 → #68 → #69` incident: #65 cherry-picked from a locked branch at a
-  remembered SHA, missed three subsequent commits including a security fix, and
-  briefly shipped a known credential-leak bug to `main` before #67 and #68 caught up.
-  #69 ultimately abandoned the split and shipped one coherent PR instead. Use the
-  diff-against-claimed-source check from the bullet above to confirm a split range
-  actually landed intact, rather than trusting a remembered commit.
+  from a locked worktree** — a lock means "still changing," not "safe to snapshot."
+  `#51 → #65 → #67 → #68 → #69`: #65 cherry-picked from a locked branch at a
+  remembered SHA, missed a security fix landed afterward, and briefly shipped a known
+  leak to `main` before #67/#68 caught up; #69 abandoned the split entirely. Use the
+  diff-against-claimed-source check above to confirm a claimed range landed intact.
 
 ## Visual verification on PRs/issues that change rendered output
 
