@@ -22,9 +22,10 @@ Enable `@typescript-eslint/no-explicit-any`, `consistent-type-assertions` (with
 `assertionStyle: "never"` — the default `"as"` setting only standardizes
 assertion syntax, it doesn't ban assertions), and `no-non-null-assertion` —
 together they diagnose every form below. Don't write a type assertion
-(`as Foo`, `as unknown as Foo`, `as any`, the non-null `!` operator) any of
-these would flag. An assertion silences the compiler instead of proving the
-claim, so a wrong one becomes a runtime bug the types said couldn't happen.
+(`as Foo`, `as unknown as Foo`, or `as any`) or a non-null assertion (`!`) —
+the enabled rules flag both. An assertion silences the compiler instead of
+proving the claim, so a wrong one becomes a runtime bug the types said
+couldn't happen.
 When one is genuinely needed, prefer, in order: **narrow** with a type guard,
 **validate** at the boundary (a schema/parse), **fix the source** type or
 generic. `as const` is always fine — `consistent-type-assertions` exempts it
