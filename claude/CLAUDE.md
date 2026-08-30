@@ -21,6 +21,25 @@ background or parallel tasks. Never commit directly to the main working copy.
   the tool exists because that bypass was a recurring source of pain: untracked
   directories re-copied by hand, and worktrees created outside the convention that a
   repo's own pruning tooling then can't find.
+- **A subagent whose cwd was pinned at launch can't call `EnterWorktree` itself** —
+  creating a worktree from inside one would mutate the parent session's process-wide
+  working directory, and switching to an *existing* worktree by path fails too unless
+  the subagent's own cwd already happens to be inside a worktree. Reproduced directly:
+  `EnterWorktree cannot create a worktree from a subagent with a cwd override
+  (isolation: "worktree" or explicit cwd) — it would mutate the parent session's
+  process-wide working directory. To work in a different directory (including a
+  worktree), spawn an Agent with cwd set to it.` So decide isolation at spawn time,
+  not mid-task: pass `isolation: "worktree"` on the `Agent`-tool call (or the
+  equivalent field in a persistent custom subagent's frontmatter) rather than having
+  the subagent call `EnterWorktree` itself once it's already running — that's exactly
+  the gap that pushes a subagent toward the raw-`git worktree add` fallback the bullet
+  above warns against.
+- **Glance at `git worktree list` periodically.** A worktree created via that raw-git
+  fallback — including one a subagent was forced into before the point above applied —
+  sits outside `EnterWorktree`'s bookkeeping, so it also sits outside Claude Code's
+  automatic stale-worktree sweep, regardless of age (see the sweep's documented
+  exceptions in the docs linked below). Nothing removes it but a manual
+  `git worktree remove`.
 - **Pick what to parallelize by file surface, not by ticket.** Two tasks that both
   touch shared config (a lint config, `package.json`, a shared component) will
   conflict at merge time even if the sessions never overlap in time — stagger those
@@ -59,6 +78,75 @@ background or parallel tasks. Never commit directly to the main working copy.
   default branch** — cleanup tooling that checks reachability may warn a branch is
   "unmerged" when it's actually merged. Verify against the PR itself (state: merged),
   not a local branch-reachability check.
+- **Name the branch `issue-<N>-<slug>` when a GitHub issue drives the work, or a bare
+  `<slug>` otherwise, by passing it as `EnterWorktree`'s `name` argument** — an
+  explicit `name` is used as given; the `worktree-`/`worktree-agent-<hash>` shape is
+  only what the tool generates when `name` is omitted. `issue-<N>-<slug>` is the
+  pattern the most recent PR batch already converged on organically; codify it
+  rather than inventing a new one. Not adopting a Conventional-Branch
+  `type/description` prefix — redundant with this repo's Conventional-Commit
+  messages, a considered non-adoption rather than an oversight. Guidance, not
+  enforcement, for now; if that changes, this repo's GitHub rulesets on `main`
+  already support a native `branch_name_pattern` rule. Exclude `dependabot/*`. No
+  retroactive renaming.
+- **Once a branch has an open PR, catch it up to a moved `main` via merge, not
+  rebase** — every merge in this repo's history already is one. Rewriting a branch
+  under active review invalidates the PR's diff view and detaches anchored review
+  comments (the golden-rule-of-rebasing reasoning). Rebase freely before a PR exists.
+- **Before trusting a resolved conflict, or a PR claiming to carry a commit range
+  forward intact, diff the result against the side it's supposed to match and name
+  every surviving delta.** Commit `e5d2428` did exactly this — diffed a merged tree
+  against `origin/main` and named the two deltas that legitimately survived, rather
+  than trusting a read-through. The same check (`git diff <split-branch>
+  <source-branch> -- <paths>`, empty = safe) catches a dropped commit when splitting.
+
+Several of the bullets above describe first-class, versioned tool behavior — isolation
+enforcement, automatic locking, the sweep and its documented exceptions — rather than
+conventions this repo invented. See the
+[official Claude Code worktrees docs](https://code.claude.com/docs/en/worktrees) for
+what the tool itself guarantees: that page carries roughly a dozen "Before v2.1.x"
+behavior-change notes across patches 2.1.198–2.1.247 alone, so treat this section as a
+convention layer on top of a target that keeps moving, not a snapshot of it.
+
+### Conflict resolution: when to escalate
+
+Give conflict resolution the same three-way shape `pr-babysit`'s `address-reviews`
+step already uses for review comments, instead of treating "merge, resolve, commit,
+push" as unconditional:
+
+- **Resolve confidently** when both sides' intent traces to a primary source (a
+  commit, PR, or issue) and reconciles without inventing unspecified behavior.
+- **Resolve with a named trade-off**, stated in the commit message, when reconciling
+  needs a judgment call (e.g. one side wins because it matches the merge's goal).
+- **Escalate** — only when neither side's intent is recoverable, or it's a genuine
+  product decision rather than a text-reconciliation problem. Pause the merge in
+  place rather than `--abort`ing it, but never stage or commit a file that still
+  contains `<<<<<<<`/`=======`/`>>>>>>>` markers; write the ambiguity summary
+  somewhere other than the conflicted file itself.
+
+The diff-against-claimed-source check above applies to whichever of the three a
+conflict lands in.
+
+### Splitting a large or already-written PR
+
+- **Default to sequential PRs against `main`, coordinated in prose** — a
+  `## Sequencing` section in the PR body naming every related PR and what happens
+  under each merge order, the pattern already in use here.
+- **Reserve branch-off-branch PRs (`gh pr create --base <other-pr-branch>`) for the
+  rare case of two split pieces in flight at once** — no extra tooling needed, but if
+  the base PR's branch changes underneath it, catch the dependent branch up by
+  merging the base branch in, the same as the merge-not-rebase rule above (never
+  `git rebase --onto` a dependent branch that already has its own open PR).
+- **Not adopting Graphite, `ghstack`, git-branchless, Sapling, or `jj`** — no PR here
+  has ever used branch-level stacking, and this repo's one splitting incident (below)
+  was a process gap, not a tooling one. Revisit only if concurrent-stack usage starts.
+- **When mechanically splitting an already-written diff, re-verify the claimed range
+  against the source branch's live tip before opening the PR, and never cherry-pick
+  from a locked worktree** — a lock means "still changing," not "safe to snapshot."
+  `#51 → #65 → #67 → #68 → #69`: #65 cherry-picked from a locked branch at a
+  remembered SHA, missed a security fix landed afterward, and briefly shipped a known
+  leak to `main` before #67/#68 caught up; #69 abandoned the split entirely. Use the
+  diff-against-claimed-source check above to confirm a claimed range landed intact.
 
 ## Visual verification on PRs/issues that change rendered output
 
@@ -91,56 +179,6 @@ Don't trust a single rendering technique blindly, especially for anything involv
 - If a fix's effect only manifests when the rendered output is embedded in a specific host context (e.g. a CSS variable that's only meaningful when a parent page defines it), build that host context rather than screenshotting the artifact in isolation — an isolated screenshot of both branches can look identical even when the fix is real, simply because the thing being tested never gets exercised in isolation.
 - When comparing two rendered variants, put them in **separate, isolated documents** rather than side-by-side in one shared page if either one embeds its own `<style>` block — inline `<style>` tags (including inside inline SVG) apply document-wide by default, not scoped to their containing element, so two variants sharing one page can silently cross-contaminate each other's styling and produce a false negative (both look like whichever rule won the cascade, not what each actually specifies). This happened once already: two SVGs side-by-side both rendered with the "after" variant's font because its `<style>` rule won the cascade tie-break for the whole document, masking a real, verified difference.
 - Where possible, verify programmatically in addition to the screenshot: grep the raw output for expected content/attributes, or (for a real browser context) `getComputedStyle(...)` on the actual rendered element — don't rely on eyeballing pixels alone, especially for subtle differences (font family, color, small text). If a quick renderer (e.g. a Quick Look thumbnail) and a real browser disagree, trust the real browser and say so — some lightweight renderers don't fully implement CSS semantics.
-
-## TypeScript: avoid type assertions
-
-Don't reach for a type assertion — `as Foo`, `as unknown as Foo`, `as any`, or the
-non-null `!` operator — to make types line up. An assertion silences the compiler
-instead of proving the claim, so a wrong one becomes a runtime bug the types said
-couldn't happen. Never use `as any`. Prefer, in order: **narrow** with a type guard,
-**validate** at the boundary (a schema/parse), **fix the source** type or generic.
-`as const` is always fine.
-
-If a project enables `@typescript-eslint/consistent-type-assertions` and
-`no-non-null-assertion`, treat a genuinely unavoidable assertion the same way: a
-single-line disable directly above it with a comment stating why it's sound and why
-no type-safe path exists — never a bare disable, and never at file/block scope. A
-project with its own fix-ladder doc (narrow → validate → fix-source, with concrete
-examples) takes precedence over this generic version.
-
-## JS/TS: comment syntax
-
-Pick the comment form by what the comment is doing, not by habit:
-
-- **`//`** — standalone single-line comments; the default for ordinary one-liners.
-- **`/* … */` inline** — a note embedded *within* a line that runs, so the code
-  continues after it: `document.querySelector(/* nullable */ '.card')`, `fn(a, /* retries */ 3, cb)`.
-- **`/* … */` multi-line (starred block)** — a standalone note spanning multiple lines
-  that is *not* documenting the declaration it precedes (a rationale, module overview,
-  workaround explanation): aligned leading `*` on each line, never a stack of `//` lines:
-
-  ```ts
-  /*
-   * Colons/dots aren't filesystem- or URL-friendly; a flattened ISO timestamp
-   * stays human-readable and lexically sortable.
-   */
-  ```
-
-- **`/** … */` JSDoc** — a multi-line comment that documents the function, type, or
-  export it directly precedes:
-
-  ```ts
-  /**
-   * Converts Markdown into the target rich-text shape.
-   * Fences must be triple-backtick at the start of the line.
-   */
-  function markdownToPost(md: string) { /* … */ }
-  ```
-
-The "no stacked `//`" half is mechanically checkable via
-`@stylistic/multiline-comment-style` if a project's ESLint config enables it — that
-rule can't tell starred block from JSDoc apart, so which multi-line form fits stays a
-judgment call either way.
 
 ## Don't steal focus from the human
 
