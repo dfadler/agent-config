@@ -141,6 +141,24 @@ Answer no, or run non-interactively, and nothing is written. Add the rule later 
 
 or remove it any time from `~/.claude/settings.json`'s `permissions.allow` array.
 
+### Recommended companion: mattpocock/skills
+
+[mattpocock/skills](https://github.com/mattpocock/skills) is a separately maintained
+Claude Code plugin (TDD, diagnosing bugs, domain modeling, code review, and more) that
+this repo has used as a prior-art reference for idiomatic skill authoring — see issues #15
+and #132 for how and why. Nothing from it is vendored into this plugin; it's recommended
+as a standalone companion install, kept current by its own maintainer:
+
+```bash
+claude plugin install mattpocock-skills
+```
+
+It's in Claude Code's official marketplace — confirmed directly against
+`anthropics/claude-plugins-official`'s own manifest, not assumed — so there's nothing to
+add first, and updates arrive automatically. `setup.sh` doesn't install this: that's
+deliberate (#132, option A over B), so this repo's own setup only ever reaches into
+content it actually owns.
+
 ## Adding something new
 
 1. Put it in the right place:
