@@ -18,17 +18,19 @@ metadata:
 
 ## Avoid type assertions
 
-Enable and follow `@typescript-eslint/no-explicit-any` and
-`consistent-type-assertions` — don't write a type assertion (`as Foo`,
-`as unknown as Foo`, `as any`, the non-null `!` operator) a lint fix would
-flag. An assertion silences the compiler instead of proving the claim, so a
-wrong one becomes a runtime bug the types said couldn't happen. When one is
-genuinely needed, prefer, in order: **narrow** with a type guard, **validate**
-at the boundary (a schema/parse), **fix the source** type or generic.
-`as const` is always fine.
+Enable `@typescript-eslint/no-explicit-any`, `consistent-type-assertions` (with
+`assertionStyle: "never"` — the default `"as"` setting only standardizes
+assertion syntax, it doesn't ban assertions), and `no-non-null-assertion` —
+together they diagnose every form below. Don't write a type assertion
+(`as Foo`, `as unknown as Foo`, `as any`, the non-null `!` operator) any of
+these would flag. An assertion silences the compiler instead of proving the
+claim, so a wrong one becomes a runtime bug the types said couldn't happen.
+When one is genuinely needed, prefer, in order: **narrow** with a type guard,
+**validate** at the boundary (a schema/parse), **fix the source** type or
+generic. `as const` is always fine — `consistent-type-assertions` exempts it
+even under `"never"`.
 
-If a project enables `@typescript-eslint/consistent-type-assertions` and
-`no-non-null-assertion`, treat a genuinely unavoidable assertion the same way: a
+With those rules enabled, treat a genuinely unavoidable assertion the same way: a
 single-line disable directly above it with a comment stating why it's sound and why
 no type-safe path exists — never a bare disable, and never at file/block scope. A
 project with its own fix-ladder doc (narrow → validate → fix-source, with concrete
