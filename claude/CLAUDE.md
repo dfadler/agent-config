@@ -422,14 +422,15 @@ history:
 - **Its own claimed thread-resolution outcome is not trustworthy.** Three of four
   resolved threads on #103 carry CodeRabbit's own text — "I couldn't resolve this
   review thread on the repository platform... Please retry or resolve it
-  manually" — yet all three show resolved today; the PR author (who has the
+  manually" — yet all three were resolved shortly after, at the time of review;
+  the PR author (who has the
   necessary permission under GitHub's write-access-or-author resolution model)
   resolved them by hand after the bot's own resolve call silently failed. Never
   treat a bot's "resolved"/"couldn't resolve" claim in a comment body as ground
   truth — verify or drive resolution via the actual API/mutation instead.
 
 **Out-of-scope findings become a new issue, not scope creep on the current PR.**
-#55→#56 is the concrete precedent: #55's body states in one line why the finding
+Issues `#55`→`#56` are the concrete precedent: #55's body states in one line why the finding
 needed its own issue ("everything dfadler.com-specific... that turned out to be
 a disclosure problem as well as a correctness one, and it needed its own
 scope"), and #56 closes with the reverse link ("Split out of #55"). Carry over:
