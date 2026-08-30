@@ -62,11 +62,13 @@ KCOV_EXCLUDE := /scripts/tests
 # global CLAUDE.md loads into every session on this machine regardless of
 # project, so unrelated content belongs in a skill/doc instead of growing this
 # file — #137 trimmed it from 352 to 302 lines by relocating the TypeScript
-# sections into the typescript-conventions skill. 330 is that post-trim
-# measurement plus headroom for organic growth, not the exact count, so a
-# single small addition doesn't immediately trip the gate; raising it further
-# takes a deliberate commit, the same as COVERAGE_MIN above.
-CLAUDE_MD_MAX_LINES := 330
+# sections into the typescript-conventions skill. 330 was that post-trim
+# measurement plus headroom for organic growth, not the exact count. #139
+# converged genuinely global git-workflow research (#83-85, tracked since
+# #81) back into this file, raising it to 385 lines; 400 is that measurement
+# plus the same style of headroom, not a new baseline to fill up to. Raising
+# it further takes a deliberate commit, the same as COVERAGE_MIN above.
+CLAUDE_MD_MAX_LINES := 400
 
 .PHONY: help check lint lint-sh lint-py lint-actions fmt fmt-py test test-sh test-py \
         structure typecheck venv coverage check-links
