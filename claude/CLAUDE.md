@@ -79,15 +79,16 @@ background or parallel tasks. Never commit directly to the main working copy.
   "unmerged" when it's actually merged. Verify against the PR itself (state: merged),
   not a local branch-reachability check.
 - **Name the branch `issue-<N>-<slug>` when a GitHub issue drives the work, or a bare
-  `<slug>` otherwise** — the pattern the most recent PR batch already converged on
-  organically; codify it rather than inventing a new one. Drop the
-  `worktree-`/`worktree-agent-<hash>` prefix as the default — the
-  `.claude/worktrees/<name>/` path already namespaces "this is a worktree." Not
-  adopting a Conventional-Branch `type/description` prefix — redundant with this
-  repo's Conventional-Commit messages, a considered non-adoption rather than an
-  oversight. Guidance, not enforcement, for now; if that changes, this repo's
-  GitHub rulesets on `main` already support a native `branch_name_pattern` rule.
-  Exclude `dependabot/*`. No retroactive renaming.
+  `<slug>` otherwise, by passing it as `EnterWorktree`'s `name` argument** — an
+  explicit `name` is used as given; the `worktree-`/`worktree-agent-<hash>` shape is
+  only what the tool generates when `name` is omitted. `issue-<N>-<slug>` is the
+  pattern the most recent PR batch already converged on organically; codify it
+  rather than inventing a new one. Not adopting a Conventional-Branch
+  `type/description` prefix — redundant with this repo's Conventional-Commit
+  messages, a considered non-adoption rather than an oversight. Guidance, not
+  enforcement, for now; if that changes, this repo's GitHub rulesets on `main`
+  already support a native `branch_name_pattern` rule. Exclude `dependabot/*`. No
+  retroactive renaming.
 - **Once a branch has an open PR, catch it up to a moved `main` via merge, not
   rebase** — every merge in this repo's history already is one. Rewriting a branch
   under active review invalidates the PR's diff view and detaches anchored review
@@ -117,9 +118,11 @@ push" as unconditional:
   commit, PR, or issue) and reconciles without inventing unspecified behavior.
 - **Resolve with a named trade-off**, stated in the commit message, when reconciling
   needs a judgment call (e.g. one side wins because it matches the merge's goal).
-- **Escalate** — markers left in place, ambiguity summarized in writing, never
-  `--abort` — only when neither side's intent is recoverable, or it's a genuine
-  product decision rather than a text-reconciliation problem.
+- **Escalate** — only when neither side's intent is recoverable, or it's a genuine
+  product decision rather than a text-reconciliation problem. Pause the merge in
+  place rather than `--abort`ing it, but never stage or commit a file that still
+  contains `<<<<<<<`/`=======`/`>>>>>>>` markers; write the ambiguity summary
+  somewhere other than the conflicted file itself.
 
 The diff-against-claimed-source check above applies to whichever of the three a
 conflict lands in.
@@ -130,8 +133,10 @@ conflict lands in.
   `## Sequencing` section in the PR body naming every related PR and what happens
   under each merge order, the pattern already in use here.
 - **Reserve branch-off-branch PRs (`gh pr create --base <other-pr-branch>`) for the
-  rare case of two split pieces in flight at once** — no extra tooling needed, but
-  the base PR moving means `git rebase --onto` before the dependent PR merges clean.
+  rare case of two split pieces in flight at once** — no extra tooling needed, but if
+  the base PR's branch changes underneath it, catch the dependent branch up by
+  merging the base branch in, the same as the merge-not-rebase rule above (never
+  `git rebase --onto` a dependent branch that already has its own open PR).
 - **Not adopting Graphite, `ghstack`, git-branchless, Sapling, or `jj`** — no PR here
   has ever used branch-level stacking, and this repo's one splitting incident (below)
   was a process gap, not a tooling one. Revisit only if concurrent-stack usage starts.
