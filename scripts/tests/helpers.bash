@@ -43,6 +43,40 @@ EOF
   export PATH="$SHIM_BIN:$PATH"
 }
 
+# Extends make_sandbox for a script that runs REAL git against a remote (so
+# far only session-sync.sh). git itself is not shimmed — it's the thing under
+# test — but it's pointed exclusively at a local bare "origin" (a plain
+# directory, not a URL), so fetch/push work with zero network, and at sandbox
+# config so the developer's real gitconfig and any repo above $TMPDIR are
+# invisible. Ported from dfadler.com's scripts/tests/helpers.bash, which uses
+# the same pattern to test prune-merged-worktrees.sh.
+#
+# Sets REPO (a clone with an initial commit, pushed to origin/main) and ORIGIN
+# (the bare remote) in addition to make_sandbox's own SANDBOX/HOME.
+make_git_sandbox() {
+  make_sandbox
+  export GIT_CONFIG_GLOBAL="$SANDBOX/gitconfig"
+  export GIT_CONFIG_SYSTEM=/dev/null
+  # Don't let git walk above the sandbox looking for a .git — keeps a
+  # "not a repo" case honest and isolates the test from any repo that happens
+  # to contain $TMPDIR.
+  export GIT_CEILING_DIRECTORIES="$SANDBOX"
+  git config --global init.defaultBranch main
+  git config --global user.name "Sync Test"
+  git config --global user.email "sync-test@example.com"
+  # Local-path remotes work without this on most git versions, but set it
+  # defensively — some versions restrict the file transport by default.
+  git config --global protocol.file.allow always
+
+  ORIGIN="$SANDBOX/origin.git"
+  REPO="$SANDBOX/repo"
+  git init -q --bare "$ORIGIN"
+  git init -q "$REPO"
+  git -C "$REPO" commit -q --allow-empty -m "init"
+  git -C "$REPO" remote add origin "$ORIGIN"
+  git -C "$REPO" push -q -u origin main
+}
+
 # Build a throwaway plugin tree for the structure checker, so tests never
 # depend on the repo's real plugin layout (which changes as skills are added).
 # Usage: make_plugin_fixture <root> <plugin-name>
