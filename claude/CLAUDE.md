@@ -338,14 +338,9 @@ confidently. This applies to any platform or tool, not just Claude/Anthropic.
 
 ## GitHub workflow habits
 
-- **Never create an issue/PR, post a comment or reply, or submit a review without
-  explicit, request-scoped permission** — see the `gh-publish-permission` skill for
-  the full standard (explicit, request-scoped, and specific about what's being
-  posted) and what does/doesn't count. A broader adjacent ask ("fix this bug",
-  "look into X") is not permission to also file an issue or post a comment about it.
-  `agent-config`'s own `.claude/settings.json` backs this with a config-level
-  confirmation prompt on the relevant `gh` commands, but that's a backstop, not a
-  substitute for having actually asked.
+- **Never create an issue/PR, comment/reply, edit a body, or review without explicit,
+  request-scoped permission** (an adjacent ask like "fix this bug" doesn't imply it) —
+  see `gh-publish-permission`; the `.claude/settings.json` ask-rules backstop it.
 - Prefer GitHub Issues/PRs as the tracker when a project uses GitHub — don't route
   around it into a different tracker (Linear, Jira, ad-hoc docs) even if a connector
   for one is attached to the session, unless the project's own docs say otherwise.
