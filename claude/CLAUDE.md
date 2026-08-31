@@ -78,6 +78,18 @@ background or parallel tasks. Never commit directly to the main working copy.
   default branch** — cleanup tooling that checks reachability may warn a branch is
   "unmerged" when it's actually merged. Verify against the PR itself (state: merged),
   not a local branch-reachability check.
+- **Kill worktree-scoped background processes before removing the worktree.** A dev/
+  preview server or headless browser instance started against files inside a worktree
+  keeps running after the worktree directory (or branch) is deleted — nothing ties its
+  lifetime to the worktree's. This is easy to miss because such a server is often
+  started manually in the first place: `preview_start`/`.claude/launch.json` resolves
+  against the *original* repo root regardless of where `EnterWorktree` switched the
+  session's cwd, so a worktree-scoped preview is typically a plain `Bash`
+  `run_in_background` process launched by hand that nothing else tracks. Before
+  calling `ExitWorktree` (or otherwise abandoning the worktree), check for and stop
+  anything spawned against it — `lsof -i :<port>`, or the PID captured at launch — an
+  orphaned server left listening is wasted resources at best and stale/misleading
+  content at worst.
 - **Name the branch `issue-<N>-<slug>` when a GitHub issue drives the work, or a bare
   `<slug>` otherwise, by passing it as `EnterWorktree`'s `name` argument** — an
   explicit `name` is used as given; the `worktree-`/`worktree-agent-<hash>` shape is
