@@ -12,6 +12,10 @@
       "Bash(gh pr comment *)",
       "Bash(gh pr review)",
       "Bash(gh pr review *)",
+      "Bash(gh issue edit)",
+      "Bash(gh issue edit *)",
+      "Bash(gh pr edit)",
+      "Bash(gh pr edit *)",
       "Bash(gh api *)"
     ]
   }
