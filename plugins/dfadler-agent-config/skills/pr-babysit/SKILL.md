@@ -230,7 +230,9 @@ Field meanings worth calling out:
     otherwise report the blocker. Never "fix" flakes by editing tests, CI
     config, or dependency pins.
 - **`address-reviews`** — for each thread with `needsAction: true` and each
-  `generalComments` entry with `needsAction: true`:
+  `generalComments` entry with `needsAction: true`. Every reply body must open
+  with an explicit AI-authorship marker (e.g. `🤖 **Claude:**`) — never post a
+  reply that could read as if a human wrote it:
   - *Agree and actionable*: fix locally, commit (`fix: address PR review —
     <what>`), push, then reply naming what changed. For a thread:
     (`gh api repos/<owner>/<repo>/pulls/<n>/comments/<commentId>/replies -f body="…"`),
