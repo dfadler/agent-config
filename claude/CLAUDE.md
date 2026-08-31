@@ -356,6 +356,13 @@ confidently. This applies to any platform or tool, not just Claude/Anthropic.
   Inline/review comment:
   `gh api repos/<owner>/<repo>/pulls/<pr>/comments/<comment-id>/replies -f body="<reply>"`.
   General PR-level comment: `gh pr comment <pr> --body "<reply>"`.
+- **Any comment, reply, or review this agent posts on a GitHub PR or issue must be
+  clearly identified as AI-generated** — lead the body with an explicit marker (e.g.
+  `🤖 **Claude:**`) rather than letting it read as if a human wrote it. `pr-review-rubric`'s
+  `🤖 **Claude:**` / `## 🤖 Claude Auto-Review` markers already satisfy this for review
+  output; apply the same idea to a plain `pr-babysit` reply or a one-off `gh pr
+  comment`/`gh issue comment`. This is a transparency requirement, not a style choice —
+  don't drop the marker to keep a reply terse.
 - When `gh pr checks`/`gh run view --log-failed` (see above) doesn't explain a
   failure, escalate in this order before giving up: `gh api
   repos/<owner>/<repo>/actions/runs/<runId>/jobs` for per-step status/timing the
