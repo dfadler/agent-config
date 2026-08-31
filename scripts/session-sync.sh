@@ -69,6 +69,15 @@ if ! GIT_TERMINAL_PROMPT=0 GIT_SSH_COMMAND="ssh -o BatchMode=yes -o ConnectTimeo
   exit "$EXIT_OK"
 fi
 
+# Fetch is the one slow, network-bound step; re-check the checkout right
+# after it in case something else (a manual `git checkout`, a concurrent
+# invocation) changed it out from under us while we waited.
+if [[ -n "$(git status --porcelain 2>/dev/null)" ]] ||
+  [[ "$(git symbolic-ref --short HEAD 2>/dev/null)" != "main" ]]; then
+  echo "Skipping: checkout changed during fetch" >&2
+  exit "$EXIT_OK"
+fi
+
 local_sha="$(git rev-parse HEAD)"
 remote_sha="$(git rev-parse origin/main 2>/dev/null || true)"
 
