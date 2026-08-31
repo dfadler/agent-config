@@ -65,10 +65,13 @@ KCOV_EXCLUDE := /scripts/tests
 # sections into the typescript-conventions skill. 330 was that post-trim
 # measurement plus headroom for organic growth, not the exact count. #139
 # converged genuinely global git-workflow research (#83-85, tracked since
-# #81) back into this file, raising it to 385 lines; 400 is that measurement
-# plus the same style of headroom, not a new baseline to fill up to. Raising
-# it further takes a deliberate commit, the same as COVERAGE_MIN above.
-CLAUDE_MD_MAX_LINES := 400
+# #81) back into this file, raising it to 385 lines; 400 was that measurement
+# plus the same style of headroom. A worktree-cleanup bullet (kill
+# background processes before removing a worktree) landed separately and
+# pushed it to 412; 425 is that measurement plus the same headroom again,
+# not a new baseline to fill up to. Raising it further takes a deliberate
+# commit, the same as COVERAGE_MIN above.
+CLAUDE_MD_MAX_LINES := 425
 
 .PHONY: help check lint lint-sh lint-py lint-actions fmt fmt-py test test-sh test-py \
         structure typecheck venv coverage check-links
