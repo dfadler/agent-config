@@ -9,10 +9,13 @@ description: |
   equivalent `gh api` publish call, and whenever a skill (e.g. `pr-babysit`,
   `gh-attach-image`) is about to post on the user's behalf. The user should
   never discover AI-generated public content they did not explicitly approve
-  in the request that produced it.
+  in the request that produced it. Also covers `~/.claude/gh-publish-exceptions.json`,
+  the standing per-repo exception list a user can pre-authorize so Claude
+  skips asking in chat (the environment's own confirmation prompt still
+  fires either way).
 license: MIT
 metadata:
-  version: "1.0.0"
+  version: "1.1.0"
 ---
 
 # Explicit permission for publishing to GitHub
@@ -83,9 +86,56 @@ don't proceed and don't infer consent from something adjacent.
 2. If it does, proceed — and expect `.claude/settings.json`'s `ask` rule to
    still surface a confirmation prompt; that's the enforcement backstop, not
    a substitute for having asked.
-3. If it doesn't, stop and ask the user directly (`AskUserQuestion` or a
-   plain question) naming exactly what you're about to create/post and
+3. If it doesn't, check `~/.claude/gh-publish-exceptions.json` (see
+   Exceptions below) for a standing exception matching this action and repo.
+   If one matches, proceed without stopping to ask in chat — the
+   `.claude/settings.json` `ask` rule still surfaces its own confirmation
+   prompt regardless, so this only skips the conversational round-trip, not
+   the click-through.
+4. If neither applies, stop and ask the user directly (`AskUserQuestion` or
+   a plain question) naming exactly what you're about to create/post and
    where. Don't proceed on an assumption that the broader task implied it.
+
+## Exceptions
+
+A user can pre-authorize specific (action, repo) pairs so Claude doesn't
+have to interrupt the conversation to ask each time — without touching
+`.claude/settings.json`'s `ask` rules, which stay in force as the final
+human-in-the-loop confirmation no matter what this file contains (Claude
+Code's permission engine evaluates `deny`, then `ask`, then `allow` in that
+order, and a matching `ask` rule always wins regardless of how specific a
+competing `allow` rule is — so there is no config that makes the
+confirmation prompt itself disappear for a narrower case).
+
+**File**: `~/.claude/gh-publish-exceptions.json` — global (applies wherever
+this skill loads), personal to the machine, and never committed to any repo.
+
+**Format**:
+
+```json
+{
+  "exceptions": [
+    {
+      "actions": ["pr_comment", "pr_review"],
+      "repo": "owner/repo",
+      "note": "why this is pre-approved"
+    }
+  ]
+}
+```
+
+- `actions`: one or more of `issue_create`, `pr_create`, `issue_comment`,
+  `pr_comment`, `pr_review`, `issue_edit`, `pr_edit`.
+- `repo`: an exact `owner/repo` — no wildcards. An exception has to name the
+  repo it applies to; there's no "all repos" form.
+- `note`: required, short, states why — this is the audit trail for a rule
+  that lets Claude skip asking.
+
+**Only add or edit entries when the user explicitly asks you to** (e.g. "add
+an exception for PR comments on this repo"). Don't self-grant an exception
+as a side effect of some other task, and don't infer one from the user
+approving a single action — an exception is deliberately a standing rule,
+not something to create from a one-off "yes."
 
 ## Skills that publish as part of their normal flow
 
