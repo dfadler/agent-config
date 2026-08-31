@@ -59,7 +59,12 @@ if [[ "$branch" != "main" ]]; then
   exit "$EXIT_OK"
 fi
 
-if ! git fetch --quiet origin main 2>&1; then
+# GIT_TERMINAL_PROMPT=0 and BatchMode=yes stop git from blocking on an
+# interactive credential/host-key prompt (this runs unattended, from a
+# SessionStart hook); ConnectTimeout bounds a stalled connection instead of
+# leaving it to the hook's own outer timeout.
+if ! GIT_TERMINAL_PROMPT=0 GIT_SSH_COMMAND="ssh -o BatchMode=yes -o ConnectTimeout=10" \
+  git fetch --quiet origin main 2>&1; then
   echo "Skipping: git fetch failed" >&2
   exit "$EXIT_OK"
 fi
