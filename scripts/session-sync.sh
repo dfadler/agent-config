@@ -48,7 +48,16 @@ command -v git >/dev/null 2>&1 || {
   exit "$EXIT_DEPENDENCY"
 }
 
-if [[ -n "$(git status --porcelain 2>/dev/null)" ]]; then
+# A failed `git status --porcelain` (corrupted repo, permissions) also
+# prints nothing, which would otherwise read as "clean" and fail OPEN into
+# a merge. Capture the command's own exit status, not just its output, so
+# that failure instead fails closed (skip).
+working_tree_status=""
+if ! working_tree_status="$(git status --porcelain 2>/dev/null)"; then
+  echo "Skipping: git status failed" >&2
+  exit "$EXIT_OK"
+fi
+if [[ -n "$working_tree_status" ]]; then
   echo "Skipping: working tree has uncommitted changes"
   exit "$EXIT_OK"
 fi
@@ -61,10 +70,14 @@ fi
 
 # GIT_TERMINAL_PROMPT=0 and BatchMode=yes stop git from blocking on an
 # interactive credential/host-key prompt (this runs unattended, from a
-# SessionStart hook); ConnectTimeout bounds a stalled connection instead of
-# leaving it to the hook's own outer timeout.
-if ! GIT_TERMINAL_PROMPT=0 GIT_SSH_COMMAND="ssh -o BatchMode=yes -o ConnectTimeout=10" \
-  git fetch --quiet origin main 2>&1; then
+# SessionStart hook). ConnectTimeout bounds SSH connection setup;
+# ServerAlive* additionally detects a stall *after* connecting and drops
+# it. lowSpeedLimit/-Time is the HTTPS-remote equivalent (a no-op over
+# SSH) so a stalled transfer is bounded on either transport.
+if ! GIT_TERMINAL_PROMPT=0 \
+  GIT_SSH_COMMAND="ssh -o BatchMode=yes -o ConnectTimeout=10 -o ServerAliveInterval=5 -o ServerAliveCountMax=3" \
+  git -c http.lowSpeedLimit=1000 -c http.lowSpeedTime=15 \
+  fetch --quiet origin main 2>&1; then
   echo "Skipping: git fetch failed" >&2
   exit "$EXIT_OK"
 fi
@@ -72,7 +85,11 @@ fi
 # Fetch is the one slow, network-bound step; re-check the checkout right
 # after it in case something else (a manual `git checkout`, a concurrent
 # invocation) changed it out from under us while we waited.
-if [[ -n "$(git status --porcelain 2>/dev/null)" ]] ||
+if ! working_tree_status="$(git status --porcelain 2>/dev/null)"; then
+  echo "Skipping: git status failed after fetch" >&2
+  exit "$EXIT_OK"
+fi
+if [[ -n "$working_tree_status" ]] ||
   [[ "$(git symbolic-ref --short HEAD 2>/dev/null)" != "main" ]]; then
   echo "Skipping: checkout changed during fetch" >&2
   exit "$EXIT_OK"
