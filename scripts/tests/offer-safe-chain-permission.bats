@@ -92,6 +92,23 @@ run_offer() {
   assert_output_contains "is it valid JSON"
 }
 
+@test "reports and fails cleanly when replacing settings.json fails" {
+  local failbin="$BATS_TEST_TMPDIR/failing-mv-bin"
+  mkdir -p "$failbin"
+  cat > "$failbin/mv" <<'EOF'
+#!/usr/bin/env bash
+echo "stub mv: simulated failure" >&2
+exit 1
+EOF
+  chmod +x "$failbin/mv"
+  PATH="$failbin:$PATH" run_offer --yes
+  assert_failure
+  assert_output_contains "Failed to replace"
+  # The rule was never actually committed — the placeholder from before the
+  # failed mv is still what's on disk, not a false "added" report.
+  [ "$(cat "$SETTINGS")" = "{}" ]
+}
+
 @test "-h prints usage and exits 0" {
   run bash "$REPO_ROOT/scripts/offer-safe-chain-permission.sh" -h
   assert_success
