@@ -383,3 +383,14 @@ link "$PLUGIN_SRC" "$PLUGIN_LINK"
 check_git_identity
 check_python_deps
 check_mattpocock_skills
+
+# Also last, and independent of everything above: offers (opt-in, y/n) to
+# pre-approve Aikido Safe Chain's pinned installer command in Claude Code's
+# permission settings. See scripts/offer-safe-chain-permission.sh for why —
+# it decides on its own whether it's safe to prompt (skips cleanly under CI
+# or a non-interactive run). Unlike the checks above, it can genuinely fail
+# (missing jq, a corrupt settings.json) rather than always reporting 0, so
+# `|| true` is what keeps it advisory here — under this script's `set -e`,
+# an unguarded failure on this final line would otherwise abort the whole
+# run despite the linking work above having already succeeded.
+"$REPO_ROOT/scripts/offer-safe-chain-permission.sh" || true
