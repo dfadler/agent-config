@@ -388,5 +388,9 @@ check_mattpocock_skills
 # pre-approve Aikido Safe Chain's pinned installer command in Claude Code's
 # permission settings. See scripts/offer-safe-chain-permission.sh for why —
 # it decides on its own whether it's safe to prompt (skips cleanly under CI
-# or a non-interactive run) and never fails setup.sh's overall exit status.
-"$REPO_ROOT/scripts/offer-safe-chain-permission.sh"
+# or a non-interactive run). Unlike the checks above, it can genuinely fail
+# (missing jq, a corrupt settings.json) rather than always reporting 0, so
+# `|| true` is what keeps it advisory here — under this script's `set -e`,
+# an unguarded failure on this final line would otherwise abort the whole
+# run despite the linking work above having already succeeded.
+"$REPO_ROOT/scripts/offer-safe-chain-permission.sh" || true

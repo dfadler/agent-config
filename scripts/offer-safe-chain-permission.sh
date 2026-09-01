@@ -89,7 +89,11 @@ add_rule() {
     rm -f "$tmp"
     return 1
   fi
-  mv "$tmp" "$SETTINGS_FILE"
+  if ! mv "$tmp" "$SETTINGS_FILE"; then
+    echo "Failed to replace $SETTINGS_FILE" >&2
+    rm -f "$tmp"
+    return 1
+  fi
   echo "✓ Added Aikido Safe Chain installer to $SETTINGS_FILE"
 }
 

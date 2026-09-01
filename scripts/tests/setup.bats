@@ -552,6 +552,35 @@ run_setup_with() {
   [ "$(readlink "$HOME/.claude/CLAUDE.md")" = "$FAKE_REPO/claude/CLAUDE.md" ]
 }
 
+# --- Aikido Safe Chain permission offer (advisory) --------------------------
+#
+# offer-safe-chain-permission.sh has its own bats suite; these tests just pin
+# that setup.sh calls it as the final step and, unlike the checks above,
+# treats its failure as advisory via `|| true` rather than letting it end the
+# run — that script can genuinely return nonzero (missing jq, a corrupt
+# settings.json), unlike check_git_identity/check_python_deps/
+# check_mattpocock_skills, which always report 0 themselves.
+
+@test "runs the Aikido Safe Chain offer as the final step" {
+  run_setup
+  assert_success
+  assert_output_contains "Skipping Aikido Safe Chain permission prompt"
+  [ "$(readlink "$HOME/.claude/CLAUDE.md")" = "$FAKE_REPO/claude/CLAUDE.md" ]
+}
+
+@test "a failing Aikido Safe Chain offer does not fail setup.sh" {
+  cat > "$FAKE_REPO/scripts/offer-safe-chain-permission.sh" <<'EOF'
+#!/usr/bin/env bash
+echo "stub offer script: simulated failure" >&2
+exit 1
+EOF
+  chmod +x "$FAKE_REPO/scripts/offer-safe-chain-permission.sh"
+  run_setup
+  assert_success
+  assert_output_contains "stub offer script: simulated failure"
+  [ "$(readlink "$HOME/.claude/CLAUDE.md")" = "$FAKE_REPO/claude/CLAUDE.md" ]
+}
+
 @test "--help prints usage and links nothing" {
   run_setup_with --help
   assert_success
