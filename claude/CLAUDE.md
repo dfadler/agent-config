@@ -410,3 +410,46 @@ confidently. This applies to any platform or tool, not just Claude/Anthropic.
   anything under `.github/workflows/`, read `docs/github-actions.md` — SHA-pinning,
   composite-action-vs-reusable-workflow judgment calls, the debugging escalation
   order, and known failure patterns already hit and resolved here.
+
+### Opening and maintaining a PR
+
+- Size a PR by whether it would be mergeable and valuable standing alone, not by
+  line count. Split when a piece is independently useful on its own; keep pieces
+  together when they only make sense as one concern.
+- When two or more PRs are in flight and their merge order matters, add a
+  `## Sequencing` section to the PR body: name every related PR, state what
+  happens under each possible merge order, and say explicitly what gets closed
+  or superseded rather than leaving it to be inferred from the diff.
+- Merge via ordinary merge commits, not squash — keep review-iteration commits
+  as permanent, individually-referenceable history rather than collapsing them.
+
+### Responding to and resolving review comments
+
+Treat CI passing, not an approving human review, as the actual merge gate —
+don't wait on or expect an approval that isn't part of how this repo works.
+
+Sort each finding into one of four outcomes, not a binary fixed-or-pushback:
+
+- **Fixed** — reply with the commit SHA: `Fixed in <sha>: <what changed and
+  why>`. Never "done" alone; the SHA is what makes the reply verifiable later.
+- **Refuted** — reproduce the claim against the real, current system and post
+  the command and its output, not just prose disagreement.
+- **Confirmed real but deferred** — say so explicitly, with the reason, instead
+  of silently dropping it. Don't auto-close a tracking issue while a deferred
+  finding is open on it — leave that decision to a human.
+- **Judged not real** — state what was checked and that nothing matched.
+
+Handling an automated reviewer:
+
+- If it re-litigates a refuted finding, give it one more round of fresh
+  evidence rather than repeating the same reply — the first repro may not be
+  the last word it accepts.
+- Never treat its own claimed "resolved" or "couldn't resolve" text in a
+  comment body as ground truth. Verify or drive resolution via the actual
+  API/mutation instead.
+
+Out-of-scope findings become a new issue, not scope creep on the current PR —
+whether the trigger is a human comment or a bot finding outside the diff
+range. Carry over a synthesis (not a comment dump), a link back to the source,
+the one-line reason it's out of scope, and a concrete acceptance bar where one
+exists.
