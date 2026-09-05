@@ -18,7 +18,7 @@ jobs:
     permissions:
       contents: read
       issues: write
-      pull-requests: read
+      pull-requests: write
     steps:
       - uses: dfadler/issue-bot@e66038db719cdb9b17f12e6918c5beb239c3abf8 # v1.1.0
         with:
