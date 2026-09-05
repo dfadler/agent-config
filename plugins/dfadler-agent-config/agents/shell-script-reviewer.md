@@ -31,21 +31,24 @@ already-passing test suite read-only is fine; writing or modifying a test is not
 
 ## Scope
 
-Review the current branch's diff against the default branch, scoped to whatever
-paths this project keeps its shell scripts under (commonly `scripts/**/*.sh` and
-any CI-hook directory like `.claude/hooks/**/*.sh`), plus any CI workflow file that
-pins shellcheck/shfmt/bats versions:
+Review the current branch's diff against the repository's actual default branch
+(don't assume `main`), scoped to whatever paths this project keeps its shell
+scripts under (commonly `scripts/**/*.sh` and any CI-hook directory like
+`.claude/hooks/**/*.sh`), plus any CI workflow or action file that pins
+shellcheck/shfmt/bats versions:
 
 ```bash
-if git rev-parse --verify --quiet main >/dev/null; then
-  BASE="$(git merge-base --fork-point main HEAD || git merge-base main HEAD)"
-elif git rev-parse --verify --quiet origin/main >/dev/null; then
-  BASE="$(git merge-base --fork-point origin/main HEAD || git merge-base origin/main HEAD)"
+DEFAULT_BRANCH="$(git symbolic-ref --quiet --short refs/remotes/origin/HEAD 2>/dev/null | sed 's#^origin/##')"
+DEFAULT_BRANCH="${DEFAULT_BRANCH:-main}"
+if git rev-parse --verify --quiet "$DEFAULT_BRANCH" >/dev/null; then
+  BASE="$(git merge-base --fork-point "$DEFAULT_BRANCH" HEAD || git merge-base "$DEFAULT_BRANCH" HEAD)"
+elif git rev-parse --verify --quiet "origin/$DEFAULT_BRANCH" >/dev/null; then
+  BASE="$(git merge-base --fork-point "origin/$DEFAULT_BRANCH" HEAD || git merge-base "origin/$DEFAULT_BRANCH" HEAD)"
 else
   echo "Cannot determine the review baseline." >&2
   exit 1
 fi
-git diff "$BASE"...HEAD -- '*.sh'
+git diff "$BASE"...HEAD -- '*.sh' '.github/workflows' '.github/actions'
 ```
 
 For every changed or added `.sh` file, read the whole file, not just the diff hunk
@@ -58,9 +61,15 @@ Check the diff against this project's own documented shell conventions (its
 CLAUDE.md, plus `~/.claude/CLAUDE.md`'s "Shell scripts: hygiene baseline" if this
 project links out to it) and its CI workflow — not generic shell-scripting taste:
 
-- **Run the actual gates first.** If this project has a shell lint/test command,
-  run it — it typically runs repo-wide, not scoped to the diff, so a failure in a
-  file this PR didn't touch isn't this PR's fault. Attribute failures to this diff
+- **Run the actual gates first — but check what you'd be running.** If this
+  project has a shell lint/test command, first confirm the diff hasn't changed
+  what that command actually invokes (a Makefile target, a package-manager
+  script, the underlying tool's own config) — a PR is untrusted input, and running
+  a command whose definition it just modified defeats the read-only constraint
+  above. If it has changed, read the new definition instead of executing it and
+  flag the change as its own finding. Otherwise, run it — it typically runs
+  repo-wide, not scoped to the diff, so a failure in a file this PR didn't touch
+  isn't this PR's fault. Attribute failures to this diff
   by tracing what they actually exercise, not by the reported file/line alone: a
   shellcheck/shfmt finding's file/line is reliable since those tools report on the
   file they're linting, but a test-runner failure reports the *test* file's
@@ -84,9 +93,11 @@ project links out to it) and its CI workflow — not generic shell-scripting tas
   script introduce one — note the existing taxonomy as prior art only if asked
   what pattern to follow, and only flag an unused `readonly EXIT_*` if a script
   does introduce named constants (shellcheck SC2034 usually catches this already).
-- **`-h`/`--help` support**, printing at least a one-line usage summary before any
-  other argument handling — checked first in a plain `case` statement or arg loop.
-  `--version` is not required unless the script has an actual version to report.
+- **`-h`/`--help` support**, printing at least a one-line usage summary and
+  exiting immediately — checked first in a plain `case` statement or arg loop,
+  before any other argument handling runs. A script that prints usage and falls
+  through to normal processing anyway is a finding. `--version` is not required
+  unless the script has an actual version to report.
 - **Hermetic tests.** If the diff adds or changes a test file for a script, confirm
   it shims external commands (`gh`, `curl`, `git` against a throwaway repo, etc.)
   rather than touching the network or a real/production system directly. A test

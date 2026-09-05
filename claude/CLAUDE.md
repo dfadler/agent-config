@@ -81,9 +81,10 @@ background or parallel tasks. Never commit directly to the main working copy.
   tool returns, or `$!`) over killing by port or name — two worktrees can each think
   of "the" dev server on a shared port as theirs without being the same process. No
   PID captured? Verify first — `lsof -i :<port>` before killing, never `lsof -ti`
-  piped straight into `xargs kill` — and match a headless browser by its `--headless`
-  flag (stable even when `--user-data-dir` changes the profile path), never by a
-  generic process-name pattern that could also match the user's real browser.
+  piped straight into `xargs kill`. `--headless` narrows a browser match but isn't
+  unique to a worktree; confirm a session-specific marker (working directory, launch
+  command, `--user-data-dir`) before killing, and skip an ambiguous match — a broad
+  `pkill` on a generic pattern can hit the user's real browser too.
 - **Name the branch `issue-<N>-<slug>` when a GitHub issue drives the work, or a bare
   `<slug>` otherwise, by passing it as `EnterWorktree`'s `name` argument** — an
   explicit `name` is used as given; the `worktree-`/`worktree-agent-<hash>` shape is
