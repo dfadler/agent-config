@@ -316,6 +316,8 @@ from PIL import Image, ImageChops
 img = Image.open(path_in).convert("RGB")
 bg = Image.new("RGB", img.size, (255, 255, 255))
 bbox = ImageChops.difference(img, bg).getbbox()
+if bbox is None:
+    raise ValueError("No non-background content found")
 pad = 20
 img.crop((max(0, bbox[0]-pad), max(0, bbox[1]-pad), min(img.width, bbox[2]+pad), min(img.height, bbox[3]+pad))).save(path_out)
 ```
