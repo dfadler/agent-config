@@ -24,16 +24,12 @@ background or parallel tasks. Never commit directly to the main working copy.
 - **A subagent whose cwd was pinned at launch can't call `EnterWorktree` itself** —
   creating a worktree from inside one would mutate the parent session's process-wide
   working directory, and switching to an *existing* worktree by path fails too unless
-  the subagent's own cwd already happens to be inside a worktree. Reproduced directly:
-  `EnterWorktree cannot create a worktree from a subagent with a cwd override
-  (isolation: "worktree" or explicit cwd) — it would mutate the parent session's
-  process-wide working directory. To work in a different directory (including a
-  worktree), spawn an Agent with cwd set to it.` So decide isolation at spawn time,
-  not mid-task: pass `isolation: "worktree"` on the `Agent`-tool call (or the
-  equivalent field in a persistent custom subagent's frontmatter) rather than having
-  the subagent call `EnterWorktree` itself once it's already running — that's exactly
-  the gap that pushes a subagent toward the raw-`git worktree add` fallback the bullet
-  above warns against.
+  the subagent's own cwd already happens to be inside a worktree. So decide isolation
+  at spawn time, not mid-task: pass `isolation: "worktree"` on the `Agent`-tool call
+  (or the equivalent field in a persistent custom subagent's frontmatter) rather than
+  having the subagent call `EnterWorktree` itself once it's already running — that's
+  exactly the gap that pushes a subagent toward the raw-`git worktree add` fallback
+  the bullet above warns against.
 - **Glance at `git worktree list` periodically.** A worktree created via that raw-git
   fallback — including one a subagent was forced into before the point above applied —
   sits outside `EnterWorktree`'s bookkeeping, so it also sits outside Claude Code's
@@ -67,58 +63,44 @@ background or parallel tasks. Never commit directly to the main working copy.
   script's test counts too). The first PR to actually execute that file under
   coverage makes every line in it visible for the first time; if that new execution
   only exercises part of the file, the rest now drags the aggregate percentage down,
-  and the floor can fail even though coverage strictly improved.
-  Real example: dfadler/agent-config#106 added 3 tests for a new branch in
-  `upload.sh`, a script the kcov gate had never measured before — that made the
-  script's untested `--pr`/`--issue`/`--comment`/validation paths visible for the
-  first time, dropping aggregate shell coverage from 70.24% to 56.90% and failing the
-  70% floor. The fix is to finish covering the newly-visible file, not to lower the
-  threshold.
+  and the floor can fail even though coverage strictly improved (dfadler/agent-config#106
+  is a real instance). The fix is to finish covering the newly-visible file, not to
+  lower the threshold.
 - **Squash merges mean a merged branch's commits aren't reachable by SHA on the local
   default branch** — cleanup tooling that checks reachability may warn a branch is
   "unmerged" when it's actually merged. Verify against the PR itself (state: merged),
   not a local branch-reachability check.
 - **Kill worktree-scoped background processes before removing the worktree.** A dev/
-  preview server or headless browser instance started against files inside a worktree
-  keeps running after the worktree directory (or branch) is deleted — nothing ties its
-  lifetime to the worktree's. This is easy to miss because such a server is often
-  started manually in the first place: `preview_start`/`.claude/launch.json` resolves
-  against the *original* repo root regardless of where `EnterWorktree` switched the
-  session's cwd, so a worktree-scoped preview is typically a plain `Bash`
-  `run_in_background` process launched by hand that nothing else tracks. Before
-  calling `ExitWorktree` (or otherwise abandoning the worktree), check for and stop
-  anything spawned against it — `lsof -i :<port>`, or the PID captured at launch — an
-  orphaned server left listening is wasted resources at best and stale/misleading
-  content at worst.
+  preview server or headless browser instance started against worktree files keeps
+  running after the worktree is deleted — nothing ties its lifetime to the
+  worktree's, and `preview_start`/`.claude/launch.json` resolves against the
+  *original* repo root regardless of `EnterWorktree`'s cwd switch, so such a preview
+  is typically a plain `Bash` `run_in_background` process nothing else tracks. Before
+  `ExitWorktree` (or otherwise abandoning the worktree), check for and stop anything
+  spawned against it — `lsof -i :<port>`, or the PID captured at launch.
 - **Name the branch `issue-<N>-<slug>` when a GitHub issue drives the work, or a bare
   `<slug>` otherwise, by passing it as `EnterWorktree`'s `name` argument** — an
   explicit `name` is used as given; the `worktree-`/`worktree-agent-<hash>` shape is
-  only what the tool generates when `name` is omitted. `issue-<N>-<slug>` is the
-  pattern the most recent PR batch already converged on organically; codify it
-  rather than inventing a new one. Not adopting a Conventional-Branch
-  `type/description` prefix — redundant with this repo's Conventional-Commit
-  messages, a considered non-adoption rather than an oversight. Guidance, not
-  enforcement, for now; if that changes, this repo's GitHub rulesets on `main`
-  already support a native `branch_name_pattern` rule. Exclude `dependabot/*`. No
-  retroactive renaming.
+  only what the tool generates when `name` is omitted. Not adopting a
+  Conventional-Branch `type/description` prefix (redundant with this repo's
+  Conventional-Commit messages). Guidance, not enforcement, for now. Exclude
+  `dependabot/*`. No retroactive renaming.
 - **Once a branch has an open PR, catch it up to a moved `main` via merge, not
   rebase** — every merge in this repo's history already is one. Rewriting a branch
   under active review invalidates the PR's diff view and detaches anchored review
   comments (the golden-rule-of-rebasing reasoning). Rebase freely before a PR exists.
 - **Before trusting a resolved conflict, or a PR claiming to carry a commit range
   forward intact, diff the result against the side it's supposed to match and name
-  every surviving delta.** Commit `e5d2428` did exactly this — diffed a merged tree
-  against `origin/main` and named the two deltas that legitimately survived, rather
-  than trusting a read-through. The same check (`git diff <split-branch>
-  <source-branch> -- <paths>`, empty = safe) catches a dropped commit when splitting.
+  every surviving delta** (`git diff <split-branch> <source-branch> -- <paths>`,
+  empty = safe) rather than trusting a read-through — this also catches a dropped
+  commit when splitting.
 
-Several of the bullets above describe first-class, versioned tool behavior — isolation
-enforcement, automatic locking, the sweep and its documented exceptions — rather than
-conventions this repo invented. See the
-[official Claude Code worktrees docs](https://code.claude.com/docs/en/worktrees) for
-what the tool itself guarantees: that page carries roughly a dozen "Before v2.1.x"
-behavior-change notes across patches 2.1.198–2.1.247 alone, so treat this section as a
-convention layer on top of a target that keeps moving, not a snapshot of it.
+Several of the bullets above describe first-class, versioned tool behavior (isolation
+enforcement, automatic locking, the sweep and its documented exceptions) rather than
+conventions this repo invented — see the
+[official Claude Code worktrees docs](https://code.claude.com/docs/en/worktrees),
+which log roughly a dozen behavior changes across recent patches, so treat this
+section as a convention layer over a moving target, not a snapshot of it.
 
 ### Conflict resolution: when to escalate
 
@@ -149,15 +131,10 @@ conflict lands in.
   the base PR's branch changes underneath it, catch the dependent branch up by
   merging the base branch in, the same as the merge-not-rebase rule above (never
   `git rebase --onto` a dependent branch that already has its own open PR).
-- **Not adopting Graphite, `ghstack`, git-branchless, Sapling, or `jj`** — no PR here
-  has ever used branch-level stacking, and this repo's one splitting incident (below)
-  was a process gap, not a tooling one. Revisit only if concurrent-stack usage starts.
 - **When mechanically splitting an already-written diff, re-verify the claimed range
   against the source branch's live tip before opening the PR, and never cherry-pick
-  from a locked worktree** — a lock means "still changing," not "safe to snapshot."
-  `#51 → #65 → #67 → #68 → #69`: #65 cherry-picked from a locked branch at a
-  remembered SHA, missed a security fix landed afterward, and briefly shipped a known
-  leak to `main` before #67/#68 caught up; #69 abandoned the split entirely. Use the
+  from a locked worktree** — a lock means "still changing," not "safe to snapshot"
+  (dfadler/agent-config#65 shipped a known leak this way). Use the
   diff-against-claimed-source check above to confirm a claimed range landed intact.
 
 ## Visual verification on PRs/issues that change rendered output
@@ -168,21 +145,11 @@ Do this proactively, without waiting to be asked — treat it as part of finishi
 
 ### How
 
-1. Render the same input on the base branch ("before") and the change branch ("after"). Reuse whatever the project's own rendering path is (its actual render function/build step/dev server) rather than reimplementing rendering logic — the goal is to prove what a real user would actually see.
-2. Convert to PNG if the native output isn't already a raster image (e.g. `qlmanage -t -s 1000 -o <dir> <file.svg>` on macOS is a fast, dependency-free way to rasterize SVG/HTML).
-3. Crop to content before uploading. A raw screenshot/thumbnail — especially `qlmanage`, which pads to a square canvas — is often mostly whitespace around a small diagram, and posting it as-is produces a before/after that's technically correct but too small to actually read once GitHub scales it to fit a PR description. Auto-crop to the non-background bounding box with a small margin rather than guessing crop coordinates by hand (hand-guessed offsets from the SVG's own viewBox math are unreliable, since the thumbnailer's own padding/centering behavior isn't part of that math):
-   ```python
-   from PIL import Image, ImageChops
-   img = Image.open(path_in).convert("RGB")
-   bg = Image.new("RGB", img.size, (255, 255, 255))
-   bbox = ImageChops.difference(img, bg).getbbox()
-   pad = 20
-   img.crop((max(0, bbox[0]-pad), max(0, bbox[1]-pad), min(img.width, bbox[2]+pad), min(img.height, bbox[3]+pad))).save(path_out)
-   ```
-   Look at the actual cropped result before uploading — don't assume the crop worked.
-4. Upload both images and embed them via the `dfadler-agent-config:gh-attach-image` skill (`~/.claude/skills/dfadler-agent-config/skills/gh-attach-image/`) — never commit screenshots to the repo and never use a Gist for this; the skill uses GitHub's own attachment upload endpoint, which needs neither.
-5. Add a "Visual verification" section to the PR/issue body with a two-column before/after markdown table, plus a one-line caption saying what to look for.
-6. Verify the images actually resolve after saving the body (`curl -sI -L <url>` should return 200, not 404 — see the skill for why a fresh upload 404s until claimed).
+1. Render the same input on the base branch ("before") and the change branch ("after"), reusing the project's own rendering path (its actual render function/build step/dev server) rather than reimplementing rendering logic — the goal is to prove what a real user would actually see.
+2. Convert to PNG if the native output isn't already raster (e.g. `qlmanage -t -s 1000 -o <dir> <file.svg>` on macOS). For a rendered diagram/SVG specifically (not a full-page UI/document screenshot, which should keep its original bounds), auto-crop to the non-background bounding box before uploading — a raw thumbnail (especially `qlmanage`, which pads to a square) is often mostly whitespace and unreadable once GitHub scales it down. See `dfadler-agent-config:pr-visual-capture`'s "Cropping to content" section for the crop script; look at the cropped result before uploading, don't assume it worked.
+3. Upload both images and embed them via the `dfadler-agent-config:gh-attach-image` skill — never commit screenshots to the repo and never use a Gist for this.
+4. Add a "Visual verification" section to the PR/issue body: a two-column before/after markdown table plus a one-line caption of what to look for.
+5. Verify the images actually resolve after saving the body (`curl -sI -L <url>` should return 200, not 404 — see the skill for why a fresh upload 404s until claimed).
 
 ### Getting an honest before/after, not a false negative
 
@@ -406,10 +373,6 @@ confidently. This applies to any platform or tool, not just Claude/Anthropic.
   feature genuinely needs its own PR template, use an opt-in file under
   `.github/PULL_REQUEST_TEMPLATE/<feature>.md` (or have tooling append content only
   for those PRs) — never grow the generic template with feature-specific sections.
-- In the `agent-config` repo specifically: before writing, changing, or debugging
-  anything under `.github/workflows/`, read `docs/github-actions.md` — SHA-pinning,
-  composite-action-vs-reusable-workflow judgment calls, the debugging escalation
-  order, and known failure patterns already hit and resolved here.
 
 ### Opening and maintaining a PR
 

@@ -304,7 +304,23 @@ behavior).
 ## Cropping to content (diagrams/SVGs specifically)
 
 For a rendered diagram/SVG (not a full-page screenshot), auto-crop to the
-non-background bounding box rather than guessing coordinates — see the
-global CLAUDE.md "Visual verification on PRs/issues that change rendered
-output" section for the Pillow bounding-box snippet. Look at the actual
-cropped result before uploading; don't assume it worked.
+non-background bounding box with a small margin rather than guessing crop
+coordinates by hand — hand-guessed offsets from the SVG's own viewBox math
+are unreliable, since a thumbnailer's own padding/centering behavior isn't
+part of that math. This matters most for `qlmanage -t`, which pads its
+thumbnail to a square canvas, often leaving a small diagram mostly
+whitespace and unreadable once GitHub scales it down:
+
+```python
+from PIL import Image, ImageChops
+img = Image.open(path_in).convert("RGB")
+bg = Image.new("RGB", img.size, (255, 255, 255))
+bbox = ImageChops.difference(img, bg).getbbox()
+if bbox is None:
+    raise ValueError("No non-background content found")
+pad = 20
+img.crop((max(0, bbox[0]-pad), max(0, bbox[1]-pad), min(img.width, bbox[2]+pad), min(img.height, bbox[3]+pad))).save(path_out)
+```
+
+Look at the actual cropped result before uploading — don't assume the crop
+worked.
