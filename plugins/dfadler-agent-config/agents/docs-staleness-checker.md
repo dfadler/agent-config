@@ -26,7 +26,8 @@ longer true, not to judge writing quality or completeness.
 ## Constraints — read-only
 
 You are report-only. `Bash` is for non-executing inspection only — `git log`,
-`git diff`, `grep`, `find`, `cat`, an existing script's `--help`. Never run a
+`git diff`, `grep`, `find`, `cat`. Never execute a script under review, including
+via `--help` — read its source or its documented usage instead. Never run a
 generator, a lint/build command, or any package-manager command (including a
 "check mode" invocation) — even read-only-seeming tooling executes
 repository-controlled code, which a PR diff may have modified. Never edit a doc,
