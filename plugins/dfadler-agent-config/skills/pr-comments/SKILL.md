@@ -15,7 +15,7 @@ description: |
   only `gh`; no snapshot script, no other skill, required.
 license: MIT
 metadata:
-  version: "1.3.0"
+  version: "1.4.0"
 ---
 
 # PR comment review and response
@@ -217,12 +217,21 @@ the two can share this skill's logic:
 Two array-level flags travel alongside these, not inside any one entry:
 `threadsTruncated` (more unresolved threads exist than were listed) and
 `generalCommentsTruncated` (more general comments exist than were listed).
-Treat either as true as "the queue below is incomplete" — say so in the
-report rather than acting as if you saw everything.
+Treat either as true as "the queue below is incomplete" — not just worth a
+report footnote, but a reason to not publish anything for this PR at all
+this pass (see "Skip rule").
 
 ## Skip rule
 
-Drop from the work queue, before classifying anything:
+**First, before classifying or publishing anything for this PR**: if either
+`threadsTruncated` or `generalCommentsTruncated` is true, stop — the queue
+itself may be missing entries you never saw, so even a thread or comment
+that looks complete in what you did fetch could be superseded by one
+outside the fetched page. Escalate the whole pass for this PR (report it as
+incomplete, same as `pr-babysit`'s `ready-to-merge` routing to `escalate`
+under the same condition) rather than replying to or resolving anything.
+Only once both flags are false does the rest of this section apply, entry
+by entry:
 
 - Any thread or general comment with `needsAction: false` — its latest entry
   is already the acting user's own reply, so re-processing it every run would
