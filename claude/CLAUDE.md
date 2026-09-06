@@ -77,7 +77,14 @@ background or parallel tasks. Never commit directly to the main working copy.
   *original* repo root regardless of `EnterWorktree`'s cwd switch, so such a preview
   is typically a plain `Bash` `run_in_background` process nothing else tracks. Before
   `ExitWorktree` (or otherwise abandoning the worktree), check for and stop anything
-  spawned against it — `lsof -i :<port>`, or the PID captured at launch.
+  spawned against it. Prefer the PID captured at launch (the background-task PID a
+  tool returns, or `$!`) over killing by port or name — two worktrees can each think
+  of "the" dev server on a shared port as theirs without being the same process. No
+  PID captured? Verify first — `lsof -i :<port>` before killing, never `lsof -ti`
+  piped straight into `xargs kill`. `--headless` narrows a browser match but isn't
+  unique to a worktree; confirm a session-specific marker (working directory, launch
+  command, `--user-data-dir`) before killing, and skip an ambiguous match — a broad
+  `pkill` on a generic pattern can hit the user's real browser too.
 - **Name the branch `issue-<N>-<slug>` when a GitHub issue drives the work, or a bare
   `<slug>` otherwise, by passing it as `EnterWorktree`'s `name` argument** — an
   explicit `name` is used as given; the `worktree-`/`worktree-agent-<hash>` shape is
