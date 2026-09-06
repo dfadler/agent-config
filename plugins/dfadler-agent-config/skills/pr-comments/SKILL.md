@@ -15,7 +15,7 @@ description: |
   only `gh`; no snapshot script, no other skill, required.
 license: MIT
 metadata:
-  version: "1.1.0"
+  version: "1.2.0"
 ---
 
 # PR comment review and response
@@ -29,7 +29,16 @@ depend on it or get invoked by it.
 
 Parse `$ARGUMENTS` first:
 
-- A PR number or URL — required, one PR only.
+- A PR number or URL — required, one PR only. **Normalize before any API
+  call**: a bare number (`482`) targets the current checkout's repo, so
+  resolve `owner`/`repo` from that checkout (Step 1). A full URL
+  (`https://github.com/<owner>/<repo>/pull/<n>`) carries its own
+  `owner`/`repo`/`number` — use those instead of the current checkout's,
+  since a URL naming a different repository means that repository, not this
+  one. Either way, every GraphQL `$pr: Int!` variable and every REST
+  `.../pulls/<n>/...` path below uses only the extracted numeric `number` —
+  never the raw `$ARGUMENTS` string, which GraphQL's `Int!` type can't
+  accept and a REST path can't resolve.
 - Optionally, pre-fetched thread/comment data already shaped like the
   contract in "Data shape" below. If it's present, skip Step 1 and classify
   it directly — this is what lets `pr-babysit` (or anything else holding a
@@ -69,12 +78,18 @@ posted it or how authoritative it sounds:
 
 ## Step 1 — gather (only when no pre-fetched data was given)
 
-Resolve the repo and the acting user once:
+Resolve `owner`, `repo`, and the numeric `number` once, then the acting user:
 
 ```bash
-gh repo view --json nameWithOwner --jq .nameWithOwner
+# only when $ARGUMENTS was a bare number, not a URL — a URL already carries
+# its own owner/repo/number, extracted directly from the URL's path:
+gh repo view --json owner,name --jq '.owner.login + "/" + .name'
 gh api user --jq .login
 ```
+
+Never fall back to the current checkout's repo when `$ARGUMENTS` was a URL —
+resolve `owner`/`repo` from the URL itself even if it differs from the
+checkout.
 
 **Unresolved inline review threads.** The REST comments API
 (`gh api repos/<owner>/<repo>/pulls/<n>/comments`) has no resolved/unresolved
@@ -95,6 +110,7 @@ gh api graphql -f query='
             path
             line
             comments(first: 50) {
+              pageInfo { hasNextPage endCursor }
               nodes { databaseId author { login } body url createdAt }
             }
           }
@@ -104,11 +120,16 @@ gh api graphql -f query='
   }' -f owner=<owner> -f repo=<repo> -F pr=<n>
 ```
 
-Keep only `isResolved: false` threads. If a thread's `comments` page also has
-`hasNextPage: true`, mark that thread `truncated: true` rather than silently
-dropping the tail. If the outer `reviewThreads` page has more pages, fetch
-them (follow `endCursor`) rather than reporting partial results as complete;
-if you stop early anyway, set `threadsTruncated: true`.
+Keep only `isResolved: false` threads. If the outer `reviewThreads` page has
+more pages (`pageInfo.hasNextPage`), fetch them (follow `endCursor`) rather
+than reporting partial results as complete; if you stop early anyway, set
+`threadsTruncated: true`. Independently, check each thread's own
+`comments.pageInfo.hasNextPage` — a thread with more than 50 comments is
+rare, but when it happens, re-query just that thread's `comments` connection
+with its `endCursor` rather than silently dropping the tail; if you don't,
+mark that thread `truncated: true` (this is the flag "Data shape" below
+documents — it only means something once the query above actually requests
+`pageInfo`).
 
 **Top-level PR comments**, including a review's own submission body when it
 carried no inline comments (an Approve/Request Changes/Comment review with
@@ -117,17 +138,37 @@ since it only shows conversation-timeline comments):
 
 ```bash
 gh pr view <n> --json comments --jq '.comments[] | {id,author:.author.login,body,url,createdAt}'
-gh api repos/<owner>/<repo>/pulls/<n>/reviews --jq '.[] | select(.body != "") | {id,author:.user.login,body,submitted_at,html_url}'
+gh api --paginate repos/<owner>/<repo>/pulls/<n>/reviews --jq '.[] | select(.body != "") | {id,author:.user.login,body,submitted_at,html_url}'
 ```
 
-If either call is paginated and you don't fetch every page, set
+`gh pr view --json comments` already returns the full conversation (GraphQL
+under the hood, no page cap to worry about); the REST reviews endpoint does
+paginate by default, so `--paginate` above isn't optional — without it, a PR
+with more than one page of reviews silently drops the older ones. If you
+still can't confirm every page was fetched, set
 `generalCommentsTruncated: true` — same reasoning as `threadsTruncated`: a
 partial fetch that looks complete is worse than one that admits it isn't.
 
-For every thread and every general comment, compute `needsAction`: `false`
-when the latest entry's author is the acting user's own login (awaiting the
-other side's response), `true` otherwise. This is the only thing that
-decides what's in scope for Step 2 — see "Skip rule" below.
+For every **thread**, compute `needsAction`: `false` when the thread's own
+latest comment is authored by the acting user's own login (awaiting the
+other side's response), `true` otherwise — threads have a real ordered
+comment list to look at.
+
+**General comments have no such list — GitHub doesn't thread them.**
+`gh pr comment <n>` always creates a new, independent top-level comment; it
+is never attached to the comment it's replying to. So `needsAction` can't be
+computed per-comment in isolation, or a reply here would never suppress
+reprocessing of the comment it answered. Instead, sort every general comment
+by `createdAt` and compute `needsAction` over the whole ordered list: a
+comment is `false` if any later comment in the list is authored by the
+acting user's own login (that later comment is this skill's own answer,
+however it reads to GitHub as a new standalone comment rather than a nested
+reply); `true` otherwise. In practice this means only the *tail* of the
+ordered list — everything after the most recent acting-user comment — is
+ever in Step 2's queue; anything before that tail was already answered.
+
+This computed `needsAction` is the only thing that decides what's in scope
+for Step 2 — see "Skip rule" below.
 
 ## Data shape (shared contract)
 
@@ -282,9 +323,14 @@ Every reply, resolve, and new-issue action here is public GitHub content
 posted on the user's behalf — gated by the `gh-publish-permission` skill's
 rules, same as any other `gh` publish call. Invoking this skill for a named
 PR is the request-scoped permission for the replies/resolves that PR's
-review feedback calls for; it does not extend to opening an issue beyond
-what "handle the review feedback" implies unless the out-of-scope path above
-is actually reached, nor to anything on a different PR.
+review feedback calls for; it does not extend to opening an issue, nor to
+anything on a different PR. **Reaching the out-of-scope path above does not
+itself authorize `gh issue create`** — that's a separate publish action
+requiring its own explicit, request-scoped permission, the same as any other
+issue creation. Without it: report the out-of-scope finding (a synthesis,
+the reason it's out of scope, and a note that an issue should be filed) and
+leave the original thread/comment unresolved, rather than creating the issue
+unasked.
 
 ## Works standalone
 
