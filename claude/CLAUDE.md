@@ -157,7 +157,7 @@ isolation) — pick a number, don't default to "as many as fit."
 - **Usage/rate-limit quota scales roughly with concurrent sessions**
   ([docs](https://code.claude.com/docs/en/agents)). Burst/concurrency
   rate-limiting — distinct from monthly quota exhaustion — has hit users on
-  even the highest paid tier when 5-10 sessions were launched in quick
+  even the highest-paid tier when 5-10 sessions were launched in quick
   succession (`anthropics/claude-code#53922`, `#62426`). Stagger session
   starts instead of bulk-launching many at once.
 - **Cost scales with concurrency too.** A rough, dated ballpark: ~$50-130/day
