@@ -76,10 +76,19 @@ project links out to it) and its CI workflow — not generic shell-scripting tas
   file/line even when the regression is in a changed script the test exercises
   indirectly. Note (don't ignore) any failure that's genuinely pre-existing so it
   doesn't get silently attributed to this change.
-- **`set -uo pipefail` (or `set -euo pipefail`) as the first real statement.** A
-  file with no shebang (sourced-only) is exempt; everything else isn't. If a
-  mechanical check for this already exists and passes, don't re-flag placement by
-  eye; check by hand only for a script that check doesn't yet cover.
+- **`set -uo pipefail` (or `set -euo pipefail`) as the first real statement.**
+  Exempt only a file with explicit sourced-only evidence: a literal
+  `# sourced-only` comment line in its header, present only because every real
+  call site was verified to source the file (`. file.sh` / `source file.sh`)
+  rather than execute it — everything else isn't exempt. A missing shebang
+  alone is NOT that evidence: a file with no shebang can still be run via
+  `bash path/to/file.sh` or a wrapper, so treat it like any other script unless
+  it carries the marker. If a `# sourced-only` marker is present, verify it's
+  actually true (grep the repo for direct invocations of the file) rather than
+  taking the marker on faith — a stale or wrong marker is itself a finding. If
+  a mechanical check for this already exists and passes, don't re-flag
+  placement by eye; check by hand only for a script that check doesn't yet
+  cover.
 - **Every shellcheck disable has a justification comment directly above the bare
   `# shellcheck disable=SCxxxx` line**, explaining *why* the flagged pattern is
   sound here — not just restating what the code does. A disable with no comment,
