@@ -15,7 +15,7 @@ check() {
 @test "passes on a directory with no scripts" {
   check
   assert_success
-  assert_output_contains "All executable shell scripts are chmod +x and declare"
+  assert_output_contains "All shell scripts are chmod +x"
 }
 
 @test "passes when set -uo pipefail is the first statement" {
@@ -80,10 +80,55 @@ check() {
   assert_failure
 }
 
-@test "skips a file with no shebang (sourced-only libraries are exempt)" {
-  printf '# a sourced library\nhelper() { echo hi; }\n' > "$FIXTURE_DIR/lib.sh"
+
+# --- sourced-only exemption (#168: a missing shebang alone is not proof a
+# file is sourced-only — it can still be run via `bash file.sh` or a
+# wrapper, so it's checked like any other file unless it carries the
+# explicit `# sourced-only` marker) -------------------------------------
+
+@test "a file with no shebang and no sourced-only marker is NOT exempt: it must still declare set -uo pipefail" {
+  printf '# a library, maybe sourced, maybe not\nhelper() { echo hi; }\n' > "$FIXTURE_DIR/lib.sh"
+  check
+  assert_failure
+  assert_output_contains "lib.sh"
+  assert_output_contains "Missing 'set -uo pipefail'"
+  # No shebang means the executable-bit check never applies to it.
+  refute_output_contains "not marked executable"
+}
+
+@test "a file with no shebang passes when set -uo pipefail is its first real statement" {
+  printf '# a library\nset -uo pipefail\nhelper() { echo hi; }\n' > "$FIXTURE_DIR/lib.sh"
   check
   assert_success
+}
+
+@test "the '# sourced-only' marker exempts a no-shebang file from the set-flags check" {
+  printf '# sourced-only\nhelper() { echo hi; }\n' > "$FIXTURE_DIR/lib.sh"
+  check
+  assert_success
+}
+
+@test "the '# sourced-only' marker exempts a shebang'd, non-executable file with no set flags" {
+  printf '#!/bin/bash\n# sourced-only\nhelper() { echo hi; }\n' > "$FIXTURE_DIR/lib.sh"
+  # Deliberately no chmod +x and no set -uo pipefail — both checks should be
+  # skipped once the file is explicitly declared sourced-only.
+  check
+  assert_success
+}
+
+@test "a '# sourced-only' marker placed after the first real statement does not count" {
+  printf '#!/bin/bash\necho hi\n# sourced-only\n' > "$FIXTURE_DIR/late-marker.sh"
+  chmod +x "$FIXTURE_DIR/late-marker.sh"
+  check
+  assert_failure
+  assert_output_contains "late-marker.sh"
+}
+
+@test "a near-miss marker ('#sourced-only', no space) does not grant the exemption" {
+  printf '#sourced-only\nhelper() { echo hi; }\n' > "$FIXTURE_DIR/near-miss.sh"
+  check
+  assert_failure
+  assert_output_contains "near-miss.sh"
 }
 
 @test "reports every offender, not just the first" {
@@ -124,11 +169,22 @@ check() {
   [ "$count" -eq 2 ]
 }
 
-@test "a file with no shebang is exempt from the executable-bit check too" {
-  printf '# a sourced library\nhelper() { echo hi; }\n' > "$FIXTURE_DIR/lib.sh"
-  # Deliberately no chmod +x — sourced-only libraries are never run directly.
+@test "a no-shebang file is never checked for the executable bit, marker or not" {
+  # Deliberately no chmod +x, and no set -uo pipefail either — this should
+  # fail on the set-flags check (no marker, no shebang) but never even
+  # mention the executable-bit check, which only applies to shebang'd files.
+  printf '# a library\nhelper() { echo hi; }\n' > "$FIXTURE_DIR/lib.sh"
+  check
+  assert_failure
+  refute_output_contains "not marked executable"
+}
+
+@test "a marked sourced-only, no-shebang file is exempt from the executable-bit check too" {
+  printf '# sourced-only\nhelper() { echo hi; }\n' > "$FIXTURE_DIR/lib.sh"
+  # Deliberately no chmod +x — a sourced-only library is never run directly.
   check
   assert_success
+  refute_output_contains "not marked executable"
 }
 
 @test "the repo's own scripts satisfy the convention" {
