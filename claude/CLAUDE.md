@@ -53,10 +53,15 @@ background or parallel tasks. Never commit directly to the main working copy.
   pop` in either one can pop the *other* session's entry, silently applying
   a stranger's diff into your working tree. For a scoped "revert these
   known files, then restore" need (e.g. a before/after screenshot), skip
-  `git stash` entirely — `git checkout HEAD -- <files>` plus a filesystem
-  copy as your own backup never touches repo-wide state. If it already
-  happened, a stash entry is just a commit: `git fsck --no-reflog
-  --unreachable --dangling`, filtered by your own `-m` text and a recent
+  `git stash` entirely — `git restore --source=HEAD --worktree -- <files>`
+  (Git 2.23+; touches only the worktree, unlike `git checkout HEAD --
+  <files>`, which also resets the index) plus a filesystem copy as your own
+  backup never touches repo-wide state. If it already happened, check
+  `git stash list`/`git stash show` first — a conflicted `pop` leaves the
+  entry there. Only if it's genuinely gone is a stash entry just a dangling
+  commit: `git fsck --no-reflog --unreachable --dangling`, then inspect
+  candidates with `git show`/`git log` (fsck itself has no way to filter by
+  message or date) to find the one matching your own `-m` text and a recent
   author-date, then `git stash apply <sha>` (never `pop`) once you've found
   your entry.
 - **After merging a PR that adds or tightens an enforcing CI rule** (a new lint rule,
