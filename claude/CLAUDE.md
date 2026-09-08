@@ -449,3 +449,28 @@ whether the trigger is a human comment or a bot finding outside the diff
 range. Carry over a synthesis (not a comment dump), a link back to the source,
 the one-line reason it's out of scope, and a concrete acceptance bar where one
 exists.
+
+### Security-critical or regulated paths: keep a human on the merge/approve button
+
+The "CI passing is the merge gate" rule above is this repo's own default; it
+does not extend to security-critical or regulated paths. Research shows a
+crafted comment or string literal in code under review can instruct a
+reviewing agent to overlook a vulnerability or wave it through — an attack
+surface that doesn't exist for a human reviewer, with no fully solved defense
+yet (arXiv:2606.13175 §VI.C; corroborated by Endor Labs, NVIDIA, and Cloud
+Security Alliance write-ups on the same 2026 concern). So, as a standing
+guardrail rather than a case-by-case judgment call: **an agent must never
+autonomously approve or merge a pull request touching a security-critical or
+regulated path.** Any "move the workstream forward via agents" design (this
+repo's `pr-babysit`/`--auto-merge` included) keeps a human on that button for
+these paths — surface the PR and diff and stop, don't `gh pr merge` or
+approve it yourself.
+
+"Security-critical," for this purpose, means at minimum: auth/authz code;
+credential, secret, or token handling; `.github/workflows/` and other CI/CD
+definitions; dependency manifests/lockfiles (supply-chain surface);
+`.claude/settings.json` permissions or hooks; and this repo's own PR
+review/merge tooling (`pr-review-rubric`, `pr-babysit`, `pr-comments`,
+`pr-checks`, `gh-publish-permission`). Treat that as a floor — extend it by
+judgment to a given repo's actual regulated surface (PCI/HIPAA/PII-handling
+code, for instance).
