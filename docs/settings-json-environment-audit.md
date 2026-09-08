@@ -25,12 +25,14 @@ since #186 already links back here for this exact section.
 
 ### `.claude/settings.json` (checked into git, applies to every contributor)
 
-The entire file, in full, as of this audit:
+The entire file, in full, as of this audit (including the one change this PR
+makes — see "Gaps and what changed in this PR" below):
 
 ```json
 {
   "$schema": "https://json.schemastore.org/claude-code-settings.json",
   "permissions": {
+    "disableBypassPermissionsMode": "disable",
     "ask": [
       "Bash(gh issue create)",
       "Bash(gh issue create *)",
@@ -53,7 +55,8 @@ The entire file, in full, as of this audit:
 ```
 
 That's the entire environment-layer footprint: one `ask` list, no `allow`,
-no `deny`. It gates exactly the GitHub publish surface `gh-publish-permission`
+no `deny`, plus the `disableBypassPermissionsMode` toggle this PR adds (see
+below). The `ask` list gates exactly the GitHub publish surface `gh-publish-permission`
 (`plugins/dfadler-agent-config/skills/gh-publish-permission/SKILL.md`)
 documents — issue/PR creation, comments, reviews, edits, and every `gh api`
 call — behind a confirmation prompt that, per Claude Code's own permission
@@ -87,7 +90,7 @@ a handful of exact `rm -f`/`sed -i` invocations against specific `/tmp`
 scratch files from past PR-body editing, `Bash(git ls-remote *)`,
 `Bash(gh pr *)` — plus one that stands out:
 
-```
+```text
 "Bash(python3 -c ' *)"
 ```
 
@@ -143,13 +146,20 @@ v2.1.216 was the installed version at the time of this audit):
   etc.) from sandboxed commands specifically, independent of filesystem
   isolation.
 
-None of this is enabled today, at either the project (`.claude/settings.json`,
-checked in) or user (`~/.claude/settings.json`) level — there is no `sandbox`
-key in either file. Every Bash command in every Claude Code session against
-this repo currently runs unsandboxed: filesystem and network access are
-bounded only by the permission system's per-command approval flow (Manual
-mode asks before non-read-only Bash commands by default) and whatever
-`allow` rules have accumulated locally, not by an OS-enforced boundary.
+None of the sources this audit inspected enable it: there is no `sandbox` key
+in the checked-in `.claude/settings.json`, nor in this developer's own user
+settings at `~/.claude/settings.json` (checked separately for this audit,
+since sandboxing is one of the few areas where user settings matter more
+than project settings — several sub-settings, like `filesystem.disabled` and
+credential masking, are honored only from user or managed settings). Neither
+this repo nor this developer's account currently turns sandboxing on for any
+source this audit could see; a contributor's own `--settings` CLI flag or
+local `.claude/settings.local.json` could still enable it for themselves,
+independent of what's checked in here. Absent that, Bash commands run
+unsandboxed by default: filesystem and network access are bounded only by
+the permission system's per-command approval flow (Manual mode asks before
+non-read-only Bash commands by default) and whatever `allow` rules have
+accumulated locally, not by an OS-enforced boundary.
 
 ## Gaps and what changed in this PR
 
@@ -171,13 +181,22 @@ mode asks before non-read-only Bash commands by default) and whatever
    `bypassPermissions` mode against this repo (checked via grep across
    `docs/`, `claude/`, and `plugins/`), so disabling it costs nothing here.
    **Changed in this PR**: added `permissions.disableBypassPermissionsMode:
-   "disable"` to `.claude/settings.json`. This is a project-setting value
-   Claude Code enforces from any settings file per the
-   [permissions docs](https://code.claude.com/docs/en/permissions#permission-modes);
-   it means a session started against this repo with
-   `--dangerously-skip-permissions` (or the equivalent SDK option) has that
-   request refused rather than silently skipping the publish gate and every
-   other `ask`/`deny` rule.
+   "disable"` to `.claude/settings.json`, the checked-in "shared project"
+   settings file. Per Claude Code's own
+   [settings precedence](https://code.claude.com/docs/en/settings#settings-precedence)
+   (highest to lowest: managed, command-line `--settings`, project-local
+   `.claude/settings.local.json`, shared project `.claude/settings.json`,
+   user), this establishes the repo-wide default: a session started against
+   this repo with `--dangerously-skip-permissions` is refused *unless* a
+   higher-precedence source overrides it — a contributor's own `--settings`
+   flag, or their own project-local `.claude/settings.local.json`, both of
+   which outrank this file and are exactly the mechanism the
+   `.claude/settings.local.json` finding above already shows can accumulate
+   unreviewed grants. The [permissions docs](https://code.claude.com/docs/en/permissions#permission-modes)
+   say this setting is "most useful in managed settings, where it can't be
+   overridden" — this repo has no managed settings, so what this PR adds is
+   a repo-wide default that closes the gap for anyone who hasn't
+   deliberately overridden it locally, not an unconditional guarantee.
 4. **(Local-only) an overly broad accumulated `Bash(python3 -c ' *)` allow
    rule** in this developer's untracked `.claude/settings.local.json`.
    Documented above as a recommendation; not something this PR can fix,
