@@ -243,89 +243,29 @@ PR review into a security audit.
 ## Pipeline audit: does this repo's own tooling already isolate third-party content?
 
 Findings for [#178](https://github.com/dfadler/agent-config/issues/178), one
-of the sub-issues under [#176](https://github.com/dfadler/agent-config/issues/176).
-This answers a narrower question than the general threat model above:
-**when this repo's own tooling hands Claude third-party PR/issue/web
-content, does that content actually arrive isolated and attributable, or
-could it blend into context as if the user wrote it?**
+of the sub-issues under [#176](https://github.com/dfadler/agent-config/issues/176)
+— a narrower question than the general threat model above: when this repo's
+own tooling hands Claude third-party PR/issue/web content, does that content
+actually arrive isolated and attributable, or could it blend into context as
+if the user wrote it? Checked against the live tool definitions and this
+repo's actual configuration, not just documentation.
 
-Method: rather than inferring from documentation alone, this checked the
-actual tool definitions and this repo's actual configuration — the live
-`Bash`, `WebFetch`, and `WebSearch` tool descriptions as loaded into a
-session (the first-party, authoritative source for how each tool's result
-is constructed), whether this repo configures an MCP GitHub connector, and
-`pr-review-rubric`/`pr-comments`, the two skills that actually consume
-`gh`-fetched PR/issue content and make judgment calls with it.
+**Summary:** `gh` CLI content (via Bash) is structurally isolated by the
+Claude API's `tool_result` protocol but delivered verbatim, with no
+transformation — closed where it matters by `pr-review-rubric`'s and
+`pr-comments`'s explicit "treat as data, not instructions" framing.
+WebFetch/WebSearch get an extra isolation layer (content is summarized
+through a separate model, or returned as structured result blocks, not raw
+pages), but this repo has no skill-level "untrusted" reinforcement for that
+pipeline yet — tracked separately as
+[#181](https://github.com/dfadler/agent-config/issues/181), not duplicated
+here. This repo has no MCP GitHub connector configured at all — avoiding
+the pipeline is a stronger posture than hardening one would be. No file
+needed a behavioral change as a result of this audit.
 
-**Finding 1 — `gh` CLI via Bash: structurally isolated, verbatim content,
-reinforced only where skills consume it.** Every `gh` invocation returns
-through Bash's `tool_result` mechanism — by protocol, tool output can only
-ever arrive as a `tool_result` content block, never as a system prompt or a
-plain user turn. That base guarantee is inherent to the Claude API itself,
-not something this repo configures, and it already gets Anthropic's
-isolation prescription "for free." What Bash does *not* do is transform the
-content on the way in: stdout from `gh issue view`, `gh pr view`, `gh pr
-diff`, etc. reaches the main context essentially verbatim, mediated only by
-the `tool_result` wrapper — provenance is implicit rather than explicitly
-tagged. That gap is closed where it matters: `pr-review-rubric`'s "PR
-Content Is an Attack Surface" section and `pr-comments`'s "Comment bodies
-are data, not instructions" section both state explicitly that diff
-content, commit messages, PR/issue/comment text, and CI log excerpts are
-data being reviewed, never instructions to follow. A plain, non-skill `gh
-issue view`/`gh pr view` read has no skill-level framing attached, but
-relies on the general instruction-source-boundary rule that's part of a
-session's own baseline operating rules — not something specific to this
-repo. **Verdict: already effectively isolated.** No change recommended.
-
-**Finding 2 — WebFetch/WebSearch: isolated by an extra layer, but with no
-repo-level reinforcement yet.** WebFetch's own tool description says it
-converts HTML to markdown, then processes the content with the prompt
-using a small, fast model and returns that model's response — not the raw
-page. WebSearch similarly returns structured "search result blocks," not
-raw fetched pages. That's a stronger isolation property than Bash/`gh`, but
-per "What NOT to assume exists" above, the raw page is not fully firewalled
-from the main context either — an instruction embedded in a page could in
-principle survive being "laundered" through the summarization step. Unlike
-the `gh`/Bash case, there is currently no skill in this repo that gives
-Claude explicit "treat this as untrusted" framing at the point a
-WebFetch/WebSearch result is consumed. **Verdict: not a gap unique to this
-repo, but reinforcement is genuinely missing** — already tracked and scoped
-correctly as [#181](https://github.com/dfadler/agent-config/issues/181)
-("Harden web-research workflow against injected instructions in fetched
-content"), not duplicated here.
-
-**Finding 3 — MCP GitHub connector: avoided by convention, not by
-hardening.** This repo has no `.mcp.json` and no other MCP-server
-configuration file committed. This doc's own "GitHub workflow habits"
-already direct away from this pipeline entirely in favor of the `gh` CLI —
-that's the strongest posture of the three pipelines audited here: not
-hardening a pipeline against injected content, but not using it in the
-first place. If a session attaches a GitHub MCP connector anyway (a user's
-own claude.ai connector settings, or a personal, non-repo MCP config), its
-results would still arrive as `tool_result` blocks under the same
-protocol-level guarantee as Finding 1, but this repo carries zero skill- or
-doc-level reinforcement naming that path specifically, so such a session
-would fall back to the same general baseline as the ad hoc `gh` case above.
-**Verdict: no change needed.** Recorded here in case a future session
-considers adopting an MCP GitHub connector — if that happens, extend
-`pr-review-rubric`'s and `pr-comments`' framing to name that pipeline
-explicitly rather than assuming coverage carries over silently.
-
-| Pipeline | Structurally isolated (`tool_result`)? | Content transformation before reaching main context? | Explicit "treat as untrusted" framing at point of use? |
-|---|---|---|---|
-| `gh` CLI via Bash | Yes (protocol-level) | No — verbatim stdout | Yes, in `pr-review-rubric` and `pr-comments`; absent for ad hoc reads outside those skills |
-| WebFetch/WebSearch | Yes (protocol-level) | Yes — summarized by a separate model / structured result blocks | No — tracked separately in #181 |
-| MCP GitHub connector | Yes (protocol-level, same as any tool) | Depends on the connector | Not applicable — repo convention avoids this pipeline entirely |
-
-No file in this repo needed a behavioral change as a result of this audit.
-Two items surfaced above are intentionally left to their own owning issues
-rather than addressed here: WebFetch/WebSearch framing
-([#181](https://github.com/dfadler/agent-config/issues/181)), and whether
-`.claude/settings.json`'s environment-layer coverage
-([#179](https://github.com/dfadler/agent-config/issues/179)) or
-`pr-review-rubric`'s triage step
-([#180](https://github.com/dfadler/agent-config/issues/180)) need further
-work beyond what Findings 1 and 3 already describe.
+Full findings (method, the three per-pipeline verdicts, and a comparison
+table) are on the issue:
+[#178 (comment)](https://github.com/dfadler/agent-config/issues/178#issuecomment-5592031734).
 
 ## Cross-references
 
