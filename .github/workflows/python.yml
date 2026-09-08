@@ -42,9 +42,8 @@ jobs:
 
       - name: Install pinned dependencies
         run: |
-          python -m pip install --upgrade pip
-          pip install -r requirements-dev.txt
-          pip list
+          make venv
+          .venv/bin/pip list
 
       - name: Lint (ruff check + format)
         run: make lint-py
