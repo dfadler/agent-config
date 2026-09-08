@@ -69,9 +69,11 @@ KCOV_EXCLUDE := /scripts/tests
 # plus the same style of headroom. A worktree-cleanup bullet (kill
 # background processes before removing a worktree) landed separately and
 # pushed it to 412; 425 is that measurement plus the same headroom again,
-# not a new baseline to fill up to. Raising it further takes a deliberate
-# commit, the same as COVERAGE_MIN above.
-CLAUDE_MD_MAX_LINES := 425
+# not a new baseline to fill up to. #168's sourced-only exemption rewrite
+# pushed it to 430; 440 is that measurement plus the same style of headroom.
+# Raising it further takes a deliberate commit, the same as COVERAGE_MIN
+# above.
+CLAUDE_MD_MAX_LINES := 440
 
 .PHONY: help check lint lint-sh lint-py lint-actions fmt fmt-py test test-sh test-py \
         structure typecheck venv coverage check-links

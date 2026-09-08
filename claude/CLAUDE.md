@@ -221,7 +221,12 @@ not a recap of what should have happened.
 For any non-trivial bash script:
 
 - Every script's first real statement should be `set -uo pipefail` (or
-  `set -euo pipefail`). A file with no shebang (sourced-only) is exempt.
+  `set -euo pipefail`). Exempt only a file with explicit sourced-only
+  evidence: a literal `# sourced-only` comment line in its header, added
+  only after verifying every real call site sources the file rather than
+  executing it. A missing shebang alone is NOT that evidence — a file with
+  no shebang can still be run via `bash path/to/file.sh` or a wrapper
+  (#168). `scripts/check-shell-set-flags.sh` enforces this.
 - Run it through shellcheck (correctness) and shfmt (formatting) before considering
   it done, if the project has those set up.
 - A shellcheck disable needs a justification at the same bar as a TypeScript type
