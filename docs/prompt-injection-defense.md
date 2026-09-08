@@ -270,10 +270,13 @@ table) are on the issue:
 ## Cross-references
 
 - `plugins/dfadler-agent-config/skills/pr-review-rubric/SKILL.md` —
-  "PR Content Is an Attack Surface" section: embedded-instruction handling,
-  infrastructure-tampering scrutiny on the review pipeline's own trust
-  surface, supply-chain-shaped changes, and the fixed tool-authority
-  boundary, all specific to reviewing a diff or PR.
+  "PR Content Is an Attack Surface" section: embedded-instruction handling
+  (with an explicit triage checklist and a note on known evasion
+  techniques — unusual encodings, hidden/invisible text, image-borne
+  payloads such as the GhostCommit disclosure), infrastructure-tampering
+  scrutiny on the review pipeline's own trust surface, supply-chain-shaped
+  changes, and the fixed tool-authority boundary, all specific to reviewing
+  a diff or PR.
 - `plugins/dfadler-agent-config/skills/gh-publish-permission/SKILL.md` —
   the human-layer backstop before any GitHub publish action; defines what
   counts as valid, explicit, request-scoped permission.
