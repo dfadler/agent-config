@@ -293,9 +293,9 @@ class TestHistoryRendering:
         for i in range(8):
             stub.stream.feed(f"line-{i}\r\n".encode())
         visible = stub.render(lines=20, history=False)
-        assert "line-0" not in visible, (
-            f"scrollback leaked without --history: {visible!r}"
-        )
+        assert (
+            "line-0" not in visible
+        ), f"scrollback leaked without --history: {visible!r}"
         assert "line-7" in visible
 
     def test_history_flag_includes_the_scrolled_off_lines(self) -> None:
@@ -390,9 +390,9 @@ class TestSendWriteTimeout:
         try:
             monkeypatch.setattr(agent_term, "WRITE_TIMEOUT", 0.3)
             exc = self._send_in_thread(self._StubSession(write_fd), ["hi", "Enter"])
-            assert isinstance(exc, RuntimeError), (
-                f"expected a RuntimeError, got {exc!r}"
-            )
+            assert isinstance(
+                exc, RuntimeError
+            ), f"expected a RuntimeError, got {exc!r}"
             assert "not reading its input" in str(exc)
         finally:
             os.close(read_fd)
@@ -414,16 +414,16 @@ class TestSendWriteTimeout:
             monkeypatch.setattr(agent_term, "WRITE_TIMEOUT", 0.3)
             payload = "z" * (64 << 10)
             exc = self._send_in_thread(self._StubSession(write_fd), [payload])
-            assert isinstance(exc, RuntimeError), (
-                f"expected a RuntimeError, got {exc!r}"
-            )
+            assert isinstance(
+                exc, RuntimeError
+            ), f"expected a RuntimeError, got {exc!r}"
             match = re.search(r"writing (\d+) of (\d+) bytes", str(exc))
             assert match, f"no byte counts in {exc!r}"
             remaining, total = int(match.group(1)), int(match.group(2))
             assert total == len(payload)
-            assert 0 < remaining < total, (
-                f"partial write not accounted for ({remaining} of {total})"
-            )
+            assert (
+                0 < remaining < total
+            ), f"partial write not accounted for ({remaining} of {total})"
         finally:
             os.close(read_fd)
             os.close(write_fd)
@@ -559,9 +559,9 @@ class TestHistoryGating:
 
         result = term("read", "hg1", "--raw", "--lines", "20")
         assert "line-11" in result.stdout
-        assert "line-0" not in result.stdout, (
-            f"read without --history leaked scrollback: {result.stdout!r}"
-        )
+        assert (
+            "line-0" not in result.stdout
+        ), f"read without --history leaked scrollback: {result.stdout!r}"
 
     def test_history_flag_includes_scrolled_off_content(self, term: Runner) -> None:
         term("start", "hg2", "--size", "20x5", "--history", "50", "--", "cat")
@@ -746,9 +746,9 @@ class TestBindFailureCleanup:
                 f"fixture child {pid} died on SIGHUP; SIG_IGN did not survive "
                 "into it, so the failure arm below would prove nothing"
             )
-            assert self._wait_for_file(marker, 5.0), (
-                "the fixture child never reached its marker"
-            )
+            assert self._wait_for_file(
+                marker, 5.0
+            ), "the fixture child never reached its marker"
         finally:
             run("stop", "control", check=False)
 
@@ -972,9 +972,9 @@ class TestSocketPreservation:
         close = self._fake_daemon(path, b"")  # accepts, replies nothing, stays up
         try:
             result = term("list")
-            assert os.path.exists(path), (
-                "a still-listening daemon's socket was unlinked"
-            )
+            assert os.path.exists(
+                path
+            ), "a still-listening daemon's socket was unlinked"
             assert "socket kept" in result.stdout
         finally:
             close()
