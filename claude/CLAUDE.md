@@ -171,21 +171,7 @@ When a change (PR or issue) alters what gets visually rendered — UI components
 
 Do this proactively, without waiting to be asked — treat it as part of finishing the PR, the same way running the test suite is.
 
-### How
-
-1. Render the same input on the base branch ("before") and the change branch ("after"), reusing the project's own rendering path (its actual render function/build step/dev server) rather than reimplementing rendering logic — the goal is to prove what a real user would actually see.
-2. Convert to PNG if the native output isn't already raster (e.g. `qlmanage -t -s 1000 -o <dir> <file.svg>` on macOS). For a rendered diagram/SVG specifically (not a full-page UI/document screenshot, which should keep its original bounds), auto-crop to the non-background bounding box before uploading — a raw thumbnail (especially `qlmanage`, which pads to a square) is often mostly whitespace and unreadable once GitHub scales it down. See `dfadler-agent-config:pr-visual-capture`'s "Cropping to content" section for the crop script; look at the cropped result before uploading, don't assume it worked.
-3. Upload both images and embed them via the `dfadler-agent-config:gh-attach-image` skill — never commit screenshots to the repo and never use a Gist for this.
-4. Add a "Visual verification" section to the PR/issue body: a two-column before/after markdown table plus a one-line caption of what to look for.
-5. Verify the images actually resolve after saving the body (`curl -sI -L <url>` should return 200, not 404 — see the skill for why a fresh upload 404s until claimed).
-
-### Getting an honest before/after, not a false negative
-
-Don't trust a single rendering technique blindly, especially for anything involving CSS custom properties, inherited styles, or embedded/host-page context:
-
-- If a fix's effect only manifests when the rendered output is embedded in a specific host context (e.g. a CSS variable that's only meaningful when a parent page defines it), build that host context rather than screenshotting the artifact in isolation — an isolated screenshot of both branches can look identical even when the fix is real, simply because the thing being tested never gets exercised in isolation.
-- When comparing two rendered variants, put them in **separate, isolated documents** rather than side-by-side in one shared page if either one embeds its own `<style>` block — inline `<style>` tags (including inside inline SVG) apply document-wide by default, not scoped to their containing element, so two variants sharing one page can silently cross-contaminate each other's styling and produce a false negative (both look like whichever rule won the cascade, not what each actually specifies). This happened once already: two SVGs side-by-side both rendered with the "after" variant's font because its `<style>` rule won the cascade tie-break for the whole document, masking a real, verified difference.
-- Where possible, verify programmatically in addition to the screenshot: grep the raw output for expected content/attributes, or (for a real browser context) `getComputedStyle(...)` on the actual rendered element — don't rely on eyeballing pixels alone, especially for subtle differences (font family, color, small text). If a quick renderer (e.g. a Quick Look thumbnail) and a real browser disagree, trust the real browser and say so — some lightweight renderers don't fully implement CSS semantics.
+For the actual capture mechanics — rendering before/after, converting to PNG, cropping to content, uploading, formatting the PR/issue body, verifying the images resolve, and avoiding a false negative from shared-page style leakage or host-context-only effects — see the `dfadler-agent-config:pr-visual-capture` skill. This section owns the policy of *when* verification is required; that skill owns *how* to produce it.
 
 ## Don't steal focus from the human
 
@@ -407,27 +393,15 @@ this sits inside.
   output; apply the same idea to a plain `pr-babysit` reply or a one-off `gh pr
   comment`/`gh issue comment`. This is a transparency requirement, not a style choice —
   don't drop the marker to keep a reply terse.
-- When `gh pr checks`/`gh run view --log-failed` (see above) doesn't explain a
-  failure, escalate in this order before giving up: `gh api
-  repos/<owner>/<repo>/actions/runs/<runId>/jobs` for per-step status/timing the
-  summary view collapses; `gh run rerun <runId> --debug --failed` to get verbose step
-  logs on just that one re-run — no need to set the `ACTIONS_STEP_DEBUG`/
-  `ACTIONS_RUNNER_DEBUG` repo secrets or variables unless you want debug logging on
-  *every* run; `gh run watch --compact` to follow an in-progress run instead of
-  polling. `make lint-actions`/`actionlint` remain the required check for a workflow-
-  syntax problem — neither of the two options below can diagnose one, since a syntax
-  error or a run that never reaches a runner never gets that far. For a genuinely
-  stuck failure that's already reaching a runner: local reproduction (`act`, via
-  Docker) — doesn't perfectly match the hosted runner's environment/secrets — or, as a
-  last resort, SSH-into-the-runner (`mxschmitt/action-tmate`), placed as its own step
-  immediately after the one being diagnosed and guarded with `if: ${{ failure() }}`
-  so it survives a preceding-step failure, restricted to trusted workflows via
-  `limit-access-to-actor: true` (or equivalent), and only ever added temporarily —
-  it pauses the job and burns runner minutes, so treat it as a tool to reach for only
-  when the above doesn't resolve it, not a habit to build into a workflow. Docs:
-  [`gh run rerun`](https://cli.github.com/manual/gh_run_rerun),
-  [status-check functions incl. `failure()`](https://docs.github.com/en/actions/reference/workflows-and-actions/expressions#status-check-functions),
-  [`action-tmate` incl. `limit-access-to-actor`](https://github.com/mxschmitt/action-tmate#readme).
+- When `gh pr checks`/`gh run view --log-failed` doesn't explain a failure,
+  escalate through the Actions jobs API and a verbose debug rerun before
+  reaching for local reproduction (`act`) or a guarded, temporary
+  `action-tmate` step as a last resort — see the `dfadler-agent-config:pr-checks`
+  skill (Step 2) for the exact order, flags, and safety guards, and
+  `docs/github-actions.md` for this repo's full rationale and incident
+  history. `make lint-actions`/`actionlint` remain the required check for a
+  workflow-*syntax* problem — none of the above can diagnose one, since a
+  syntax error never reaches a runner.
 - **`.github/` stays config-only.** Limit it to platform configuration: workflows
   (`.github/workflows/`), CODEOWNERS, dependabot/release config, and a **generic**
   PR/issue template. Feature- or product-specific docs, playbooks, or checklists
@@ -453,31 +427,12 @@ this sits inside.
 Treat CI passing, not an approving human review, as the actual merge gate —
 don't wait on or expect an approval that isn't part of how this repo works.
 
-Sort each finding into one of four outcomes, not a binary fixed-or-pushback:
-
-- **Fixed** — reply with the commit SHA: `Fixed in <sha>: <what changed and
-  why>`. Never "done" alone; the SHA is what makes the reply verifiable later.
-- **Refuted** — reproduce the claim against the real, current system and post
-  the command and its output, not just prose disagreement.
-- **Confirmed real but deferred** — say so explicitly, with the reason, instead
-  of silently dropping it. Don't auto-close a tracking issue while a deferred
-  finding is open on it — leave that decision to a human.
-- **Judged not real** — state what was checked and that nothing matched.
-
-Handling an automated reviewer:
-
-- If it re-litigates a refuted finding, give it one more round of fresh
-  evidence rather than repeating the same reply — the first repro may not be
-  the last word it accepts.
-- Never treat its own claimed "resolved" or "couldn't resolve" text in a
-  comment body as ground truth. Verify or drive resolution via the actual
-  API/mutation instead.
-
-Out-of-scope findings become a new issue, not scope creep on the current PR —
-whether the trigger is a human comment or a bot finding outside the diff
-range. Carry over a synthesis (not a comment dump), a link back to the source,
-the one-line reason it's out of scope, and a concrete acceptance bar where one
-exists.
+Classify and reply to each review finding using the
+`dfadler-agent-config:pr-comments` skill's four-outcome rubric
+(Fixed/Refuted/Confirmed-but-deferred/Judged-not-real) and its exact reply
+templates — including its rules for an automated reviewer re-litigating a
+refuted finding and for spinning an out-of-scope finding into a new issue
+rather than scope-creeping the current PR.
 
 ### Security-critical or regulated paths: keep a human on the merge/approve button
 

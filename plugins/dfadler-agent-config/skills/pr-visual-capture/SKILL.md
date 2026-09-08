@@ -11,7 +11,7 @@ description: >
   and the available browser tooling can only preview, not export.
 license: MIT
 metadata:
-  version: "1.0.0"
+  version: "1.1.0"
 ---
 
 # PR/issue visual capture
@@ -21,6 +21,45 @@ attach to a PR/issue body — not the policy of *when* one is required (that
 lives in your project's own CLAUDE.md; see the "Visual verification on
 PRs/issues that change rendered output" convention in this repo's global
 CLAUDE.md for one example policy).
+
+## Render both variants first
+
+Render the same input on the base branch ("before") and the change branch
+("after"), reusing the project's own rendering path — its actual render
+function, build step, or dev server — rather than reimplementing rendering
+logic. The goal is to prove what a real user would actually see, not what a
+hand-rolled renderer produces.
+
+## Avoiding a false negative
+
+Don't trust a single rendering technique blindly, especially for anything
+involving CSS custom properties, inherited styles, or embedded/host-page
+context:
+
+- If a fix's effect only manifests when the rendered output is embedded in a
+  specific host context (e.g. a CSS variable that's only meaningful when a
+  parent page defines it), build that host context rather than
+  screenshotting the artifact in isolation — an isolated screenshot of both
+  branches can look identical even when the fix is real, simply because the
+  thing being tested never gets exercised in isolation.
+- When comparing two rendered variants, put them in **separate, isolated
+  documents** rather than side-by-side in one shared page if either one
+  embeds its own `<style>` block — inline `<style>` tags (including inside
+  inline SVG) apply document-wide by default, not scoped to their
+  containing element, so two variants sharing one page can silently
+  cross-contaminate each other's styling and produce a false negative (both
+  look like whichever rule won the cascade, not what each actually
+  specifies). This happened once already: two SVGs side-by-side both
+  rendered with the "after" variant's font because its `<style>` rule won
+  the cascade tie-break for the whole document, masking a real, verified
+  difference.
+- Where possible, verify programmatically in addition to the screenshot:
+  grep the raw output for expected content/attributes, or (for a real
+  browser context) `getComputedStyle(...)` on the actual rendered element —
+  don't rely on eyeballing pixels alone, especially for subtle differences
+  (font family, color, small text). If a quick renderer (e.g. a Quick Look
+  thumbnail) and a real browser disagree, trust the real browser and say
+  so — some lightweight renderers don't fully implement CSS semantics.
 
 ## Why not an in-app/embedded browser tool
 
@@ -300,6 +339,10 @@ return `200`, not `404` — a freshly uploaded attachment 404s until the
 PR/issue body that references it is saved (GitHub "claims" the asset on
 save; see `dfadler-agent-config:gh-attach-image`'s SKILL.md for the full explanation of this
 behavior).
+
+**PR/issue body format:** add a "Visual verification" section with a
+two-column before/after markdown table plus a one-line caption of what to
+look for — don't just describe the change in prose.
 
 ## Cropping to content (diagrams/SVGs specifically)
 

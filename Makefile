@@ -84,9 +84,15 @@ KCOV_EXCLUDE := /scripts/tests
 # #174's concurrency guideline pushed it to 451, #175's no-autonomous-merge
 # guardrail for security-critical/regulated paths pushed it further to 476,
 # and #181's web-research injection-hardening section pushed it further to
-# 505; 520 is that measurement plus the same style of headroom. Raising it
-# further takes a deliberate commit, the same as COVERAGE_MIN above.
-CLAUDE_MD_MAX_LINES := 520
+# 505; 520 was that measurement plus the same style of headroom. #191's
+# audit moved duplicated mechanics out to the skills that already owned them
+# (visual-verification capture steps to pr-visual-capture, the CI-checks
+# escalation order to pr-checks, and PR-review-comment classification to
+# pr-comments — CLAUDE.md keeps only the policy/pointer), pulling it back
+# down to 460; 475 is that measurement plus the same style of headroom, not
+# a new baseline to fill up to. Raising it further takes a deliberate
+# commit, the same as COVERAGE_MIN above.
+CLAUDE_MD_MAX_LINES := 475
 
 .PHONY: help check lint lint-sh lint-py lint-actions fmt fmt-py test test-sh test-py \
         structure typecheck venv coverage check-links
