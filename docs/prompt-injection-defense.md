@@ -9,16 +9,17 @@ model, and it has already been exploited in the wild through exactly these
 channels — a documented April 2026 incident hijacked coding agents, Claude
 Code included, via hidden instructions in a GitHub PR title.
 
-Background: this doc synthesizes a
-[deep-research memo](https://claude.ai/code/artifact/c911b411-abd9-475b-b30d-95c846a54d46)
-(private artifact) commissioned for issue
-[#176](https://github.com/dfadler/agent-config/issues/176), which tracks a
-family of hardening sub-issues (#177–#183). This doc covers #177 only — the
-reference itself. The other sub-issues apply pieces of it to specific files
-(the `gh`/WebFetch/MCP pipeline, `.claude/settings.json`, `pr-review-rubric`,
-web research, `gh-publish-permission`/`pr-comments`/`pr-babysit`, and
-supply-chain scrutiny in review) and should link back here rather than
-re-explain the model.
+Background: this doc synthesizes an internal deep-research memo commissioned
+for issue [#176](https://github.com/dfadler/agent-config/issues/176), which
+tracks a family of hardening sub-issues (#177–#183). This doc covers #177
+only — the reference itself. The other sub-issues apply pieces of it to
+specific files (the `gh`/WebFetch/MCP pipeline, `.claude/settings.json`,
+`pr-review-rubric`, web research, `gh-publish-permission`/`pr-comments`/
+`pr-babysit`, and supply-chain scrutiny in review) and should link back here
+rather than re-explain the model. The memo itself isn't linked here — it
+lives in a private, account-scoped Claude artifact, which isn't a citable
+public source — but every claim it fed into this doc is independently
+sourced below, in "What the evidence supports" and "Sources".
 
 ## The three exposure points
 
@@ -277,6 +278,3 @@ PR review into a security audit.
 - arXiv:2607.05277 — Untrusted Content Masking (preprint)
 - Microsoft Security — [Securing CI/CD in an agentic world: Claude Code GitHub Action case](https://www.microsoft.com/en-us/security/blog/2026/06/05/securing-ci-cd-in-agentic-world-claude-code-github-action-case/)
 - SecurityWeek — [Claude Code, Gemini CLI, GitHub Copilot agents vulnerable to prompt injection via comments](https://www.securityweek.com/claude-code-gemini-cli-github-copilot-agents-vulnerable-to-prompt-injection-via-comments/)
-
-Full research memo (private artifact, includes per-claim confidence votes):
-https://claude.ai/code/artifact/c911b411-abd9-475b-b30d-95c846a54d46
