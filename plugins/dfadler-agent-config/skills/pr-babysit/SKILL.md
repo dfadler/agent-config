@@ -9,12 +9,14 @@ description: |
   "handle the review feedback on PR N" — and also proactively after opening a
   PR: once CI has had a few minutes, run a pass on that PR to catch failures
   and early review feedback. Arguments: optional PR number/URL, optional
-  --auto-merge. For continuous monitoring run it under /loop; a single
-  invocation is exactly one pass. Requires the consuming repo to supply its
-  own snapshot script/command matching the JSON contract documented below —
-  this skill has no `gh`-only fallback and does no snapshotting itself.
+  --auto-merge. Never approves or merges a PR touching a security-critical or
+  regulated path — always escalates those to a human instead. For continuous
+  monitoring run it under /loop; a single invocation is exactly one pass.
+  Requires the consuming repo to supply its own snapshot script/command
+  matching the JSON contract documented below — this skill has no `gh`-only
+  fallback and does no snapshotting itself.
 metadata:
-  version: "1.1.0"
+  version: "1.2.0"
 ---
 
 # Babysit PRs (one pass)
@@ -253,9 +255,14 @@ Field meanings worth calling out:
   conforming snapshot script shouldn't emit this recommendation when any is
   true: if any is true, treat it as `escalate` instead — never merge on
   review data you know is incomplete, regardless of what `recommendation`
-  says. Otherwise,
-  default: report it, with the merge command (`gh pr merge <n> --merge`).
-  With `--auto-merge`: run `gh pr merge <n> --auto --merge` and report that
+  says. Next, check whether the PR's diff touches a security-critical or
+  regulated path (see `claude/CLAUDE.md`'s "Security-critical or regulated
+  paths: keep a human on the merge/approve button" for the definition and
+  the rule): if it does, this is a hard `escalate` regardless of CI/review
+  state — report it as needing human approval/merge and never run `gh pr
+  merge`, with or without `--auto-merge`, for that PR. Otherwise, default:
+  report it, with the merge command (`gh pr merge <n> --merge`). With
+  `--auto-merge`: run `gh pr merge <n> --auto --merge` and report that
   auto-merge is armed. Never auto-merge a PR you didn't fix into a known
   state this pass if its author isn't the user driving this pass (e.g. a
   bot like dependabot).
@@ -314,6 +321,9 @@ convention rather than improvising one here. Whatever the mechanism:
   For anything else (an explicitly named bot or fork PR), report and
   escalate — never execute a third party's branch locally. (A conforming
   snapshot script already skips cross-repo PRs.)
+- Never approve or merge (`gh pr merge`, `--auto-merge` included) a PR
+  touching a security-critical or regulated path — see the `ready-to-merge`
+  entry above. This is a standing guardrail, not a per-PR call to make.
 
 The rerun-budget cap, the "never fix a flake by editing tests/CI config"
 rule, and "ignore sticky bot summary comments as feedback" are now enforced

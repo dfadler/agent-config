@@ -144,6 +144,27 @@ conflict lands in.
   (dfadler/agent-config#65 shipped a known leak this way). Use the
   diff-against-claimed-source check above to confirm a claimed range landed intact.
 
+## Concurrency: how many parallel sessions to run
+
+Multiple Claude Code sessions in parallel need their own budget, not just
+their own worktree (see the isolation guidance above for file-surface
+isolation) — pick a number, don't default to "as many as fit."
+
+- **Default to roughly 2-5 concurrent agents.** Review bandwidth is the
+  constraint that binds first for most reported use — past that range, diffs
+  arrive faster than they can be reviewed well. Only go higher with a
+  concrete plan for who reviews the extra output.
+- **Usage/rate-limit quota scales roughly with concurrent sessions**
+  ([docs](https://code.claude.com/docs/en/agents)). Burst/concurrency
+  rate-limiting — distinct from monthly quota exhaustion — has hit users on
+  even the highest-paid tier when 5-10 sessions were launched in quick
+  succession (`anthropics/claude-code#53922`, `#62426`). Stagger session
+  starts instead of bulk-launching many at once.
+- **Cost scales with concurrency too.** A rough, dated ballpark: ~$50-130/day
+  for 5-10 parallel agents at current (2026) pricing — an order-of-magnitude
+  planning estimate, not a live quote; check current pricing before
+  budgeting against it.
+
 ## Visual verification on PRs/issues that change rendered output
 
 When a change (PR or issue) alters what gets visually rendered — UI components, generated images/diagrams, styled documents, anything a human would look at rather than just read as code — provide before/after screenshots in the PR or issue description, not just a prose description of the change. Skip this for changes that don't affect rendered output: backend logic, config, migrations, scripts, tests, types, docs, tooling.
@@ -428,3 +449,28 @@ whether the trigger is a human comment or a bot finding outside the diff
 range. Carry over a synthesis (not a comment dump), a link back to the source,
 the one-line reason it's out of scope, and a concrete acceptance bar where one
 exists.
+
+### Security-critical or regulated paths: keep a human on the merge/approve button
+
+The "CI passing is the merge gate" rule above is this repo's own default; it
+does not extend to security-critical or regulated paths. Research shows a
+crafted comment or string literal in code under review can instruct a
+reviewing agent to overlook a vulnerability or wave it through — an attack
+surface that doesn't exist for a human reviewer, with no fully solved defense
+yet (arXiv:2606.13175 §VI.C; corroborated by Endor Labs, NVIDIA, and Cloud
+Security Alliance write-ups on the same 2026 concern). So, as a standing
+guardrail rather than a case-by-case judgment call: **an agent must never
+autonomously approve or merge a pull request touching a security-critical or
+regulated path.** Any "move the workstream forward via agents" design (this
+repo's `pr-babysit`/`--auto-merge` included) keeps a human on that button for
+these paths — surface the PR and diff and stop, don't `gh pr merge` or
+approve it yourself.
+
+"Security-critical," for this purpose, means at minimum: auth/authz code;
+credential, secret, or token handling; `.github/workflows/` and other CI/CD
+definitions; dependency manifests/lockfiles (supply-chain surface);
+`.claude/settings.json` permissions or hooks; and this repo's own PR
+review/merge tooling (`pr-review-rubric`, `pr-babysit`, `pr-comments`,
+`pr-checks`, `gh-publish-permission`). Treat that as a floor — extend it by
+judgment to a given repo's actual regulated surface (PCI/HIPAA/PII-handling
+code, for instance).
