@@ -8,10 +8,15 @@
 # `coverage` additionally needs kcov and jq, and only MEASURES anything on
 # Linux — see the comment above that target.
 #
-# The Python side (the detached-terminal skill) needs a virtualenv:
-#   make venv        # creates .venv from requirements-dev.txt
-# `check` uses it if it exists and falls back to whatever python3 is on PATH,
-# so a shell-only contributor doesn't have to build one to run the shell checks.
+# The Python side (the detached-terminal skill) needs a virtualenv. Every
+# target that shells out to ruff/mypy/pytest depends on `venv` and always
+# runs through .venv's pinned interpreter (never whatever `python3` happens
+# to resolve to on PATH) — a stray, unpinned global ruff install produced a
+# confusing false "would reformat" failure on this exact file (unrelated to
+# whatever change was actually in flight) because it disagreed with the
+# ruff==0.9.6 this repo pins in requirements-dev.txt. `lint-sh`/`structure`/
+# `test-sh`/`coverage` need no Python at all, so a shell-only contributor
+# never triggers the venv build.
 
 SHELL := /usr/bin/env bash
 
@@ -25,7 +30,12 @@ PY_SOURCES := plugins/dfadler-agent-config/skills/detached-terminal/scripts/agen
 
 VENV := .venv
 VENV_BIN := $(VENV)/bin
-PY := $(shell test -x $(VENV_BIN)/python && echo $(VENV_BIN)/python || echo python3)
+# A real file, not a phony re-run-every-time target: make only rebuilds the
+# venv when requirements-dev.txt changes (or .venv doesn't exist yet), so
+# `make lint-py` stays fast on repeat local runs instead of reinstalling on
+# every invocation.
+VENV_STAMP := $(VENV)/.installed
+PY := $(VENV_BIN)/python
 
 # Coverage settings. The floor is a MEASURED baseline, not an aspiration: 70%
 # is the first honest measurement (70.24%) rounded DOWN — kcov line coverage
@@ -94,10 +104,13 @@ help: ## Show available targets
 # pytest dependency is exactly how this broke once already.
 check: lint structure typecheck test lint-actions coverage ## Everything CI runs
 
-venv: ## Create .venv from requirements-dev.txt
+venv: $(VENV_STAMP) ## Create/refresh .venv from requirements-dev.txt
+
+$(VENV_STAMP): requirements-dev.txt
 	@python3 -m venv $(VENV)
 	@$(VENV_BIN)/pip install -q --upgrade pip
 	@$(VENV_BIN)/pip install -q -r requirements-dev.txt
+	@touch $(VENV_STAMP)
 	@echo "✓ $(VENV) ready"
 
 lint: lint-sh lint-py ## Lint shell and Python
@@ -108,17 +121,17 @@ lint-sh: ## shellcheck + shfmt (check only) + set-flags convention + CLAUDE.md s
 	@bash scripts/check-shell-set-flags.sh
 	@bash scripts/check-claude-md-lines.sh claude/CLAUDE.md $(CLAUDE_MD_MAX_LINES)
 
-lint-py: ## ruff check + ruff format --check
+lint-py: venv ## ruff check + ruff format --check
 	@$(PY) -m ruff check $(PY_SOURCES)
 	@$(PY) -m ruff format --check $(PY_SOURCES)
 
-typecheck: ## mypy --strict over the Python sources
+typecheck: venv ## mypy --strict over the Python sources
 	@$(PY) -m mypy --strict --ignore-missing-imports $(PY_SOURCES)
 
 fmt: fmt-py ## Rewrite sources to the repo's style
 	@$(SH_FIND) | xargs -0 shfmt -i 2 -ci -w
 
-fmt-py: ## Rewrite Python to ruff's style
+fmt-py: venv ## Rewrite Python to ruff's style
 	@$(PY) -m ruff check --fix $(PY_SOURCES)
 	@$(PY) -m ruff format $(PY_SOURCES)
 
@@ -130,7 +143,7 @@ test: test-sh test-py ## Run every suite
 test-sh: ## Run the bats suites
 	@bats scripts/tests
 
-test-py: ## Run the pytest suite
+test-py: venv ## Run the pytest suite
 	@$(PY) -m pytest scripts/tests -q
 
 # Re-runs the bats suite under kcov and enforces COVERAGE_MIN above. CI calls
