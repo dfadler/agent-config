@@ -11,7 +11,7 @@ description: |
   consistent-type-assertions`/`no-non-null-assertion` question, or a
   question about which comment syntax to use in JS/TS.
 metadata:
-  version: "1.0.0"
+  version: "1.1.0"
 ---
 
 # TypeScript and JS/TS Conventions
@@ -42,11 +42,26 @@ examples) takes precedence over this generic version.
 Pick the comment form by what the comment is doing, not by habit:
 
 - **`//`** — standalone single-line comments; the default for ordinary one-liners.
-- **`/* … */` inline** — a note embedded *within* a line that runs, so the code
-  continues after it: `document.querySelector(/* nullable */ '.card')`, `fn(a, /* retries */ 3, cb)`.
+- **`/* … */` inline** — sits *inside* a single statement, with code before and after
+  it as part of that same statement: `document.querySelector(/* nullable */ '.card')`,
+  `fn(a, /* retries */ 3, cb)`. The test is whether the comment interrupts one
+  statement, not whether it visually sits alone on its own line — a comment a
+  formatter wrapped onto its own line is still this form as long as the statement
+  continues below it, e.g.:
+
+  ```ts
+  fn(
+    a,
+    /* retries: bump only after the flaky-network fix ships */
+    3,
+    cb,
+  );
+  ```
+
 - **`/* … */` multi-line (starred block)** — a standalone note spanning multiple lines
-  that is *not* documenting the declaration it precedes (a rationale, module overview,
-  workaround explanation): aligned leading `*` on each line, never a stack of `//` lines:
+  that sits *between* statements or declarations (not interrupting one) and is *not*
+  documenting the declaration it precedes (a rationale, module overview, workaround
+  explanation): aligned leading `*` on each line, never a stack of `//` lines:
 
   ```ts
   /*
@@ -70,3 +85,26 @@ The "no stacked `//`" half is mechanically checkable via
 `@stylistic/multiline-comment-style` if a project's ESLint config enables it — that
 rule can't tell starred block from JSDoc apart, so which multi-line form fits stays a
 judgment call either way.
+
+All four forms side by side, each doing a different job:
+
+```ts
+// Single line: a standalone note before the statement below.
+
+fn(a, /* retries */ 3, cb); // Inline: interrupts this one statement.
+
+/*
+ * Starred block: a standalone rationale between statements — not
+ * documenting the declaration that happens to follow it.
+ */
+
+/**
+ * JSDoc: documents the declaration it directly precedes.
+ */
+function example() {}
+```
+
+Inline vs. starred block is the pair most often confused, since both use `/* … */`:
+inline comments live *inside* a statement (something follows it on the same
+statement, even across a line break); a starred block lives *between* statements, with
+nothing of the prior or next statement sharing its line.
