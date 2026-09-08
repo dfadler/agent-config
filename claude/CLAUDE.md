@@ -47,6 +47,23 @@ background or parallel tasks. Never commit directly to the main working copy.
   briefly removing their work and dragging it onto your branch. Instead, enter a
   clean worktree from the up-to-date default branch and re-apply only your own hunks
   there.
+- **`git stash` is repo-wide, not per-worktree, so it collides across
+  concurrent worktree sessions.** Every worktree linked to one repo shares
+  the same `.git` directory, and `refs/stash` lives there — not scoped to
+  the worktree that pushed it. Two sessions in two different worktrees
+  running `git stash push` around the same time interleave into one shared
+  stack, and a plain `git stash pop` in either one can pop the *other*
+  session's entry instead of its own, silently applying a stranger's diff
+  into your working tree. For a scoped "temporarily revert these known
+  files, capture something, then restore" need (e.g. a before/after
+  screenshot comparison), skip `git stash` entirely: `git checkout HEAD --
+  <files>` plus a plain filesystem copy of the current content as your own
+  backup never touches repo-wide state, so there's nothing to collide with.
+  If it already happened, a stash entry is just a commit — recover with
+  `git fsck --no-reflog --unreachable --dangling` to list dangling commits,
+  filter to your own by `-m` message text and a recent author-date to keep
+  the search fast, then `git stash apply <sha>` (never `pop`, to avoid
+  touching the shared stack again) once you've identified your entry.
 - **After merging a PR that adds or tightens an enforcing CI rule** (a new lint rule,
   a stricter type check), re-run that check against a fresh default branch and sweep
   any stragglers in a follow-up — branches cut *before* the rule-adding PR merged
