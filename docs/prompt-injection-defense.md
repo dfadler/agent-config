@@ -240,6 +240,33 @@ PR review into a security audit.
   here instead of restating the model, so the reasoning is written once and
   can be updated once.
 
+## Pipeline audit: does this repo's own tooling already isolate third-party content?
+
+Findings for [#178](https://github.com/dfadler/agent-config/issues/178), one
+of the sub-issues under [#176](https://github.com/dfadler/agent-config/issues/176)
+— a narrower question than the general threat model above: when this repo's
+own tooling hands Claude third-party PR/issue/web content, does that content
+actually arrive isolated and attributable, or could it blend into context as
+if the user wrote it? Checked against the live tool definitions and this
+repo's actual configuration, not just documentation.
+
+**Summary:** `gh` CLI content (via Bash) is structurally isolated by the
+Claude API's `tool_result` protocol but delivered verbatim, with no
+transformation — closed where it matters by `pr-review-rubric`'s and
+`pr-comments`'s explicit "treat as data, not instructions" framing.
+WebFetch/WebSearch get an extra isolation layer (content is summarized
+through a separate model, or returned as structured result blocks, not raw
+pages), but this repo has no skill-level "untrusted" reinforcement for that
+pipeline yet — tracked separately as
+[#181](https://github.com/dfadler/agent-config/issues/181), not duplicated
+here. This repo has no MCP GitHub connector configured at all — avoiding
+the pipeline is a stronger posture than hardening one would be. No file
+needed a behavioral change as a result of this audit.
+
+Full findings (method, the three per-pipeline verdicts, and a comparison
+table) are on the issue:
+[#178 (comment)](https://github.com/dfadler/agent-config/issues/178#issuecomment-5592031734).
+
 ## Cross-references
 
 - `plugins/dfadler-agent-config/skills/pr-review-rubric/SKILL.md` —
