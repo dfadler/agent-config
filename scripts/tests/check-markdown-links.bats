@@ -45,6 +45,12 @@ check() {
   assert_success
 }
 
+@test "ignores an absolute https URL when the link text has its own parenthetical" {
+  printf '[Prompt injection defenses (research)](https://example.com/research)\n' >"$ROOT/page.md"
+  check
+  assert_success
+}
+
 @test "ignores an anchor-only link" {
   printf '[section](#some-heading)\n' >"$ROOT/page.md"
   check

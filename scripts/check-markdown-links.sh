@@ -118,8 +118,11 @@ for file in ${files[@]+"${files[@]}"}; do
   while IFS=: read -r lineno match; do
     [ -n "${match:-}" ] || continue
 
-    # match looks like: [text](target) -- pull out just the target.
-    link="${match#*(}"
+    # match looks like: [text](target) -- pull out just the target. Split on
+    # the LAST "](" rather than the first "(": link text containing its own
+    # parenthetical (e.g. "[foo (bar)](url)") would otherwise truncate the
+    # target to "bar)](url)".
+    link="${match##*](}"
     link="${link%)}"
 
     # Drop an anchor suffix; a pure "#foo" anchor link disappears entirely.
