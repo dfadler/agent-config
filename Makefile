@@ -90,10 +90,15 @@ KCOV_EXCLUDE := /scripts/tests
 # escalation order to pr-checks, and PR-review-comment classification to
 # pr-comments — CLAUDE.md keeps only the policy/pointer), pulling it back
 # down to 460, and the repo-wide git-stash-hazard bullet pushed it back up
-# to 477; 490 is that measurement plus the same style of headroom, not a
-# new baseline to fill up to. Raising it further takes a deliberate commit,
-# the same as COVERAGE_MIN above.
-CLAUDE_MD_MAX_LINES := 490
+# to 477; 490 was that measurement plus the same style of headroom. #203's
+# follow-up to #191 moved the remaining worktree/git mechanics (worktree
+# creation and locking conventions, the stash-collision hazard, conflict-
+# resolution escalation levels, PR-splitting sequencing, branch naming) into
+# a new `git-worktree-usage` skill, leaving only the policy/pointer behind
+# and pulling this file down to 336 lines; 350 is that measurement plus the
+# same style of headroom, not a new baseline to fill up to. Raising it
+# further takes a deliberate commit, the same as COVERAGE_MIN above.
+CLAUDE_MD_MAX_LINES := 350
 
 .PHONY: help check lint lint-sh lint-py lint-actions fmt fmt-py test test-sh test-py \
         structure typecheck venv coverage check-links
