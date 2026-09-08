@@ -82,7 +82,7 @@ milestone — a part landing, a PR opening, a plan changing — not at
 arbitrary time intervals and not by restating "still working on it" with no
 new information:
 
-- "Part 1 is up in PR #N" when a PR for one piece opens.
+- "🤖 **Claude:** Part 1 is up in PR #N" when a PR for one piece opens.
 - A note if the plan from Step 2 changes (a deferred part turns out to be
   needed now, or vice versa).
 - Nothing at all between real milestones — a status update that says
@@ -105,10 +105,15 @@ look each one up:
   `~/.claude/CLAUDE.md`'s "Responding to and resolving review comments"
   section already requires for review-comment replies (read that section
   rather than inventing a different phrasing here). Get the real merge
-  commit SHA — `gh pr view <n> --json mergeCommit --jq .mergeCommit.oid`,
-  or `git log --merges` on the branch the PR merged into — not the last
-  commit on the PR's own branch, which usually differs from the merge
-  commit.
+  commit SHA from `gh pr view <n> --json mergeCommit --jq .mergeCommit.oid`
+  — this is authoritative regardless of merge method and should be tried
+  first. If it's unavailable, the fallback depends on how the PR was
+  merged: `git log --merges` only finds an ordinary merge commit (search
+  its message for the PR number to confirm it's the right one) — a squash
+  or rebase merge never creates one, so for those, look on the base branch
+  for the commit carrying the PR's squashed title or its last commit
+  re-applied, not the last commit on the PR's own branch, which usually
+  differs from whatever landed on the base branch.
 - **The release/tag/version** the fix will be, or already is, available in.
   Look this up rather than guessing:
   - `git describe --contains <merge-sha>` against the target branch tells
@@ -123,7 +128,7 @@ look each one up:
 Example shape (fill in every placeholder from a real lookup, never leave
 one implied):
 
-```
+```text
 🤖 **Claude:** This is resolved.
 
 - Implemented in #<pr1> and #<pr2>
@@ -160,7 +165,7 @@ each need their own explicit, request-scoped permission.
 Every comment this skill posts opens with the same AI-authorship marker
 used elsewhere in this repo, so it never reads as if a human wrote it:
 
-```
+```text
 🤖 **Claude:** <the rest of the comment>
 ```
 
