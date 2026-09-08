@@ -71,9 +71,11 @@ KCOV_EXCLUDE := /scripts/tests
 # pushed it to 412; 425 is that measurement plus the same headroom again,
 # not a new baseline to fill up to. #168's sourced-only exemption rewrite
 # pushed it to 430; 440 is that measurement plus the same style of headroom.
+# #175's no-autonomous-merge guardrail for security-critical/regulated paths
+# pushed it to 455; 465 is that measurement plus the same style of headroom.
 # Raising it further takes a deliberate commit, the same as COVERAGE_MIN
 # above.
-CLAUDE_MD_MAX_LINES := 440
+CLAUDE_MD_MAX_LINES := 465
 
 .PHONY: help check lint lint-sh lint-py lint-actions fmt fmt-py test test-sh test-py \
         structure typecheck venv coverage check-links
