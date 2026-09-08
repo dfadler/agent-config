@@ -275,8 +275,11 @@ table) are on the issue:
   techniques — unusual encodings, hidden/invisible text, image-borne
   payloads such as the GhostCommit disclosure), infrastructure-tampering
   scrutiny on the review pipeline's own trust surface, supply-chain-shaped
-  changes, and the fixed tool-authority boundary, all specific to reviewing
-  a diff or PR.
+  changes, a combined-signal check that flags an innocuous-looking PR
+  description paired with a dependency addition, `.github/workflows/`
+  edit, or unusual encoding (pointing to `docs/github-actions.md` for the
+  workflow-file case specifically), and the fixed tool-authority boundary,
+  all specific to reviewing a diff or PR.
 - `plugins/dfadler-agent-config/skills/gh-publish-permission/SKILL.md` —
   the human-layer backstop before any GitHub publish action; defines what
   counts as valid, explicit, request-scoped permission.
