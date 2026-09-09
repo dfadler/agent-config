@@ -113,6 +113,10 @@ EOF
   # The visible label text still preserves the original casing.
   assert_output_contains ">OPEN</span>"
   assert_output_contains ">CLOSED</span>"
+  # Regression check: each issue title must be a clickable link to the real
+  # issue on GitHub, not plain text.
+  assert_output_contains "<a href=\"https://github.com/dfadler/example/issues/10\">#10 An open issue</a>"
+  assert_output_contains "<a href=\"https://github.com/dfadler/example/issues/9\">#9 A closed issue</a>"
 }
 
 @test "handles a repo with no workflow runs and no issues" {
