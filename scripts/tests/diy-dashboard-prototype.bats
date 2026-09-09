@@ -119,6 +119,65 @@ EOF
   assert_output_contains "<a href=\"https://github.com/dfadler/example/issues/9\">#9 A closed issue</a>"
 }
 
+@test "escapes quote characters in titles so they cannot break out of href attributes" {
+  FIXTURE_BIN="$BATS_TEST_TMPDIR/fixture-bin-quotes"
+  mkdir -p "$FIXTURE_BIN"
+  cat >"$FIXTURE_BIN/gh" <<'EOF'
+#!/usr/bin/env bash
+set -euo pipefail
+case "$1 $2" in
+  "pr list") echo "0" ;;
+  "run list") echo "[]" ;;
+  "issue list")
+    cat <<'JSON'
+[{"number": 1, "title": "a\" onmouseover=\"alert(1)", "state": "OPEN", "updatedAt": "2026-01-01T00:00:00Z"}]
+JSON
+    ;;
+  *) exit 99 ;;
+esac
+EOF
+  chmod +x "$FIXTURE_BIN/gh"
+  # Regression check (CWE-79): a crafted issue title containing a double
+  # quote must not be able to break out of the <a href="..."> attribute it's
+  # rendered inside. Before html_escape covered quote characters, this title
+  # would have injected a live onmouseover handler into the page.
+  PATH="$FIXTURE_BIN:$PATH" run bash "$SCRIPT" -o "$OUT_FILE" dfadler/quote-example
+  assert_success
+
+  run cat "$OUT_FILE"
+  refute_output_contains 'onmouseover="alert(1)"'
+  assert_output_contains "a&quot; onmouseover=&quot;alert(1)"
+}
+
+@test "shows an error state, not empty data, when gh run/issue list fail" {
+  FIXTURE_BIN="$BATS_TEST_TMPDIR/fixture-bin-gh-failure"
+  mkdir -p "$FIXTURE_BIN"
+  cat >"$FIXTURE_BIN/gh" <<'EOF'
+#!/usr/bin/env bash
+set -euo pipefail
+case "$1 $2" in
+  "pr list") echo "0" ;;
+  "run list") echo "authentication failed" >&2; exit 1 ;;
+  "issue list") echo "authentication failed" >&2; exit 1 ;;
+  *) exit 99 ;;
+esac
+EOF
+  chmod +x "$FIXTURE_BIN/gh"
+  # Regression check: a nonzero `gh` exit (expired token, API error, bad
+  # repo) must render as a distinct error state, never silently collapse
+  # into the same "no workflow runs found" / "No issues found." text a
+  # genuinely-empty, successful fetch would produce — those two situations
+  # are not the same thing and must not look identical on the page.
+  PATH="$FIXTURE_BIN:$PATH" run bash "$SCRIPT" -o "$OUT_FILE" dfadler/broken-example
+  assert_success
+
+  run cat "$OUT_FILE"
+  assert_output_contains "error fetching runs"
+  assert_output_contains "Could not fetch issues"
+  refute_output_contains "no workflow runs found"
+  refute_output_contains "No issues found."
+}
+
 @test "handles a repo with no workflow runs and no issues" {
   FIXTURE_BIN="$BATS_TEST_TMPDIR/fixture-bin-empty"
   mkdir -p "$FIXTURE_BIN"

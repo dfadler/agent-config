@@ -82,9 +82,16 @@ for dep in gh jq; do
 done
 
 html_escape() {
-  # Minimal HTML-entity escaping for text pulled from API JSON before
-  # interpolating it into the page.
-  sed -e 's/&/\&amp;/g' -e 's/</\&lt;/g' -e 's/>/\&gt;/g'
+  # HTML-entity escaping for text pulled from API JSON before interpolating
+  # it into the page — including quote characters, since escaped values
+  # (e.g. safe_repo) are also inserted into quoted href="..." attributes,
+  # not just element text content. Omitting quote-escaping would let a
+  # crafted repo/title value break out of an attribute (CWE-79).
+  sed -e 's/&/\&amp;/g' \
+    -e 's/"/\&quot;/g' \
+    -e "s/'/\\&#39;/g" \
+    -e 's/</\&lt;/g' \
+    -e 's/>/\&gt;/g'
 }
 
 cards=""
@@ -94,13 +101,34 @@ for repo in "${repos[@]}"; do
   echo "Fetching data for $repo ..." >&2
   safe_repo=$(printf '%s' "$repo" | html_escape)
 
-  # 1. Open PR count.
-  open_pr_count=$(gh pr list --repo "$repo" --state open --json number --jq 'length' 2>/dev/null || echo "n/a")
+  # 1. Open PR count. A `gh` failure (expired token, API error, bad repo) is
+  # surfaced as "n/a", never as a count — 0 always means a real, successful
+  # zero-result fetch.
+  if open_pr_count=$(gh pr list --repo "$repo" --state open --json number --jq 'length' 2>/dev/null); then
+    :
+  else
+    echo "::warning::gh pr list failed for $repo — showing as unavailable" >&2
+    open_pr_count="n/a"
+  fi
 
-  # 2. Latest CI run: name, status, conclusion, and how long ago.
-  latest_run_json=$(gh run list --repo "$repo" --limit 1 --json displayTitle,status,conclusion,workflowName,createdAt 2>/dev/null || echo "[]")
+  # 2. Latest CI run: name, status, conclusion, and how long ago. A `gh`
+  # failure must not collapse into "no workflow runs found" — that reads as
+  # a confirmed, successful zero-result fetch when it may just mean the
+  # fetch itself failed.
+  if latest_run_json=$(gh run list --repo "$repo" --limit 1 --json displayTitle,status,conclusion,workflowName,createdAt 2>/dev/null); then
+    run_fetch_failed=0
+  else
+    echo "::warning::gh run list failed for $repo — showing as error, not empty" >&2
+    run_fetch_failed=1
+    latest_run_json="[]"
+  fi
   run_count=$(jq 'length' <<<"$latest_run_json")
-  if [ "$run_count" -gt 0 ]; then
+  if [ "$run_fetch_failed" -eq 1 ]; then
+    run_workflow="(error fetching runs)"
+    run_status="error"
+    run_conclusion="error"
+    run_created=""
+  elif [ "$run_count" -gt 0 ]; then
     run_workflow=$(jq -r '.[0].workflowName' <<<"$latest_run_json")
     run_status=$(jq -r '.[0].status' <<<"$latest_run_json")
     run_conclusion=$(jq -r '.[0].conclusion // "in_progress"' <<<"$latest_run_json")
@@ -113,12 +141,21 @@ for repo in "${repos[@]}"; do
   fi
 
   # 3. Recent issue activity (open or closed, most recently updated first).
-  recent_issues_json=$(gh issue list --repo "$repo" --state all --limit 5 \
-    --json number,title,state,updatedAt 2>/dev/null || echo "[]")
+  # Same failure-vs-empty distinction as above.
+  if recent_issues_json=$(gh issue list --repo "$repo" --state all --limit 5 \
+    --json number,title,state,updatedAt 2>/dev/null); then
+    issues_fetch_failed=0
+  else
+    echo "::warning::gh issue list failed for $repo — showing as error, not empty" >&2
+    issues_fetch_failed=1
+    recent_issues_json="[]"
+  fi
 
   issue_rows=""
   issue_count=$(jq 'length' <<<"$recent_issues_json")
-  if [ "$issue_count" -gt 0 ]; then
+  if [ "$issues_fetch_failed" -eq 1 ]; then
+    issue_rows="<li class=\"muted\">&#9888; Could not fetch issues (gh error) &mdash; not necessarily zero.</li>"
+  elif [ "$issue_count" -gt 0 ]; then
     while IFS=$'\t' read -r inum ititle istate iupdated; do
       safe_title=$(printf '%s' "$ititle" | html_escape)
       istate_lc=$(printf '%s' "$istate" | tr '[:upper:]' '[:lower:]')
@@ -131,7 +168,7 @@ for repo in "${repos[@]}"; do
   conclusion_class="neutral"
   case "$run_conclusion" in
     success) conclusion_class="ok" ;;
-    failure | timed_out | cancelled) conclusion_class="fail" ;;
+    failure | timed_out | cancelled | error) conclusion_class="fail" ;;
     in_progress | n/a) conclusion_class="neutral" ;;
   esac
 
