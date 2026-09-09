@@ -92,6 +92,7 @@ fetch_start_epoch=$(date +%s)
 
 for repo in "${repos[@]}"; do
   echo "Fetching data for $repo ..." >&2
+  safe_repo=$(printf '%s' "$repo" | html_escape)
 
   # 1. Open PR count.
   open_pr_count=$(gh pr list --repo "$repo" --state open --json number --jq 'length' 2>/dev/null || echo "n/a")
@@ -121,7 +122,7 @@ for repo in "${repos[@]}"; do
     while IFS=$'\t' read -r inum ititle istate iupdated; do
       safe_title=$(printf '%s' "$ititle" | html_escape)
       istate_lc=$(printf '%s' "$istate" | tr '[:upper:]' '[:lower:]')
-      issue_rows+="<li><span class=\"badge badge-${istate_lc}\">${istate}</span> #${inum} ${safe_title} <span class=\"muted\">(updated ${iupdated})</span></li>"
+      issue_rows+="<li><span class=\"badge badge-${istate_lc}\">${istate}</span> <a href=\"https://github.com/${safe_repo}/issues/${inum}\">#${inum} ${safe_title}</a> <span class=\"muted\">(updated ${iupdated})</span></li>"
     done < <(jq -r '.[] | [.number, .title, .state, .updatedAt] | @tsv' <<<"$recent_issues_json")
   else
     issue_rows="<li class=\"muted\">No issues found.</li>"
@@ -134,7 +135,6 @@ for repo in "${repos[@]}"; do
     in_progress | n/a) conclusion_class="neutral" ;;
   esac
 
-  safe_repo=$(printf '%s' "$repo" | html_escape)
   safe_workflow=$(printf '%s' "$run_workflow" | html_escape)
   run_detail="$run_status"
   [ -n "$run_created" ] && run_detail="$run_status, started $run_created"
