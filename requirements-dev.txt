@@ -2,5 +2,6 @@
 # only `pyte` at runtime; the rest are the quality gate.
 pyte==0.8.2
 pytest==9.0.3
+pytest-cov==7.1.0
 ruff==0.9.6
 mypy==1.15.0
