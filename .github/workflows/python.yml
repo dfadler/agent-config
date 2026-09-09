@@ -56,3 +56,11 @@ jobs:
       # they do need a working pty(4), which the ubuntu runner provides.
       - name: Test (pytest)
         run: make test-py
+
+      # Mirrors shell.yml's kcov step: re-runs the same suite under
+      # pytest-cov and enforces a floor (see COVERAGE_PY_MIN in the
+      # Makefile for the number and how it was measured). Unlike kcov this
+      # needs no Linux-only guard — coverage.py instruments Python
+      # identically on every platform `make coverage-py` runs on.
+      - name: Coverage (pytest-cov, floor)
+        run: make coverage-py
