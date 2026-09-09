@@ -277,6 +277,81 @@ def test_status_file_is_written_on_update(tmp_path: Path) -> None:
         thread.join(timeout=5)
 
 
+def test_post_to_unknown_path_returns_404(server: str) -> None:
+    req = urllib.request.Request(
+        f"{server}/not-a-real-endpoint",
+        data=b"{}",
+        headers={"Content-Type": "application/json"},
+        method="POST",
+    )
+    try:
+        urllib.request.urlopen(req, timeout=5)
+        raise AssertionError("expected HTTPError for an unknown POST path")
+    except urllib.error.HTTPError as exc:
+        assert exc.code == 404
+    # A 404 on an unrecognized path must not have been recorded as a session.
+    assert get_status(server) == []
+
+
+def test_get_to_unknown_path_returns_404(server: str) -> None:
+    try:
+        urllib.request.urlopen(f"{server}/not-a-real-endpoint", timeout=5)
+        raise AssertionError("expected HTTPError for an unknown GET path")
+    except urllib.error.HTTPError as exc:
+        assert exc.code == 404
+
+
+def test_log_file_receives_raw_payload_lines(tmp_path: Path) -> None:
+    log_path = tmp_path / "hooks.log"
+    store = receiver.SessionStore()
+    handler = receiver.make_handler(
+        store, log_file=open(log_path, "a", encoding="utf-8"), status_file=None
+    )
+    httpd = ThreadingHTTPServer(("127.0.0.1", 0), handler)
+    thread = threading.Thread(target=httpd.serve_forever, daemon=True)
+    thread.start()
+    host, port = str(httpd.server_address[0]), httpd.server_address[1]
+    base_url = f"http://{host}:{port}"
+
+    try:
+        post_hook(
+            base_url,
+            {"session_id": "abc123", "hook_event_name": "Stop", "cwd": "/x"},
+        )
+        post_hook(
+            base_url,
+            {
+                "session_id": "abc123",
+                "hook_event_name": "SessionEnd",
+                "reason": "other",
+            },
+        )
+        # --log-file's whole purpose is an audit trail independent of the
+        # in-memory /status snapshot -- one JSON line per raw payload
+        # received, in order, not just the latest state per session.
+        lines = log_path.read_text().splitlines()
+        assert len(lines) == 2
+        first = json.loads(lines[0])
+        second = json.loads(lines[1])
+        assert first["hook_event_name"] == "Stop"
+        assert second["hook_event_name"] == "SessionEnd"
+    finally:
+        httpd.shutdown()
+        httpd.server_close()
+        thread.join(timeout=5)
+
+
+def test_missing_session_id_defaults_to_unknown(server: str) -> None:
+    # A malformed or nonstandard hook payload with no session_id at all
+    # must not crash the handler -- it should be attributed to a visible
+    # "unknown" bucket rather than silently dropped or raising.
+    post_hook(server, {"hook_event_name": "Stop", "cwd": "/x"})
+
+    (session,) = get_status(server)
+    assert session["session_id"] == "unknown"
+    assert session["status"] == receiver.STATUS_DONE
+
+
 def test_render_table_smoke() -> None:
     # Exercises render_table directly (rather than only via HTTP) for the
     # column-width computation with rows of very different lengths.
