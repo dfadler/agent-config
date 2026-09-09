@@ -26,7 +26,9 @@ SH_FIND := find scripts plugins setup.sh -type f -name '*.sh' -print0
 
 # Python sources: the skill's implementation plus its tests.
 PY_SOURCES := plugins/dfadler-agent-config/skills/detached-terminal/scripts/agent_term.py \
-              scripts/tests/test_agent_term.py
+              scripts/tests/test_agent_term.py \
+              scripts/session-status-hook-receiver/receiver.py \
+              scripts/tests/test_session_status_receiver.py
 
 VENV := .venv
 VENV_BIN := $(VENV)/bin
