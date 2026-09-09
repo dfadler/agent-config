@@ -6,7 +6,10 @@
 #   brew install shellcheck shfmt bats-core actionlint
 #
 # `coverage` additionally needs kcov and jq, and only MEASURES anything on
-# Linux — see the comment above that target.
+# Linux — see the comment above that target. `coverage-py` needs jq too (to
+# read pytest-cov's JSON report the same way `coverage` reads kcov's), but
+# runs on any platform pytest itself does — coverage.py has no macOS SIP
+# restriction the way kcov's bash instrumentation does.
 #
 # The Python side (the detached-terminal skill) needs a virtualenv. Every
 # target that shells out to ruff/mypy/pytest depends on `venv` and always
@@ -27,6 +30,22 @@ SH_FIND := find scripts plugins setup.sh -type f -name '*.sh' -print0
 # Python sources: the skill's implementation plus its tests.
 PY_SOURCES := plugins/dfadler-agent-config/skills/detached-terminal/scripts/agent_term.py \
               scripts/tests/test_agent_term.py
+
+# The non-test entries of PY_SOURCES, reduced to their containing
+# directories, is what `coverage-py` points pytest-cov at. This is
+# deliberately directory-based rather than file-based: pytest-cov refused to
+# attribute any coverage at all when pointed at an exact `*.py` path here
+# (coverage.py's own module-resolution warned "was never imported", because
+# agent_term.py is loaded by the test suite via `importlib` under a synthetic
+# module name, not a regular package import `--cov=<file>` can match) — the
+# containing directory works because pytest-cov then discovers every `.py`
+# file under it directly from the filesystem rather than via import-name
+# matching. One consequence worth knowing: a new file added to PY_SOURCES in
+# a DIFFERENT directory that isn't already covered here needs adding to this
+# list too, same as it already needs manually adding to PY_SOURCES itself for
+# lint-py/typecheck (neither of those uses `find`, unlike SH_FIND above) —
+# this is not a new gap `coverage-py` introduces, just one it inherits.
+PY_COVERAGE_DIRS := $(sort $(dir $(filter-out scripts/tests/%,$(PY_SOURCES))))
 
 VENV := .venv
 VENV_BIN := $(VENV)/bin
@@ -68,6 +87,48 @@ COVERAGE_MIN := 70
 KCOV_INCLUDE := $(CURDIR)/scripts,$(CURDIR)/plugins,$(CURDIR)/setup.sh
 KCOV_EXCLUDE := /scripts/tests
 
+# Python's own coverage floor, the sibling this file's COVERAGE_MIN comment
+# above asks for rather than a second, inconsistent mechanism (dfadler/
+# agent-config#208). Same discipline as COVERAGE_MIN: 33 is the first honest
+# measurement (33.958...%) rounded DOWN, not an aspirational number. Measured
+# by running `make coverage-py` locally (macOS, Python 3.12.2) with
+# pytest==9.0.3, pytest-cov==7.1.0 pinned in requirements-dev.txt — the
+# measurement is platform-independent (coverage.py, unlike kcov, instruments
+# Python everywhere; nothing in agent_term.py or its tests branches on OS),
+# so the same run on ubuntu-latest in CI should reproduce it. It is much
+# lower than the bash floor because agent_term.py's CLI/daemon dispatch
+# (cmd_start, serve, bind_control_socket, the socket request/response loop)
+# is exercised only by real usage, not by scripts/tests/test_agent_term.py's
+# suite of pure-function/unit tests — a real gap, not a measurement error.
+# Lowering this line takes a deliberate commit; raising it as coverage
+# improves is welcome.
+COVERAGE_PY_DIR := coverage-py
+COVERAGE_PY_MIN := 33
+
+# What lands in the denominator, and what doesn't — the Python-side mirror of
+# the KCOV_INCLUDE/KCOV_EXCLUDE comment above:
+#
+#   * --cov is pointed at PY_COVERAGE_DIRS (derived above), never at
+#     scripts/tests — grading the test scaffolding against itself would
+#     inflate the number the same way including it in kcov's denominator
+#     would.
+#   * UNLIKE kcov's trace-based bash coverage, coverage.py's directory mode
+#     DOES count a file it never executed at all: a new, wholly-untested
+#     `.py` file dropped into a directory PY_COVERAGE_DIRS already points at
+#     shows up as an explicit 0%-covered entry (verified empirically: a
+#     never-imported dummy file in agent_term.py's directory appeared in the
+#     report at 0%, not silently omitted from the denominator). That is the
+#     exact failure mode #208 exists to close for Python. It is NOT closed
+#     for a new Python file in a directory PY_COVERAGE_DIRS doesn't already
+#     list — that file has to be added to PY_SOURCES (and therefore to this
+#     derived list) first, the same manual-onboarding step lint-py and
+#     typecheck already require and `coverage-py` inherits rather than fixes.
+#   * diff/patch coverage (a tool like diff-cover restricting the check to a
+#     PR's newly-changed lines, independent of the repo's aggregate number)
+#     was investigated for this target and deliberately left as follow-up —
+#     see the PR that introduced this comment for why.
+COVERAGE_PY_JSON := $(COVERAGE_PY_DIR)/py-coverage.json
+
 # Ceiling for claude/CLAUDE.md (see scripts/check-claude-md-lines.sh). The
 # global CLAUDE.md loads into every session on this machine regardless of
 # project, so unrelated content belongs in a skill/doc instead of growing this
@@ -101,7 +162,7 @@ KCOV_EXCLUDE := /scripts/tests
 CLAUDE_MD_MAX_LINES := 350
 
 .PHONY: help check lint lint-sh lint-py lint-actions fmt fmt-py test test-sh test-py \
-        structure typecheck venv coverage check-links
+        structure typecheck venv coverage coverage-py check-links
 
 help: ## Show available targets
 	@grep -E '^[a-z-]+:.*?## ' $(MAKEFILE_LIST) | awk -F':.*?## ' '{printf "  \033[36m%-14s\033[0m %s\n", $$1, $$2}'
@@ -110,13 +171,13 @@ help: ## Show available targets
 # promise the README makes. The split, so a new target lands in both places:
 #
 #   shell.yml      lint-sh, structure, test-sh, coverage
-#   python.yml     lint-py, typecheck, test-py
+#   python.yml     lint-py, typecheck, test-py, coverage-py
 #   actionlint.yml lint-actions
 #
 # Each workflow calls its own subset rather than `make check` — shell.yml has
 # no Python installed, and pointing it at an aggregate target that had grown a
 # pytest dependency is exactly how this broke once already.
-check: lint structure typecheck test lint-actions coverage ## Everything CI runs
+check: lint structure typecheck test lint-actions coverage coverage-py ## Everything CI runs
 
 venv: $(VENV_STAMP) ## Create/refresh .venv from requirements-dev.txt
 
@@ -184,6 +245,20 @@ coverage: ## Measure bats coverage with kcov and enforce the floor (Linux only)
 	  $(COVERAGE_DIR) bats scripts/tests; \
 	bash scripts/check-shell-coverage.sh \
 	  "$$(find $(COVERAGE_DIR) -maxdepth 2 -name coverage.json -print -quit)" $(COVERAGE_MIN)
+
+# Re-runs the pytest suite under pytest-cov and enforces COVERAGE_PY_MIN
+# above. CI calls this exact target, so the local and CI numbers come from
+# the same command — same contract as `coverage`, but with no platform skip:
+# coverage.py has no macOS equivalent of kcov's SIP restriction, so this
+# measures identically everywhere pytest itself runs.
+coverage-py: venv ## Measure pytest coverage and enforce the floor
+	@rm -rf $(COVERAGE_PY_DIR)
+	@mkdir -p $(COVERAGE_PY_DIR)
+	@$(PY) -m pytest scripts/tests -q \
+	  $(addprefix --cov=,$(PY_COVERAGE_DIRS)) \
+	  --cov-report=term-missing \
+	  --cov-report=json:$(COVERAGE_PY_JSON)
+	@bash scripts/check-python-coverage.sh $(COVERAGE_PY_JSON) $(COVERAGE_PY_MIN)
 
 lint-actions: ## Lint .github/workflows with actionlint
 	@actionlint
