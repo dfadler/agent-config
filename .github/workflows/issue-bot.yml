@@ -9,17 +9,11 @@ on:
   issue_comment:
     types: [created, edited]
 
-permissions:
-  contents: read
-
 jobs:
   issue-bot:
-    runs-on: ubuntu-latest
     permissions:
-      contents: read
       issues: write
       pull-requests: write
-    steps:
-      - uses: dfadler/issue-bot@778495b3d77158d2ed1f3c596f50bc2664f11386 # v1.3.0
-        with:
-          mention: "@issue-bot"
+    uses: dfadler/issue-bot/.github/workflows/reusable.yml@778495b3d77158d2ed1f3c596f50bc2664f11386 # v1.3.0
+    with:
+      ref: 778495b3d77158d2ed1f3c596f50bc2664f11386 # v1.3.0
