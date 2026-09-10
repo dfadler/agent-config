@@ -21,6 +21,12 @@ automatically, with no per-project copy to keep in sync.
     - `.claude-plugin/plugin.json` — the plugin manifest (name, version, description).
     - `agents/` — subagent definitions.
     - `skills/` — skills, a directory each containing a `SKILL.md` plus any scripts.
+    - `hooks/hooks.json` — hook events (e.g. `SessionStart`) the plugin wires up.
+      Unlike a skill, a hook here activates automatically for every project the
+      plugin is enabled in — nothing for that project's own `.claude/settings.json`
+      to reference. Scripts a hook invokes live wherever makes sense (a skill's own
+      `scripts/`, if the hook is that skill's companion) and are addressed via
+      `${CLAUDE_PLUGIN_ROOT}`, never a hardcoded path.
 - `docs/` — reference material specific to this repo's own tooling and CI, not
   general enough for `claude/CLAUDE.md` (which is loaded globally, for every
   project). `github-actions.md` is the first entry.
@@ -166,6 +172,16 @@ content it actually owns.
      containing a `SKILL.md`.
    - An **agent** → a new `.md` file under `plugins/dfadler-agent-config/agents/`.
    - A **slash command** → a new `.md` file under `claude/commands/`.
+   - A **hook** → an entry in `plugins/dfadler-agent-config/hooks/hooks.json`,
+     pointing (via `${CLAUDE_PLUGIN_ROOT}`) at a script under wherever fits — a
+     related skill's own `scripts/`, if the hook is that skill's companion. Unlike
+     everything else in this list, a hook activates for every project this plugin
+     is enabled in the moment it's added — there's no opt-in step on the
+     project's side — so it needs to be safe to run unconditionally: no-op
+     cleanly (exit 0, no output) whenever its precondition doesn't hold (wrong
+     project type, feature not configured, required CLI missing), and never let
+     the hook's own failure block a session start. The `git-worktree-usage`
+     skill's two `SessionStart` hooks are the reference example.
    - A whole new **plugin** (a set of skills/agents that belong together) → a new
      directory under `plugins/`, with its own `.claude-plugin/plugin.json`, `agents/`,
      and `skills/`. Give it a `PLUGIN_SRC`/`PLUGIN_LINK` pair and a `link` line in

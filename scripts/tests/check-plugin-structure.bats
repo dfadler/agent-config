@@ -216,6 +216,57 @@ EOF
   assert_success
 }
 
+@test "passes when there is no hooks/hooks.json at all" {
+  add_skill "$ROOT" demo my-skill
+  check
+  assert_success
+}
+
+@test "passes with a well-formed hooks/hooks.json" {
+  add_skill "$ROOT" demo my-skill
+  mkdir -p "$ROOT/plugins/demo/hooks"
+  echo '{ "hooks": { "SessionStart": [] } }' >"$ROOT/plugins/demo/hooks/hooks.json"
+  check
+  assert_success
+}
+
+@test "fails when hooks/hooks.json is not valid JSON" {
+  add_skill "$ROOT" demo my-skill
+  mkdir -p "$ROOT/plugins/demo/hooks"
+  echo '{ "hooks":, }' >"$ROOT/plugins/demo/hooks/hooks.json"
+  check
+  assert_failure
+  assert_output_contains "hooks/hooks.json: not valid JSON"
+}
+
+@test "fails when hooks/hooks.json's top level is not an object" {
+  add_skill "$ROOT" demo my-skill
+  mkdir -p "$ROOT/plugins/demo/hooks"
+  echo '[]' >"$ROOT/plugins/demo/hooks/hooks.json"
+  check
+  assert_failure
+  assert_output_contains "top level is not a JSON object"
+}
+
+@test "fails when hooks/hooks.json is a directory, not a file" {
+  add_skill "$ROOT" demo my-skill
+  # A directory NAMED hooks.json (not a file) — -f alone would treat this as
+  # "absent" and silently skip validation instead of reporting it.
+  mkdir -p "$ROOT/plugins/demo/hooks/hooks.json"
+  check
+  assert_failure
+  assert_output_contains "hooks/hooks.json"
+}
+
+@test "fails when hooks/hooks.json is a broken symlink" {
+  add_skill "$ROOT" demo my-skill
+  mkdir -p "$ROOT/plugins/demo/hooks"
+  ln -s "$ROOT/plugins/demo/hooks/does-not-exist.json" "$ROOT/plugins/demo/hooks/hooks.json"
+  check
+  assert_failure
+  assert_output_contains "hooks/hooks.json"
+}
+
 @test "reports every offender, not just the first" {
   add_skill "$ROOT" demo skill-a wrong-a
   add_skill "$ROOT" demo skill-b wrong-b
