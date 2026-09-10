@@ -14,12 +14,9 @@ automatically, with no per-project copy to keep in sync.
   - `CLAUDE.md` — global instructions (`~/.claude/CLAUDE.md` is a symlink to this file).
   - `commands/` — slash commands, symlinked individually into `~/.claude/commands/`.
 - `plugins/` — one directory per plugin, in the layout Claude Code's plugin format
-  expects. Every directory here carrying a `.claude-plugin/plugin.json` is discovered
-  and linked automatically by `setup.sh` (see below) — adding a new plugin doesn't
-  require touching the setup script.
-  - `dfadler-agent-config/` — this repo's own authored, cross-project engineering
-    habits (PR shepherding, git worktrees, shell hygiene). Its directory name matches
-    the `name` in its manifest, which is what makes its contents resolve as
+  expects.
+  - `dfadler-agent-config/` — the only plugin so far. Its directory name matches the
+    `name` in its manifest, which is what makes its contents resolve as
     `dfadler-agent-config:<skill>`.
     - `.claude-plugin/plugin.json` — the plugin manifest (name, version, description).
     - `agents/` — subagent definitions.
@@ -30,13 +27,6 @@ automatically, with no per-project copy to keep in sync.
       to reference. Scripts a hook invokes live wherever makes sense (a skill's own
       `scripts/`, if the hook is that skill's companion) and are addressed via
       `${CLAUDE_PLUGIN_ROOT}`, never a hardcoded path.
-  - `react-skills/` — React/Next.js skills vendored (not authored here) from
-    [vercel-labs/agent-skills](https://github.com/vercel-labs/agent-skills), MIT
-    licensed: `react-best-practices` and `composition-patterns`. Kept as a separate
-    plugin from `dfadler-agent-config` on purpose — these are framework-specific and
-    someone else's content, not this repo's own general habits. See
-    `plugins/react-skills/NOTICE.md` for the pinned source commit, license text, and
-    update instructions — this content goes stale silently unless re-pulled by hand.
 - `docs/` — reference material specific to this repo's own tooling and CI, not
   general enough for `claude/CLAUDE.md` (which is loaded globally, for every
   project). `github-actions.md` is the first entry.
@@ -79,11 +69,6 @@ with every project's own skills; inside a namespaced plugin it only produced
 Sharing the plugin with another machine or person would need a
 `.claude-plugin/marketplace.json` at the repo root; that isn't here yet, and adding it
 later wouldn't change how this machine loads the plugin.
-
-`react-skills` loads the identical way — a second, independent plugin symlinked
-alongside `dfadler-agent-config`, discovered by the same loop in `setup.sh` rather than
-a separate hardcoded step. It namespaces the same way, so its skills resolve as
-`react-skills:react-best-practices` and `react-skills:composition-patterns`.
 
 A future tool gets its own sibling directory (e.g. `codex/`) with whatever layout that
 tool expects, symlinked into its own config location the same way.
@@ -180,12 +165,45 @@ add first, and updates arrive automatically. `setup.sh` doesn't install this: th
 deliberate (#132, option A over B), so this repo's own setup only ever reaches into
 content it actually owns.
 
+### Recommended companion: vercel-labs/agent-skills
+
+[vercel-labs/agent-skills](https://github.com/vercel-labs/agent-skills) is Vercel
+Engineering's own React/Next.js skill collection, MIT licensed. Two of its skills came
+up while evaluating third-party React tooling for a refactor: `react-best-practices`
+(40+ performance rules) and `composition-patterns` (avoiding boolean-prop
+proliferation via compound components and state lifting). Recommended as a standalone
+install, same posture as `mattpocock-skills` above — nothing here depends on it, and
+nothing from it is vendored into this repo:
+
+```bash
+skills add vercel-labs/agent-skills --agent claude-code -g \
+  --skill vercel-react-best-practices vercel-composition-patterns
+```
+
+This isn't a `claude plugin` at all — Vercel distributes via a separate `skills` CLI
+(the `skills` npm package, from the [Agent Skills](https://agentskills.io/) spec /
+[skills.sh](https://skills.sh/vercel-labs/agent-skills)), confirmed directly against
+`vercel-labs/agent-skills`: it ships no `.claude-plugin/marketplace.json`. Skill names
+for `--skill` are each `SKILL.md`'s own `name:` field
+(`vercel-react-best-practices`), not its directory name — confirmed against a real
+probe install, not assumed from the README. `setup.sh` runs an advisory-only check
+(`check_react_skills`) that only fires if the `skills` CLI is already on `PATH` — it
+never runs `npx skills@latest` itself, since that would fetch and execute a
+third-party package over the network on every `setup.sh` run.
+
+An earlier version of this section vendored these two skills into their own plugin
+here instead of referencing them — reverted (#211's review) once it turned out `skills
+add` *does* support installing individual skills (`--skill <names>`), which was the
+premise vendoring was based on. Reference-only is more consistent with this repo's own
+#132 precedent: let upstream stay the source of truth with its own update story, rather
+than freezing a copy that goes stale silently.
+
 ### Recommended companion: anthropics/skills (frontend-design)
 
 [anthropics/skills](https://github.com/anthropics/skills) is Anthropic's own example
 skills repo. Its `example-skills` plugin includes `frontend-design`, aimed at UI/CSS
-output quality — a useful companion to `react-skills`' `composition-patterns`, which
-covers component *architecture* rather than visual polish. Recommended as a standalone
+output quality — a useful companion to `composition-patterns` above, which covers
+component *architecture* rather than visual polish. Recommended as a standalone
 install, same posture as `mattpocock-skills` above — nothing here depends on it:
 
 ```bash
