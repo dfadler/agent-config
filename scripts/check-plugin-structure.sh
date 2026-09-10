@@ -18,6 +18,10 @@
 #   * every agents/*.md has the same, with `name` matching the filename.
 #   * every *.sh or *.py shipped under a skill's scripts/ is executable — one that
 #     documents `scripts/foo.sh` is useless if the mode bit didn't survive.
+#   * hooks/hooks.json, if present, parses as JSON and its top level is an
+#     object — a hook, unlike a skill or agent, activates automatically for
+#     every project the plugin is enabled in the moment it merges, so a typo
+#     here fails silently at every session start rather than loudly in review.
 set -euo pipefail
 
 # Exit-code taxonomy — see the hygiene baseline in claude/CLAUDE.md.
@@ -168,6 +172,42 @@ if data["name"] != expected:
   fi
 }
 
+# hooks/hooks.json is optional (a plugin with no hooks has none), but when
+# present it MUST parse and its top level MUST be an object — the same static-
+# source-as-argv pattern as check_manifest, for the same reason (#60).
+check_hooks() {
+  local plugin_dir="$1" hooks_file="$1/hooks/hooks.json"
+
+  # -e alone misses a broken symlink (its target doesn't exist, so -e is
+  # false even though the symlink itself is a real, wrong entry); -L
+  # catches that. Anything present this way falls through to Python's
+  # open(), which reports a directory or broken symlink with its own OSError
+  # rather than this function silently treating it as "no hooks shipped."
+  [[ -e "$hooks_file" || -L "$hooks_file" ]] || return 0
+
+  local output
+  if ! output="$(python3 -c '
+import json, sys
+
+path = sys.argv[1]
+try:
+    with open(path) as fh:
+        data = json.load(fh)
+except (json.JSONDecodeError, UnicodeDecodeError):
+    print("not valid JSON")
+    sys.exit(1)
+except OSError as exc:
+    print("unreadable: %s" % exc.strerror)
+    sys.exit(1)
+
+if not isinstance(data, dict):
+    print("top level is not a JSON object")
+    sys.exit(1)
+' "$hooks_file" 2>&1)"; then
+    fail "$hooks_file: $output"
+  fi
+}
+
 check_frontmatter_doc() {
   local file="$1" expected="$2" label="$3"
 
@@ -195,6 +235,7 @@ fi
 for plugin_dir in "${plugins[@]}"; do
   plugin_dir="${plugin_dir%/}"
   check_manifest "$plugin_dir"
+  check_hooks "$plugin_dir"
 
   for skill_dir in "$plugin_dir"/skills/*/; do
     skill_dir="${skill_dir%/}"
