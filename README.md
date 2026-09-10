@@ -14,9 +14,12 @@ automatically, with no per-project copy to keep in sync.
   - `CLAUDE.md` — global instructions (`~/.claude/CLAUDE.md` is a symlink to this file).
   - `commands/` — slash commands, symlinked individually into `~/.claude/commands/`.
 - `plugins/` — one directory per plugin, in the layout Claude Code's plugin format
-  expects.
-  - `dfadler-agent-config/` — the only plugin so far. Its directory name matches the
-    `name` in its manifest, which is what makes its contents resolve as
+  expects. Every directory here carrying a `.claude-plugin/plugin.json` is discovered
+  and linked automatically by `setup.sh` (see below) — adding a new plugin doesn't
+  require touching the setup script.
+  - `dfadler-agent-config/` — this repo's own authored, cross-project engineering
+    habits (PR shepherding, git worktrees, shell hygiene). Its directory name matches
+    the `name` in its manifest, which is what makes its contents resolve as
     `dfadler-agent-config:<skill>`.
     - `.claude-plugin/plugin.json` — the plugin manifest (name, version, description).
     - `agents/` — subagent definitions.
@@ -27,6 +30,13 @@ automatically, with no per-project copy to keep in sync.
       to reference. Scripts a hook invokes live wherever makes sense (a skill's own
       `scripts/`, if the hook is that skill's companion) and are addressed via
       `${CLAUDE_PLUGIN_ROOT}`, never a hardcoded path.
+  - `react-skills/` — React/Next.js skills vendored (not authored here) from
+    [vercel-labs/agent-skills](https://github.com/vercel-labs/agent-skills), MIT
+    licensed: `react-best-practices` and `composition-patterns`. Kept as a separate
+    plugin from `dfadler-agent-config` on purpose — these are framework-specific and
+    someone else's content, not this repo's own general habits. See
+    `plugins/react-skills/NOTICE.md` for the pinned source commit, license text, and
+    update instructions — this content goes stale silently unless re-pulled by hand.
 - `docs/` — reference material specific to this repo's own tooling and CI, not
   general enough for `claude/CLAUDE.md` (which is loaded globally, for every
   project). `github-actions.md` is the first entry.
@@ -69,6 +79,11 @@ with every project's own skills; inside a namespaced plugin it only produced
 Sharing the plugin with another machine or person would need a
 `.claude-plugin/marketplace.json` at the repo root; that isn't here yet, and adding it
 later wouldn't change how this machine loads the plugin.
+
+`react-skills` loads the identical way — a second, independent plugin symlinked
+alongside `dfadler-agent-config`, discovered by the same loop in `setup.sh` rather than
+a separate hardcoded step. It namespaces the same way, so its skills resolve as
+`react-skills:react-best-practices` and `react-skills:composition-patterns`.
 
 A future tool gets its own sibling directory (e.g. `codex/`) with whatever layout that
 tool expects, symlinked into its own config location the same way.
@@ -164,6 +179,25 @@ It's in Claude Code's official marketplace — confirmed directly against
 add first, and updates arrive automatically. `setup.sh` doesn't install this: that's
 deliberate (#132, option A over B), so this repo's own setup only ever reaches into
 content it actually owns.
+
+### Recommended companion: anthropics/skills (frontend-design)
+
+[anthropics/skills](https://github.com/anthropics/skills) is Anthropic's own example
+skills repo. Its `example-skills` plugin includes `frontend-design`, aimed at UI/CSS
+output quality — a useful companion to `react-skills`' `composition-patterns`, which
+covers component *architecture* rather than visual polish. Recommended as a standalone
+install, same posture as `mattpocock-skills` above — nothing here depends on it:
+
+```bash
+claude plugin marketplace add anthropics/skills
+claude plugin install example-skills
+```
+
+Unlike `mattpocock-skills`, this one is **not** in the official marketplace (checked
+directly against `anthropics/claude-plugins-official`'s manifest — absent), so it needs
+the `marketplace add` step first; updates after that arrive automatically the same way.
+`setup.sh` runs an advisory-only check (`check_frontend_design`) and prints the install
+command above if it's missing — it doesn't install it.
 
 ## Adding something new
 
