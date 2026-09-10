@@ -165,6 +165,58 @@ add first, and updates arrive automatically. `setup.sh` doesn't install this: th
 deliberate (#132, option A over B), so this repo's own setup only ever reaches into
 content it actually owns.
 
+### Recommended companion: vercel-labs/agent-skills
+
+[vercel-labs/agent-skills](https://github.com/vercel-labs/agent-skills) is Vercel
+Engineering's own React/Next.js skill collection, MIT licensed. Two of its skills came
+up while evaluating third-party React tooling for a refactor: `react-best-practices`
+(40+ performance rules) and `composition-patterns` (avoiding boolean-prop
+proliferation via compound components and state lifting). Recommended as a standalone
+install, same posture as `mattpocock-skills` above — nothing here depends on it, and
+nothing from it is vendored into this repo:
+
+```bash
+skills add vercel-labs/agent-skills --agent claude-code -g \
+  --skill vercel-react-best-practices vercel-composition-patterns
+```
+
+This isn't a `claude plugin` at all — Vercel distributes via a separate `skills` CLI
+(the `skills` npm package, from the [Agent Skills](https://agentskills.io/) spec /
+[skills.sh](https://skills.sh/vercel-labs/agent-skills)), confirmed directly against
+`vercel-labs/agent-skills`: it ships no `.claude-plugin/marketplace.json`. Skill names
+for `--skill` are each `SKILL.md`'s own `name:` field
+(`vercel-react-best-practices`), not its directory name — confirmed against a real
+probe install, not assumed from the README. `setup.sh` runs an advisory-only check
+(`check_react_skills`) that only fires if the `skills` CLI is already on `PATH` — it
+never runs `npx skills@latest` itself, since that would fetch and execute a
+third-party package over the network on every `setup.sh` run.
+
+An earlier version of this section vendored these two skills into their own plugin
+here instead of referencing them — reverted (#211's review) once it turned out `skills
+add` *does* support installing individual skills (`--skill <names>`), which was the
+premise vendoring was based on. Reference-only is more consistent with this repo's own
+#132 precedent: let upstream stay the source of truth with its own update story, rather
+than freezing a copy that goes stale silently.
+
+### Recommended companion: anthropics/skills (frontend-design)
+
+[anthropics/skills](https://github.com/anthropics/skills) is Anthropic's own example
+skills repo. Its `example-skills` plugin includes `frontend-design`, aimed at UI/CSS
+output quality — a useful companion to `composition-patterns` above, which covers
+component *architecture* rather than visual polish. Recommended as a standalone
+install, same posture as `mattpocock-skills` above — nothing here depends on it:
+
+```bash
+claude plugin marketplace add anthropics/skills
+claude plugin install example-skills
+```
+
+Unlike `mattpocock-skills`, this one is **not** in the official marketplace (checked
+directly against `anthropics/claude-plugins-official`'s manifest — absent), so it needs
+the `marketplace add` step first; updates after that arrive automatically the same way.
+`setup.sh` runs an advisory-only check (`check_frontend_design`) and prints the install
+command above if it's missing — it doesn't install it.
+
 ## Adding something new
 
 1. Put it in the right place:
