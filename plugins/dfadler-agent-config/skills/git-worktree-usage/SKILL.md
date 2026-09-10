@@ -7,11 +7,13 @@ description: |
   repo-wide `git stash` collision hazard and its `git restore` alternative,
   branch naming, catching a branch up to a moved `main` via merge (not
   rebase), CI/coverage gotchas after a merge, conflict-resolution escalation
-  levels, and PR-splitting sequencing. Use when creating, entering, or
-  cleaning up a git worktree; deciding how to parallelize agent sessions
-  across a repo; hitting a `git stash` collision between sessions; resolving
-  a merge/rebase conflict; or splitting an already-written diff into
-  multiple PRs.
+  levels, and PR-splitting sequencing. Also ships two SessionStart hooks that
+  self-heal a project's own symlinked-worktree-directory convention and
+  auto-prune merged worktrees. Use when creating, entering, or cleaning up a
+  git worktree; deciding how to parallelize agent sessions across a repo;
+  hitting a `git stash` collision between sessions; resolving a merge/rebase
+  conflict; splitting an already-written diff into multiple PRs; or a stale
+  or wrongly-linked worktree directory needs diagnosing.
 license: MIT
 metadata:
   version: "1.0.0"
@@ -29,15 +31,25 @@ never commit directly to the main working copy).
 ## Creating and managing worktrees
 
 - **Create worktrees with the `EnterWorktree` tool, never raw `git worktree
-  add`.** The tool applies whatever worktree conventions the repo has
-  configured automatically — path/branch naming, locking (so a worktree in
-  active use can't be collided into by another session), and any
-  `worktree.symlinkDirectories` set in `.claude/settings.json` (e.g. a heavy
-  `node_modules`/`vendor` directory), so a new worktree doesn't need its own
-  copy. Raw `git worktree add` bypasses all of that — the tool exists
-  because that bypass was a recurring source of pain: untracked directories
-  re-copied by hand, and worktrees created outside the convention that a
-  repo's own pruning tooling then can't find.
+  add`.** The tool applies Claude Code's own worktree conventions
+  automatically — path (`.claude/worktrees/<name>`), branch naming
+  (`worktree-<name>`), and locking (so a worktree in active use can't be
+  collided into by another session). Raw `git worktree add` bypasses all of
+  that — the tool exists because that bypass was a recurring source of pain:
+  worktrees created outside the convention that this repo's own pruning
+  tooling (below) then can't find.
+- **A worktree is a fresh checkout of tracked files only — EnterWorktree does
+  not symlink or otherwise carry over any untracked directory** (a heavy
+  `node_modules`/`vendor` install, say). `worktree.symlinkDirectories` in
+  `.claude/settings.json` is *not* a Claude Code setting; it's a
+  project-invented convention some repos use to record which untracked
+  directories they've chosen to share (via their own symlinking step —
+  a post-creation script, a `WorktreeCreate` hook, whatever that project set
+  up) across every worktree instead of reinstalling one copy each. If a
+  project has adopted that convention, this plugin ships a SessionStart hook
+  that verifies and self-heals it — see "Self-healing worktree hooks" below.
+  A project that hasn't adopted it can ignore `symlinkDirectories` entirely;
+  the hook no-ops when the setting is absent.
 - **A subagent whose cwd was pinned at launch can't call `EnterWorktree`
   itself** — creating a worktree from inside one would mutate the parent
   session's process-wide working directory, and switching to an *existing*
@@ -90,6 +102,50 @@ exceptions) rather than conventions this repo invented — see the
 which log roughly a dozen behavior changes across recent patches, so treat
 this section as a convention layer over a moving target, not a snapshot of
 it.
+
+## Self-healing worktree hooks
+
+This plugin ships two `SessionStart` hooks (wired in `hooks/hooks.json`,
+scripts under this skill's `scripts/`) that activate automatically for any
+project this plugin is enabled in — nothing to add to that project's own
+`.claude/settings.json`. Both are designed to be safe no-ops on a project
+that hasn't opted into what they check: they only ever act on Claude-created
+worktrees, they gate on being inside a git repo, and they run only locally
+(a cloud/remote session has no worktrees to check). Neither can fail a
+session — both catch their own errors and always exit 0.
+
+- **`check-worktree-symlinks-hook.sh`** runs `verify-worktree-symlinks.sh
+  --fix`: for a project that has adopted the `worktree.symlinkDirectories`
+  convention described above, confirms each configured directory's symlink
+  in the current worktree still resolves to the main checkout, and repairs
+  it if not (relinks; never touches a directory that isn't a symlink, e.g.
+  one already materialized into a real copy). No-ops immediately on a
+  project that hasn't set `worktree.symlinkDirectories` at all — the
+  underlying script reads that key from `.claude/settings.json` and exits
+  clean when it's empty or the file doesn't exist. Prints a `🔗`-prefixed
+  summary only when it actually found (and fixed) something.
+- **`prune-merged-worktrees-hook.sh`** runs `prune-merged-worktrees.sh
+  --auto`: removes any worktree under `.claude/worktrees/` (on a
+  `worktree-*` or `claude/*` branch) whose pull request has already merged,
+  as long as it's unlocked, isn't the current session's own worktree, has no
+  uncommitted changes, and has no commits unpushed to its upstream. This is
+  a genuine gap in Claude Code's own periodic stale-worktree sweep, not a
+  duplicate of it: that sweep only ever looks at local git state (age, lock,
+  clean/pushed) and only ever covers subagent and *backgrounded* session
+  worktrees — it has no way to know a PR merged, and it never touches a
+  worktree from an ordinary interactive session that was left open past
+  merge. Requires `gh` on `PATH` and authenticated; silently skips (never
+  removes anything) if either is missing, or if the GitHub API call itself
+  fails — a fetch error is not the same as "nothing merged," so the script
+  fails closed rather than risk removing something with a live PR. Opt out
+  to a read-only nudge (report what *could* be pruned, remove nothing) by
+  setting `WORKTREE_AUTO_PRUNE=0` (or `false`/`no`/`off`) in the
+  environment; anything else, including unset, keeps auto-removal on.
+
+Both underlying scripts (`verify-worktree-symlinks.sh`,
+`prune-merged-worktrees.sh`) are also usable standalone — real exit codes,
+`--help`, no hook-only quieting — for a human running them by hand or a
+project wiring its own automation around them instead of the shipped hook.
 
 ## The `git stash` collision hazard
 
