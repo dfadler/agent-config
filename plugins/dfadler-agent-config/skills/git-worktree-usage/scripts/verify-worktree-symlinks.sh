@@ -35,11 +35,14 @@ set -uo pipefail
 #   verify-worktree-symlinks.sh --fix    # also repair any mismatch found
 #
 # Exit codes: 0 all symlinks verified (or nothing to check), 1 a mismatch was
-# found and not fixed, 2 bad usage, 4 a required dependency (jq) is missing.
+# found and not fixed, 2 bad usage, 3 worktree.symlinkDirectories itself is
+# malformed (not valid JSON, or not an array), 4 a required dependency (jq)
+# is missing.
 
 EXIT_OK=0
 EXIT_FAILURE=1
 EXIT_USAGE=2
+EXIT_CONFIG=3
 EXIT_DEPENDENCY=4
 
 usage() {
@@ -56,7 +59,7 @@ resolves to the main checkout's copy of that directory. Prints a mismatch
           materialized into a real, independent copy).
 
 No-op (exit 0) when run from the main checkout, or when
-symlinkDirectories is empty/unset.
+symlinkDirectories is empty/unset — neither case requires jq.
 EOF
 }
 
@@ -83,11 +86,6 @@ if ! git rev-parse --is-inside-work-tree >/dev/null 2>&1; then
   exit "$EXIT_USAGE"
 fi
 
-if ! command -v jq >/dev/null 2>&1; then
-  echo "jq is required but not found on PATH." >&2
-  exit "$EXIT_DEPENDENCY"
-fi
-
 self="$(git rev-parse --show-toplevel)"
 # Same main-vs-worktree detection as elsewhere in this project: in a linked
 # worktree, --git-dir points at .git/worktrees/<name> while --git-common-dir
@@ -107,12 +105,47 @@ if [[ ! -f "$settings_file" ]]; then
   exit "$EXIT_OK"
 fi
 
+# jq is only required from here on — a project with no settings.json (the
+# common case for one that hasn't adopted the symlinkDirectories convention
+# at all) must never demand jq just to reach the no-op above.
+if ! command -v jq >/dev/null 2>&1; then
+  echo "jq is required but not found on PATH." >&2
+  exit "$EXIT_DEPENDENCY"
+fi
+
+# Validate before trusting: a bare `jq ... // empty` swallows a parse error
+# (jq's own exit status is invisible through process substitution, so a
+# malformed settings.json silently reads as "no directories configured"),
+# and jq's `[]` iterates an OBJECT's values too, so `symlinkDirectories` set
+# to `{"a":"b"}` would silently populate `dirs` with `"b"` as if it were a
+# directory name. Check the value's actual type first and report anything
+# that isn't an array or absent, rather than guessing at what was meant.
+symlink_dirs_type="$(jq -r '.worktree.symlinkDirectories | type' "$settings_file" 2>&1)"
+jq_status=$?
+if [[ $jq_status -ne 0 ]]; then
+  echo "verify-worktree-symlinks: could not read worktree.symlinkDirectories" >&2
+  echo "  from $settings_file: $symlink_dirs_type" >&2
+  exit "$EXIT_CONFIG"
+fi
+case "$symlink_dirs_type" in
+  array) ;;
+  null)
+    # Key absent, or explicitly null: nothing configured, clean no-op.
+    exit "$EXIT_OK"
+    ;;
+  *)
+    echo "verify-worktree-symlinks: $settings_file's worktree.symlinkDirectories" >&2
+    echo "  must be an array, got $symlink_dirs_type." >&2
+    exit "$EXIT_CONFIG"
+    ;;
+esac
+
 # Avoid `mapfile`/`readarray` (bash 4+ only): macOS still ships bash 3.2 as
 # the default `bash` on PATH, and this script needs to run there too.
 dirs=()
 while IFS= read -r dir; do
   [[ -n "$dir" ]] && dirs+=("$dir")
-done < <(jq -r '.worktree.symlinkDirectories[]? // empty' "$settings_file" 2>/dev/null)
+done < <(jq -r '.worktree.symlinkDirectories[]' "$settings_file")
 
 if [[ ${#dirs[@]} -eq 0 ]]; then
   exit "$EXIT_OK"
@@ -125,6 +158,26 @@ fi
 any_unresolved=false
 
 for dir in "${dirs[@]}"; do
+  # settings.json's symlinkDirectories is project-controlled config, not this
+  # script's own trusted input — reject an absolute entry or one containing a
+  # `..` path segment before it ever reaches `path`/`main_path`, so a bad
+  # (malicious or copy-pasted-wrong) entry can never point --fix's rm/ln at
+  # anything outside this worktree or the main checkout.
+  case "$dir" in
+    /*)
+      echo "verify-worktree-symlinks: $dir is an absolute path — skipping." >&2
+      any_unresolved=true
+      continue
+      ;;
+  esac
+  case "/$dir/" in
+    */../*)
+      echo "verify-worktree-symlinks: $dir contains a '..' segment — skipping." >&2
+      any_unresolved=true
+      continue
+      ;;
+  esac
+
   path="$self/$dir"
   main_path="$main_checkout/$dir"
 

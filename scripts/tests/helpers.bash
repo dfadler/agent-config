@@ -175,8 +175,14 @@ EOF
   unset GH_UNAUTHENTICATED GH_PR_LIST_FAILS
 }
 
+# _mark_merged <branch> <head-oid>
+# Records one merged-PR fixture entry as branch<TAB>oid, matching the real
+# `gh pr list --json headRefName,headRefOid --jq '... | @tsv'` shape the
+# script's is_merged() parses. <head-oid> is required, not defaulted, so a
+# caller can't accidentally record a merged PR without the commit it merged
+# at — the whole point of carrying an oid is to catch a mismatch.
 _mark_merged() {
-  echo "$1" >>"$GH_MERGED_HEADS_FILE"
+  printf '%s\t%s\n' "$1" "$2" >>"$GH_MERGED_HEADS_FILE"
 }
 
 # add_worktree <name> <state> [branch]
@@ -204,18 +210,20 @@ add_worktree() {
   case "$state" in
     merged-clean | locked | current)
       git -C "$path" push -q -u origin "$branch"
-      _mark_merged "$branch"
+      _mark_merged "$branch" "$(git -C "$path" rev-parse HEAD)"
       [ "$state" = "locked" ] && git -C "$REPO" worktree lock "$path"
       ;;
     merged-dirty)
       git -C "$path" push -q -u origin "$branch"
+      # The uncommitted file below never becomes a commit, so it doesn't move
+      # HEAD — the oid recorded here still matches what was actually pushed.
+      _mark_merged "$branch" "$(git -C "$path" rev-parse HEAD)"
       echo "uncommitted" >"$path/scratch.txt"
-      _mark_merged "$branch"
       ;;
     merged-unpushed)
       # Never pushed: no @{u}, so the script's upstream check reports unpushed.
       git -C "$path" commit -q --allow-empty -m "local only"
-      _mark_merged "$branch"
+      _mark_merged "$branch" "$(git -C "$path" rev-parse HEAD)"
       ;;
     unmerged)
       git -C "$path" push -q -u origin "$branch"

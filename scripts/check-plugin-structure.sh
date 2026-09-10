@@ -178,7 +178,12 @@ if data["name"] != expected:
 check_hooks() {
   local plugin_dir="$1" hooks_file="$1/hooks/hooks.json"
 
-  [[ -f "$hooks_file" ]] || return 0
+  # -e alone misses a broken symlink (its target doesn't exist, so -e is
+  # false even though the symlink itself is a real, wrong entry); -L
+  # catches that. Anything present this way falls through to Python's
+  # open(), which reports a directory or broken symlink with its own OSError
+  # rather than this function silently treating it as "no hooks shipped."
+  [[ -e "$hooks_file" || -L "$hooks_file" ]] || return 0
 
   local output
   if ! output="$(python3 -c '

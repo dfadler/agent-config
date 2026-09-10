@@ -204,6 +204,96 @@ EOF
   # ... but the overall exit code still reflects vendor's unresolved failure.
 }
 
+# --- config validation (EXIT_CONFIG) -----------------------------------------
+
+@test "malformed settings.json JSON exits 3 (EXIT_CONFIG) instead of silently reading as empty" {
+  printf '{ "worktree": { "symlinkDirectories": [,] } }' >"$REPO/.claude/settings.json"
+  git -C "$REPO" add .claude/settings.json
+  git -C "$REPO" commit -q -m "malformed settings.json"
+
+  wt="$(_add_wt bad-json)"
+  ln -s "$REPO/node_modules" "$wt/node_modules"
+
+  run_verify "$wt" --fix
+  [ "$status" -eq 3 ]
+  assert_output_contains "could not read worktree.symlinkDirectories"
+  # Must not silently treat the malformed config as "nothing configured" and
+  # proceed to touch the symlink anyway.
+  [ "$(readlink "$wt/node_modules")" = "$REPO/node_modules" ]
+}
+
+@test "a non-array worktree.symlinkDirectories exits 3 (EXIT_CONFIG), not silently empty" {
+  cat >"$REPO/.claude/settings.json" <<'EOF'
+{
+  "worktree": { "symlinkDirectories": { "node_modules": "yes please" } }
+}
+EOF
+  git -C "$REPO" add .claude/settings.json
+  git -C "$REPO" commit -q -m "object instead of array"
+
+  wt="$(_add_wt object-config)"
+
+  run_verify "$wt" --fix
+  [ "$status" -eq 3 ]
+  assert_output_contains "must be an array, got object"
+}
+
+@test "a null worktree.symlinkDirectories is a clean no-op, not a config error" {
+  cat >"$REPO/.claude/settings.json" <<'EOF'
+{
+  "worktree": { "symlinkDirectories": null }
+}
+EOF
+  git -C "$REPO" add .claude/settings.json
+  git -C "$REPO" commit -q -m "explicit null"
+
+  wt="$(_add_wt null-config)"
+
+  run_verify "$wt" --fix
+  assert_success
+  [ -z "$output" ]
+}
+
+# --- path-traversal guard -----------------------------------------------------
+
+@test "a symlinkDirectories entry containing '..' is rejected, never touched" {
+  cat >"$REPO/.claude/settings.json" <<'EOF'
+{
+  "worktree": { "symlinkDirectories": ["../../etc"] }
+}
+EOF
+  git -C "$REPO" add .claude/settings.json
+  git -C "$REPO" commit -q -m "traversal entry"
+
+  wt="$(_add_wt traversal)"
+  # A real symlink at the traversal target, so a bug that DID follow it would
+  # be observable (relinked) rather than silently missing.
+  mkdir -p "$SANDBOX/outside-marker"
+  ln -s "$SANDBOX/outside-marker" "$SANDBOX/etc"
+
+  run_verify "$wt" --fix
+  assert_failure
+  assert_output_contains "contains a '..' segment"
+  # Nothing outside the worktree was touched.
+  [ "$(readlink "$SANDBOX/etc")" = "$SANDBOX/outside-marker" ]
+}
+
+@test "an absolute symlinkDirectories entry is rejected, never touched" {
+  cat >"$REPO/.claude/settings.json" <<'EOF'
+{
+  "worktree": { "symlinkDirectories": ["/etc"] }
+}
+EOF
+  git -C "$REPO" add .claude/settings.json
+  git -C "$REPO" commit -q -m "absolute entry"
+
+  wt="$(_add_wt absolute)"
+
+  run_verify "$wt" --fix
+  assert_failure
+  assert_output_contains "is an absolute path"
+}
+
 @test "--help prints usage and touches nothing" {
   wt="$(_add_wt eta)"
   other="$(_add_wt other)"
@@ -228,6 +318,28 @@ EOF
   run_verify "$SANDBOX/not-a-repo"
   [ "$status" -eq 2 ]
   [[ "$output" == *"Not inside a git repository"* ]]
+}
+
+@test "jq missing on PATH is a silent no-op for a project with no .claude/settings.json at all" {
+  # A project that never adopted the symlinkDirectories convention (no
+  # settings.json in this worktree) must not be forced to install jq just to
+  # reach the no-op — jq is only required once there's a settings.json to
+  # actually parse.
+  git -C "$REPO" rm -q .claude/settings.json
+  git -C "$REPO" commit -q -m "remove settings.json"
+
+  wt="$(_add_wt no-jq-no-settings)"
+  [ ! -f "$wt/.claude/settings.json" ]
+  mini_bin="$SANDBOX/no-jq-bin"
+  mkdir -p "$mini_bin"
+  local tool
+  for tool in bash git dirname; do
+    ln -s "$(command -v "$tool")" "$mini_bin/$tool"
+  done
+
+  run bash -c 'cd -- "$1" && PATH="$2" bash "$3" --fix' bash "$wt" "$mini_bin" "$SCRIPT_UNDER_TEST"
+  assert_success
+  [ -z "$output" ]
 }
 
 @test "jq missing on PATH exits 4 (EXIT_DEPENDENCY)" {
