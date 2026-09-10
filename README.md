@@ -189,7 +189,11 @@ for `--skill` are each `SKILL.md`'s own `name:` field
 probe install, not assumed from the README. `setup.sh` runs an advisory-only check
 (`check_react_skills`) that only fires if the `skills` CLI is already on `PATH` — it
 never runs `npx skills@latest` itself, since that would fetch and execute a
-third-party package over the network on every `setup.sh` run.
+third-party package over the network on every `setup.sh` run. The same reasoning
+applies to an agent running the `skills add`/`npx skills@latest` command above on the
+user's behalf: it's a fetch-and-execute install, not an ordinary dependency change, so
+it needs explicit, per-run permission — see the
+`dfadler-agent-config:fetch-execute-permission` skill.
 
 An earlier version of this section vendored these two skills into their own plugin
 here instead of referencing them — reverted (#211's review) once it turned out `skills
