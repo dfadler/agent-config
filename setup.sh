@@ -357,6 +357,137 @@ sys.exit(1)
   esac
 }
 
+# Same posture as check_mattpocock_skills above: purely informational, nothing
+# here depends on it, no --install-deps. anthropics/skills isn't in the
+# official marketplace the way mattpocock-skills is (checked directly against
+# anthropics/claude-plugins-official's own manifest - absent), so unlike that
+# one, getting it requires adding its marketplace first; the install id is
+# therefore always "example-skills@anthropic-agent-skills", never a
+# "@claude-plugins-official" variant.
+check_frontend_design() {
+  command -v claude >/dev/null 2>&1 || return 0
+
+  local listing
+  listing="$(claude plugin list --json 2>/dev/null)" || return 0
+
+  local state rc
+  if state="$(printf '%s' "$listing" | python3 -c '
+import json, sys
+try:
+    data = json.load(sys.stdin)
+except Exception:
+    sys.exit(2)
+for entry in data:
+    if str(entry.get("id", "")).startswith("example-skills@"):
+        print("enabled" if entry.get("enabled") else "disabled")
+        sys.exit(0)
+sys.exit(1)
+' 2>/dev/null)"; then
+    rc=0
+  else
+    rc=$?
+  fi
+
+  case "$rc:$state" in
+    0:enabled)
+      echo "✓ anthropics/skills (frontend-design) is installed"
+      ;;
+    0:disabled)
+      {
+        echo
+        echo "⚠ anthropics/skills is installed but disabled."
+        echo "  Re-enable it with: claude plugin enable example-skills"
+        echo
+      } >&2
+      ;;
+    1:*)
+      {
+        echo
+        echo "ℹ anthropics/skills (frontend-design) is not installed — a recommended"
+        echo "  companion plugin, not required by anything here. See README's"
+        echo "  \"Recommended companion\" section. Install it with:"
+        echo "    claude plugin marketplace add anthropics/skills"
+        echo "    claude plugin install example-skills"
+        echo
+      } >&2
+      ;;
+    *)
+      return 0
+      ;;
+  esac
+}
+
+# Same posture as the two checks above: purely informational, nothing here
+# depends on it, no --install-deps. Unlike mattpocock-skills/frontend-design,
+# vercel-labs/agent-skills isn't a `claude plugin` at all - it distributes
+# through a separate `skills` CLI (see README's "Recommended companion"
+# section), so this check only fires when that CLI is already resolvable on
+# PATH. It deliberately never runs `npx skills@latest` itself: that would mean
+# fetching and executing a third-party package over the network on every
+# setup.sh run, a materially bigger side effect than the other two checks,
+# which only ever shell out to the `claude` CLI the user already has. Skills
+# are matched by their SKILL.md `name:` field (vercel-react-best-practices /
+# vercel-composition-patterns), not their directory name — confirmed against a
+# real probe install in a scratch directory, not assumed from the README.
+check_react_skills() {
+  command -v skills >/dev/null 2>&1 || return 0
+
+  local listing
+  listing="$(skills ls -g --json 2>/dev/null)" || return 0
+
+  local state rc
+  if state="$(printf '%s' "$listing" | python3 -c '
+import json, sys
+try:
+    data = json.load(sys.stdin)
+except Exception:
+    sys.exit(2)
+names = {str(e.get("name", "")) for e in data}
+wanted = {"vercel-react-best-practices", "vercel-composition-patterns"}
+missing = wanted - names
+if not missing:
+    print("installed")
+elif missing == wanted:
+    print("absent")
+else:
+    print("partial:" + ",".join(sorted(missing)))
+sys.exit(0)
+' 2>/dev/null)"; then
+    rc=0
+  else
+    rc=$?
+  fi
+
+  case "$rc:$state" in
+    0:installed)
+      echo "✓ vercel-labs react-skills (react-best-practices, composition-patterns) installed"
+      ;;
+    0:absent)
+      {
+        echo
+        echo "ℹ vercel-labs react-best-practices/composition-patterns are not installed —"
+        echo "  a recommended companion, not required by anything here. See README's"
+        echo "  \"Recommended companion\" section. Install them with:"
+        echo "    skills add vercel-labs/agent-skills --agent claude-code -g \\"
+        echo "      --skill vercel-react-best-practices vercel-composition-patterns"
+        echo
+      } >&2
+      ;;
+    0:partial:*)
+      {
+        echo
+        echo "⚠ Only one of vercel-react-best-practices/vercel-composition-patterns is"
+        echo "  installed (missing: ${state#partial:}). Install the other with the same"
+        echo "  command as above, naming just the missing skill."
+        echo
+      } >&2
+      ;;
+    *)
+      return 0
+      ;;
+  esac
+}
+
 mkdir -p "$HOME/.claude"
 link "$REPO_ROOT/claude/CLAUDE.md" "$HOME/.claude/CLAUDE.md"
 link_dir_contents "$REPO_ROOT/claude/commands" "$HOME/.claude/commands"
@@ -377,12 +508,14 @@ mkdir -p "$HOME/.claude/skills"
 link "$PLUGIN_SRC" "$PLUGIN_LINK"
 
 # Last, so the linking work is already done and reported when these speak up.
-# All three are advisory, not failures: the symlinks are correct either way,
+# All five are advisory, not failures: the symlinks are correct either way,
 # and `./setup.sh && something-else` shouldn't break over any of them. An
 # explicitly requested --install-deps that doesn't install is still a failure.
 check_git_identity
 check_python_deps
 check_mattpocock_skills
+check_frontend_design
+check_react_skills
 
 # Also last, and independent of everything above: offers (opt-in, y/n) to
 # pre-approve Aikido Safe Chain's pinned installer command in Claude Code's
