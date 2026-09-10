@@ -288,6 +288,66 @@ teardown() {
   [ ! -d "$wt" ]
 }
 
+# --- reused branch name (headRefOid must match, not just headRefName) ------
+# `gh pr list --state merged` keeps returning an OLD PR's record forever,
+# even after its branch name is reused by a new, unrelated, still-open PR —
+# it's a fact about a past PR, not about what the branch currently points at.
+# Matching by headRefName alone would wrongly REMOVE the new worktree.
+
+@test "does not remove a worktree whose branch name was reused by an unrelated later PR" {
+  local old_oid
+  old_oid="$(git -C "$REPO" rev-parse HEAD)"
+  _mark_merged "worktree-foo" "$old_oid"
+
+  # A new commit on main, so the reused branch starts from a genuinely
+  # different tip than the earlier (already-merged) one did.
+  git -C "$REPO" commit -q --allow-empty -m "unrelated later work"
+
+  local wt="$REPO/.claude/worktrees/foo"
+  git -C "$REPO" worktree add -q -b "worktree-foo" "$wt" main
+  git -C "$wt" push -q -u origin "worktree-foo"
+
+  run prune "$REPO"
+
+  assert_success
+  refute_output_contains "REMOVE"
+  assert_output_contains "no merged PR for worktree-foo"
+  [ -d "$wt" ]
+}
+
+@test "--auto never removes a worktree whose branch name was reused by an unrelated later PR" {
+  local old_oid
+  old_oid="$(git -C "$REPO" rev-parse HEAD)"
+  _mark_merged "worktree-foo" "$old_oid"
+
+  git -C "$REPO" commit -q --allow-empty -m "unrelated later work"
+
+  local wt="$REPO/.claude/worktrees/foo"
+  git -C "$REPO" worktree add -q -b "worktree-foo" "$wt" main
+  git -C "$wt" push -q -u origin "worktree-foo"
+
+  run prune "$REPO" --auto
+
+  assert_success
+  [ -d "$wt" ]
+  refute_output_contains "Removed"
+}
+
+@test "removes a worktree once its own commit genuinely matches the merged PR's head" {
+  # Sanity check for the oid-matching change itself: the ordinary merged case
+  # (branch AND commit both match) must still be removable, not just the
+  # reused-name case correctly kept.
+  local wt="$REPO/.claude/worktrees/foo"
+  git -C "$REPO" worktree add -q -b "worktree-foo" "$wt" main
+  git -C "$wt" push -q -u origin "worktree-foo"
+  _mark_merged "worktree-foo" "$(git -C "$wt" rev-parse HEAD)"
+
+  run prune "$REPO" --yes
+
+  assert_success
+  [ ! -d "$wt" ]
+}
+
 # --- gh failure handling (fail closed for humans, silent for the hook) ------
 
 @test "aborts without changes when gh pr list fails (human run)" {
@@ -471,7 +531,7 @@ teardown() {
 @test "ignores a claude/* worktree outside .claude/worktrees/ (path scope)" {
   git -C "$REPO" worktree add -q -b "claude/outside-fermi-000" "$SANDBOX/outside-claude" main
   git -C "$SANDBOX/outside-claude" push -q -u origin "claude/outside-fermi-000"
-  _mark_merged "claude/outside-fermi-000"
+  _mark_merged "claude/outside-fermi-000" "$(git -C "$SANDBOX/outside-claude" rev-parse HEAD)"
 
   run prune "$REPO"
 

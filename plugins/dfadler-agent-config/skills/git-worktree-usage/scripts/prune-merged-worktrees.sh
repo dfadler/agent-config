@@ -21,13 +21,22 @@ set -uo pipefail
 #   * it is NOT the worktree this script is being run from
 #   * its working tree is clean (no uncommitted changes) AND has no commits that
 #     aren't pushed to its upstream
-#   * a MERGED pull request exists for its branch
+#   * a MERGED pull request exists for its branch, at the SAME commit the
+#     worktree is currently at — not just a branch-name match
 # Anything that fails a check is reported and LEFT in place. Never uses --force.
 #
 # Merged detection asks GitHub via `gh` (one `gh pr list --state merged` call,
 # matched by head branch) rather than `git branch --merged`: the latter is wrong
 # for squash/rebase merges (the branch tip never lands on main) and it keeps
 # working after the remote head branch is auto-deleted on merge.
+#
+# Branch name alone isn't a safe match: `gh pr list --state merged` keeps
+# returning an OLD PR's record forever, even after its branch name is reused
+# by a new, unrelated, still-open PR — a fact about a past PR, not about what
+# the branch currently points at. So merge matching also requires the
+# worktree's own current commit (`git rev-parse HEAD`) to equal that merged
+# PR's recorded head commit (`headRefOid`); a same-named branch sitting at a
+# different commit is correctly kept as "no merged PR for <branch>".
 #
 # Remote branches are intentionally NOT deleted here - turn on GitHub's
 # "Automatically delete head branches" for that. This is local-only cleanup.
@@ -97,17 +106,33 @@ if ! command -v gh >/dev/null 2>&1 || ! gh auth status >/dev/null 2>&1; then
   exit 1
 fi
 
-# One API call: every merged PR's head branch name. Membership check is local.
-# Fail CLOSED if the call itself errors (network, rate limit, API 5xx) — an empty
-# result then would be indistinguishable from "nothing merged" and every worktree
-# would be misreported as unmerged. Abort loudly for a human; stay silent for the
-# hook. (An empty list on success is exit 0 and handled normally.)
-if ! merged_heads="$(gh pr list --state merged --limit 500 --json headRefName --jq '.[].headRefName' 2>/dev/null)"; then
+# One API call: every merged PR's head branch name AND head commit SHA.
+# Membership check is local. Fail CLOSED if the call itself errors (network,
+# rate limit, API 5xx) — an empty result then would be indistinguishable from
+# "nothing merged" and every worktree would be misreported as unmerged. Abort
+# loudly for a human; stay silent for the hook. (An empty list on success is
+# exit 0 and handled normally.)
+if ! merged_heads="$(gh pr list --state merged --limit 500 \
+  --json headRefName,headRefOid --jq '.[] | [.headRefName, .headRefOid] | @tsv' 2>/dev/null)"; then
   $hook_mode && exit 0
   echo "Couldn't fetch merged PRs from GitHub (network or API error). Aborting without changes." >&2
   exit 1
 fi
-is_merged() { printf '%s\n' "$merged_heads" | grep -Fxq -- "$1"; }
+# Matching branch name alone isn't enough: a branch name can be reused after
+# its earlier PR merged (a new, unrelated, still-open PR on the same name),
+# and `gh pr list --state merged` still returns that earlier PR's record
+# forever — it's a fact about a past PR, not about what the branch currently
+# points at. Requiring the worktree's OWN current commit to equal the merged
+# PR's recorded head commit is what tells "this exact merged work" apart from
+# "a same-named but unrelated branch that happens to still be clean and
+# pushed" — the second only ever looks removable if this check is skipped.
+is_merged() {
+  local branch="$1" head_oid="$2" candidate_branch candidate_oid
+  while IFS=$'\t' read -r candidate_branch candidate_oid; do
+    [ "$candidate_branch" = "$branch" ] && [ "$candidate_oid" = "$head_oid" ] && return 0
+  done <<<"$merged_heads"
+  return 1
+}
 
 # Deliberately NO `git fetch --prune` here. The merged signal comes live from
 # `gh pr list` above, so a fetch adds nothing to the merge decision — but it
@@ -154,7 +179,7 @@ flush() {
     report_lines+=("keep    $name — current session")
   elif $locked; then
     report_lines+=("keep    $name — locked (another session is using it)")
-  elif ! is_merged "$branch"; then
+  elif ! is_merged "$branch" "$(git -C "$path" rev-parse HEAD 2>/dev/null)"; then
     report_lines+=("keep    $name — no merged PR for $branch")
   elif [ -n "$(git -C "$path" status --porcelain 2>/dev/null)" ]; then
     report_lines+=("keep    $name — uncommitted changes")
