@@ -40,8 +40,21 @@ while [[ $# -gt 0 ]]; do
 done
 
 REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-PLUGIN_SRC="$REPO_ROOT/plugins/dfadler-agent-config"
-PLUGIN_LINK="$HOME/.claude/skills/dfadler-agent-config"
+
+# Every directory under plugins/ that carries a .claude-plugin/plugin.json is a
+# plugin this repo ships (currently dfadler-agent-config and react-skills) -
+# discovered rather than hardcoded so adding one doesn't require touching this
+# list by hand. The trailing "/" restricts the glob to directories; if plugins/
+# is ever empty the pattern itself fails the -f test below and the loop body
+# never runs, so no nullglob/-e guard is needed.
+PLUGIN_SRCS=()
+PLUGIN_LINKS=()
+for plugin_dir in "$REPO_ROOT"/plugins/*/; do
+  plugin_dir="${plugin_dir%/}"
+  [[ -f "$plugin_dir/.claude-plugin/plugin.json" ]] || continue
+  PLUGIN_SRCS+=("$plugin_dir")
+  PLUGIN_LINKS+=("$HOME/.claude/skills/$(basename "$plugin_dir")")
+done
 
 link() {
   local src="$1" dest="$2"
@@ -80,12 +93,13 @@ link_dir_contents() {
 }
 
 # Remove links this repo created that are no longer canonical. Two generations
-# of those exist: earlier versions linked the plugin's skills and agents into
-# ~/.claude/{skills,agents} one entry at a time (the plugin now supplies those
-# itself, so a leftover would load the same skill twice), and the plugin used to
-# be named generic-tools (that link is left dangling by the rename). Anything
-# under these directories pointing into this repo's plugins/ that isn't the
-# current plugin link is stale by definition.
+# of those exist: earlier versions linked dfadler-agent-config's skills and
+# agents into ~/.claude/{skills,agents} one entry at a time (each plugin now
+# supplies those itself, so a leftover would load the same skill twice), and
+# dfadler-agent-config used to be named generic-tools (that link is left
+# dangling by the rename). Anything under these directories pointing into this
+# repo's plugins/ that isn't one of the current plugin links (PLUGIN_LINKS) is
+# stale by definition.
 #
 # readlink reports the target exactly as stored, so a relative one has to be
 # made absolute before it can be compared against $REPO_ROOT - otherwise a
@@ -109,7 +123,7 @@ resolve_target() {
 prune_stale_plugin_links() {
   local dest_dir="$1"
   [[ -d "$dest_dir" ]] || return 0
-  local entry target resolved
+  local entry target resolved i keep
   for entry in "$dest_dir"/*; do
     [[ -L "$entry" ]] || continue
     target="$(readlink "$entry")"
@@ -117,9 +131,14 @@ prune_stale_plugin_links() {
     if [[ "$resolved" != "$REPO_ROOT/plugins/"* ]]; then
       continue
     fi
-    if [[ "$entry" == "$PLUGIN_LINK" && "$resolved" == "$PLUGIN_SRC" ]]; then
-      continue
-    fi
+    keep=0
+    for i in "${!PLUGIN_LINKS[@]}"; do
+      if [[ "$entry" == "${PLUGIN_LINKS[$i]}" && "$resolved" == "${PLUGIN_SRCS[$i]}" ]]; then
+        keep=1
+        break
+      fi
+    done
+    [[ "$keep" == 1 ]] && continue
     rm "$entry"
     echo "Removed superseded symlink: $entry -> $target"
   done
@@ -357,6 +376,66 @@ sys.exit(1)
   esac
 }
 
+# Same posture as check_mattpocock_skills above: purely informational, nothing
+# here depends on it, no --install-deps. anthropics/skills isn't in the
+# official marketplace the way mattpocock-skills is (checked directly against
+# anthropics/claude-plugins-official's own manifest - absent), so unlike that
+# one, getting it requires adding its marketplace first; the install id is
+# therefore always "example-skills@anthropic-agent-skills", never a
+# `@claude-plugins-official` variant.
+check_frontend_design() {
+  command -v claude >/dev/null 2>&1 || return 0
+
+  local listing
+  listing="$(claude plugin list --json 2>/dev/null)" || return 0
+
+  local state rc
+  if state="$(printf '%s' "$listing" | python3 -c '
+import json, sys
+try:
+    data = json.load(sys.stdin)
+except Exception:
+    sys.exit(2)
+for entry in data:
+    if str(entry.get("id", "")).startswith("example-skills@"):
+        print("enabled" if entry.get("enabled") else "disabled")
+        sys.exit(0)
+sys.exit(1)
+' 2>/dev/null)"; then
+    rc=0
+  else
+    rc=$?
+  fi
+
+  case "$rc:$state" in
+    0:enabled)
+      echo "✓ anthropics/skills (frontend-design) is installed"
+      ;;
+    0:disabled)
+      {
+        echo
+        echo "⚠ anthropics/skills is installed but disabled."
+        echo "  Re-enable it with: claude plugin enable example-skills"
+        echo
+      } >&2
+      ;;
+    1:*)
+      {
+        echo
+        echo "ℹ anthropics/skills (frontend-design) is not installed — a recommended"
+        echo "  companion plugin, not required by anything here. See README's"
+        echo "  \"Recommended companion\" section. Install it with:"
+        echo "    claude plugin marketplace add anthropics/skills"
+        echo "    claude plugin install example-skills"
+        echo
+      } >&2
+      ;;
+    *)
+      return 0
+      ;;
+  esac
+}
+
 mkdir -p "$HOME/.claude"
 link "$REPO_ROOT/claude/CLAUDE.md" "$HOME/.claude/CLAUDE.md"
 link_dir_contents "$REPO_ROOT/claude/commands" "$HOME/.claude/commands"
@@ -364,25 +443,28 @@ link_dir_contents "$REPO_ROOT/claude/commands" "$HOME/.claude/commands"
 prune_stale_plugin_links "$HOME/.claude/skills"
 prune_stale_plugin_links "$HOME/.claude/agents"
 
-# dfadler-agent-config is a plugin, so link the directory as a unit rather than
-# its contents. Claude Code auto-loads any directory under ~/.claude/skills/
-# that carries a .claude-plugin/plugin.json as "<name>@skills-dir", and it
-# follows symlinks - so this keeps edits in this repo live (no
-# install/update/restart cycle) while still getting plugin identity: a version,
-# `claude plugin disable`, `claude plugin details` token accounting, `claude
-# plugin validate`. The plugin's agents/ are discovered from inside it; don't
-# link them separately. The link basename must match the manifest name so the
-# skills it contains resolve as dfadler-agent-config:<skill>.
+# Each plugin under plugins/ is linked as a unit rather than its contents.
+# Claude Code auto-loads any directory under ~/.claude/skills/ that carries a
+# .claude-plugin/plugin.json as "<name>@skills-dir", and it follows symlinks -
+# so this keeps edits in this repo live (no install/update/restart cycle)
+# while still getting plugin identity: a version, `claude plugin disable`,
+# `claude plugin details` token accounting, `claude plugin validate`. Each
+# plugin's agents/ are discovered from inside it; don't link them separately.
+# The link basename must match its manifest's name so its skills resolve as
+# <plugin-name>:<skill>.
 mkdir -p "$HOME/.claude/skills"
-link "$PLUGIN_SRC" "$PLUGIN_LINK"
+for i in "${!PLUGIN_SRCS[@]}"; do
+  link "${PLUGIN_SRCS[$i]}" "${PLUGIN_LINKS[$i]}"
+done
 
 # Last, so the linking work is already done and reported when these speak up.
-# All three are advisory, not failures: the symlinks are correct either way,
+# All four are advisory, not failures: the symlinks are correct either way,
 # and `./setup.sh && something-else` shouldn't break over any of them. An
 # explicitly requested --install-deps that doesn't install is still a failure.
 check_git_identity
 check_python_deps
 check_mattpocock_skills
+check_frontend_design
 
 # Also last, and independent of everything above: offers (opt-in, y/n) to
 # pre-approve Aikido Safe Chain's pinned installer command in Claude Code's
