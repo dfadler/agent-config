@@ -154,14 +154,27 @@ function checkDrift(actualFiles) {
   }
 }
 
-// Rewrites bulletproof-react's docs-relative links (e.g. "../apps/react-vite/
-// src/lib/api-client.ts") into absolute GitHub blob URLs at the pinned commit.
-// Left as relative, these links are broken outside bulletproof-react's own
-// repo — which is exactly where every consumer of this skill reads them from.
+// Rewrites bulletproof-react's docs-relative links and images (e.g. "../apps/
+// react-vite/src/lib/api-client.ts", or "./assets/foo.png" for an asset
+// sitting next to the docs themselves) into absolute GitHub URLs at the
+// pinned commit. Left as relative, these are broken outside bulletproof-
+// react's own repo — which is exactly where every consumer of this skill
+// reads them from. Resolved via path.posix against "docs/" (every source
+// file lives directly in that directory) rather than special-casing "../"
+// vs "./", so any relative form resolves correctly. A plain link uses a
+// "blob" URL (GitHub's syntax-highlighted source view); an image (leading
+// "!") uses raw.githubusercontent.com instead, since a blob URL serves an
+// HTML page, not image bytes, and would render as a broken image.
 function rewriteRelativeLinks(markdown, pinnedSha) {
-  return markdown.replace(/\]\(\.\.\/([^)]+)\)/g, (full, target) => {
+  return markdown.replace(/(!?)\[([^\]]*)\]\(([^)]+)\)/g, (full, bang, text, target) => {
     if (/^[a-z][a-z0-9+.-]*:/i.test(target)) return full; // already a URL
-    return `](${REPO_URL}/blob/${pinnedSha}/${target})`;
+    if (target.startsWith('#')) return full; // in-page anchor
+    const repoPath = path.posix.normalize(path.posix.join('docs', target));
+    const base =
+      bang === '!'
+        ? `https://raw.githubusercontent.com/alan2207/bulletproof-react/${pinnedSha}`
+        : `${REPO_URL}/blob/${pinnedSha}`;
+    return `${bang}[${text}](${base}/${repoPath})`;
   });
 }
 
