@@ -201,6 +201,15 @@ environment's own permission system already governs:
   posted — rotate the credential immediately and note the remediation rather than
   just scrubbing the visible copy.
 
+## Fetch-and-execute installs: always ask first
+
+A command that fetches code from a registry or URL and runs it in the same
+step (`npx <pkg>@latest`, `curl <url> | sh`, etc., but not an ordinary `npm
+install`/`pip install` against a project's own lockfile) needs explicit,
+per-run permission before it runs, even under a broad Bash allow-rule — see
+the `dfadler-agent-config:fetch-execute-permission` skill for the exact
+scope and procedure.
+
 ## Cite sources for platform-capability claims
 
 When stating a platform or tool capability as fact — rate limits, model behavior,

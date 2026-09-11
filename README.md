@@ -136,7 +136,11 @@ At the end of a run, `setup.sh` asks (interactively, y/n) whether to add a Bash 
 rule to `~/.claude/settings.json` that pre-approves exactly that pinned command, so a future
 agent session doesn't have to stop and ask. It's an exact-string match tied to one specific
 version and checksum — not a blanket `curl *` allow — and it only *allowlists* the command;
-it doesn't run the installer itself. The prompt is skipped cleanly (no hang) when there's no
+it doesn't run the installer itself. This is the reference example the
+`dfadler-agent-config:fetch-execute-permission` skill points to for when a standing,
+already-approved rule like this one is allowed to skip the ask-every-time default: the user
+approved this exact pinned command once, visibly, through this y/n prompt — a broad or
+wildcard rule never gets the same treatment. The prompt is skipped cleanly (no hang) when there's no
 interactive terminal, e.g. in CI or a piped run.
 
 Answer no, or run non-interactively, and nothing is written. Add the rule later with:
@@ -189,7 +193,11 @@ for `--skill` are each `SKILL.md`'s own `name:` field
 probe install, not assumed from the README. `setup.sh` runs an advisory-only check
 (`check_react_skills`) that only fires if the `skills` CLI is already on `PATH` — it
 never runs `npx skills@latest` itself, since that would fetch and execute a
-third-party package over the network on every `setup.sh` run.
+third-party package over the network on every `setup.sh` run. The same reasoning
+applies to an agent running the `skills add`/`npx skills@latest` command above on the
+user's behalf: it's a fetch-and-execute install, not an ordinary dependency change, so
+it needs explicit, per-run permission — see the
+`dfadler-agent-config:fetch-execute-permission` skill.
 
 An earlier version of this section vendored these two skills into their own plugin
 here instead of referencing them — reverted (#211's review) once it turned out `skills
