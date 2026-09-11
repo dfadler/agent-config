@@ -4,7 +4,8 @@
   "version": "0.1.0",
   "description": "Pins bulletproof-react's docs as a devDependency for a scripted generator (agent-config#217) that distills them into this plugin's skills. See NOTICE.md for provenance, license, and the re-pin workflow.",
   "scripts": {
-    "generate": "node generate.js"
+    "generate": "node generate.js",
+    "polish": "node polish.js"
   },
   "devDependencies": {
     "bulletproof-react": "git+https://github.com/alan2207/bulletproof-react.git#9506629ed003a561c6627735480cce4994244bb4"
