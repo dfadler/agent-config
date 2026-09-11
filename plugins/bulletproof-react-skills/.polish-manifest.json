@@ -1,0 +1,11 @@
+{
+  "polished": {
+    "testing": "2b60cd6e4a8b47e872948c58956c63b7224a4b128e80bf55b1a55cd58e201dff",
+    "security": "edafcb920999bfa192b1a04ea5c494e1c5e8622e375a67b1a0fe37559b381463",
+    "project-structure": "acba7340289a8e008861f28bc5924aedd08cbed66e0e6c763e27aa5857dde957",
+    "state-and-data": "6cd3830137361a53632a1bd07cb57fd4ea1ec524d0d99fd6a8008efdad686019",
+    "performance": "b8938159d8ddbc7a5b9384e7db5ee26c0e9ec8231a3b790d57cf22fa8279838b",
+    "components-and-styling": "2802a73c59e99ad386784aa107aee70bfc595ee1e518c0a0681ff682aa456496",
+    "project-standards": "85ef44c299cca439a068ee5df745298f3d51d79a1b51e8f5d1315b365ed9233d"
+  }
+}
