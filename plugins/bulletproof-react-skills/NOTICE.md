@@ -33,25 +33,46 @@ change like this on every re-run rather than silently regenerating around it.
 
 ## Updating
 
-```bash
-# 1. Find the new commit to pin (or a specific one you've already decided on):
-git ls-remote https://github.com/alan2207/bulletproof-react.git HEAD
+This is a **manual process today** — there is no scheduled or CI job that checks for
+a new upstream commit and opens a re-pin PR automatically. Given bulletproof-react
+has no releases to watch, that would mean periodically diffing the pinned SHA
+against upstream `master` on some cadence; worth doing eventually, but it's
+explicitly future work, not a requirement for this plugin to be useful today.
 
-# 2. Bump the pin in package.json's devDependencies, then reinstall:
-#      "bulletproof-react": "github:alan2207/bulletproof-react#<new-sha>"
-npm install
+1. **Find the new commit to pin** (or use a specific one you've already decided on):
 
-# 3. Re-run the generator (agent-config#217) and review what it flags/changes:
-#      - a changed doc-set shape (added/removed/reshaped file) vs. the manifest
-#      - the diff in each regenerated SKILL.md
-```
+   ```bash
+   git ls-remote https://github.com/alan2207/bulletproof-react.git HEAD
+   ```
 
-Then update the commit SHA/date above and bump this plugin's `version` in
-`.claude-plugin/plugin.json`.
+2. **Bump the pin** in `package.json`'s `devDependencies`, then reinstall:
 
-`npm install` in this directory respects the local `.npmrc` (`ignore-scripts=true`):
-bulletproof-react's own `package.json` has a `prepare` script that would otherwise
-try to install three example apps' worth of dependencies just to fetch `docs/*.md`.
+   ```
+   "bulletproof-react": "git+https://github.com/alan2207/bulletproof-react.git#<new-sha>"
+   ```
+
+   ```bash
+   npm install
+   ```
+
+   This respects the local `.npmrc` (`ignore-scripts=true`): bulletproof-react's
+   own `package.json` has a `prepare` script that would otherwise try to install
+   three example apps' worth of dependencies just to fetch `docs/*.md`.
+
+3. **Re-run the generator** (`npm run generate`, agent-config#217) and read its
+   output. It refuses to proceed — rather than silently regenerating around the
+   gap — if the doc set no longer matches its mapping (a file added, removed, or
+   renamed); in that case, update `generate.js`'s `SKILL_MAP`/`DROPPED` first.
+
+4. **Review the manifest diff** (`.docs-manifest.json`, per-file content hashes) to
+   see which source docs actually changed since the last generation.
+
+5. **Review each changed `SKILL.md`** against its source doc(s) — the generator's
+   merge is mechanical, so a re-run can shift wording or introduce something that
+   needs a human pass, the same as the initial generation did (agent-config#218).
+
+6. **Commit** the updated `SKILL.md` files, `.docs-manifest.json`, the new pinned
+   SHA/date in this file, and a bumped `version` in `.claude-plugin/plugin.json`.
 
 ## MIT License (alan2207/bulletproof-react)
 
