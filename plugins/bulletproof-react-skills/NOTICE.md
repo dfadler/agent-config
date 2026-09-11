@@ -67,11 +67,19 @@ explicitly future work, not a requirement for this plugin to be useful today.
 4. **Review the manifest diff** (`.docs-manifest.json`, per-file content hashes) to
    see which source docs actually changed since the last generation.
 
-5. **Review each changed `SKILL.md`** against its source doc(s) — the generator's
-   merge is mechanical, so a re-run can shift wording or introduce something that
-   needs a human pass, the same as the initial generation did (agent-config#218).
+5. **Run the polish step** (`npm run polish`) to rewrite each changed skill from
+   generate.js's mechanical draft into agent-directed guidance, via `claude -p`.
+   Skips any skill whose source hasn't changed since it was last polished
+   (tracked in `.polish-manifest.json`), so this only spends an API call — and
+   only re-rolls wording — on skills the pin bump actually touched.
 
-6. **Commit** the updated `SKILL.md` files, `.docs-manifest.json`, the new pinned
+6. **Review each changed `SKILL.md`** against its source doc(s) anyway — an LLM
+   rewrite can still get a technical detail subtly wrong, especially on
+   security-sensitive content, so the human pass from the initial generation
+   (agent-config#218) still applies on every re-run, not just the first one.
+
+7. **Commit** the updated `SKILL.md` files, `.docs-manifest.json`,
+   `.polish-manifest.json`, the new pinned
    SHA/date in this file, and a bumped `version` in `.claude-plugin/plugin.json`.
 
 ## MIT License (alan2207/bulletproof-react)
