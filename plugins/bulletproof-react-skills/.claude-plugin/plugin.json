@@ -2,7 +2,7 @@
   "$schema": "https://json.schemastore.org/claude-code-plugin-manifest.json",
   "name": "bulletproof-react-skills",
   "version": "0.1.0",
-  "description": "Skills distilled from bulletproof-react's docs/*.md (MIT), produced by a scripted, re-runnable generator rather than a hand-vendored copy. See NOTICE.md for provenance and the re-pin workflow. This is infrastructure only (agent-config#216); the generator and the skills themselves land in follow-up work (agent-config#217, #218).",
+  "description": "Infrastructure only (agent-config#216): pins bulletproof-react's docs/*.md (MIT) as a devDependency for a planned, scripted generator that will distill them into skills, rather than a hand-vendored copy. No generator or skills exist yet — those land in follow-up work (agent-config#217, #218). See NOTICE.md for provenance and the re-pin workflow.",
   "author": {
     "name": "Dustin Fadler",
     "url": "https://github.com/dfadler"
