@@ -5,7 +5,13 @@ description: |
   component vs. application vs. server vs. form vs. URL state, a single shared
   API client instance, colocated request declarations paired with React Query
   hooks, and API/in-app error handling. Use when adding state, wiring up an
-  API call, or handling request/render errors in a React app.
+  API call, or handling request/render errors in a React app. Reach for this
+  whenever you're about to decide "should this be useState or global state?",
+  add a new fetch/mutation to a React app, wire up form validation, or figure
+  out where a caught error should surface — e.g. "where should I put this
+  modal's open/closed state?", "how do I fetch and cache this list from the
+  API?", "the app crashed on one bad component and took the whole page down
+  with it."
 license: MIT
 metadata:
   version: "0.1.0"
@@ -17,11 +23,11 @@ metadata:
 
 ## 🗃️ State Management
 
-Don't dump every piece of state into one centralized store. Split it by category first, then pick the right tool per category — this keeps each piece of state as close as possible to where it's actually needed and avoids unnecessary global re-renders.
+Don't default to one centralized store for everything — sort state by *how it's used* first, since that determines which tool is actually appropriate for it. Categorizing state this way keeps the app performant and keeps you from reaching for a global store when a local `useState` would do.
 
 ### Component State
 
-Start state here by default. Keep it local to the component, and pass it down as props to children when needed — only lift it higher if another part of the tree genuinely needs it. Use:
+Scope state to the component that owns it, and pass it down as props only when a child actually needs it. Start local; only lift it up once something else in the tree genuinely requires it. Use:
 
 - [useState](https://react.dev/reference/react/useState) - for simpler states that are independent
 - [useReducer](https://react.dev/reference/react/useReducer) - for more complex states where on a single action you want to update several pieces of state
@@ -30,7 +36,7 @@ Start state here by default. Keep it local to the component, and pass it down as
 
 ### Application State
 
-Reserve this for genuinely global concerns — modals, notifications, color mode toggles. Localize it as close as possible to the components that need it; don't globalize state by default just because it's convenient.
+Reach for application state only for things that are genuinely global — modals, notifications, color mode. Don't promote state to this layer by default; keep it as close as possible to the components that need it, or you'll end up with a bloated, hard-to-reason-about global store.
 
 Good Application State Solutions:
 
@@ -45,7 +51,7 @@ Good Application State Solutions:
 
 ### Server Cache State
 
-Don't cache remote data in a general-purpose store like Redux — it's technically possible but not optimal. Reach for a dedicated server-cache library instead; they handle caching, invalidation, and refetching far better than a generic state store.
+Don't cache server-fetched data in a general state store like Redux — it's the wrong tool for this job. Use a dedicated cache library instead; it'll handle invalidation, refetching, and staleness far better than a hand-rolled store.
 
 Good Server Cache Libraries:
 
@@ -59,11 +65,13 @@ Good Server Cache Libraries:
 
 ### Form State
 
-Use a dedicated form library rather than hand-rolling form state with React primitives alone — it's possible, but you lose the built-in validation, error handling, and submission handling these libraries give you for free, and forms often grow many interdependent fields that need this.
+Use a form library rather than hand-rolling validation, error handling, and submission logic — it's a lot of surface area to get right on your own, and these libraries already cover it.
 
 Forms in React can be [controlled and uncontrolled](https://react.dev/learn/sharing-state-between-components#controlled-and-uncontrolled-components).
 
-Pick one of:
+Depending on the application needs, they might be pretty complex with many different fields that require validation.
+
+Although it's possible to build a form using only React primitives, prefer one of these instead:
 
 - [React Hook Form](https://react-hook-form.com/)
 - [Formik](https://formik.org/)
@@ -75,7 +83,7 @@ Wrap the library in your own abstracted `Form` component and input field compone
 
 [Input Field Example Code](https://github.com/alan2207/bulletproof-react/blob/9506629ed003a561c6627735480cce4994244bb4/apps/react-vite/src/components/ui/form/input.tsx)
 
-Validate inputs on the client by integrating one of these with the form library:
+Pair the form library with a validation library for client-side input validation:
 
 - [zod](https://github.com/colinhacks/zod)
 - [yup](https://github.com/jquense/yup)
@@ -84,7 +92,7 @@ Validate inputs on the client by integrating one of these with the form library:
 
 ### URL State
 
-When state needs to be shareable via link or survive a refresh, put it in the URL instead — as a route param (`/app/${dynamicParam}`) or query param (`/app?dynamicParam=1`). Use a routing solution like react-router-dom to read and manipulate it.
+When state should be shareable, bookmarkable, or reflect navigation (a dynamic param like `/app/${dynamicParam}`, or a query param like `/app?dynamicParam=1`), put it in the URL rather than component or application state. Use a routing solution like react-router-dom to read and manipulate it.
 
 [URL State Example Code](https://github.com/alan2207/bulletproof-react/blob/9506629ed003a561c6627735480cce4994244bb4/apps/react-vite/src/features/discussions/components/discussion-view.tsx)
 
@@ -92,21 +100,21 @@ When state needs to be shareable via link or survive a refresh, put it in the UR
 
 ### Use a Single Instance of the API Client
 
-Create one pre-configured API client instance and reuse it everywhere, rather than constructing clients ad hoc. Build it on the native fetch API or a library like [axios](https://github.com/axios/axios), [graphql-request](https://github.com/prisma-labs/graphql-request), or [apollo-client](https://www.apollographql.com/docs/react/), with your config baked in once.
+Create one pre-configured API client instance and reuse it everywhere, instead of constructing a new client per call site. Build it with the native fetch API or a library like [axios](https://github.com/axios/axios), [graphql-request](https://github.com/prisma-labs/graphql-request), or [apollo-client](https://www.apollographql.com/docs/react/), with your shared config baked in once.
 
 [API Client Example Code](https://github.com/alan2207/bulletproof-react/blob/9506629ed003a561c6627735480cce4994244bb4/apps/react-vite/src/lib/api-client.ts)
 
 ### Define and Export Request Declarations
 
-Don't declare API requests inline at the call site — define and export them separately, colocated by feature, so every available endpoint is easy to find and the codebase stays organized.
+Don't declare API requests inline at the call site — define and export them separately, colocated with the feature that uses them. This keeps the codebase organized and makes every endpoint the app uses easy to track.
 
-Give every API request declaration:
+Every API request declaration should consist of:
 
 - Types and validation schemas for the request and response data
 - A fetcher function that calls an endpoint, using the API client instance
-- A hook built on a data-fetching library — [react-query](https://tanstack.com/query), [swr](https://swr.vercel.app/), [apollo-client](https://www.apollographql.com/docs/react/), [urql](https://formidable.com/open-source/urql/), etc. — that consumes the fetcher and manages fetching/caching
+- A hook that consumes the fetcher function, built on top of a library like [react-query](https://tanstack.com/query), [swr](https://swr.vercel.app/), [apollo-client](https://www.apollographql.com/docs/react/), or [urql](https://formidable.com/open-source/urql/) to manage the fetching and caching logic
 
-Type the responses and let those types flow down through the app — this is what gives you real type safety at the point of use, not just at the fetch boundary.
+Type the responses and let that typing flow down through the app — it's what gives you type safety on data coming back from the API.
 
 [API Request Declarations - Query - Example Code](https://github.com/alan2207/bulletproof-react/blob/9506629ed003a561c6627735480cce4994244bb4/apps/react-vite/src/features/discussions/api/get-discussions.ts)
 [API Request Declarations - Mutation - Example Code](https://github.com/alan2207/bulletproof-react/blob/9506629ed003a561c6627735480cce4994244bb4/apps/react-vite/src/features/discussions/api/create-discussion.ts)
@@ -115,16 +123,16 @@ Type the responses and let those types flow down through the app — this is wha
 
 ### API Errors
 
-Add an interceptor to handle errors centrally — use it to fire notification toasts, log out unauthorized users, or trigger a token refresh, instead of scattering this handling across every call site.
+Add an interceptor to the API client to handle errors centrally — use it to fire notification toasts, log out unauthorized users, or trigger a token-refresh request, rather than handling these cases ad hoc at each call site.
 
 [API Errors Notification Example Code](https://github.com/alan2207/bulletproof-react/blob/9506629ed003a561c6627735480cce4994244bb4/apps/react-vite/src/lib/api-client.ts)
 
 ### In App Errors
 
-Don't rely on a single error boundary for the whole app — place multiple error boundaries at different points in the tree instead, so an error in one area is contained there and doesn't take down the rest of the app's functionality.
+Use React error boundaries, and place multiple of them at different points in the tree rather than wrapping the whole app in a single one. That way a failure in one area gets contained and handled locally instead of taking down the entire application.
 
 [Error Boundary Example Code](https://github.com/alan2207/bulletproof-react/blob/9506629ed003a561c6627735480cce4994244bb4/apps/react-vite/src/app/routes/app/discussions/discussion.tsx)
 
 ### Error Tracking
 
-Track production errors with a tool like [Sentry](https://sentry.io/) rather than rolling your own — it reports every break along with platform/browser context. Upload source maps to it so stack traces resolve back to your actual source.
+Track production errors with a dedicated tool like [Sentry](https://sentry.io/) rather than rolling your own — it reports issues that break the app along with the platform/browser context they occurred in. Upload source maps so errors point back to your actual source code, not the bundled output.
