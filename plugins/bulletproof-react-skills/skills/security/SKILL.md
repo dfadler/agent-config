@@ -1,13 +1,10 @@
 ---
 name: security
 description: |
-  Security conventions for React apps, distilled from bulletproof-react: JWT
-  authentication for SPAs, cookie vs. localStorage tradeoffs for token storage,
-  XSS input sanitization, and RBAC/PBAC authorization patterns. Use this
-  whenever implementing a login/auth flow, deciding where to store a token,
-  adding a protected route or role/permission check, or reviewing any code
-  that handles user credentials, permissions, or sensitive data — even if the
-  user doesn't say "security" explicitly.
+  Security conventions from bulletproof-react: token storage and
+  authentication for SPAs, authorization patterns, and other client-side
+  hardening practices. Use when implementing auth, authorization checks, or
+  handling sensitive data in a React app.
 license: MIT
 metadata:
   version: "0.1.0"
@@ -15,70 +12,58 @@ metadata:
 
 > Adapted from [bulletproof-react](https://github.com/alan2207/bulletproof-react) @ [`9506629`](https://github.com/alan2207/bulletproof-react/commit/9506629ed003a561c6627735480cce4994244bb4), MIT licensed. See ../../NOTICE.md for provenance and the re-pin workflow.
 
-# Security
+# 🔐 Security
 
-Client-side authentication and authorization improve the user experience, but
-they are never a substitute for server-side enforcement. Treat everything
-below as a UX layer on top of protections the server must enforce
-independently — a client-side check is a convenience, not the security
-boundary.
+## Auth
 
-## Authentication: verifying who the user is
+Never treat client-side authentication as sufficient on its own — always enforce authorization on the server too. Client-side auth improves UX and complements server-side security, but it does not replace it.
 
-In a single-page app, authenticate with a [JWT](https://jwt.io/): the server
-issues a token on login/register, and every subsequent request sends it
-(header or cookie) to prove identity.
+Protecting resources comprises two key components:
 
-**Where to store the token** — prefer a cookie over `localStorage`/`sessionStorage`:
+### Authentication
 
-- `localStorage` is readable by any JavaScript running on the page, so a
-  single [XSS](https://owasp.org/www-community/attacks/xss/) vulnerability
-  anywhere in the app can steal the token directly. Only fall back to it if
-  the app genuinely can't use cookies.
-- A cookie set with `HttpOnly` is inaccessible to client-side JavaScript
-  entirely, which removes that attack surface — set this up on the API side;
-  the client shouldn't need direct cookie access at all.
-- Storing the token in application state (not persisted) is the most secure
-  option, but it resets on page refresh, losing the session. Weigh that
-  against how often your users actually refresh/reload before choosing it.
+Authentication verifies the identity of a user. In single-page applications (SPAs), authenticate users with JSON Web Tokens ([JWT](https://jwt.io/)): issue a token on login/registration, store it in the application, and send it with every authenticated request (header or cookie) to validate the user's identity and access permissions.
 
-Whichever storage you pick, also sanitize every piece of user input before
-rendering it — an unsanitized input is an XSS vector regardless of how well
-the token itself is stored:
+Prefer storing the token in application state — it's the most secure option. But be aware that a page refresh resets application state, which loses the user's authentication status.
+
+That's why you'll need to persist the token in a cookie or `localStorage`/`sessionStorage` instead.
+
+#### `localStorage` vs cookie for storing tokens
+
+Avoid storing authentication tokens in `localStorage` when you can — it's readable by any script on the page, so a Cross-Site Scripting ([XSS](https://owasp.org/www-community/attacks/xss/)) vulnerability can let an attacker steal the token directly.
+
+Prefer cookies configured with the `HttpOnly` attribute instead, since that makes them inaccessible to client-side JavaScript. In the sample app, js-cookie is used for cookie management on the assumption that the real API enforces `HttpOnly`, so the application never has client-side access to the cookie.
+
+Storing the token securely isn't enough on its own — also sanitize all user inputs before rendering them anywhere in the application. This reduces the app's exposure to XSS attacks regardless of where the token lives.
 
 [HTML Sanitization Example Code](https://github.com/alan2207/bulletproof-react/blob/9506629ed003a561c6627735480cce4994244bb4/apps/react-vite/src/components/ui/md-preview/md-preview.tsx)
 
-Check [OWASP's client-side security risks](https://owasp.org/www-project-top-10-client-side-security-risks/) for the fuller threat list before assuming a given input is safe to render as-is.
+For a full list of security risks, check [OWASP](https://owasp.org/www-project-top-10-client-side-security-risks/).
 
-Treat the authenticated user as global state — react-query with
-[react-query-auth](https://github.com/alan2207/react-query-auth), or context +
-hooks, or another state library. Components anywhere in the tree need to know
-"is someone logged in," so don't scope this locally. Bulletproof-react's own
-convention: a present user object *is* "authenticated" — don't also maintain
-a separate `isAuthenticated` flag that could drift out of sync with it.
+#### Handling user data
+
+Treat user info as global state, available from anywhere in the application. If you're already using `react-query`, reach for [react-query-auth](https://github.com/alan2207/react-query-auth) to manage user state — it handles the details once you give it configuration. Otherwise, use React context + hooks, or a third-party state management library.
 
 [Auth Configuration Example Code](https://github.com/alan2207/bulletproof-react/blob/9506629ed003a561c6627735480cce4994244bb4/apps/react-vite/src/lib/auth.tsx)
 
-## Authorization: verifying what the user can do
+Treat the presence of a user object as the signal that the user is authenticated.
 
-Once you know who the user is, decide what they're allowed to do. Two
-patterns — pick based on how fine-grained the check needs to be:
+### Authorization
 
-**RBAC (role-based)** — assign each user a role (e.g. `USER`, `ADMIN`) and
-gate features by role. Reach for this first; it's simpler to reason about and
-covers most "some users can do X, others can't" cases.
+Authorization verifies whether a user has permission to access a specific resource within the application.
 
-[RBAC Configuration Example Code](https://github.com/alan2207/bulletproof-react/blob/9506629ed003a561c6627735480cce4994244bb4/apps/react-vite/src/lib/authorization.tsx)
+#### RBAC (Role based access control)
+
+[Authorization Configuration Example Code](https://github.com/alan2207/bulletproof-react/blob/9506629ed003a561c6627735480cce4994244bb4/apps/react-vite/src/lib/authorization.tsx)
+
+Use role-based authorization when access maps cleanly onto a small set of roles: define roles (e.g. `USER`, `ADMIN`) and associate each with permissions, then grant access based on the user's role — for instance, restrict certain functionality to regular users while letting administrators access everything.
+
 [RBAC Example Code](https://github.com/alan2207/bulletproof-react/blob/9506629ed003a561c6627735480cce4994244bb4/apps/react-vite/src/features/discussions/components/delete-discussion.tsx)
 
-**PBAC (permission-based)** — use this when a role alone isn't precise
-enough. "Only the comment's author can delete it" isn't a role-shaped rule
-(any `USER` has the same role, but only one of them should be able to delete
-a given comment) — check a specific permission/policy against the resource
-instead.
+#### PBAC (Permission based access control)
+
+Reach for permission-based access control when RBAC's role granularity isn't precise enough — for example, when access must depend on specific criteria like resource ownership, such as letting only a comment's author delete it. PBAC gives you that finer-grained control where RBAC would otherwise force everyone with a role to share the same permissions.
+
+Use the RBAC component, passing it allowed roles, for role-based protection. When you need stricter, criteria-based protection instead, pass it a policies check.
 
 [PBAC Example Code](https://github.com/alan2207/bulletproof-react/blob/9506629ed003a561c6627735480cce4994244bb4/apps/react-vite/src/features/comments/components/comments-list.tsx)
-
-In practice: use the RBAC component when a plain role check is enough; pass
-an explicit policy check instead when the rule depends on ownership or other
-resource data, not just which role the user holds.

@@ -38,6 +38,10 @@ const SKILL_MAP = [
   },
   {
     name: 'state-and-data',
+    // Only a multi-source skill needs an explicit title: each source's own
+    // H1 becomes a demoted subsection (see buildSkillMarkdown), so there's
+    // no single existing title left to promote - one has to be supplied.
+    title: 'State and Data',
     description:
       'State management and data-fetching conventions from bulletproof-react: ' +
       'component vs. application vs. server vs. form vs. URL state, a single ' +
@@ -178,16 +182,82 @@ function rewriteRelativeLinks(markdown, pinnedSha) {
   });
 }
 
+// Demotes every heading in `markdown` by `levels` (capped at H6). Used when
+// merging more than one source doc: each source's own H1 must become a
+// subsection under the skill's single synthetic title, not remain a sibling
+// root heading once concatenated. Skips headings inside fenced code blocks —
+// a "# comment" in an example script is code, not a section title.
+function demoteHeadings(markdown, levels) {
+  let inFence = false;
+  return markdown
+    .split('\n')
+    .map((line) => {
+      if (/^(```|~~~)/.test(line)) {
+        inFence = !inFence;
+        return line;
+      }
+      if (inFence) return line;
+      const match = line.match(/^(#{1,6}) (.*)$/);
+      if (!match) return line;
+      const newLevel = Math.min(6, match[1].length + levels);
+      return `${'#'.repeat(newLevel)} ${match[2]}`;
+    })
+    .join('\n');
+}
+
+// Closes heading-level gaps (an H1 followed directly by an H3, no H2 used in
+// between) while preserving the existing parent/child structure.
+// bulletproof-react's own docs sometimes skip a level on their own — the
+// gap isn't specific to merging multiple docs together, checked directly
+// against the generated skills (4 of 7 had a skip, only one of which was a
+// multi-source merge). A heading's normalized level is always exactly one
+// deeper than its nearest shallower ancestor's normalized level, tracked
+// with a stack of (originalLevel, normalizedLevel) pairs: an incoming
+// heading whose original level is <= the stack top's means "not a
+// descendant of it," so pop back to (and past) that level first. Skips
+// fenced code blocks, same as demoteHeadings.
+function normalizeHeadingGaps(markdown) {
+  const stack = [];
+  let inFence = false;
+  return markdown
+    .split('\n')
+    .map((line) => {
+      if (/^(```|~~~)/.test(line)) {
+        inFence = !inFence;
+        return line;
+      }
+      if (inFence) return line;
+      const match = line.match(/^(#{1,6}) (.*)$/);
+      if (!match) return line;
+      const origLevel = match[1].length;
+      while (stack.length && stack[stack.length - 1].orig >= origLevel) {
+        stack.pop();
+      }
+      const normLevel = stack.length ? stack[stack.length - 1].norm + 1 : 1;
+      stack.push({ orig: origLevel, norm: normLevel });
+      return `${'#'.repeat(normLevel)} ${match[2]}`;
+    })
+    .join('\n');
+}
+
 function buildSkillMarkdown(skill, pinnedSha) {
+  if (skill.sources.length > 1 && !skill.title) {
+    throw new Error(
+      `${skill.name}: a multi-source skill needs an explicit "title" — there's no single existing H1 to promote once each source's own is demoted.`
+    );
+  }
+
   const sections = skill.sources.map((filename) => {
     const raw = fs.readFileSync(path.join(DOCS_DIR, filename), 'utf8').trim();
-    return rewriteRelativeLinks(raw, pinnedSha);
+    const rewritten = rewriteRelativeLinks(raw, pinnedSha);
+    return skill.sources.length > 1 ? demoteHeadings(rewritten, 1) : rewritten;
   });
 
-  const body =
+  let body =
     skill.sources.length === 1
       ? sections[0]
-      : sections.join('\n\n---\n\n');
+      : `# ${skill.title}\n\n${sections.join('\n\n')}`;
+  body = normalizeHeadingGaps(body);
 
   const frontmatter = [
     '---',

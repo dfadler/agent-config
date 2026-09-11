@@ -4,13 +4,8 @@ description: |
   State management and data-fetching conventions from bulletproof-react:
   component vs. application vs. server vs. form vs. URL state, a single shared
   API client instance, colocated request declarations paired with React Query
-  hooks, and API/in-app error handling. Trigger this whenever you're about to
-  add or wire up React state (useState/useReducer/context/redux/zustand/etc.),
-  fetch data or call an API from a React component, set up or extend an API
-  client, build a form, put data in the URL, or add error handling/error
-  boundaries/error tracking to a React app — including questions like "where
-  should this state live", "how should I fetch this data", or "how do I
-  handle this API error".
+  hooks, and API/in-app error handling. Use when adding state, wiring up an
+  API call, or handling request/render errors in a React app.
 license: MIT
 metadata:
   version: "0.1.0"
@@ -18,22 +13,24 @@ metadata:
 
 > Adapted from [bulletproof-react](https://github.com/alan2207/bulletproof-react) @ [`9506629`](https://github.com/alan2207/bulletproof-react/commit/9506629ed003a561c6627735480cce4994244bb4), MIT licensed. See ../../NOTICE.md for provenance and the re-pin workflow.
 
-# 🗃️ State Management
+# State and Data
 
-Don't dump every piece of state into one centralized store. Before adding new state, decide which of the five categories below it belongs to — the right category keeps the app fast and keeps the state management code easy to follow.
+## 🗃️ State Management
 
-## Component State
+Don't dump every piece of state into one centralized store. Split it by category first, then pick the right tool per category — this keeps each piece of state as close as possible to where it's actually needed and avoids unnecessary global re-renders.
 
-Use this for state that's specific to one component and doesn't need to be shared globally; pass it down to children as props if they need it too. Start state at the component level by default, and only lift it higher once something else in the tree actually needs it — don't globalize preemptively. Reach for:
+### Component State
+
+Start state here by default. Keep it local to the component, and pass it down as props to children when needed — only lift it higher if another part of the tree genuinely needs it. Use:
 
 - [useState](https://react.dev/reference/react/useState) - for simpler states that are independent
 - [useReducer](https://react.dev/reference/react/useReducer) - for more complex states where on a single action you want to update several pieces of state
 
 [Component State Example Code](https://github.com/alan2207/bulletproof-react/blob/9506629ed003a561c6627735480cce4994244bb4/apps/react-vite/src/components/layouts/dashboard-layout.tsx)
 
-## Application State
+### Application State
 
-Use this for genuinely global concerns — modals, notifications, color mode toggles. Keep the state as close as possible to the components that actually need it rather than hoisting everything into a global store by default; that keeps the app both faster and easier to maintain.
+Reserve this for genuinely global concerns — modals, notifications, color mode toggles. Localize it as close as possible to the components that need it; don't globalize state by default just because it's convenient.
 
 Good Application State Solutions:
 
@@ -46,9 +43,9 @@ Good Application State Solutions:
 
 [Global State Example Code](https://github.com/alan2207/bulletproof-react/blob/9506629ed003a561c6627735480cce4994244bb4/apps/react-vite/src/components/ui/notifications/notifications-store.ts)
 
-## Server Cache State
+### Server Cache State
 
-Treat data fetched from the server as its own category, not just more state to shove into Redux or similar. You *can* cache remote data in a general state store, but a dedicated server-cache library handles staleness, refetching, and invalidation far more effectively — use one instead.
+Don't cache remote data in a general-purpose store like Redux — it's technically possible but not optimal. Reach for a dedicated server-cache library instead; they handle caching, invalidation, and refetching far better than a generic state store.
 
 Good Server Cache Libraries:
 
@@ -60,76 +57,74 @@ Good Server Cache Libraries:
 
 [Server Cache State Example Code](https://github.com/alan2207/bulletproof-react/blob/9506629ed003a561c6627735480cce4994244bb4/apps/react-vite/src/features/discussions/api/get-discussions.ts)
 
-## Form State
+### Form State
 
-Don't hand-roll form state management for anything non-trivial — reach for a form library to get validation, error handling, and submission handling built in, rather than reimplementing them. Forms in React can be [controlled and uncontrolled](https://react.dev/learn/sharing-state-between-components#controlled-and-uncontrolled-components); pick based on how complex the field set and validation needs are.
+Use a dedicated form library rather than hand-rolling form state with React primitives alone — it's possible, but you lose the built-in validation, error handling, and submission handling these libraries give you for free, and forms often grow many interdependent fields that need this.
 
-You can build a form from raw React primitives, but prefer an established library instead:
+Forms in React can be [controlled and uncontrolled](https://react.dev/learn/sharing-state-between-components#controlled-and-uncontrolled-components).
+
+Pick one of:
 
 - [React Hook Form](https://react-hook-form.com/)
 - [Formik](https://formik.org/)
 - [React Final Form](https://github.com/final-form/react-final-form)
 
-Wrap the library's functionality in your own abstracted `Form` component and input field components, adapted to the application's needs, rather than calling the library directly from every form.
+Wrap the library in your own abstracted `Form` component and input field components, adapted to the application's needs, rather than using the library's primitives directly everywhere.
 
 [Form Example Code](https://github.com/alan2207/bulletproof-react/blob/9506629ed003a561c6627735480cce4994244bb4/apps/react-vite/src/components/ui/form/form.tsx)
 
 [Input Field Example Code](https://github.com/alan2207/bulletproof-react/blob/9506629ed003a561c6627735480cce4994244bb4/apps/react-vite/src/components/ui/form/input.tsx)
 
-Pair the form library with a validation library for client-side input validation:
+Validate inputs on the client by integrating one of these with the form library:
 
 - [zod](https://github.com/colinhacks/zod)
 - [yup](https://github.com/jquense/yup)
 
 [Validation Example Code](https://github.com/alan2207/bulletproof-react/blob/9506629ed003a561c6627735480cce4994244bb4/apps/react-vite/src/features/auth/components/register-form.tsx)
 
-## URL State
+### URL State
 
-When state should be shareable, bookmarkable, or reflected in navigation, put it in the URL — as a route param (e.g. `/app/${dynamicParam}`) or a query param (e.g. `/app?dynamicParam=1`) — instead of component/application state. Use a routing solution like react-router-dom to read and manipulate it directly from the address bar.
+When state needs to be shareable via link or survive a refresh, put it in the URL instead — as a route param (`/app/${dynamicParam}`) or query param (`/app?dynamicParam=1`). Use a routing solution like react-router-dom to read and manipulate it.
 
 [URL State Example Code](https://github.com/alan2207/bulletproof-react/blob/9506629ed003a561c6627735480cce4994244bb4/apps/react-vite/src/features/discussions/components/discussion-view.tsx)
 
----
-
-# 📡 API Layer
+## 📡 API Layer
 
 ### Use a Single Instance of the API Client
 
-When the app talks to a REST or GraphQL API, create one pre-configured API client instance and reuse it everywhere — don't instantiate a new client per call site. Build it with the native fetch API or a library such as [axios](https://github.com/axios/axios), [graphql-request](https://github.com/prisma-labs/graphql-request), or [apollo-client](https://www.apollographql.com/docs/react/), with your shared config (base URL, headers, interceptors) baked in.
+Create one pre-configured API client instance and reuse it everywhere, rather than constructing clients ad hoc. Build it on the native fetch API or a library like [axios](https://github.com/axios/axios), [graphql-request](https://github.com/prisma-labs/graphql-request), or [apollo-client](https://www.apollographql.com/docs/react/), with your config baked in once.
 
 [API Client Example Code](https://github.com/alan2207/bulletproof-react/blob/9506629ed003a561c6627735480cce4994244bb4/apps/react-vite/src/lib/api-client.ts)
 
 ### Define and Export Request Declarations
 
-Don't declare API requests inline at the call site — define and export each one separately, colocated with its feature. This keeps the codebase organized and makes every available endpoint easy to find in one place.
+Don't declare API requests inline at the call site — define and export them separately, colocated by feature, so every available endpoint is easy to find and the codebase stays organized.
 
-Every API request declaration should consist of:
+Give every API request declaration:
 
 - Types and validation schemas for the request and response data
 - A fetcher function that calls an endpoint, using the API client instance
-- A hook that consumes the fetcher function that is built on top of libraries such as [react-query](https://tanstack.com/query), [swr](https://swr.vercel.app/), [apollo-client](https://www.apollographql.com/docs/react/), [urql](https://formidable.com/open-source/urql/), etc. to manage the data fetching and caching logic.
+- A hook built on a data-fetching library — [react-query](https://tanstack.com/query), [swr](https://swr.vercel.app/), [apollo-client](https://www.apollographql.com/docs/react/), [urql](https://formidable.com/open-source/urql/), etc. — that consumes the fetcher and manages fetching/caching
 
-Follow this pattern so endpoints stay easy to track, and so typing the response and inferring it downstream keeps the rest of the app type-safe.
+Type the responses and let those types flow down through the app — this is what gives you real type safety at the point of use, not just at the fetch boundary.
 
 [API Request Declarations - Query - Example Code](https://github.com/alan2207/bulletproof-react/blob/9506629ed003a561c6627735480cce4994244bb4/apps/react-vite/src/features/discussions/api/get-discussions.ts)
 [API Request Declarations - Mutation - Example Code](https://github.com/alan2207/bulletproof-react/blob/9506629ed003a561c6627735480cce4994244bb4/apps/react-vite/src/features/discussions/api/create-discussion.ts)
 
----
-
-# ⚠️ Error Handling
+## ⚠️ Error Handling
 
 ### API Errors
 
-Add an interceptor to the API client to handle errors in one place rather than at every call site: use it to trigger notification toasts, log out unauthorized users, or refresh tokens, so the app stays secure and behaves consistently on failure.
+Add an interceptor to handle errors centrally — use it to fire notification toasts, log out unauthorized users, or trigger a token refresh, instead of scattering this handling across every call site.
 
 [API Errors Notification Example Code](https://github.com/alan2207/bulletproof-react/blob/9506629ed003a561c6627735480cce4994244bb4/apps/react-vite/src/lib/api-client.ts)
 
 ### In App Errors
 
-Use React error boundaries to contain errors locally instead of relying on a single boundary for the whole app. Place multiple boundaries around different areas of the app so that when one part fails, it doesn't take down the rest of the UI with it.
+Don't rely on a single error boundary for the whole app — place multiple error boundaries at different points in the tree instead, so an error in one area is contained there and doesn't take down the rest of the app's functionality.
 
 [Error Boundary Example Code](https://github.com/alan2207/bulletproof-react/blob/9506629ed003a561c6627735480cce4994244bb4/apps/react-vite/src/app/routes/app/discussions/discussion.tsx)
 
 ### Error Tracking
 
-Track production errors rather than relying on user reports. Use a tool like [Sentry](https://sentry.io/) instead of building your own — it reports errors as they happen along with the platform/browser context, and lets you trace an error back to source when you upload source maps.
+Track production errors with a tool like [Sentry](https://sentry.io/) rather than rolling your own — it reports every break along with platform/browser context. Upload source maps to it so stack traces resolve back to your actual source.

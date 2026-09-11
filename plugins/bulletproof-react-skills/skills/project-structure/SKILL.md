@@ -4,9 +4,7 @@ description: |
   Project structure conventions from bulletproof-react: what lives in src/,
   the app/assets/components/features/hooks/lib/stores/testing/types/utils
   layout, and how features are organized to stay unidirectional. Use when
-  scaffolding a new React project, deciding where a new file belongs, wiring
-  up ESLint import restrictions, or answering "where should this go" /
-  "should this feature import from that feature" questions.
+  scaffolding a new React project or deciding where a new file belongs.
 license: MIT
 metadata:
   version: "0.1.0"
@@ -16,7 +14,7 @@ metadata:
 
 # 🗄️ Project Structure
 
-Put most application code under `src`, laid out like this:
+Put most application code inside `src`, laid out like this:
 
 ```sh
 src
@@ -48,9 +46,9 @@ src
 +-- utils             # shared utility functions
 ```
 
-Put most of the code inside `features`, not in flat shared folders — this is what keeps the codebase scalable and maintainable. Group each feature's own code together in its own feature folder rather than scattering it across shared component/hook/util directories; that separation is what makes the codebase easier to navigate, and what makes collaboration and scaling work as the app grows. A flat structure with everything mixed together is harder to manage as it grows.
+Organize most of the code inside `features` rather than as a flat pile of files — when deciding where a new file belongs, default to putting it under its owning feature. Keeping feature-specific code separate from shared components makes the codebase easier to manage and improves collaboration, readability, and scalability compared to a flat structure.
 
-Structure a feature folder like this:
+Structure each feature like this:
 
 ```sh
 src/features/awesome-feature
@@ -70,15 +68,15 @@ src/features/awesome-feature
 +-- utils       # utility functions for a specific feature
 ```
 
-Only create the subfolders a given feature actually needs — don't scaffold all of them by default.
+NOTE: Only create the subfolders a given feature actually needs — don't scaffold all of them by default.
 
-If a lot of API calls are shared across features, pull them out of the individual feature folders into a dedicated top-level `api` folder instead of duplicating them per feature.
+If a lot of API calls are shared across features, put them in a dedicated top-level `api` folder instead of duplicating them inside each feature.
 
-Don't reach for barrel files to re-export a feature's contents — import directly from the specific file instead. Barrel files used to be the recommendation, but they block Vite's tree shaking and can cause real performance regressions.
+Avoid barrel files for exporting a feature's files — they defeat Vite's tree shaking and can cause performance issues. Import directly from the source file instead.
 
-Never import one feature's internals from another feature — compose features together only at the application level. This keeps each feature independent and keeps the codebase from becoming tangled.
+Never import across features. Compose features together only at the application level, so each feature stays independent and the codebase doesn't become tangled.
 
-Enforce the no-cross-feature-import rule with ESLint rather than relying on code review to catch it:
+Enforce the no-cross-feature-import rule with ESLint:
 
 ```js
 'import/no-restricted-paths': [
@@ -119,13 +117,13 @@ Enforce the no-cross-feature-import rule with ESLint rather than relying on code
 ],
 ```
 
-Also enforce a unidirectional codebase architecture: make code flow in one direction, from shared parts to features to the app (shared -> features -> app). This is what keeps the codebase predictable and easy to reason about, instead of letting dependencies tangle in both directions.
+Enforce a unidirectional codebase architecture: code should flow one way, from shared parts to features to the app (shared -> features -> app). This keeps the codebase predictable and easier to understand.
 
 ![Unidirectional Codebase](https://raw.githubusercontent.com/alan2207/bulletproof-react/9506629ed003a561c6627735480cce4994244bb4/docs/assets/unidirectional-codebase.png)
 
-Follow the direction shown above: shared parts can be imported from anywhere, features can only import from shared parts, and the app can import from both features and shared parts — never the other way around.
+Shared parts can be imported from anywhere in the codebase. Features may only import from shared parts. The app layer may import from both features and shared parts — never the reverse.
 
-Enforce this with ESLint as well:
+Enforce this direction with ESLint too:
 
 ```js
 'import/no-restricted-paths': [
@@ -157,4 +155,4 @@ Enforce this with ESLint as well:
 ],
 ```
 
-Follow these practices to keep the codebase organized, scalable, and maintainable, and to make collaboration more efficient. The same architecture carries over cleanly to apps built with Next.js, Remix, or React Native, so apply it there too.
+Following these practices keeps the codebase organized, scalable, and maintainable, and the same architecture carries over cleanly to apps built with Next.js, Remix, or React Native.

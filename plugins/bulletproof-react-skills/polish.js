@@ -57,12 +57,76 @@ ${skillName}
 ${rawMarkdown}`;
 }
 
+// Every markdown/image link target in `markdown` (order-independent set) -
+// used to verify the polish pass didn't drop one. Mirrors the link pattern
+// generate.js's rewriteRelativeLinks already matches.
+function linkTargets(markdown) {
+  const targets = new Set();
+  const re = /!?\[[^\]]*\]\(([^)]+)\)/g;
+  let match;
+  while ((match = re.exec(markdown))) {
+    targets.add(match[1]);
+  }
+  return targets;
+}
+
+const MAX_ATTEMPTS = 2;
+
 function polishSkill(skill, rawMarkdown) {
   const prompt = buildPrompt(skill.name, rawMarkdown);
-  return execFileSync('claude', ['-p', prompt], {
-    encoding: 'utf8',
-    maxBuffer: 10 * 1024 * 1024,
-  }).trim() + '\n';
+  const rawLinks = linkTargets(rawMarkdown);
+  let lastError;
+
+  for (let attempt = 1; attempt <= MAX_ATTEMPTS; attempt++) {
+    // --tools '' strips all tool access from this subprocess. Without it,
+    // claude -p can behave as a full agent rather than a pure text
+    // completion - observed firsthand: it attempted a Write tool call
+    // (apparently reading "SKILL.md" in the prompt as an instruction to
+    // edit a real file), which needs interactive permission a
+    // non-interactive `-p` call can't give, and its "waiting for your
+    // approval" message came back as stdout and got written into the skill
+    // file as if it were the rewritten content. Must come after the prompt
+    // argument - placed before it, `--tools`'s variadic arg parsing
+    // swallows the prompt as part of the tools list.
+    const result = execFileSync('claude', ['-p', prompt, '--tools', ''], {
+      encoding: 'utf8',
+      maxBuffer: 10 * 1024 * 1024,
+    }).trim();
+
+    // Defense in depth alongside --tools '': refuse to write anything that
+    // doesn't look like a real SKILL.md rather than trusting the subprocess
+    // output blindly - the exact failure mode above produced a plausible-
+    // looking single line of prose with a clean (0) exit code, so "it
+    // didn't throw" isn't sufficient evidence the output is safe to write.
+    if (!result.startsWith('---\n') && !result.startsWith('---\r\n')) {
+      lastError = new Error(
+        `claude -p's output doesn't start with a frontmatter delimiter ("---"). ` +
+          `Got:\n${result.slice(0, 300)}`
+      );
+      continue;
+    }
+
+    // The prompt explicitly says "preserve every link exactly," but this is
+    // non-deterministic: observed firsthand that a rewrite can still
+    // consolidate a bulleted list into prose and drop the per-item links in
+    // the process, on a re-run of the very same skill that preserved them
+    // correctly the first time. Checking the actual output beats trusting
+    // the instruction was followed - retry once before giving up, since a
+    // second sample from the same prompt is cheap and often succeeds where
+    // the first didn't.
+    const missing = [...rawLinks].filter((l) => !linkTargets(result).has(l));
+    if (missing.length > 0) {
+      lastError = new Error(
+        `claude -p dropped ${missing.length} link(s) present in the source:\n` +
+          missing.map((l) => `  - ${l}`).join('\n')
+      );
+      continue;
+    }
+
+    return result + '\n';
+  }
+
+  throw new Error(`${skill.name}: ${lastError.message} (after ${MAX_ATTEMPTS} attempts)`);
 }
 
 function main() {
@@ -99,11 +163,17 @@ function main() {
     const rawMarkdown = fs.readFileSync(skillPath, 'utf8');
     fs.writeFileSync(skillPath, polishSkill(skill, rawMarkdown));
     polishManifest.polished[skill.name] = key;
+    // Written after every skill, not once at the end: polishSkill throws on
+    // an unrecoverable failure (see MAX_ATTEMPTS), and without this, a
+    // failure on skill N would lose the manifest entries for the 1..N-1
+    // skills that already succeeded - their SKILL.md files would be
+    // correctly polished on disk, but a re-run wouldn't know that and would
+    // spend an API call re-polishing them anyway.
+    fs.writeFileSync(POLISH_MANIFEST_PATH, JSON.stringify(polishManifest, null, 2) + '\n');
     console.log(`✓ polished skills/${skill.name}/SKILL.md`);
     polished++;
   }
 
-  fs.writeFileSync(POLISH_MANIFEST_PATH, JSON.stringify(polishManifest, null, 2) + '\n');
   console.log(`\n${polished} polished, ${skipped} already up to date.`);
   if (polished > 0) {
     console.log('Review each polished SKILL.md against its source before committing.');
