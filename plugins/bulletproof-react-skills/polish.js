@@ -37,7 +37,10 @@ function buildPrompt(skillName, rawMarkdown) {
 
 ## Rules — follow all of them
 
-1. Keep the YAML frontmatter's "name", "license", and "metadata" fields byte-for-byte unchanged. You MAY rewrite the "description" field to be more specific about when to trigger this skill (mention concrete situations or phrasings a user might use) — descriptions should be a little "pushy" so the skill isn't under-triggered.
+1. Keep the YAML frontmatter's "name", "license", and "metadata" fields byte-for-byte unchanged. You MUST rewrite the "description" field, even if the current one already looks reasonable to you — it needs to be longer and more specific, not just acceptable. Concretely: it MUST end with a sentence listing 3 or more specific situations or phrasings a user might actually type (in quotes), not just a one-line topic summary. This is a hard, checkable requirement, separate from rule 5's "keep it roughly the same length" — that rule is about the body, and does not apply to the description. Example of the shift:
+
+   BEFORE: "Testing conventions from bulletproof-react: unit/integration/e2e test types and MSW. Use when adding tests to a React app."
+   AFTER: "Testing strategy conventions from bulletproof-react: when to reach for a unit vs. integration vs. e2e test, and the recommended tooling (Vitest, Testing Library, Playwright, MSW) for each. Use this whenever adding tests to a React app, deciding what kind of test a piece of code actually needs, or reviewing a PR's test coverage — especially when the default has been "add a unit test" without considering whether an integration test would give more real confidence."
 2. Preserve every markdown link and image URL in the body EXACTLY, character for character, including the attribution blockquote line right after the frontmatter. Do not add, remove, or alter any URL.
 3. Do not invent new advice, facts, or examples that aren't already present in the source content. Do not drop any substantive point that IS present — condensing repeated wording for concision is fine, dropping information is not.
 4. Rewrite the body's voice: from prose describing a topic to a human reader, into direct guidance addressed to an AI coding agent about to take action. Prefer imperative form ("When doing X, do Y because Z") over descriptive form ("X is a technique that..."). Explain the WHY behind a recommendation rather than just asserting it. Example of the shift:
@@ -54,7 +57,11 @@ ${skillName}
 
 ## Current content to rewrite
 
-${rawMarkdown}`;
+${rawMarkdown}
+
+## Before you output
+
+Compare the description you're about to output, word for word, against the "description" block above. If it's the same or nearly the same, you have not done rule 1 — go back and actually rewrite it to be more specific and pushier before responding.`;
 }
 
 // Every markdown/image link target in `markdown` (order-independent set) -
@@ -70,11 +77,22 @@ function linkTargets(markdown) {
   return targets;
 }
 
-const MAX_ATTEMPTS = 2;
+// Pulls the raw text of the "description: |" block scalar out of a SKILL.md's
+// frontmatter — everything indented under it, up to the next top-level key
+// (or the closing "---"). Used only to compare before/after, so it doesn't
+// need to be a real YAML parser, just consistent between two calls on the
+// same file shape.
+function descriptionBlock(markdown) {
+  const match = markdown.match(/^description:\s*\|\n((?:[ \t].*\n?|\n)*)/m);
+  return match ? match[1].trim() : null;
+}
+
+const MAX_ATTEMPTS = 3;
 
 function polishSkill(skill, rawMarkdown) {
   const prompt = buildPrompt(skill.name, rawMarkdown);
   const rawLinks = linkTargets(rawMarkdown);
+  const rawDescription = descriptionBlock(rawMarkdown);
   let lastError;
 
   for (let attempt = 1; attempt <= MAX_ATTEMPTS; attempt++) {
@@ -119,6 +137,28 @@ function polishSkill(skill, rawMarkdown) {
       lastError = new Error(
         `claude -p dropped ${missing.length} link(s) present in the source:\n` +
           missing.map((l) => `  - ${l}`).join('\n')
+      );
+      continue;
+    }
+
+    // Rule 1 says the description MUST be rewritten with 3+ quoted example
+    // phrasings, but "must" in a prompt is a request, not a guarantee -
+    // observed firsthand that a run can leave every one of 7 descriptions
+    // byte-identical to the input despite the instruction, silently
+    // skipping the one part of the pass that's supposed to happen every
+    // time (it's the main lever against under-triggering, per the
+    // skill-creator guidance this prompt is built from). Checking for the
+    // concrete, checkable part of rule 1 (quoted phrasings present, content
+    // actually changed) can't confirm the rewrite is well-written, only
+    // that it was actually attempted along the lines asked for - good
+    // enough to catch the observed failure mode without trying to grade
+    // prose quality mechanically.
+    const newDescription = descriptionBlock(result);
+    const quotedPhrases = (newDescription.match(/["“][^"”]{3,}["”]/g) || []).length;
+    if (newDescription === rawDescription || quotedPhrases < 2) {
+      lastError = new Error(
+        'claude -p did not rewrite the description with the required quoted example ' +
+          `phrasings (found ${quotedPhrases}, need at least 2).`
       );
       continue;
     }

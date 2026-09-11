@@ -4,6 +4,11 @@ description: |
   Project standards from bulletproof-react: ESLint/Prettier/TypeScript config,
   absolute imports, pre-commit hooks, and CI conventions. Use when setting up
   tooling for a React project or reviewing its lint/format/type configuration.
+  Reach for this whenever asked to "set up linting for a new React project,"
+  "configure absolute imports so I stop seeing ../../../," "add a pre-commit
+  hook to run lint and type-check," or "review this project's ESLint/Prettier/
+  tsconfig setup" — or when enforcing consistent file/folder naming conventions
+  across a codebase.
 license: MIT
 metadata:
   version: "0.1.0"
@@ -13,31 +18,31 @@ metadata:
 
 # ⚙️ Project Standards
 
-Enforce these standards when setting up or reviewing a React project's tooling — they keep the codebase clean, consistent, and scalable as it grows.
+Enforce these project standards to keep a React codebase clean, consistent, and scalable as it grows — without them, code quality and maintainability degrade as more people touch the project.
 
 ## ESLint
 
-Configure rules in `.eslintrc.js` to catch common errors and enforce coding standards early, before they turn into bugs. This also keeps coding practices uniform across the codebase, which improves overall quality and readability.
+Configure rules in `.eslintrc.js` and treat ESLint as your first line of defense against JavaScript errors: it catches mistakes early and enforces uniform coding practices across the codebase, which is what keeps the code correct and readable as the project scales.
 
 [ESLint Configuration Example Code](https://github.com/alan2207/bulletproof-react/blob/9506629ed003a561c6627735480cce4994244bb4/apps/react-vite/.eslintrc.cjs)
 
 ## Prettier
 
-Enable "format on save" in the IDE so code is automatically formatted per the `.prettierrc` config — this keeps code style uniform across the codebase. Treat a failed auto-format as a signal of a likely syntax error. Integrate Prettier with ESLint so formatting and standards enforcement happen together throughout development.
+Enable "format on save" in the IDE so Prettier auto-formats code against the `.prettierrc` config on every save — this keeps code style uniform across the codebase without manual effort. Treat a failed auto-format as a signal of a syntax error, not a tooling glitch. Integrate Prettier with ESLint so formatting and linting run together as one consistent step in development.
 
 [Prettier Configuration Example Code](https://github.com/alan2207/bulletproof-react/blob/9506629ed003a561c6627735480cce4994244bb4/apps/react-vite/.prettierrc)
 
 ## TypeScript
 
-ESLint catches language-related bugs in JavaScript, but JavaScript's dynamic nature means it can miss runtime data issues, especially in complex projects — recommend TypeScript to close that gap. When doing a large refactor, update type declarations first, then resolve the TypeScript errors that surface throughout the project — this surfaces issues that would otherwise go unnoticed. Note that TypeScript increases development confidence via build-time type checking, but it does not prevent runtime failures. See this [great resource on using TypeScript with React](https://react-typescript-cheatsheet.netlify.app/).
+Don't rely on ESLint alone for catching bugs — JavaScript's dynamic nature means ESLint misses runtime data issues, especially in complex projects. Use TypeScript to close that gap and to surface issues during large refactors that would otherwise go unnoticed. When refactoring, update type declarations first, then resolve the TypeScript errors that ripple out across the project — this ordering surfaces the full blast radius of a change instead of missing pieces. Keep in mind TypeScript only checks types at build time; it gives you refactoring confidence, but it does not prevent runtime failures. See this [resource on using TypeScript with React](https://react-typescript-cheatsheet.netlify.app/) for more.
 
 ## Husky
 
-Use Husky to run git hooks — lint, format, and type checks — before each commit, so faulty commits never reach the repository. See [how to configure it here](https://typicode.github.io/husky/#/?id=usage).
+Use Husky to run git hooks — lint, format, and type checks — before every commit, so faulty commits never reach the repository in the first place. Configure it as described [here](https://typicode.github.io/husky/#/?id=usage).
 
 ## Absolute imports
 
-Always configure and use absolute imports: they make it easy to move files around without breaking messy relative paths like `../../../component` — wherever a file moves, its imports stay intact. Configure it like this:
+Always configure and use absolute imports: they let you move files around freely without breaking import paths, and they eliminate messy relative chains like `../../../component`. Configure it as follows:
 
 For JavaScript (`jsconfig.json`) projects:
 
@@ -61,11 +66,11 @@ For TypeScript (`tsconfig.json`) projects:
   }
 ```
 
-You can define multiple paths for different folders (`@components`, `@hooks`, etc.), but prefer a single `@/*` — it's short enough that you don't need multiple paths configured, and it's visually distinct from `node_modules` imports, so there's no confusion about what's a dependency versus what's your own source. With this in place, anything under `src` is reachable via `@`: a file at `src/components/my-component` becomes `@/components/my-component` instead of `../../../components/my-component`.
+You can define multiple path aliases for individual folders (`@components`, `@hooks`, etc.), but prefer a single `@/*` alias — it's short enough that you don't need to configure multiple paths, and it's visually distinct enough from `node_modules` imports that there's no confusion about what's a dependency versus your own source. With `@/*` mapped to `src`, a file at `src/components/my-component` becomes `@/components/my-component` instead of `../../../components/my-component`.
 
 ## File naming conventions
 
-Enforce file and folder naming conventions to keep the codebase consistent and easy to navigate — for example, require all files to use `kebab-case`.
+Enforce file and folder naming conventions (e.g., `kebab-case` everywhere) to keep the codebase consistent and easy to navigate — don't leave naming to individual preference.
 
 Enforce it with ESLint:
 
