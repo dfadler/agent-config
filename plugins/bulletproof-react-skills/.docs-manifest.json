@@ -1,0 +1,17 @@
+{
+  "pinnedSha": "9506629ed003a561c6627735480cce4994244bb4",
+  "files": {
+    "additional-resources.md": "1751634213e2cb5984f8603e462d0d1a259387224350d7df4505706e4d283947",
+    "api-layer.md": "417207ad44993d1d40963a1ae453da6638ba766e96a5a3301b660a7c1c1be071",
+    "application-overview.md": "bd057161db8252da4123e08e1ac6d45cb1fdbcd00f9c4f3232b47ad2fdb7909f",
+    "components-and-styling.md": "9e709cd7d8e33ee20f67cdace2723ed2672c8c69303fc4109bd6cfe167f9a94d",
+    "deployment.md": "44a46d8bef0cf78379ba1bb4a4bde2555845057b372ff1ecf6306061f1214427",
+    "error-handling.md": "ea971fe3e40954889ed1bbd3fa15c093ab3436fd121cd3646bb5b300667ce059",
+    "performance.md": "72b77b6a7cfe2041a297549d628cdd55bc10512eb928f28b39f7421d52b3a51a",
+    "project-standards.md": "23ecaf538bdc2fac1b947d2293fb415535ad9eabdb4e22c7671f5d9faa728b5c",
+    "project-structure.md": "4457a40bab2bace057cf48f17f50922378e423a41e21c2d1bb5391d4c1be8452",
+    "security.md": "9ca44fe0ef5b91fcddf32712afb632e9dde0f8e215fdb2b66d47b79916ad873e",
+    "state-management.md": "f372a6706c4eaec5e8e8e5e8dc568cfdcf90abee35ca58e6399d03ad860c8c9c",
+    "testing.md": "ff6c96ab03ff64f7c375d83941d5aeeb007217ebdda6ffbe3be7e27cddadcaff"
+  }
+}
