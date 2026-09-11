@@ -71,21 +71,33 @@ specific about the exact command.
 
 There is no standing-exception file for this skill (contrast
 `gh-publish-permission`'s `~/.claude/gh-publish-exceptions.json`) — the
-policy is to ask every time, not once-per-package. A user can still say
-"yes, and go ahead with this every time in this repo," but that preference
-belongs in that project's own `CLAUDE.md` or `.claude/settings.json`, not in
-an ambient exception Claude infers on its own.
+policy is to ask every time, not once-per-package, and Claude never creates
+or proposes a standing exception on its own initiative.
+
+**Precedence when `.claude/settings.json` already has a matching rule:** an
+*exact-string* Bash allow rule the user deliberately added themselves —
+this repo's own Aikido Safe Chain installer rule (see the README) is the
+existing example: one specific pinned-version, checksum-verified command,
+approved through an explicit interactive y/n step — is valid standing
+permission for that one command; it doesn't need to be re-asked every run,
+since asking is exactly what the user already did once, visibly, when they
+approved the rule. A *broad or wildcard* allow rule (`Bash(npx:*)` or
+similar) never counts as consent for a specific fetch-and-execute command it
+wasn't written with awareness of — treat it the same as no rule at all and
+ask.
 
 ## Procedure
 
 1. Before running any command matching "What counts" above, check whether
-   the current request already contains explicit, request-scoped, specific
-   permission (the user pasted or dictated the exact command themselves).
+   the user has already explicitly confirmed the exact command shown in
+   this conversation, or pasted/dictated the exact command themselves —
+   either satisfies "explicit, request-scoped, specific."
 2. If it does, proceed.
 3. If it doesn't, stop and show the exact command, name what it fetches and
    what it will execute, and ask before running it. Don't proceed on an
    assumption that a broader "install the optional thing" already covered
-   it.
+   it. A user's "yes"/"go ahead" reply to that specific shown command now
+   satisfies step 1 — go back and proceed.
 4. If the user declines or doesn't respond, hand them the command to run in
    their own terminal instead of substituting a workaround (a vendored
    copy, a different install path) without asking first.
