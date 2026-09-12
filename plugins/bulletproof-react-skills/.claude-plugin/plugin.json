@@ -1,7 +1,7 @@
 {
   "$schema": "https://json.schemastore.org/claude-code-plugin-manifest.json",
   "name": "bulletproof-react-skills",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "description": "React project conventions distilled from bulletproof-react's docs/*.md (MIT): project structure, state and data fetching, testing, performance, security, components and styling, and project standards. Produced by a scripted, re-runnable generator (generate.js) plus an LLM-assisted polish pass (polish.js), rather than a hand-vendored copy. See NOTICE.md for provenance and the re-pin workflow.",
   "author": {
     "name": "Dustin Fadler",
