@@ -225,6 +225,46 @@ the `marketplace add` step first; updates after that arrive automatically the sa
 `setup.sh` runs an advisory-only check (`check_frontend_design`) and prints the install
 command above if it's missing — it doesn't install it.
 
+### Recommended companion: aws/agent-toolkit-for-aws (aws-core)
+
+[Agent Toolkit for AWS](https://github.com/aws/agent-toolkit-for-aws) is AWS's own,
+GA-status, Amazon Web Services-authored successor to the older `awslabs/mcp` server
+collection and the now-deprecated `aws-dev-toolkit` sample plugin — both surfaced by
+an earlier investigation into AWS administration support (#213) and found, on
+re-verification, to already be mid-migration to this toolkit. Its `aws-core` plugin
+bundles CDK/CloudFormation authoring, core AWS services, and cost/billing tooling
+(Cost Explorer, Savings Plans, Compute Optimizer) together with the toolkit's AWS MCP
+Server configuration — covering the IaC and cost/FinOps areas #213 asked about in one
+install. Recommended as a standalone companion, same posture as `mattpocock-skills`
+above — nothing here depends on it, and nothing from it is vendored:
+
+```bash
+claude plugin install aws-core@claude-plugins-official
+```
+
+It's in Claude Code's official marketplace — confirmed directly against
+`anthropics/claude-plugins-official`'s own manifest, the same as `mattpocock-skills`
+— so there's nothing to add first, and updates arrive automatically. Live AWS API
+calls (deployments, cost queries) need local AWS credentials configured the normal
+way (`aws configure`); documentation search and skill guidance work without them.
+Credential and permission handling for those live calls is the toolkit's own concern,
+not something this repo wraps — the tradeoff of reference-don't-vendor, same as the
+other companions in this section. `setup.sh` doesn't install this — same reasoning as
+`mattpocock-skills` (#132, option A over B) — but does run an advisory check
+(`check_aws_core`).
+
+For the third area #213 asked about, security auditing, the same toolkit ships
+`aws-agents-for-devsecops` (vulnerability scanning and an AWS Security Agent for
+release-readiness review), also listed directly in the official marketplace:
+
+```bash
+claude plugin install aws-agents-for-devsecops@claude-plugins-official
+```
+
+Not given its own `setup.sh` check: unlike `aws-core`, it needs a plugin-specific
+`/aws-agents-for-devsecops:setup` step before use, so a plain installed/not-installed
+check would understate what "ready to use" means for it.
+
 ## Adding something new
 
 1. Put it in the right place:
