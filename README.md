@@ -225,6 +225,56 @@ the `marketplace add` step first; updates after that arrive automatically the sa
 `setup.sh` runs an advisory-only check (`check_frontend_design`) and prints the install
 command above if it's missing — it doesn't install it.
 
+### Considered: Linux administration skill (not added)
+
+Issue #214 asked whether this repo should add a skill/agent for Linux system
+administration (package management, systemd, users/permissions, SSH/firewall
+hardening, log/service triage). A deep-research pass (5 search angles, 21
+sources, 82 claims, 25 adversarially verified) found two candidate
+third-party bundles:
+
+- [HermeticOrmus/linux-sysadmin-skills](https://github.com/HermeticOrmus/linux-sysadmin-skills) —
+  five Debian/Ubuntu-targeted skills (`sysadmin-security`,
+  `sysadmin-performance`, `sysadmin-diagnose`, `sysadmin-monitor`,
+  `sysadmin-maintain`).
+- [billyfranklim1/claude-skills](https://github.com/billyfranklim1/claude-skills) —
+  `linux-service-triage` and `sysadmin-toolbox`.
+
+Neither cleared the bar this repo has applied to every other companion
+recommendation above (mattpocock/skills, vercel-labs/agent-skills,
+anthropics/skills): a maintained, reasonably adopted source with checkable
+provenance.
+
+- **HermeticOrmus/linux-sysadmin-skills**: 3 stars, created and last pushed
+  the same calendar day, no activity since. The author's ~100-repo history
+  is a templated "-skills" bundle churned out across dozens of unrelated
+  domains (`auto-docs-skills`, `dx-audit-skills`, `git-workflow-skills`,
+  `commit-standard-skills`, `google-docs-drive-toolkit`, …), almost all
+  with 0-2 stars — evidence of a generator pattern, not a maintained,
+  dogfooded tool.
+- **billyfranklim1/claude-skills**: 0 stars, 0 forks.
+- Both READMEs claim their skills are "read-first" and "confirm before
+  anything destructive runs." Reading the actual `SKILL.md` content
+  directly (not just the README) shows this is unenforced prose — a
+  checklist plus a one-line "explain the risks first" instruction, no
+  `allowed-tools` restriction or scripted confirmation gate. This repo's
+  own skills take the same posture (see "Why skills here don't declare
+  `allowed-tools`" below) but don't market themselves as
+  "safe-by-default" — these READMEs make a safety claim their content
+  doesn't back up.
+- No first-party (Anthropic or major-vendor) Linux-administration skill
+  exists, and no mainstream skill directory treats it as a category.
+
+**Decision: no-go, for now.** Recommending either bundle would mean
+pointing users at unvetted, low-adoption, single-author content on the
+strength of marketing language in its own README — a materially lower bar
+than every other companion in this section. Revisit if a better-provenance
+option appears, or if an actual project need for Linux-admin assistance
+shows up the way the React-skills and frontend-design companions did (real
+work surfaced them, not research for its own sake). Recorded here so this
+isn't re-investigated from scratch by the next issue or session — see #214
+for the full research trail.
+
 ## Adding something new
 
 1. Put it in the right place:
