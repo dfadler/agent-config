@@ -27,7 +27,9 @@ from __future__ import annotations
 
 import argparse
 import json
+import os
 import sys
+import tempfile
 import threading
 from dataclasses import dataclass, field
 from datetime import datetime, timezone
@@ -142,9 +144,9 @@ class SessionStore:
 
     def snapshot(self) -> List[Dict[str, Any]]:
         with self._lock:
-            states = list(self._sessions.values())
-        states.sort(key=lambda s: s.last_updated, reverse=True)
-        return [s.to_dict() for s in states]
+            rows = [s.to_dict() for s in self._sessions.values()]
+        rows.sort(key=lambda r: r["last_updated"], reverse=True)
+        return rows
 
 
 def render_table(sessions: List[Dict[str, Any]]) -> str:
@@ -182,6 +184,9 @@ def render_table(sessions: List[Dict[str, Any]]) -> str:
 def make_handler(
     store: SessionStore, log_file: Optional[TextIO], status_file: Optional[str]
 ) -> type:
+    log_file_lock = threading.Lock()
+    status_file_lock = threading.Lock()
+
     class Handler(BaseHTTPRequestHandler):
         server_version = "SessionStatusReceiver/1.0"
 
@@ -196,8 +201,17 @@ def make_handler(
             if not status_file:
                 return
             try:
-                with open(status_file, "w", encoding="utf-8") as f:
-                    json.dump(store.snapshot(), f, indent=2)
+                payload = json.dumps(store.snapshot(), indent=2)
+                directory = os.path.dirname(os.path.abspath(status_file))
+                with status_file_lock:
+                    fd, tmp = tempfile.mkstemp(dir=directory, suffix=".tmp")
+                    try:
+                        with os.fdopen(fd, "w", encoding="utf-8") as f:
+                            f.write(payload)
+                        os.replace(tmp, status_file)
+                    except BaseException:
+                        os.unlink(tmp)
+                        raise
             except OSError as exc:
                 sys.stderr.write(f"warning: could not write status file: {exc}\n")
 
@@ -220,8 +234,9 @@ def make_handler(
                 return
 
             if log_file is not None:
-                log_file.write(json.dumps(payload) + "\n")
-                log_file.flush()
+                with log_file_lock:
+                    log_file.write(json.dumps(payload) + "\n")
+                    log_file.flush()
 
             state = store.apply_hook_payload(payload)
             self._write_status_file()
