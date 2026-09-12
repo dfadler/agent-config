@@ -49,6 +49,8 @@ Do this proactively, without waiting to be asked — treat it as part of finishi
 
 For the actual capture mechanics — rendering before/after, converting to PNG, cropping to content, uploading, formatting the PR/issue body, verifying the images resolve, and avoiding a false negative from shared-page style leakage or host-context-only effects — see the `dfadler-agent-config:pr-visual-capture` skill. This section owns the policy of *when* verification is required; that skill owns *how* to produce it.
 
+For a change that specifically touches layout, CSS, or responsive behavior, a screenshot at one fixed width isn't sufficient proof — it can look fine while missing overflow, clipping, or dead space that only shows up at a different viewport width. Do a manual resize pass across representative breakpoints plus a Lighthouse mobile/desktop CLI pass as part of the same verification; see the `pr-visual-capture` skill's "Responsive/viewport verification pass" section for the exact breakpoints, what counts as broken, and the Lighthouse CLI invocation.
+
 ## Don't steal focus from the human
 
 A human is usually typing somewhere while an agent works. Anything that makes an app
