@@ -1,11 +1,11 @@
 {
   "polished": {
-    "project-structure": "acba7340289a8e008861f28bc5924aedd08cbed66e0e6c763e27aa5857dde957",
-    "state-and-data": "6cd3830137361a53632a1bd07cb57fd4ea1ec524d0d99fd6a8008efdad686019",
-    "testing": "2b60cd6e4a8b47e872948c58956c63b7224a4b128e80bf55b1a55cd58e201dff",
-    "performance": "b8938159d8ddbc7a5b9384e7db5ee26c0e9ec8231a3b790d57cf22fa8279838b",
-    "security": "edafcb920999bfa192b1a04ea5c494e1c5e8622e375a67b1a0fe37559b381463",
-    "components-and-styling": "2802a73c59e99ad386784aa107aee70bfc595ee1e518c0a0681ff682aa456496",
-    "project-standards": "85ef44c299cca439a068ee5df745298f3d51d79a1b51e8f5d1315b365ed9233d"
+    "project-structure": "ca09df4dce52a595f16510ac04a2923ffc0ee4010ed24e6426bde7337346e7e4",
+    "state-and-data": "e7287f4b5f2eb2fce587601c1e713c836322ebd4afdfa9b8c94527eaed9af0d9",
+    "testing": "9161cedea4b9ab6eeb3cab26e8d3f16967c6c4e42006a8c2434d86c38896106f",
+    "performance": "2304781162da3c2744d2831aef922ea828ad0d499467c4f972e0b3daa28a56dc",
+    "security": "085f373f3c26c1415e1f3b980f112a0e1ea3723ebb8ab17840c63456145ff296",
+    "components-and-styling": "d76a1bf4c7aba14a7d9be18e1936cf5c5cf5b56f033fa8c3af1c4049845966aa",
+    "project-standards": "f8f962ed03177aa8de2933cb90e051e3f5c6f75310aabd0485bf5e54e708df9c"
   }
 }

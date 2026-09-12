@@ -40,7 +40,7 @@ Reach for application state only for things that are genuinely global — modals
 
 Good Application State Solutions:
 
-- [context](https://react.dev/learn/passing-data-deeply-with-context) + [hooks](https://react.dev/reference/react-dom/hooks)
+- [context](https://react.dev/learn/passing-data-deeply-with-context) + [hooks](https://react.dev/reference/react/hooks)
 - [redux](https://redux.js.org/) + [redux toolkit](https://redux-toolkit.js.org/)
 - [mobx](https://mobx.js.org)
 - [zustand](https://github.com/pmndrs/zustand)

@@ -113,7 +113,7 @@ There are multiple ways to style a react application. Some good options are:
 - [styled-components](https://styled-components.com/)
 - [emotion](https://emotion.sh/docs/introduction)
 
-NOTE: Keep React Server Components in mind, since they require a zero-runtime styling solution.
+NOTE: Keep React Server Components in mind. Server Components themselves require a zero-runtime styling solution; runtime CSS-in-JS can still work for a Client Component behind a supported Server/Client boundary, so pick your styling solution based on where in the tree it needs to run, not as a blanket rule for the whole app.
 
 With the rise of headless component libraries, another tier of component libraries has emerged where predefined components are provided with styling solutions included, but instead of being installed as a package, they are provided as code that can be customized and styled as needed.
 

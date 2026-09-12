@@ -23,13 +23,23 @@ function sha256(text) {
   return crypto.createHash('sha256').update(text, 'utf8').digest('hex');
 }
 
+// generate.js's own content, hashed once per run. A skill's polish key must
+// change whenever generate.js's transformation logic changes (SKILL_MAP
+// mapping, heading normalization, link rewriting, ...), not just when a
+// source doc does - otherwise editing the generator without bumping the
+// pinned SHA leaves a stale polished file on disk that `npm run polish`
+// wrongly reports as already up to date, since nothing it hashes noticed
+// the generator itself changed. Hit this firsthand this session: had to
+// manually delete .polish-manifest.json every time generate.js changed.
+const GENERATOR_HASH = sha256(fs.readFileSync(require.resolve('./generate.js'), 'utf8'));
+
 // A skill's "polish key" is derived from its mapped source files' content
-// hashes (already computed by generate.js into .docs-manifest.json) rather
-// than rehashing the docs directly - reuses work generate.js already did,
-// and changes exactly when generate.js's own drift-relevant inputs change.
+// hashes (already computed by generate.js into .docs-manifest.json) plus
+// generate.js's own content hash, so it changes when either the source docs
+// or the generator's transformation logic does.
 function polishKey(skill, docsManifest) {
   const hashes = skill.sources.map((f) => docsManifest.files[f]);
-  return sha256(hashes.join('|'));
+  return sha256([GENERATOR_HASH, ...hashes].join('|'));
 }
 
 function buildPrompt(skillName, rawMarkdown) {
@@ -64,17 +74,37 @@ ${rawMarkdown}
 Compare the description you're about to output, word for word, against the "description" block above. If it's the same or nearly the same, you have not done rule 1 — go back and actually rewrite it to be more specific and pushier before responding.`;
 }
 
-// Every markdown/image link target in `markdown` (order-independent set) -
-// used to verify the polish pass didn't drop one. Mirrors the link pattern
+// Every markdown/image link target in `markdown`, as a multiset (target ->
+// occurrence count) - used to verify the polish pass preserved links
+// exactly. A plain Set would miss a duplicate occurrence silently dropped
+// while the same target survives once elsewhere, and checking only "is
+// every raw link present" (one-directional) would miss the rewrite adding
+// a link that wasn't in the source (rule 3 forbids inventing content, but
+// nothing enforced that for links specifically). Mirrors the link pattern
 // generate.js's rewriteRelativeLinks already matches.
 function linkTargets(markdown) {
-  const targets = new Set();
+  const counts = new Map();
   const re = /!?\[[^\]]*\]\(([^)]+)\)/g;
   let match;
   while ((match = re.exec(markdown))) {
-    targets.add(match[1]);
+    counts.set(match[1], (counts.get(match[1]) || 0) + 1);
   }
-  return targets;
+  return counts;
+}
+
+// Every target whose count differs between two link multisets, in either
+// direction (missing, added, or a changed occurrence count) - each entry
+// describes the mismatch so a retry's error message says exactly what
+// changed, not just that something did.
+function linkDiff(rawCounts, resultCounts) {
+  const targets = new Set([...rawCounts.keys(), ...resultCounts.keys()]);
+  const diffs = [];
+  for (const target of targets) {
+    const before = rawCounts.get(target) || 0;
+    const after = resultCounts.get(target) || 0;
+    if (before !== after) diffs.push({ target, before, after });
+  }
+  return diffs;
 }
 
 // Pulls the raw text of the "description: |" block scalar out of a SKILL.md's
@@ -85,6 +115,23 @@ function linkTargets(markdown) {
 function descriptionBlock(markdown) {
   const match = markdown.match(/^description:\s*\|\n((?:[ \t].*\n?|\n)*)/m);
   return match ? match[1].trim() : null;
+}
+
+// The frontmatter block (between the two "---" delimiters) with the
+// description's own block-scalar content stripped out - everything else
+// (name, license, metadata) is expected to be byte-for-byte identical
+// between raw and polished, so comparing this instead of the whole
+// frontmatter lets the description differ (as required) while still
+// catching a rewrite that altered one of the fields rule 1 says must stay
+// fixed. Returns null if there's no well-formed frontmatter at all, or if
+// "description" isn't a block scalar inside it - both are their own
+// failures the caller should treat as validation failing.
+function frontmatterMinusDescription(markdown) {
+  const fmMatch = markdown.match(/^---\n([\s\S]*?)\n---\n/);
+  if (!fmMatch) return null;
+  const frontmatter = fmMatch[1];
+  if (!/^description:\s*\|\s*$/m.test(frontmatter)) return null;
+  return frontmatter.replace(/^description:\s*\|\n(?:[ \t].*\n?|\n)*/m, 'description: |\n');
 }
 
 const MAX_ATTEMPTS = 3;
@@ -124,6 +171,22 @@ function polishSkill(skill, rawMarkdown) {
       continue;
     }
 
+    // Rule 1 says "name", "license", and "metadata" must stay byte-for-byte
+    // unchanged, but that's an instruction, not a guarantee the model
+    // actually followed it - nothing upstream of this point verifies it.
+    // Comparing the whole frontmatter minus the (expected-to-change)
+    // description catches a rewrite that altered or dropped one of those
+    // fields, or moved "description" out of the frontmatter block entirely.
+    const rawFrontmatter = frontmatterMinusDescription(rawMarkdown);
+    const resultFrontmatter = frontmatterMinusDescription(result);
+    if (resultFrontmatter === null || resultFrontmatter !== rawFrontmatter) {
+      lastError = new Error(
+        'claude -p changed the frontmatter\'s "name", "license", or "metadata" ' +
+          'fields (or moved "description" out of the frontmatter block) - these must stay byte-for-byte unchanged.'
+      );
+      continue;
+    }
+
     // The prompt explicitly says "preserve every link exactly," but this is
     // non-deterministic: observed firsthand that a rewrite can still
     // consolidate a bulleted list into prose and drop the per-item links in
@@ -131,12 +194,15 @@ function polishSkill(skill, rawMarkdown) {
     // correctly the first time. Checking the actual output beats trusting
     // the instruction was followed - retry once before giving up, since a
     // second sample from the same prompt is cheap and often succeeds where
-    // the first didn't.
-    const missing = [...rawLinks].filter((l) => !linkTargets(result).has(l));
-    if (missing.length > 0) {
+    // the first didn't. Compared as a multiset in both directions (see
+    // linkDiff) rather than a one-way set-subset check, so a dropped
+    // duplicate, an added link, or a changed occurrence count are all
+    // caught, not just a target disappearing entirely.
+    const diffs = linkDiff(rawLinks, linkTargets(result));
+    if (diffs.length > 0) {
       lastError = new Error(
-        `claude -p dropped ${missing.length} link(s) present in the source:\n` +
-          missing.map((l) => `  - ${l}`).join('\n')
+        `claude -p changed the link set (expected count -> actual count):\n` +
+          diffs.map((d) => `  - ${d.target}: ${d.before} -> ${d.after}`).join('\n')
       );
       continue;
     }
@@ -152,13 +218,14 @@ function polishSkill(skill, rawMarkdown) {
     // actually changed) can't confirm the rewrite is well-written, only
     // that it was actually attempted along the lines asked for - good
     // enough to catch the observed failure mode without trying to grade
-    // prose quality mechanically.
+    // prose quality mechanically. Threshold matches rule 1's own "3 or
+    // more" requirement, not a looser one.
     const newDescription = descriptionBlock(result);
     const quotedPhrases = (newDescription.match(/["“][^"”]{3,}["”]/g) || []).length;
-    if (newDescription === rawDescription || quotedPhrases < 2) {
+    if (newDescription === rawDescription || quotedPhrases < 3) {
       lastError = new Error(
         'claude -p did not rewrite the description with the required quoted example ' +
-          `phrasings (found ${quotedPhrases}, need at least 2).`
+          `phrasings (found ${quotedPhrases}, need at least 3).`
       );
       continue;
     }

@@ -64,7 +64,7 @@ const Counter = () => {
       <button onClick={() => setCount((count) => count + 1)}>
         count is {count}
       </button>
-      <PureComponent /> // will rerender whenever "count" updates
+      <PureComponent /> {/* will rerender whenever "count" updates */}
     </div>
   );
 };
@@ -86,7 +86,7 @@ const Counter = ({ children }) => {
       <button onClick={() => setCount((count) => count + 1)}>
         count is {count}
       </button>
-      {children} // won't rerender whenever "count" updates
+      {children} {/* won't rerender whenever "count" updates */}
     </div>
   );
 };
@@ -104,7 +104,7 @@ Use `srcset` to serve the most optimal image for the client's screen size.
 
 ## Web vitals
 
-Google factors web vitals into indexing, so track [Lighthouse](https://web.dev/measure/) and [Pagespeed Insights](https://pagespeed.web.dev/) scores rather than treating them as optional.
+Google uses web vitals as a signal in its search ranking systems, so track [Lighthouse](https://web.dev/measure/) and [Pagespeed Insights](https://pagespeed.web.dev/) scores rather than treating them as optional.
 
 ## Data prefetching
 

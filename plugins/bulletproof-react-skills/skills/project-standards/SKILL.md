@@ -47,23 +47,27 @@ Always configure and use absolute imports: they let you move files around freely
 For JavaScript (`jsconfig.json`) projects:
 
 ```json
-"compilerOptions": {
+{
+  "compilerOptions": {
     "baseUrl": ".",
     "paths": {
       "@/*": ["./src/*"]
     }
   }
+}
 ```
 
 For TypeScript (`tsconfig.json`) projects:
 
 ```json
-"compilerOptions": {
+{
+  "compilerOptions": {
     "baseUrl": ".",
     "paths": {
       "@/*": ["./src/*"]
     }
   }
+}
 ```
 
 You can define multiple path aliases for individual folders (`@components`, `@hooks`, etc.), but prefer a single `@/*` alias — it's short enough that you don't need to configure multiple paths, and it's visually distinct enough from `node_modules` imports that there's no confusion about what's a dependency versus your own source. With `@/*` mapped to `src`, a file at `src/components/my-component` becomes `@/components/my-component` instead of `../../../components/my-component`.
