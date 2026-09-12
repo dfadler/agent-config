@@ -42,9 +42,10 @@ permission prompts, finishes turns, and exits.
 
 Endpoints:
 
-- `POST /hook` — point a hook here. Always responds `200 {}` (an explicit
-  no-op per the documented JSON output format — none of these three events
-  need this receiver to block or alter anything).
+- `POST /hook` — point a hook here. Valid JSON responds `200 {}` (an
+  explicit no-op per the documented JSON output format — none of these
+  three events need this receiver to block or alter anything); malformed
+  JSON returns `400`.
 - `GET /status` — JSON snapshot of every session seen.
 - `GET /` — the same data as a plain-text table, so `watch -n1 curl -s
   http://127.0.0.1:8787/` gives a live-refreshing terminal view with no extra
