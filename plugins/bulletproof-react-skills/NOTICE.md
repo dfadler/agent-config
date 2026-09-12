@@ -1,12 +1,12 @@
 # Third-party notice
 
-This plugin's skills will be **adapted from**, not copied verbatim out of,
+This plugin's skills are **adapted from**, not copied verbatim out of,
 [alan2207/bulletproof-react](https://github.com/alan2207/bulletproof-react)'s
-`docs/*.md` files, licensed MIT by Alan Alickovic. No generator or skills exist yet —
-this notice documents the pinned dependency this infrastructure PR (agent-config#216)
-adds. Unlike a hand-vendored copy, the adaptation will be produced by a scripted
-generator (agent-config#217) that reads the pinned commit below and re-runs whenever
-that pin is bumped — see "Updating".
+`docs/*.md` files, licensed MIT by Alan Alickovic. Unlike a hand-vendored copy, the
+adaptation is produced by a scripted generator (`generate.js`, agent-config#217) that
+reads the pinned commit below, plus an LLM-assisted polish pass (`polish.js`,
+agent-config#218) that rewrites the mechanical draft into agent-directed guidance —
+both re-run whenever the pin is bumped — see "Updating".
 
 Currently pinned at commit
 [`9506629`](https://github.com/alan2207/bulletproof-react/commit/9506629ed003a561c6627735480cce4994244bb4)

@@ -60,7 +60,7 @@ Use Playwright to run e2e tests in an automated way: define the commands a real 
 
 ### [MSW](https://mswjs.io)
 
-Use MSW to prototype and mock the API layer. It doesn't run an actual backend — it's a mocked server inside a service worker that intercepts HTTP requests and returns the responses you define in handlers. Reach for it when you're blocked by unfinished backend work: instead of waiting on the feature or hardcoding response data in your frontend code, define handlers and make real HTTP calls against the mock while building frontend features.
+Use MSW to prototype and mock the API layer. It doesn't run an actual backend: in the browser it intercepts requests via a Service Worker (`setupWorker`), and in Node.js test runs — including under Vitest — it uses `setupServer` instead, since there's no Service Worker in that environment. Either way you define the same handlers and it returns the responses you specify. Reach for it when you're blocked by unfinished backend work: instead of waiting on the feature or hardcoding response data in your frontend code, define handlers and make real HTTP calls against the mock while building frontend features.
 
 Use it to design API endpoints too — put the mocked API's business logic in its handlers.
 
