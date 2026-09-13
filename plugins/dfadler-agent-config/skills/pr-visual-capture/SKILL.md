@@ -8,10 +8,13 @@ description: >
   CDP for a client-rendered SPA (the plain `--screenshot` flag fires before
   React/Vue/etc. paint), and stitching captured stills into an MP4 with
   ffmpeg. Use whenever a PR/issue needs a screenshot or video file attached
-  and the available browser tooling can only preview, not export.
+  and the available browser tooling can only preview, not export. Also
+  covers a responsive/viewport verification pass (manual resize at
+  representative breakpoints plus a Lighthouse mobile/desktop CLI pass) for
+  a change touching layout, CSS, or responsive behavior.
 license: MIT
 metadata:
-  version: "1.1.0"
+  version: "1.2.0"
 ---
 
 # PR/issue visual capture
@@ -60,6 +63,123 @@ context:
   (font family, color, small text). If a quick renderer (e.g. a Quick Look
   thumbnail) and a real browser disagree, trust the real browser and say
   so — some lightweight renderers don't fully implement CSS semantics.
+
+## Responsive/viewport verification pass
+
+For any change that touches layout, CSS, or responsive behavior, do this pass
+before (or alongside) capturing before/after images — a screenshot at one
+fixed width can look fine while missing overflow, clipping, or dead space
+that only appears at a different viewport width. This happened once
+already: a background research pass covered responsive-design methodology
+in the abstract but never actually resized a real browser, and manually
+resizing to 375px/768px/1440px and reading `getBoundingClientRect()`/
+`scrollWidth` on the live page caught two real bugs the research missed —
+an install-command pill clipped inside an `overflow: hidden` mobile nav
+panel (a fixed `min-width` that didn't shrink for the narrower panel), and
+a ~500px dead scroll region left by desktop-sized vertical spacing that
+didn't scale down once a grid collapsed to one column.
+
+### 1. Manual resize-and-look pass
+
+Load the actual rendered page (dev server or built output — not a static
+mockup) in a real browser tool and resize to each of these three
+representative breakpoints, in order:
+
+- **~375px** — mobile (e.g. an in-app browser tool's `resize_window`
+  `mobile` preset, or CDP `Emulation.setDeviceMetricsOverride`)
+- **~768px** — tablet
+- **~1440px** — desktop
+
+At each width, don't just eyeball that the layout "looks stacked" — run
+something like this against the live page via the browser tool's
+JS-execution action (`javascript_tool`/`Runtime.evaluate`):
+
+```js
+(() => {
+  const vw = window.innerWidth, vh = window.innerHeight;
+  const out = { viewport: vw, overflow: null, clipped: [], deadGaps: [] };
+
+  // Horizontal overflow: anything wider than the viewport is a bug.
+  const scrollWidth = document.documentElement.scrollWidth;
+  if (scrollWidth > vw) out.overflow = { scrollWidth, viewportWidth: vw, excess: scrollWidth - vw };
+
+  // Content clipped by an ancestor's overflow:hidden -- usually a fixed
+  // min-width that doesn't shrink for a narrower container.
+  document.querySelectorAll('body *').forEach(el => {
+    const r = el.getBoundingClientRect();
+    if (r.width === 0 && r.height === 0) return;
+    for (let a = el.parentElement; a; a = a.parentElement) {
+      const cs = getComputedStyle(a);
+      if (cs.overflow === 'hidden' || cs.overflowX === 'hidden') {
+        const ar = a.getBoundingClientRect();
+        if (r.right > ar.right + 1 || r.left < ar.left - 1) {
+          out.clipped.push({ el: el.tagName + '.' + (el.className || ''), elRect: r, ancestorRect: ar });
+        }
+        break;
+      }
+    }
+  });
+
+  // Dead scroll space between adjacent top-level sections -- vertical
+  // spacing sized for desktop that doesn't scale down after a grid/column
+  // collapses to one column at a narrow width.
+  const sections = [...document.querySelectorAll('main > *, body > *')].filter(el => el.getBoundingClientRect().height > 0);
+  for (let i = 0; i < sections.length - 1; i++) {
+    const gap = sections[i + 1].getBoundingClientRect().top - sections[i].getBoundingClientRect().bottom;
+    if (gap > vh * 0.25) out.deadGaps.push({ between: [sections[i].tagName, sections[i + 1].tagName], gap: Math.round(gap) });
+  }
+  return out;
+})();
+```
+
+Adapt the section selector (`main > *, body > *`) to the page's actual
+structure. Flag as broken:
+
+- `overflow` is non-null (horizontal scroll exists at this width)
+- any `clipped` entry (content extends past an `overflow: hidden` ancestor
+  — that's real clipping, not just a layout that "looks tight")
+- any `deadGaps` entry, especially one that's about the same size at 375px
+  as it is at 1440px (a sign the spacing didn't respond to the layout
+  collapse at all)
+
+Per the note in "Screenshot: server-rendered pages" above, a narrow headless
+`--window-size` capture doesn't reliably emulate a real mobile viewport —
+run this pass through an actual in-app/embedded browser tool (or CDP
+`Emulation.setDeviceMetricsOverride`), not a plain headless screenshot.
+
+### 2. Lighthouse CLI pass
+
+Run both form factors from the CLI (`npx lighthouse`, no global install
+needed) as a repeatable, scriptable complement to the manual pass above —
+it scores performance/accessibility/best-practices and doesn't replace the
+resize-and-look pass, which is what actually catches overflow/clipping/
+dead-space bugs:
+
+```bash
+# Mobile form factor
+npx lighthouse "<url>" \
+  --output=json --output-path=./lighthouse-mobile.json \
+  --form-factor=mobile --screenEmulation.mobile \
+  --chrome-flags="--headless=new" --quiet
+
+# Desktop form factor -- --preset=desktop applies Lighthouse's own desktop
+# config (formFactor: 'desktop' plus its desktop screenEmulation metrics;
+# see core/config/desktop-config.js in the Lighthouse repo) instead of
+# spelling the equivalent flags out by hand
+npx lighthouse "<url>" \
+  --output=json --output-path=./lighthouse-desktop.json \
+  --preset=desktop \
+  --chrome-flags="--headless=new" --quiet
+```
+
+(CLI flag reference:
+https://github.com/GoogleChrome/lighthouse/blob/main/readme.md#cli-options
+and
+https://github.com/GoogleChrome/lighthouse/blob/main/core/config/desktop-config.js.)
+
+`<url>` needs to be reachable by the headless Chrome Lighthouse launches —
+a local dev server URL, not a `file://` path. Read the resulting JSON for
+score regressions and new findings; don't just skim the top-level scores.
 
 ## Why not an in-app/embedded browser tool
 
