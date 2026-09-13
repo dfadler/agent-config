@@ -507,6 +507,70 @@ sys.exit(0)
   esac
 }
 
+# Same posture as check_mattpocock_skills above: purely informational, nothing
+# here depends on it, no --install-deps. aws-core is Amazon Web Services' own
+# plugin (part of aws/agent-toolkit-for-aws, GA) and - like mattpocock-skills -
+# ships directly in Claude Code's official marketplace, confirmed against
+# anthropics/claude-plugins-official's own manifest, so its install id is
+# always "aws-core@claude-plugins-official" with no marketplace-add step
+# first. Matched by id prefix only (not the marketplace suffix), same
+# reasoning as check_mattpocock_skills. aws-agents-for-devsecops (the
+# security-auditing companion documented alongside aws-core in the README)
+# deliberately has no check here: it needs a plugin-specific
+# /aws-agents-for-devsecops:setup step before use, so installed/not-installed
+# alone would misstate whether it's actually ready.
+check_aws_core() {
+  command -v claude >/dev/null 2>&1 || return 0
+
+  local listing
+  listing="$(claude plugin list --json 2>/dev/null)" || return 0
+
+  local state rc
+  if state="$(printf '%s' "$listing" | python3 -c '
+import json, sys
+try:
+    data = json.load(sys.stdin)
+except Exception:
+    sys.exit(2)
+for entry in data:
+    if str(entry.get("id", "")).startswith("aws-core@"):
+        print("enabled" if entry.get("enabled") else "disabled")
+        sys.exit(0)
+sys.exit(1)
+' 2>/dev/null)"; then
+    rc=0
+  else
+    rc=$?
+  fi
+
+  case "$rc:$state" in
+    0:enabled)
+      echo "✓ aws-core is installed"
+      ;;
+    0:disabled)
+      {
+        echo
+        echo "⚠ aws-core is installed but disabled."
+        echo "  Re-enable it with: claude plugin enable aws-core"
+        echo
+      } >&2
+      ;;
+    1:*)
+      {
+        echo
+        echo "ℹ aws-core is not installed — a recommended companion plugin, not"
+        echo "  required by anything here. See README's \"Recommended companion\""
+        echo "  section. Install it with:"
+        echo "    claude plugin install aws-core@claude-plugins-official"
+        echo
+      } >&2
+      ;;
+    *)
+      return 0
+      ;;
+  esac
+}
+
 mkdir -p "$HOME/.claude"
 link "$REPO_ROOT/claude/CLAUDE.md" "$HOME/.claude/CLAUDE.md"
 link_dir_contents "$REPO_ROOT/claude/commands" "$HOME/.claude/commands"
@@ -537,6 +601,7 @@ check_python_deps
 check_mattpocock_skills
 check_frontend_design
 check_react_skills
+check_aws_core
 
 # Also last, and independent of everything above: offers (opt-in, y/n) to
 # pre-approve Aikido Safe Chain's pinned installer command in Claude Code's
