@@ -12,6 +12,22 @@ Currently pinned at commit
 [`9506629`](https://github.com/alan2207/bulletproof-react/commit/9506629ed003a561c6627735480cce4994244bb4)
 (2026-09-11).
 
+## Review status
+
+All 7 skills have been reviewed against their pinned source doc(s) for
+accuracy and quality (agent-config#218): merged multi-source files (only
+`state-and-data`) read coherently as one skill, code examples and rewritten
+links were checked against source, and frontmatter descriptions were
+confirmed to represent their content. A prior pass (fixing CodeRabbit
+findings on PR #221) had already corrected every content-accuracy issue this
+review turned up independently — a broken `hooks` link inherited from
+upstream, two JSX examples whose `//` comments render as literal text
+outside `{}`, an inaccurate "Google factors web vitals into indexing" claim,
+missing braces in the `jsconfig.json`/`tsconfig.json` snippets, an
+overbroad React Server Components styling claim, and an MSW description
+that only covered the browser runtime — so this review pass found no
+further changes needed.
+
 ## Why a generator instead of a manual copy
 
 bulletproof-react has no releases or tags — its `package.json` `version` field is
