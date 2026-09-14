@@ -43,10 +43,13 @@ browser-based tool). Say which you did and didn't do.
 
 Every finding gets two independent grades:
 
-- **Evidence basis**: ● verified (a deterministic fact from source: missing
-  attribute, wrong element, skipped heading level) · ◐ flagged (real evidence,
-  but confirming it needs computed styles or a rendered page) · ○ human-required
-  (needs a screen reader or lived experience).
+- **Evidence basis**: ● verified (a deterministic fact from source that's also a
+  real conformance failure: a missing attribute, wrong element, positive
+  `tabindex`) · ◐ flagged (real evidence, but confirming the failure needs
+  computed styles, a rendered page, or a judgment call — a heading-rank skip or
+  `autofocus` is a verifiable *fact* but not an automatic failure, see
+  `references/checklist.md`'s Advisory section) · ○ human-required (needs a
+  screen reader or lived experience).
 - **Severity**: critical (blocks a core task) · serious (major barrier) ·
   moderate (friction, still completable) · minor (polish).
 
