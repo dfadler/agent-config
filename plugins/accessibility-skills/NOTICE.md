@@ -33,9 +33,10 @@ credited here.
 
 ## Apache License 2.0 (The Accessibility Project)
 
-A copy of the Apache License 2.0 is available at
-<https://www.apache.org/licenses/LICENSE-2.0>. No modifications were made to the
-license text; the checklist content itself was reworded as described above.
+The full, unmodified license text is in [`LICENSE`](LICENSE) alongside this
+file — Apache-2.0 §4(a) requires giving recipients an actual copy of the
+license, not just a link to it. No modifications were made to the license
+text; the checklist *content* itself was reworded as described above.
 
 ## MIT License (AccessLint)
 

@@ -18,18 +18,26 @@ different things to whoever reads the report.
 
 ### Evidence basis — what static source can prove
 
-- **● Verified** — a deterministic, syntactic fact the source settles on its own:
-  an attribute is absent, an element type is wrong, a heading level is skipped, a
-  `tabindex` is positive. Cite the file, line, and the exact snippet. Examples:
-  missing `alt`, an interactive `div`/`span` with no `role`/`tabIndex`/keydown
-  handler, a form input with no associated `label`/`aria-label`, `autofocus`
-  present, missing `lang` on `html`, a skipped heading level, a positive
-  `tabindex`, a `title`-attribute-only tooltip.
+- **● Verified** — a deterministic, syntactic fact the source settles on its own,
+  *and* that fact is itself a real conformance failure on its own terms (not
+  merely a heuristic a checklist happens to track). Cite the file, line, and the
+  exact snippet. Examples: missing `alt`, an interactive `div`/`span` with no
+  `role`/`tabIndex`/keydown handler, a form input with no associated
+  `label`/`aria-label`, missing `lang` on `html`, a positive `tabindex`, a
+  `title`-attribute-only tooltip. A fact being deterministically *true* doesn't
+  automatically make it ●: a heading-rank skip or `autofocus` presence are both
+  fully verifiable from source, but neither is an automatic WCAG failure (WCAG
+  permits rank skips when closing a subsection; `autofocus` only matters if it
+  actually breaks the page's logical order) — cite the fact, then grade the
+  *finding* ◐, per `references/checklist.md`'s Advisory section.
 - **◐ Flagged** — the source gives real evidence, but the actual failure depends on
-  computed/rendered state this review can't observe: a literal color pair that
+  computed/rendered state this review can't observe, or on a judgment call the
+  checklist itself marks as conditional/advisory: a literal color pair that
   looks low-contrast (real contrast needs computed styles, not just the two
   literals in source), a focus style that exists in source but whose visibility
-  can't be confirmed without rendering, a custom widget whose ARIA looks
+  can't be confirmed without rendering, a heading-rank skip or `autofocus`
+  presence (verifiable fact, but conditional per the checklist's Advisory
+  section), a custom widget whose ARIA looks
   plausible but whose keyboard operability can't be confirmed from markup alone.
   State the source evidence and what a scanner or visual check would need to
   confirm it.
