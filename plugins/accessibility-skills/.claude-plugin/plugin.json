@@ -1,0 +1,20 @@
+{
+  "$schema": "https://json.schemastore.org/claude-code-plugin-manifest.json",
+  "name": "accessibility-skills",
+  "version": "0.1.0",
+  "description": "Static, dependency-free WCAG 2.2 code review for web markup and CSS, checked against the a11yproject.com checklist and graded with an evidence-basis/severity system adapted from AccessLint's methodology. See NOTICE.md for provenance.",
+  "author": {
+    "name": "Dustin Fadler",
+    "url": "https://github.com/dfadler"
+  },
+  "homepage": "https://github.com/dfadler/agent-config",
+  "repository": "https://github.com/dfadler/agent-config",
+  "keywords": [
+    "accessibility",
+    "a11y",
+    "wcag",
+    "wcag22",
+    "aria",
+    "code-review"
+  ]
+}

@@ -42,8 +42,8 @@ done
 REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 
 # Every directory under plugins/ that carries a .claude-plugin/plugin.json is a
-# plugin this repo ships (currently dfadler-agent-config and
-# bulletproof-react-skills) - discovered rather than hardcoded so adding one
+# plugin this repo ships (currently dfadler-agent-config, bulletproof-react-skills,
+# and accessibility-skills) - discovered rather than hardcoded so adding one
 # doesn't require touching this list by hand. The trailing "/" restricts the
 # glob to directories; if plugins/ is ever empty the pattern itself fails the
 # -f test below and the loop body never runs, so no nullglob/-e guard is needed.
