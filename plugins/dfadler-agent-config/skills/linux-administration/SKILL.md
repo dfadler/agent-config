@@ -3,8 +3,9 @@ name: linux-administration
 description: |
   First-party Linux system administration guidance for systemd-based
   distributions: package management (apt/dnf/pacman), systemd service
-  management, filesystem operations, user/permission management, disk
-  partitioning, and network/firewall configuration (ufw/firewalld/nftables).
+  management and diagnosis, filesystem operations, user/permission
+  management, disk partitioning, network/firewall configuration
+  (ufw/firewalld/nftables), and SSH hardening (sshd_config, authorized_keys).
   Sorts every command shape into one of three mechanical buckets — safe to
   run freely, needs explicit confirmation, or never run autonomously — the
   same categorical discipline `~/.claude/CLAUDE.md`'s "Action categories"
@@ -21,7 +22,7 @@ description: |
   runit) or Windows/macOS administration.
 license: MIT
 metadata:
-  version: "1.1.0"
+  version: "1.2.0"
 ---
 
 # Linux administration
@@ -45,10 +46,11 @@ platform-capability claims" already requires elsewhere in this repo.
 Fedora/RHEL/CentOS-family (`dnf`), and Arch (`pacman`) — since these cover
 the large majority of Linux systems actually administered through an agent
 session today (local dev boxes, cloud VMs, containers with a systemd PID 1).
-Covers: package management, systemd unit/service management, filesystem
-operations, user and permission management, disk partitioning, and
-network/firewall configuration (`ufw`, `firewalld`, raw `nftables`/
-`iptables`).
+Covers: package management, systemd unit/service management and failure
+diagnosis, filesystem operations, user and permission management, disk
+partitioning, network/firewall configuration (`ufw`, `firewalld`, raw
+`nftables`/`iptables`), and SSH hardening (`sshd_config` directives,
+`authorized_keys` management).
 
 **Out of scope, explicitly**: non-systemd init systems (sysvinit, OpenRC,
 runit, Alpine's default setup), BSD variants, and Windows/macOS
@@ -149,6 +151,15 @@ same as any other "Explicit permission required" action.
   allow|deny <port/service>`, `firewall-cmd --add-port=<port>/<proto>
   [--permanent]`, `nft add rule ...` for a single rule; changing config for
   one named network interface.
+- **SSH hardening**: editing one directive in `/etc/ssh/sshd_config` (or a
+  drop-in under `/etc/ssh/sshd_config.d/`) — e.g. `PasswordAuthentication
+  no`, `PermitRootLogin no`, changing `Port` — validated with `sshd -t`
+  before reloading; adding a public key to an existing user's
+  `~/.ssh/authorized_keys`. These are Tier 2 on their own, but see the
+  Tier 3 rule below on cutting off session access: a change to the auth
+  method or listening config the *current* session depends on needs a
+  confirmed second access path or rollback, not just a go-ahead on the
+  edit itself.
 - **Disk**: creating a new partition on confirmed-unused space; running
   `mkfs` on a partition just created and confirmed empty; resizing a
   filesystem after a confirmed backup exists.
@@ -253,6 +264,49 @@ it goes into an actual command run against a real system.
    turns out to be a symlink into `/etc`, a "temporary" directory that
    isn't actually scratch space), treat it as the higher tier until
    confirmed otherwise — err toward asking, not toward assuming safety.
+6. **Don't bundle logically separate Tier 2 actions into one confirmation.**
+   A request like "set up a new deploy user and open port 8080 for the app"
+   contains two independent actions — user provisioning and a firewall
+   change — that happen to arrive in the same sentence. Get a separate
+   explicit go-ahead for each rather than listing every command and asking
+   for one blanket yes. A single combined "yes" leaves it genuinely
+   ambiguous whether the user weighed both parts or just the one they were
+   thinking about, and it removes their ability to approve one now and hold
+   off on the other. Steps that are only sub-parts of one coherent operation
+   — `useradd deploy` immediately followed by `usermod -aG sudo deploy` to
+   finish provisioning that same account — are one action and can share a
+   single confirmation; the test is whether the pieces would make sense as
+   separate asks on their own, not whether they happen to share a sentence.
+
+## Diagnosing a failing or misbehaving service
+
+A "why is X broken" or "X won't start" request is a Tier 1 diagnostic phase
+followed by a Tier 2 fix, not a single step — resist naming the fix before
+the diagnosis actually supports it, even when the symptom looks familiar.
+
+1. **Status first**: `systemctl status <unit>`. This alone often names the
+   failure directly (a crashed process, a failed config test, an unmet
+   dependency) and tells you what to look at next, before touching logs at
+   all.
+2. **Bounded logs next, scoped to the unit**: `journalctl -u <unit> --since
+   <window>` or `-n <N>` — not a bare `-f`/`--follow` (see Tier 1 above),
+   and not an unscoped read of the entire system log when the unit name is
+   already known. Widen the time window only if the first read doesn't
+   explain it.
+3. **State the diagnosis before proposing the fix.** "The status output
+   shows `(dead) failed` and the log shows a syntax error at
+   `nginx.conf:12`, so the fix is correcting that line and reloading" is a
+   diagnosis someone can check against the evidence. "Let's restart it and
+   see" is a guess wearing a diagnosis's clothes — it may work, but it
+   didn't come from reading the evidence, and Tier 2's "state the exact
+   command and target" requirement means the target should follow from
+   what was actually found, not from the symptom alone.
+4. **Apply the Tier 2 procedure for the fix itself** (state the command,
+   get the go-ahead, run it), **then re-check** status/logs afterward to
+   confirm the fix actually took — `active (running)` immediately after a
+   config reload doesn't yet prove the underlying problem is gone if the
+   failure was intermittent or config-validation-only; re-reading the same
+   status/log source you diagnosed from is what closes the loop.
 
 ## Package-manager quick reference
 
@@ -296,3 +350,32 @@ and only one is normally active at a time:
 - **Raw `nftables`/`iptables`** (no front-end, or scripting one directly):
   listing rules is Tier 1; adding one scoped rule is Tier 2; `flush`ing a
   table/chain or setting an `ACCEPT` default policy on `INPUT` is Tier 3.
+
+## SSH hardening quick reference
+
+`sshd`'s config lives in `/etc/ssh/sshd_config` (plus any drop-ins under
+`/etc/ssh/sshd_config.d/*.conf`, which are read in glob order and can
+override the main file — check for a conflicting drop-in before assuming a
+main-file edit is the only place a directive is set).
+
+- **Check current settings** (Tier 1): `sshd -T | grep -i <directive>`
+  reports sshd's actual *effective* config after all includes are applied —
+  more reliable than grepping the raw file, which won't show a drop-in
+  override.
+- **Edit one directive, then validate before reloading** (Tier 2):
+  `sshd -t` (or `sshd -t -f <file>` to check a drop-in in isolation) parses
+  the config and reports syntax errors without affecting the running
+  daemon — always run it after editing and before
+  `systemctl reload sshd`, since a reload with a broken config can leave
+  the daemon in a bad state.
+- **Reload, don't restart, for a config-only change**: `systemctl reload
+  sshd` re-reads config without dropping existing connections;
+  `systemctl restart sshd` does drop them. Prefer reload unless the change
+  specifically requires a full restart.
+- **The session-continuity rule (Tier 3) applies directly here**: disabling
+  password auth, changing the port, or restarting in a way that drops the
+  current session's own auth method or connection needs a confirmed second
+  access path (a second open session, console/out-of-band access, a
+  provider's rescue mode) or a timed auto-revert before it runs — "it
+  validated with `sshd -t`" proves the config is syntactically valid, not
+  that it won't lock out the session applying it.
