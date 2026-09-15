@@ -21,7 +21,7 @@ description: |
   runit) or Windows/macOS administration.
 license: MIT
 metadata:
-  version: "1.0.0"
+  version: "1.1.0"
 ---
 
 # Linux administration
@@ -78,20 +78,36 @@ Read-only or purely diagnostic. These never mutate state, so there is
 nothing to confirm.
 
 - **Service/process status**: `systemctl status|list-units|list-unit-files|is-active|is-enabled`,
-  `journalctl` (read, including `-f`/`--since`), `ps`, `top`/`htop`,
-  `pgrep`.
+  bounded `journalctl` reads (`--since`/`--until`, or `-n <N>`) — not bare
+  `-f`/`--follow`, which streams indefinitely and can hang an agent
+  workflow waiting for it to end — `ps`, a bounded `top -b -n 1`/single
+  `htop` snapshot (not an interactive, unbounded session), `pgrep`. Route a
+  genuinely interactive `top`/`htop`/`journalctl -f` session through
+  `dfadler-agent-config:detached-terminal` instead of treating it as Tier 1.
 - **Package queries**: `apt list|search|show`, `apt-cache policy`,
-  `dnf list|info|repoquery`, `dpkg -l|-s`, `rpm -qa|-qi`, `pacman -Q|-Si`.
+  `apt update` (refreshes the package index only — installs/upgrades
+  nothing), `dnf list|info|repoquery`, `dnf check-update`, `dpkg -l|-s`,
+  `rpm -qa|-qi`, `pacman -Q|-Si`. **Not** `pacman -Sy` — see the
+  package-manager quick reference below for why a standalone sync is
+  unsafe on Arch specifically.
 - **Filesystem/disk queries**: `df`, `du`, `lsblk`, `blkid`, `fdisk -l`
-  (list-only), `parted <device> print`, `stat`, `find` (search, no
-  `-delete`/`-exec rm`), `file`.
+  (list-only), `parted <device> print`, `stat`, `find` restricted to
+  search/print/stat predicates — excludes every execution action, not just
+  `-delete`/`-exec rm`: no `-exec`/`-execdir` of any kind, since those can
+  run `chmod`, `chown`, a shell, or a network client just as easily as
+  `rm` — `file`.
 - **Network/firewall queries**: `ip addr|route|link show`, `ss`, `netstat`,
   `ufw status`, `firewall-cmd --list-all|--state`, `iptables -L`/`nft list
   ruleset`.
 - **Identity queries**: `id`, `whoami`, `groups`, `getent passwd|group`,
   `last`, `w`.
-- Reading config files (`cat`/`less`/`grep` over `/etc/**`, unit files,
-  logs).
+- Reading non-secret config files (`cat`/`less`/`grep` over `/etc/**`, unit
+  files, logs) — **except** credential-bearing paths (`/etc/shadow`,
+  `/etc/gshadow`, `/etc/sudoers` and `/etc/sudoers.d/**`,
+  `/etc/ssh/ssh_host_*_key`, or any other `/etc/**` path holding a private
+  key, API token, or password): reading one of those puts its contents in
+  the session's context, so treat it as Tier 2 — state the specific path
+  and why before reading it.
 
 ### Tier 2 — Needs explicit confirmation: state-changing but scoped
 
@@ -101,10 +117,23 @@ this repo's `gh-publish-permission` pattern: state exactly what will run
 (the command, the target) and get an explicit go-ahead before running it,
 same as any other "Explicit permission required" action.
 
-- **Package management**: `apt install|remove|purge <pkg>`,
-  `apt upgrade`/`dnf upgrade` (a bounded, named upgrade — not a
-  system-wide unattended one on a production host), `dnf install|remove
-  <pkg>`, `pacman -S|-R <pkg>`.
+- **Package management — targeted**: `apt install|remove|purge <pkg>`,
+  `dnf install|remove <pkg>`, `pacman -S|-R <pkg>` — one or more named
+  packages, not the whole system.
+- **Package management — full-system upgrade**: `apt upgrade`/`apt
+  full-upgrade`, `dnf upgrade` (no package argument), `pacman -Syu`. These
+  upgrade every installed package, not a bounded target — when asking for
+  the go-ahead, say so explicitly (system-wide blast radius, not one
+  package) rather than describing it as if it were scoped like the
+  targeted case above.
+- **Fetch-and-execute installs** (`curl <url> | sh`, `curl <url> | sudo
+  bash`, an install script piped straight into a shell): governed by the
+  `dfadler-agent-config:fetch-execute-permission` skill, not this skill's
+  own tiering — that skill's per-run, exact-command permission gate applies
+  here unchanged, so this is Tier 2 (confirmation-required), not Tier 3.
+  Root/sudo context (`curl <url> | sudo bash`) raises the stakes further:
+  say so explicitly when asking, and treat the request as void if the
+  actual command differs even slightly from what was approved.
 - **Service management**: `systemctl start|stop|restart|reload|enable|disable
   <unit>` for one named unit.
 - **Filesystem**: creating/removing/moving a specific, named file or
@@ -166,10 +195,6 @@ by an agent at all regardless of permission, per the global rule.
   including `passwd`, `sudo -S`, or an expect-style script that supplies
   one — this is `~/.claude/CLAUDE.md`'s "Prohibited" credential-entry rule,
   restated here because sysadmin work is exactly where it comes up.
-- **Fetch-and-execute installs** (`curl <url> | sh`, `curl <url> | sudo
-  bash`, an install script piped straight into a shell) — covered by the
-  `fetch-execute-permission` skill; the same per-run permission gate
-  applies here, with root/sudo context raising the stakes further.
 
 ## Sourcing discipline
 
@@ -242,8 +267,16 @@ install/remove/search:
 | Remove | `apt remove <pkg>` (keeps config) / `apt purge <pkg>` | `dnf remove <pkg>` | `pacman -R <pkg>` |
 | Search | `apt search <term>` | `dnf search <term>` | `pacman -Ss <term>` |
 | List installed | `dpkg -l` | `rpm -qa` | `pacman -Q` |
-| Update index | `apt update` | `dnf check-update` | `pacman -Sy` |
-| Upgrade all | `apt upgrade` | `dnf upgrade` | `pacman -Syu` |
+| Update index only | `apt update` (Tier 1) | `dnf check-update` (Tier 1) | not supported standalone — see note below |
+| Upgrade all | `apt upgrade` (Tier 2, full-system) | `dnf upgrade` (Tier 2, full-system) | `pacman -Syu` (Tier 2, full-system) |
+
+**Never run `pacman -Sy` on its own.** Unlike `apt update`/`dnf
+check-update`, which only refresh metadata, Arch's own docs treat a
+database sync with no immediately-following upgrade as an unsupported
+partial-upgrade state that can break the system, because Arch's
+rolling-release model assumes the local package database and installed
+packages stay in sync (https://wiki.archlinux.org/title/System_maintenance).
+Always pair it as `pacman -Syu`.
 
 ## Firewall stack quick reference
 
