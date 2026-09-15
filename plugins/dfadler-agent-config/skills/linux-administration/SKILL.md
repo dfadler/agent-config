@@ -128,12 +128,15 @@ same as any other "Explicit permission required" action.
 - **Filesystem**: creating/removing/moving a specific, named file or
   directory outside a designated scratch area; `rm <specific-path>`
   (non-recursive, non-wildcard, outside scratch); mounting/unmounting one
-  named filesystem.
+  named filesystem — **except** the protected paths listed under Tier 3
+  below, where "it's just one named path" stops being a scoping argument
+  because the path itself is the whole blast radius.
 - **Users/permissions**: `useradd|usermod|userdel <user>` for a non-system
   account (UID ≥ 1000, per the distro's `/etc/login.defs` `UID_MIN` — verify
   the actual threshold on the host rather than assuming 1000, since it's
   configurable); `usermod -aG <group> <user>`; `chmod`/`chown` on a single,
-  named file or directory (no `-R` — see Tier 3 for the recursive form).
+  named file or directory (no `-R` — see Tier 3 for the recursive form, and
+  for the same protected-paths exception as Filesystem above).
 - **Network/firewall**: adding or removing one specific rule — `ufw
   allow|deny <port/service>`, `firewall-cmd --add-port=<port>/<proto>
   [--permanent]`, `nft add rule ...` for a single rule; changing config for
@@ -183,6 +186,17 @@ by an agent at all regardless of permission, per the global rule.
   `/etc/sudoers` with an editor/`sed` instead of `passwd`/`chage`/`visudo`
   (the latter validates syntax before saving; direct edits can lock out
   `sudo` entirely).
+- **Any `rm`/`mv`/`chmod`/`chown` targeting a protected path**, regardless
+  of how narrowly the command is scoped: `/etc/passwd`, `/etc/shadow`,
+  `/etc/gshadow`, `/etc/sudoers` and `/etc/sudoers.d/**`, anything under
+  `/etc/pam.d/**`, and `/`, `/etc`, `/usr`, `/var`, `/boot`, `/home` as
+  paths in their own right (an ordinary file living *under* one of those is
+  fine as Tier 2 — it's the directory itself, or a credential/auth file,
+  that's off-limits). Tier 2's "it's just one named path, so it's scoped"
+  reasoning assumes the path's own blast radius is small; these paths break
+  authentication or the whole system on their own regardless of how
+  precisely the command targets them, so a single confirmation isn't enough
+  — treat them the same as the recursive case above.
 - **Anything that would cut off the current session's own access** without
   a confirmed rollback path — e.g. changing the SSH daemon's auth method
   or restarting `sshd` in a way that drops the auth method the current
@@ -349,16 +363,25 @@ main-file edit is the only place a directive is set).
   reports sshd's actual *effective* config after all includes are applied —
   more reliable than grepping the raw file, which won't show a drop-in
   override.
-- **Edit one directive, then validate before reloading** (Tier 2):
-  `sshd -t` (or `sshd -t -f <file>` to check a drop-in in isolation) parses
-  the config and reports syntax errors without affecting the running
-  daemon — always run it after editing and before
-  `systemctl reload sshd`, since a reload with a broken config can leave
-  the daemon in a bad state.
-- **Reload, don't restart, for a config-only change**: `systemctl reload
-  sshd` re-reads config without dropping existing connections;
-  `systemctl restart sshd` does drop them. Prefer reload unless the change
-  specifically requires a full restart.
+- **Edit one directive, then validate before reloading** (Tier 2): run
+  `sshd -t` — with no `-f` — after every edit and before reloading. With no
+  `-f` it tests the *actual* effective config, `Include`d drop-ins and all,
+  which is the thing that's about to become live; that's mandatory, not
+  optional. `sshd -t -f <file>` is a different, narrower check — it treats
+  `<file>` as if it were the whole config, so it can catch a syntax error
+  in the drop-in you just edited before you've wired it in, but a clean
+  `-f` result doesn't mean the *merged* config is clean too. Use `-f` as an
+  extra quick check on the file you're editing if you want one; it never
+  substitutes for the plain `sshd -t` run against the real config.
+- **Reload, don't restart, for a config-only change** — but find the
+  actual unit name on this host first rather than assuming: the systemd
+  unit is `ssh.service` on Debian/Ubuntu and `sshd.service` on Fedora/RHEL
+  (some Ubuntu versions alias `sshd` to `ssh`, but don't rely on that
+  without checking — `systemctl status ssh sshd 2>/dev/null` on the actual
+  host shows which one is real). `systemctl reload <unit>` re-reads config
+  without dropping existing connections; `systemctl restart <unit>` does
+  drop them. Prefer reload unless the change specifically requires a full
+  restart.
 - **The session-continuity rule (Tier 3) applies directly here**: disabling
   password auth, changing the port, or restarting in a way that drops the
   current session's own auth method or connection needs a confirmed second
