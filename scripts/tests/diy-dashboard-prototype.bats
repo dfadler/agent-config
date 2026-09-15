@@ -199,3 +199,209 @@ EOF
   assert_output_contains "no workflow runs found"
   assert_output_contains "No issues found."
 }
+
+# --- issue #240: session-status receiver integration ---------------------
+#
+# The sandbox's default `curl` shim (installed by make_sandbox) blocks the
+# network with exit 97 — exercising the "receiver unreachable" path with no
+# extra setup. Tests for the "reachable" path install their own fixture
+# `curl` ahead of it on PATH, the same layering `install_gh_fixture` already
+# uses for `gh`.
+
+# make_fixture_repo DIR REMOTE_URL: a real (uncommitted) git repo whose
+# `origin` remote is REMOTE_URL, so parse_owner_repo's `git remote get-url`
+# call has something real to resolve. No network involved — `git remote add`
+# never contacts REMOTE_URL.
+make_fixture_repo() {
+  local dir="$1" remote="$2"
+  mkdir -p "$dir"
+  git init -q "$dir"
+  git -C "$dir" remote add origin "$remote"
+}
+
+# install_empty_gh_fixture: a `gh` stub answering every subcommand this
+# script calls with empty-but-successful data, for tests focused on the
+# session-status feature rather than the GitHub data path.
+install_empty_gh_fixture() {
+  FIXTURE_BIN="$BATS_TEST_TMPDIR/fixture-bin"
+  mkdir -p "$FIXTURE_BIN"
+  cat >"$FIXTURE_BIN/gh" <<'EOF'
+#!/usr/bin/env bash
+set -euo pipefail
+case "$1 $2" in
+  "pr list") echo "0" ;;
+  "run list") echo "[]" ;;
+  "issue list") echo "[]" ;;
+  *) exit 99 ;;
+esac
+EOF
+  chmod +x "$FIXTURE_BIN/gh"
+}
+
+# install_curl_status_fixture BODY_FILE: a `curl` stub that ignores its args
+# and prints BODY_FILE's contents, simulating a reachable session-status
+# receiver. Must be installed into the same FIXTURE_BIN as
+# install_empty_gh_fixture (call that first).
+install_curl_status_fixture() {
+  local body_file="$1"
+  cat >"$FIXTURE_BIN/curl" <<EOF
+#!/usr/bin/env bash
+cat "$body_file"
+EOF
+  chmod +x "$FIXTURE_BIN/curl"
+}
+
+@test "--status-url is accepted and documented in --help" {
+  run bash "$SCRIPT" --help
+  assert_success
+  assert_output_contains "--status-url"
+}
+
+@test "shows an explicit banner, not a silent empty section, when the session-status receiver is unreachable" {
+  install_empty_gh_fixture
+  PATH="$FIXTURE_BIN:$PATH" run bash "$SCRIPT" -o "$OUT_FILE" dfadler/example
+  assert_success
+
+  run cat "$OUT_FILE"
+  assert_output_contains "Session-status receiver not reachable"
+  refute_output_contains "Live sessions"
+  refute_output_contains "Other sessions"
+}
+
+@test "correlates a live session to its repo card via the session's cwd git remote" {
+  install_empty_gh_fixture
+  local repo_a="$BATS_TEST_TMPDIR/repo-a"
+  make_fixture_repo "$repo_a" "git@github.com:dfadler/example.git"
+
+  local body="$BATS_TEST_TMPDIR/status-body.json"
+  cat >"$body" <<EOF
+[
+  {
+    "session_id": "abc123def456",
+    "cwd": "$repo_a",
+    "status": "needs-input",
+    "last_event": "Notification",
+    "notification_type": "idle_prompt",
+    "message": "Claude is waiting for your input",
+    "end_reason": null,
+    "first_seen": "2026-01-01T00:00:00+00:00",
+    "last_updated": "2026-01-01T00:00:05+00:00",
+    "event_count": 3
+  }
+]
+EOF
+  install_curl_status_fixture "$body"
+
+  PATH="$FIXTURE_BIN:$PATH" run bash "$SCRIPT" -o "$OUT_FILE" dfadler/example
+  assert_success
+
+  run cat "$OUT_FILE"
+  refute_output_contains "Session-status receiver not reachable"
+  assert_output_contains "Live sessions"
+  assert_output_contains "badge-needs-input\">needs-input</span>"
+  assert_output_contains "Claude is waiting for your input"
+  refute_output_contains "Other sessions"
+}
+
+@test "lists a session whose cwd doesn't resolve to any requested repo under Other sessions" {
+  install_empty_gh_fixture
+  local stray_repo="$BATS_TEST_TMPDIR/stray-repo"
+  make_fixture_repo "$stray_repo" "git@github.com:dfadler/unrelated.git"
+
+  local body="$BATS_TEST_TMPDIR/status-body.json"
+  cat >"$body" <<EOF
+[
+  {
+    "session_id": "strayabc123",
+    "cwd": "$stray_repo",
+    "status": "done",
+    "last_event": "Stop",
+    "notification_type": null,
+    "message": "Finished the refactor",
+    "end_reason": null,
+    "first_seen": "2026-01-01T00:00:00+00:00",
+    "last_updated": "2026-01-01T00:00:05+00:00",
+    "event_count": 3
+  }
+]
+EOF
+  install_curl_status_fixture "$body"
+
+  PATH="$FIXTURE_BIN:$PATH" run bash "$SCRIPT" -o "$OUT_FILE" dfadler/example
+  assert_success
+
+  run cat "$OUT_FILE"
+  assert_output_contains "Other sessions"
+  assert_output_contains "badge-done\">done</span>"
+  assert_output_contains "No live sessions for this repo."
+}
+
+@test "a reachable receiver with zero sessions shows an explicit empty state, not the unreachable banner" {
+  install_empty_gh_fixture
+  local body="$BATS_TEST_TMPDIR/status-body.json"
+  echo "[]" >"$body"
+  install_curl_status_fixture "$body"
+
+  PATH="$FIXTURE_BIN:$PATH" run bash "$SCRIPT" -o "$OUT_FILE" dfadler/example
+  assert_success
+
+  run cat "$OUT_FILE"
+  refute_output_contains "Session-status receiver not reachable"
+  assert_output_contains "No live sessions for this repo."
+}
+
+# Regression check (CodeRabbit finding on PR #243): a session's cwd whose
+# git remote is same-shaped but on a DIFFERENT host must not be credited to
+# a same-named GitHub repo — every link this page renders is hardcoded to
+# https://github.com/..., so crediting a gitlab.com remote to the
+# dfadler/example GitHub card would point the session at the wrong project.
+@test "does not correlate a same-named repo on a different git host to a requested GitHub repo" {
+  install_empty_gh_fixture
+  local gitlab_repo="$BATS_TEST_TMPDIR/gitlab-repo"
+  make_fixture_repo "$gitlab_repo" "https://gitlab.com/dfadler/example.git"
+
+  local body="$BATS_TEST_TMPDIR/status-body.json"
+  cat >"$body" <<EOF
+[
+  {
+    "session_id": "gitlabsession1",
+    "cwd": "$gitlab_repo",
+    "status": "needs-input",
+    "last_event": "Notification",
+    "notification_type": "idle_prompt",
+    "message": "Claude is waiting for your input",
+    "end_reason": null,
+    "first_seen": "2026-01-01T00:00:00+00:00",
+    "last_updated": "2026-01-01T00:00:05+00:00",
+    "event_count": 1
+  }
+]
+EOF
+  install_curl_status_fixture "$body"
+
+  PATH="$FIXTURE_BIN:$PATH" run bash "$SCRIPT" -o "$OUT_FILE" dfadler/example
+  assert_success
+
+  run cat "$OUT_FILE"
+  assert_output_contains "No live sessions for this repo."
+  assert_output_contains "Other sessions"
+}
+
+# Regression check (CodeRabbit finding on PR #243): `jq -e .` accepts any
+# valid JSON, so a non-array response (e.g. `{}`, from a misconfigured or
+# unexpected endpoint at --status-url) was read as reachable-with-zero-
+# sessions instead of unreachable — the receiver's real /status endpoint
+# always returns a JSON array, so anything else is not a valid snapshot.
+@test "treats a non-array JSON response as unreachable, not as zero sessions" {
+  install_empty_gh_fixture
+  local body="$BATS_TEST_TMPDIR/status-body.json"
+  echo "{}" >"$body"
+  install_curl_status_fixture "$body"
+
+  PATH="$FIXTURE_BIN:$PATH" run bash "$SCRIPT" -o "$OUT_FILE" dfadler/example
+  assert_success
+
+  run cat "$OUT_FILE"
+  assert_output_contains "Session-status receiver not reachable"
+  refute_output_contains "No live sessions for this repo."
+}
