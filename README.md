@@ -225,7 +225,7 @@ the `marketplace add` step first; updates after that arrive automatically the sa
 `setup.sh` runs an advisory-only check (`check_frontend_design`) and prints the install
 command above if it's missing — it doesn't install it.
 
-### Considered: Linux administration skill (not added)
+### Linux administration skill: first-party, not vendored
 
 Issue #214 asked whether this repo should add a skill/agent for Linux system
 administration (package management, systemd, users/permissions, SSH/firewall
@@ -265,15 +265,25 @@ provenance.
 - No first-party (Anthropic or major-vendor) Linux-administration skill
   exists, and no mainstream skill directory treats it as a category.
 
-**Decision: no-go, for now.** Recommending either bundle would mean
-pointing users at unvetted, low-adoption, single-author content on the
+**Decision: no-go on vendoring either bundle.** Recommending either would
+mean pointing users at unvetted, low-adoption, single-author content on the
 strength of marketing language in its own README — a materially lower bar
-than every other companion in this section. Revisit if a better-provenance
-option appears, or if an actual project need for Linux-admin assistance
-shows up the way the React-skills and frontend-design companions did (real
-work surfaced them, not research for its own sake). Recorded here so this
-isn't re-investigated from scratch by the next issue or session — see #214
-for the full research trail.
+than every other companion in this section. Recorded here so this isn't
+re-investigated from scratch by the next issue or session — see #214 for
+the full research trail.
+
+Issue #238 followed up by writing this repo's own Linux administration
+skill from scratch instead, to the bar the third-party bundles above
+failed: `dfadler-agent-config:linux-administration`
+(`plugins/dfadler-agent-config/skills/linux-administration/`). It sorts
+package management, systemd service management, filesystem operations,
+user/permission management, disk partitioning, and firewall/network
+configuration into three mechanical tiers (safe / needs-confirmation /
+never-autonomous) rather than a prose safety reminder, scopes itself
+explicitly to systemd-based distros (Debian/Ubuntu, Fedora/RHEL, Arch), and
+requires citing the relevant man page or official docs for any
+version-sensitive command-behavior claim. See that skill's `SKILL.md` for
+the full model.
 
 ### Recommended companion: aws/agent-toolkit-for-aws (aws-core)
 
