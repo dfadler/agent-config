@@ -27,19 +27,6 @@ metadata:
 
 # Linux administration
 
-## Why this exists
-
-#214 investigated whether this repo should adopt a third-party Linux-admin
-skill. #234 rejected both candidates found: low-star, single-day,
-templated-bundle repos whose READMEs claimed "confirm before destructive
-changes" but whose actual `SKILL.md` content was unenforced prose — a
-checklist plus one safety-reminder line, no mechanical gate. This skill is
-this repo's own replacement, held to the bar that decision set: safety
-framing that is a mechanical classification of command *shapes* into
-enforceable buckets, not a vague warning sentence, plus the same
-sourcing/citation discipline `~/.claude/CLAUDE.md`'s "Cite sources for
-platform-capability claims" already requires elsewhere in this repo.
-
 ## Scope
 
 **In scope**: systemd-based Linux distributions — Debian/Ubuntu (`apt`),
