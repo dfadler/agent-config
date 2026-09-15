@@ -571,6 +571,37 @@ sys.exit(1)
   esac
 }
 
+# Same posture as check_mattpocock_skills above: purely informational, nothing
+# here depends on it, no --install-deps. Unlike the plugin-based checks above,
+# rtk-ai/rtk (see README's "Recommended companion" section) is a bare CLI, not
+# a `claude plugin` or a `skills` CLI entry, so this only checks whether the
+# `rtk` binary itself is on PATH - it has no way to introspect whether
+# `rtk init --global`'s hook is actually active, and doesn't try to. It
+# deliberately never runs the installer or `rtk init --global` itself: the
+# installer is a fetch-and-execute install (curl | sh, or the Homebrew tap),
+# and `rtk init --global` writes a PreToolUse hook into Claude Code's own
+# settings plus shell rc files - both need to be asked for explicitly, not run
+# as a side effect of every setup.sh invocation (same reasoning as
+# check_react_skills declining to run `npx skills@latest` on its own).
+check_rtk() {
+  if command -v rtk >/dev/null 2>&1; then
+    echo "✓ rtk is installed (run 'rtk init --show' to check whether its token-compression hook is active)"
+    return 0
+  fi
+
+  {
+    echo
+    echo "ℹ rtk (token compression for Bash tool output) is not installed — a"
+    echo "  recommended companion, not required by anything here. See README's"
+    echo "  \"Recommended companion\" section. Install it with:"
+    echo "    brew install rtk-ai/tap/rtk"
+    echo "  then review and run 'rtk init --global' yourself to activate the hook -"
+    echo "  it edits Claude Code's own hook settings and your shell rc files, so"
+    echo "  this script won't run it for you."
+    echo
+  } >&2
+}
+
 mkdir -p "$HOME/.claude"
 link "$REPO_ROOT/claude/CLAUDE.md" "$HOME/.claude/CLAUDE.md"
 link_dir_contents "$REPO_ROOT/claude/commands" "$HOME/.claude/commands"
@@ -593,7 +624,7 @@ for i in "${!PLUGIN_SRCS[@]}"; do
 done
 
 # Last, so the linking work is already done and reported when these speak up.
-# All five are advisory, not failures: the symlinks are correct either way,
+# All six are advisory, not failures: the symlinks are correct either way,
 # and `./setup.sh && something-else` shouldn't break over any of them. An
 # explicitly requested --install-deps that doesn't install is still a failure.
 check_git_identity
@@ -602,6 +633,7 @@ check_mattpocock_skills
 check_frontend_design
 check_react_skills
 check_aws_core
+check_rtk
 
 # Also last, and independent of everything above: offers (opt-in, y/n) to
 # pre-approve Aikido Safe Chain's pinned installer command in Claude Code's
