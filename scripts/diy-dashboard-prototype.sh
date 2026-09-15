@@ -122,15 +122,37 @@ html_escape() {
     -e 's/>/\&gt;/g'
 }
 
-# owner/repo for a git remote URL (git@host:owner/repo.git, https://host/owner/repo[.git],
-# ssh://git@host/owner/repo.git) or empty if it doesn't look like one of those forms.
+# owner/repo for a GitHub remote URL (git@github.com:owner/repo.git,
+# https://github.com/owner/repo[.git], ssh://git@github.com/owner/repo.git)
+# or empty for anything else — including a same-shaped URL on a different
+# host (e.g. gitlab.com), which must not be treated as a match: every link
+# this script renders is hardcoded to https://github.com/..., so crediting
+# a non-GitHub remote with a GitHub owner/repo would point a session at the
+# wrong project's card.
 parse_owner_repo() {
-  local url="${1%.git}"
+  local url="${1%.git}" host rest
   case "$url" in
-    git@*:*) echo "${url#git@*:}" ;;
-    *://*/*/*) echo "${url#*://*/}" ;;
-    *) echo "" ;;
+    git@*:*)
+      host="${url#git@}"
+      host="${host%%:*}"
+      rest="${url#git@*:}"
+      ;;
+    *://*)
+      rest="${url#*://}"
+      rest="${rest#*@}" # drop an optional ssh://user@ prefix
+      host="${rest%%/*}"
+      rest="${rest#*/}"
+      ;;
+    *)
+      echo ""
+      return
+      ;;
   esac
+  if [ "$host" = "github.com" ]; then
+    echo "$rest"
+  else
+    echo ""
+  fi
 }
 
 # Linear scan over $repos (a handful of entries at most) rather than an
@@ -163,14 +185,16 @@ render_session_row() {
 
 # Fetch the session-status receiver's snapshot once, up front (independent of
 # the per-repo loop below). Any failure — curl missing, connection refused,
-# timeout, non-2xx, invalid JSON — degrades to "unreachable" rather than
+# timeout, non-2xx, invalid JSON, or valid JSON that isn't an array (the
+# receiver's /status always returns one; anything else, e.g. `{}`, must not
+# be read as "zero sessions") — degrades to "unreachable" rather than
 # aborting the dashboard; see the header comment for why.
 safe_status_url=$(printf '%s' "$status_url" | html_escape)
 sessions_json="[]"
 sessions_reachable=0
 if command -v curl >/dev/null 2>&1; then
   if raw_sessions_json=$(curl -fsS -m "$status_timeout_seconds" "$status_url" 2>/dev/null) &&
-    jq -e . >/dev/null 2>&1 <<<"$raw_sessions_json"; then
+    jq -e 'type == "array"' >/dev/null 2>&1 <<<"$raw_sessions_json"; then
     sessions_json="$raw_sessions_json"
     sessions_reachable=1
   else

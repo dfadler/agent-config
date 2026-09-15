@@ -349,3 +349,59 @@ EOF
   refute_output_contains "Session-status receiver not reachable"
   assert_output_contains "No live sessions for this repo."
 }
+
+# Regression check (CodeRabbit finding on PR #243): a session's cwd whose
+# git remote is same-shaped but on a DIFFERENT host must not be credited to
+# a same-named GitHub repo — every link this page renders is hardcoded to
+# https://github.com/..., so crediting a gitlab.com remote to the
+# dfadler/example GitHub card would point the session at the wrong project.
+@test "does not correlate a same-named repo on a different git host to a requested GitHub repo" {
+  install_empty_gh_fixture
+  local gitlab_repo="$BATS_TEST_TMPDIR/gitlab-repo"
+  make_fixture_repo "$gitlab_repo" "https://gitlab.com/dfadler/example.git"
+
+  local body="$BATS_TEST_TMPDIR/status-body.json"
+  cat >"$body" <<EOF
+[
+  {
+    "session_id": "gitlabsession1",
+    "cwd": "$gitlab_repo",
+    "status": "needs-input",
+    "last_event": "Notification",
+    "notification_type": "idle_prompt",
+    "message": "Claude is waiting for your input",
+    "end_reason": null,
+    "first_seen": "2026-01-01T00:00:00+00:00",
+    "last_updated": "2026-01-01T00:00:05+00:00",
+    "event_count": 1
+  }
+]
+EOF
+  install_curl_status_fixture "$body"
+
+  PATH="$FIXTURE_BIN:$PATH" run bash "$SCRIPT" -o "$OUT_FILE" dfadler/example
+  assert_success
+
+  run cat "$OUT_FILE"
+  assert_output_contains "No live sessions for this repo."
+  assert_output_contains "Other sessions"
+}
+
+# Regression check (CodeRabbit finding on PR #243): `jq -e .` accepts any
+# valid JSON, so a non-array response (e.g. `{}`, from a misconfigured or
+# unexpected endpoint at --status-url) was read as reachable-with-zero-
+# sessions instead of unreachable — the receiver's real /status endpoint
+# always returns a JSON array, so anything else is not a valid snapshot.
+@test "treats a non-array JSON response as unreachable, not as zero sessions" {
+  install_empty_gh_fixture
+  local body="$BATS_TEST_TMPDIR/status-body.json"
+  echo "{}" >"$body"
+  install_curl_status_fixture "$body"
+
+  PATH="$FIXTURE_BIN:$PATH" run bash "$SCRIPT" -o "$OUT_FILE" dfadler/example
+  assert_success
+
+  run cat "$OUT_FILE"
+  assert_output_contains "Session-status receiver not reachable"
+  refute_output_contains "No live sessions for this repo."
+}
