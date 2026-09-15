@@ -315,6 +315,55 @@ Not given its own `setup.sh` check: unlike `aws-core`, it needs a plugin-specifi
 `/aws-agents-for-devsecops:setup` step before use, so a plain installed/not-installed
 check would understate what "ready to use" means for it.
 
+### Recommended companion: rtk-ai/rtk (token compression)
+
+[RTK](https://www.rtk-ai.app/) ([rtk-ai/rtk](https://github.com/rtk-ai/rtk)) is a
+standalone Rust CLI, Apache-2.0 licensed, that sits between Claude Code and the shell:
+a `PreToolUse` hook rewrites a Bash tool call before it runs (`git status` becomes
+`rtk git status`, and likewise for 100+ other git/test/lint/build/infra commands) so
+noisy, repetitive output gets filtered, grouped, truncated, and deduplicated before it
+ever reaches the model's context — real error messages and failures are preserved.
+Per RTK's own docs, the hook only covers Bash tool calls; built-in tools like `Read`,
+`Grep`, and `Glob` bypass it entirely. Provenance checked directly against
+`rtk-ai/rtk`'s GitHub API (not taken from its marketing page): Apache-2.0 confirmed,
+80K+ stars, 5,100+ forks, 30 contributors, and an active multi-times-daily release
+cadence as of 2026-09 — worth noting the repo itself is young (created 2026-01), so
+that's a lot of adoption in under eight months; nothing here changes because of that,
+it's just context for whoever reads this next.
+
+Recommended as a standalone companion, same reference-don't-vendor posture as every
+other entry in this section — nothing here depends on it:
+
+```bash
+brew install rtk-ai/tap/rtk
+```
+
+Prefer the Homebrew tap or a pre-built binary from
+[GitHub Releases](https://github.com/rtk-ai/rtk/releases) over RTK's own
+`curl | sh` one-liner — piping a remote script into a shell is a fetch-and-execute
+install and needs the explicit, per-run permission the
+`dfadler-agent-config:fetch-execute-permission` skill describes, the same as any other
+`curl | sh`/`npx <pkg>@latest` command. That gate applies whether a human runs it
+themselves or asks an agent to.
+
+Installing the binary does not activate anything — that needs a separate
+`rtk init --global`, which (per RTK's own docs) modifies shell rc files *and* adds a
+`PreToolUse` hook entry to Claude Code's own settings, then requires restarting
+Claude Code to take effect. Modifying `.claude/settings.json` hooks is itself a
+security-critical action under this repo's own standing rule (see global `CLAUDE.md`'s
+GitHub-workflow section on security-critical paths) — so an agent should never run
+`rtk init --global` (or the installer above) on the user's behalf without asking
+first, the same as it would never silently edit a hooks file for any other reason.
+`rtk init --show` previews what the hook would change without applying it, and
+`rtk init -g --uninstall` reverts the hook, `RTK.md`, and the settings entries it
+added.
+
+`setup.sh` runs an advisory-only check (`check_rtk`) that reports whether the `rtk`
+binary is on `PATH` and prints the install command above if it's missing — same
+posture as `check_react_skills`: it never runs the installer or `rtk init --global`
+itself, since both are exactly the kind of side effect that needs asking first rather
+than happening automatically on every `setup.sh` run.
+
 ## Adding something new
 
 1. Put it in the right place:
