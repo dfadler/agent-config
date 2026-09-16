@@ -252,35 +252,20 @@ this sits inside.
 
 ## GitHub workflow habits
 
-- **Never create an issue or PR, post a comment/reply, edit a body, or submit a
-  review without explicit, request-scoped permission** (an adjacent ask like "fix
-  this bug" doesn't imply it) — this applies regardless of which issue tracker the
-  project uses; see `gh-publish-permission`; the `.claude/settings.json` ask-rules
-  backstop it.
-- Use the `gh` CLI for GitHub operations (view/list PRs, check CI) rather than the
-  web UI, raw REST calls, or a GitHub MCP connector.
+- **Never create an issue or PR, comment/reply, edit a body, or submit a review
+  without explicit, request-scoped permission** — applies regardless of tracker;
+  see `gh-publish-permission`; the `.claude/settings.json` ask-rules backstop it.
 
 ### Issue tracker resolution
 
-Before any issue work, determine the tracker by checking repo ownership:
+Check repo ownership before any issue work (`gh repo view --json owner -q .owner.login`):
 
-```bash
-gh repo view --json owner -q .owner.login
-```
+- **Owner is `dfadler`** — GitHub Issues (`gh` CLI). Label new issues — check
+  `gh label list` first; create a label if nothing fits.
+- **Owner is an org** — look up the org in `~/.claude/CLAUDE.md` (private). If no
+  entry exists, check the project's `CLAUDE.md`.
 
-- **Owner is `dfadler`** — GitHub Issues. Use `gh` CLI for all issue operations.
-  Always label an issue you create — at minimum whatever the project's own label
-  set supports; check `gh label list` rather than guessing, and create a label first
-  if nothing fits rather than leaving the issue bare.
-- **Owner is an org** — look up the org in the tracker table in `~/.claude/CLAUDE.md`
-  (kept private; org and employer names don't belong in this public repo). If no
-  entry exists for the org, check the project's `CLAUDE.md` before touching any
-  issues.
-
-### PR workflow
-
-PRs always live on GitHub regardless of which issue tracker the project uses. The
-habits below apply to all projects.
+PRs always live on GitHub regardless of issue tracker; the habits below apply to all.
 - After opening a PR, the task isn't done — once CI has had a few minutes to produce
   signal, check its status (`gh pr checks`) and any early review comments
   (`gh pr view --comments`), and act on what's actionable before ending the turn.
