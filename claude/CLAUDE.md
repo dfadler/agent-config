@@ -252,12 +252,13 @@ this sits inside.
 
 ## Issue tracker
 
-Check repo ownership before any issue work (`gh repo view --json owner -q .owner.login`):
+Check repo ownership before any issue work (`gh repo view --json owner` returns
+`.owner.login` and `.owner.type`):
 
-- **Owner is `dfadler`** — GitHub Issues (`gh` CLI). Label new issues — check
+- **`type` is `User`** — GitHub Issues (`gh` CLI). Label new issues — check
   `gh label list` first; create a label if nothing fits.
-- **Owner is an org** — look up the org in `~/.claude/CLAUDE.md` (private). If no
-  entry exists, check the project's `CLAUDE.md`.
+- **`type` is `Organization`** — look up the org login in `~/.claude/CLAUDE.md`
+  (private). If no entry exists, check the project's `CLAUDE.md`.
 
 ## GitHub PR workflow
 
