@@ -250,13 +250,7 @@ apply deliberately on every fetch, not a platform guarantee to rely on.
 See `docs/prompt-injection-defense.md` for the full layered-defense model
 this sits inside.
 
-## GitHub workflow habits
-
-- **Never create an issue or PR, comment/reply, edit a body, or submit a review
-  without explicit, request-scoped permission** — applies regardless of tracker;
-  see `gh-publish-permission`; the `.claude/settings.json` ask-rules backstop it.
-
-### Issue tracker resolution
+## Issue tracker
 
 Check repo ownership before any issue work (`gh repo view --json owner -q .owner.login`):
 
@@ -265,7 +259,11 @@ Check repo ownership before any issue work (`gh repo view --json owner -q .owner
 - **Owner is an org** — look up the org in `~/.claude/CLAUDE.md` (private). If no
   entry exists, check the project's `CLAUDE.md`.
 
-PRs always live on GitHub regardless of issue tracker; the habits below apply to all.
+## GitHub PR workflow
+
+- **Never create or modify a GitHub issue or PR, post a comment, edit a body, or
+  submit a review without explicit, request-scoped permission** — see
+  `gh-publish-permission`; the `.claude/settings.json` ask-rules backstop it.
 - After opening a PR, the task isn't done — once CI has had a few minutes to produce
   signal, check its status (`gh pr checks`) and any early review comments
   (`gh pr view --comments`), and act on what's actionable before ending the turn.
