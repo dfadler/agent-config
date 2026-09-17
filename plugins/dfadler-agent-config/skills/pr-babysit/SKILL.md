@@ -1,20 +1,21 @@
 ---
 name: pr-babysit
 description: |
-  One pass of PR shepherding: snapshot every open PR (or one named PR) via a
-  project-supplied snapshot script, act on whatever is actionable — fix
-  branch-related CI failures, address review comments, rerun flaky checks,
-  update or unconflict branches — then report and stop. Use when the user
+  The primary entry point for GitHub PR shepherding. One pass: snapshot every
+  open PR (or one named PR) via a project-supplied snapshot script, act on
+  whatever is actionable — fix branch-related CI failures, address review
+  comments, rerun flaky checks, update or unconflict branches — then report
+  and stop. Internally delegates CI work to `pr-checks` and review-comment
+  work to `pr-comments`; load this skill alone, not those. Use when the user
   says "babysit my PRs", "check on my open PRs", "shepherd PR N to merge", or
   "handle the review feedback on PR N" — and also proactively after opening a
-  PR: once CI has had a few minutes, run a pass on that PR to catch failures
-  and early review feedback. Arguments: optional PR number/URL, optional
-  --auto-merge. Never approves or merges a PR touching a security-critical or
-  regulated path — always escalates those to a human instead. For continuous
-  monitoring run it under /loop; a single invocation is exactly one pass.
-  Requires the consuming repo to supply its own snapshot script/command
-  matching the JSON contract documented below — this skill has no `gh`-only
-  fallback and does no snapshotting itself.
+  PR once CI has had a few minutes. Arguments: optional PR number/URL,
+  optional --auto-merge. Never approves or merges a PR touching a
+  security-critical or regulated path — always escalates those to a human. For
+  continuous monitoring run under /loop; a single invocation is one pass.
+  Requires the consuming repo to supply a snapshot script/command matching the
+  JSON contract below — no `gh`-only fallback; see "Step 1" and the snapshot
+  contract for the required JSON shape.
 metadata:
   version: "1.3.0"
 ---

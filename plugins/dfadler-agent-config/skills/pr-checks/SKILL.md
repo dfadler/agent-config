@@ -1,15 +1,17 @@
 ---
 name: pr-checks
 description: |
-  Review and respond to a single PR's CI checks: snapshot status, diagnose a
+  Diagnose and act on a single PR's CI checks: snapshot status, diagnose a
   failing run, classify it as branch-related or flaky/infra, and either fix,
-  rerun, or escalate. Use when asked "why is CI failing on PR N", "check the
-  PR checks", "is CI green on my PR", "rerun the flaky check", "fix the lint
-  failure on my PR", or similar — for a specific PR, not a sweep across many.
-  Parse `$ARGUMENTS` for a PR number or URL; if a caller already has
-  pre-fetched `checks`/`failedRuns` JSON in the shape documented below (e.g.
-  a `pr-babysit`-style snapshot), pass that through instead of re-fetching —
-  this skill accepts either.
+  rerun, or escalate. Primary delegate of `pr-babysit` for `fix-ci` work —
+  `pr-babysit` hands in pre-fetched snapshot data and folds this skill's
+  report into its own; load this skill directly only when working on CI for a
+  specific PR in isolation. Use when asked "why is CI failing on PR N", "check
+  the PR checks", "is CI green on my PR", "rerun the flaky check", "fix the
+  lint failure on my PR", or similar. Parse `$ARGUMENTS` for a PR number or
+  URL; if a caller already has pre-fetched `checks`/`failedRuns` JSON in the
+  shape documented below (e.g. a `pr-babysit`-style snapshot), pass that
+  through instead of re-fetching — this skill accepts either.
 license: MIT
 metadata:
   version: "1.0.0"

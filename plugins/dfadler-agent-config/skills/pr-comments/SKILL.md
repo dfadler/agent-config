@@ -4,10 +4,13 @@ description: |
   Gather, classify, and respond to PR review feedback for a single pull
   request — unresolved inline review threads and top-level conversation
   comments, from human and automated reviewers (CodeRabbit and similar)
-  alike. Use when asked to "respond to the review comments on PR N",
-  "address the CodeRabbit findings on PR N", "reply to the review threads
-  on PR N", or "handle the review feedback on PR N" for one PR in
-  isolation — not a full shepherding pass across every open PR (that's
+  alike. Primary delegate of `pr-babysit` for `address-reviews` work —
+  `pr-babysit` hands in pre-fetched snapshot data and folds this skill's
+  report into its own; load this skill directly only when addressing review
+  feedback for a specific PR in isolation. Use when asked to "respond to the
+  review comments on PR N", "address the CodeRabbit findings on PR N", "reply
+  to the review threads on PR N", or "handle the review feedback on PR N" for
+  one PR — not a full shepherding pass across every open PR (that's
   `pr-babysit`). Parse `$ARGUMENTS`: a PR number or URL, and optionally
   pre-fetched thread/comment JSON already in the pr-babysit snapshot's
   `unresolvedThreads`/`generalComments` shape — when that's supplied, skip
