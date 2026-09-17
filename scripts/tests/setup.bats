@@ -291,6 +291,20 @@ run_setup_with() {
   [ "$(readlink "$HOME/.claude/CLAUDE.md")" = "$FAKE_REPO/claude/CLAUDE.md" ]
 }
 
+@test "writes a setup-managed marker alongside the empty CLAUDE.personal.md placeholder" {
+  run_setup
+  assert_success
+  [ -f "$HOME/.claude/CLAUDE.personal.md.setup-managed" ]
+}
+
+@test "does not write a setup-managed marker when migrating an existing CLAUDE.md" {
+  mkdir -p "$HOME/.claude"
+  echo "hand-written config" > "$HOME/.claude/CLAUDE.md"
+  run_setup
+  assert_success
+  [ ! -e "$HOME/.claude/CLAUDE.personal.md.setup-managed" ]
+}
+
 # ~/.claude/skills is shared with every other skills-dir plugin. A live symlink
 # pointing somewhere else belongs to another tool and must survive.
 @test "leaves another plugin's live symlink alone" {

@@ -7,7 +7,7 @@
 #
 # Usage: ./teardown.sh
 
-set -uo pipefail
+set -euo pipefail
 
 EXIT_OK=0
 EXIT_USAGE=2
@@ -38,17 +38,6 @@ while [[ $# -gt 0 ]]; do
 done
 
 REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-
-# Discover the same plugin set setup.sh would link — keeps this script in sync
-# automatically when a plugin is added or removed.
-PLUGIN_SRCS=()
-PLUGIN_LINKS=()
-for plugin_dir in "$REPO_ROOT"/plugins/*/; do
-  plugin_dir="${plugin_dir%/}"
-  [[ -f "$plugin_dir/.claude-plugin/plugin.json" ]] || continue
-  PLUGIN_SRCS+=("$plugin_dir")
-  PLUGIN_LINKS+=("$HOME/.claude/skills/$(basename "$plugin_dir")")
-done
 
 # Remove a symlink only if it points exactly to the expected target.
 unlink_if_owned() {
@@ -96,11 +85,13 @@ unlink_dir_contents() {
 # Restore CLAUDE.md
 # setup.sh moved the user's real CLAUDE.md to CLAUDE.personal.md and linked
 # the repo's version in its place. Undo that: remove the repo symlink, then
-# if CLAUDE.personal.md has content, move it back to CLAUDE.md. If it was
-# created empty by setup.sh, remove it so ~/.claude/ is left clean.
+# if CLAUDE.personal.md has content, move it back to CLAUDE.md. If setup.sh
+# created an empty placeholder (marked by a .setup-managed sidecar), remove
+# both. A user-owned empty file with no sidecar is left untouched.
 restore_claude_md() {
   local link="$HOME/.claude/CLAUDE.md"
   local personal="$HOME/.claude/CLAUDE.personal.md"
+  local marker="${personal}.setup-managed"
 
   # Remove the repo symlink.
   unlink_if_owned "$link" "$REPO_ROOT/claude/CLAUDE.md"
@@ -110,17 +101,20 @@ restore_claude_md() {
   if [[ -s "$personal" ]]; then
     # Non-empty personal file — it was the user's original CLAUDE.md before
     # setup.sh ran; move it back to restore the pre-setup state.
-    if [[ -e "$link" ]]; then
+    # -L guards dangling foreign symlinks that -e would miss.
+    if [[ -e "$link" || -L "$link" ]]; then
       echo "Skipping restore: $link already exists (not a repo symlink)" >&2
     else
       mv "$personal" "$link"
+      rm -f "$marker"
       echo "Restored $personal → $link"
     fi
-  else
-    # Empty file — setup.sh created it as a placeholder; clean it up.
-    rm "$personal"
+  elif [[ -f "$marker" ]]; then
+    # Empty placeholder setup.sh created — remove both the file and the marker.
+    rm "$personal" "$marker"
     echo "Removed empty $personal (placeholder created by setup.sh)"
   fi
+  # A user-owned empty CLAUDE.personal.md without a marker is left untouched.
 }
 
 restore_claude_md
@@ -128,9 +122,8 @@ restore_claude_md
 # Commands — each file under claude/commands/ was linked individually.
 unlink_dir_contents "$HOME/.claude/commands" "$REPO_ROOT/claude/commands"
 
-# Plugins — each directory under plugins/ was linked as a unit.
-for i in "${!PLUGIN_LINKS[@]}"; do
-  unlink_if_owned "${PLUGIN_LINKS[$i]}" "${PLUGIN_SRCS[$i]}"
-done
+# Plugins — any symlink in ~/.claude/skills/ pointing into this repo's
+# plugins/ directory, including links to plugins no longer in the checkout.
+unlink_dir_contents "$HOME/.claude/skills" "$REPO_ROOT/plugins"
 
 echo "Done."

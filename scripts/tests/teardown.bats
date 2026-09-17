@@ -55,7 +55,22 @@ install_links() {
   [ ! -e "$HOME/.claude/CLAUDE.personal.md" ]
 }
 
-@test "removes the repo CLAUDE.md symlink and removes an empty CLAUDE.personal.md" {
+@test "removes the repo CLAUDE.md symlink and removes an empty CLAUDE.personal.md (with setup-managed marker)" {
+  mkdir -p "$HOME/.claude"
+  ln -s "$FAKE_REPO/claude/CLAUDE.md" "$HOME/.claude/CLAUDE.md"
+  touch "$HOME/.claude/CLAUDE.personal.md"
+  touch "$HOME/.claude/CLAUDE.personal.md.setup-managed"
+
+  run_teardown
+  assert_success
+
+  [ ! -L "$HOME/.claude/CLAUDE.md" ]
+  [ ! -e "$HOME/.claude/CLAUDE.md" ]
+  [ ! -e "$HOME/.claude/CLAUDE.personal.md" ]
+  [ ! -e "$HOME/.claude/CLAUDE.personal.md.setup-managed" ]
+}
+
+@test "leaves a user-owned empty CLAUDE.personal.md untouched (no setup-managed marker)" {
   mkdir -p "$HOME/.claude"
   ln -s "$FAKE_REPO/claude/CLAUDE.md" "$HOME/.claude/CLAUDE.md"
   touch "$HOME/.claude/CLAUDE.personal.md"
@@ -64,8 +79,7 @@ install_links() {
   assert_success
 
   [ ! -L "$HOME/.claude/CLAUDE.md" ]
-  [ ! -e "$HOME/.claude/CLAUDE.md" ]
-  [ ! -e "$HOME/.claude/CLAUDE.personal.md" ]
+  [ -f "$HOME/.claude/CLAUDE.personal.md" ]
 }
 
 @test "leaves CLAUDE.md alone when it is not a repo symlink" {
@@ -117,6 +131,8 @@ install_links() {
   run_teardown
   assert_success
 
+  # CLAUDE.md was restored from CLAUDE.personal.md on the first run;
+  # a second run has nothing left to do.
   run_teardown
   assert_success
   refute_output_contains "Removed"
