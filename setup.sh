@@ -178,9 +178,8 @@ migrate_personal_claude_md() {
 # Write a thin host-local ~/.claude/CLAUDE.md that @-includes both the
 # user's personal instructions and this repo's global instructions. Using a
 # generated regular file rather than a symlink keeps the repo's working tree
-# clean: any tool that writes to ~/.claude/CLAUDE.md (e.g. eng-standards:git
-# recording a Team Label) modifies only the host-local generated file, never
-# a tracked repo file.
+# clean: any tool that writes to ~/.claude/CLAUDE.md modifies only the
+# host-local generated file, never a tracked repo file.
 #
 # Safe to re-run:
 #   • If the file is a legacy symlink to this repo, replace it.
