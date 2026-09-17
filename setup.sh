@@ -198,13 +198,13 @@ ensure_claude_md_includes() {
   if [[ -L "$claude_md" ]]; then
     # Legacy format: symlink to our repo. Replace with generated file.
     rm "$claude_md"
-    printf '%s\n%s\n%s\n%s\n' "$l1" "$l2" "$l3" "$l4" > "$claude_md"
+    printf '%s\n%s\n%s\n%s\n' "$l1" "$l2" "$l3" "$l4" >"$claude_md"
     echo "Replaced repo symlink with generated $claude_md"
     return 0
   fi
 
   if [[ ! -e "$claude_md" ]]; then
-    printf '%s\n%s\n%s\n%s\n' "$l1" "$l2" "$l3" "$l4" > "$claude_md"
+    printf '%s\n%s\n%s\n%s\n' "$l1" "$l2" "$l3" "$l4" >"$claude_md"
     echo "Created $claude_md"
     return 0
   fi
@@ -220,7 +220,7 @@ ensure_claude_md_includes() {
     tmp="$(mktemp)"
     while IFS= read -r rawline || [[ -n "$rawline" ]]; do
       if [[ "$rawline" == "$l1" ]]; then
-        printf '%s\n%s\n%s\n%s\n' "$l1" "$l2" "$l3" "$l4" >> "$tmp"
+        printf '%s\n%s\n%s\n%s\n' "$l1" "$l2" "$l3" "$l4" >>"$tmp"
         in_section=1
         continue
       fi
@@ -229,15 +229,18 @@ ensure_claude_md_includes() {
         continue
       fi
       [[ "$in_section" == 1 ]] && continue
-      printf '%s\n' "$rawline" >> "$tmp"
-    done < "$claude_md"
+      printf '%s\n' "$rawline" >>"$tmp"
+    done <"$claude_md"
     mv "$tmp" "$claude_md"
     echo "Updated managed section in $claude_md"
   else
     # No section yet: prepend, keeping user content below.
     local tmp
     tmp="$(mktemp)"
-    { printf '%s\n%s\n%s\n%s\n\n' "$l1" "$l2" "$l3" "$l4"; cat "$claude_md"; } > "$tmp"
+    {
+      printf '%s\n%s\n%s\n%s\n\n' "$l1" "$l2" "$l3" "$l4"
+      cat "$claude_md"
+    } >"$tmp"
     mv "$tmp" "$claude_md"
     echo "Prepended managed section to $claude_md"
   fi
