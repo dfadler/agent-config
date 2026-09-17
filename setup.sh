@@ -610,21 +610,26 @@ migrate_personal_claude_md() {
   local personal="$HOME/.claude/CLAUDE.personal.md"
   local current="$HOME/.claude/CLAUDE.md"
 
-  # Already migrated on a prior run — nothing to do.
-  if [[ -e "$personal" ]]; then
-    return 0
+  if [[ ! -e "$personal" ]]; then
+    if [[ -f "$current" && ! -L "$current" ]]; then
+      # A real (non-symlink) file exists — move it to the personal slot.
+      mv "$current" "$personal"
+      echo "Migrated $current → $personal (personal instructions preserved there)"
+    else
+      # Either nothing is there yet, or it's already a symlink this script will
+      # handle via link(). Create an empty personal file so @CLAUDE.personal.md
+      # in the repo's CLAUDE.md always resolves rather than erroring.
+      touch "$personal"
+      echo "Created empty $personal (add machine-specific instructions there)"
+    fi
   fi
 
+  # If CLAUDE.md is still a real file after the above (CLAUDE.personal.md
+  # already existed), remove it so link() can create the repo symlink — the
+  # personal content is already safe in CLAUDE.personal.md.
   if [[ -f "$current" && ! -L "$current" ]]; then
-    # A real (non-symlink) file exists — move it to the personal slot.
-    mv "$current" "$personal"
-    echo "Migrated $current → $personal (personal instructions preserved there)"
-  else
-    # Either nothing is there yet, or it's already a symlink this script will
-    # handle via link(). Create an empty personal file so @CLAUDE.personal.md
-    # in the repo's CLAUDE.md always resolves rather than erroring.
-    touch "$personal"
-    echo "Created empty $personal (add machine-specific instructions there)"
+    rm "$current"
+    echo "Removed $current — personal content is safe in $personal"
   fi
 }
 

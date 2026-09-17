@@ -277,14 +277,15 @@ run_setup_with() {
   [ "$(readlink "$HOME/.claude/CLAUDE.md")" = "$FAKE_REPO/claude/CLAUDE.md" ]
 }
 
-@test "migration is a no-op when CLAUDE.personal.md already exists" {
+@test "when CLAUDE.personal.md exists, removes real CLAUDE.md to make room for symlink" {
   mkdir -p "$HOME/.claude"
   echo "personal content" > "$HOME/.claude/CLAUDE.personal.md"
-  echo "should not move" > "$HOME/.claude/CLAUDE.md"
+  echo "stale real file" > "$HOME/.claude/CLAUDE.md"
   run_setup
   assert_success
   refute_output_contains "Migrated"
   [ "$(cat "$HOME/.claude/CLAUDE.personal.md")" = "personal content" ]
+  [ "$(readlink "$HOME/.claude/CLAUDE.md")" = "$FAKE_REPO/claude/CLAUDE.md" ]
 }
 
 @test "creates empty CLAUDE.personal.md when no CLAUDE.md exists" {
