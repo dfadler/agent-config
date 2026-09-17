@@ -87,14 +87,6 @@ never commit directly to the main working copy).
   worktree; confirm a session-specific marker (working directory, launch
   command, `--user-data-dir`) before killing, and skip an ambiguous match —
   a broad `pkill` on a generic pattern can hit the user's real browser too.
-- **Name the branch `issue-<N>-<slug>` when a GitHub issue drives the work,
-  or a bare `<slug>` otherwise, by passing it as `EnterWorktree`'s `name`
-  argument** — an explicit `name` is used as given; the `worktree-`/
-  `worktree-agent-<hash>` shape is only what the tool generates when `name`
-  is omitted. Not adopting a Conventional-Branch `type/description` prefix
-  (redundant with this repo's Conventional-Commit messages). Guidance, not
-  enforcement, for now. Exclude `dependabot/*`. No retroactive renaming.
-
 Several of the bullets above describe first-class, versioned tool behavior
 (isolation enforcement, automatic locking, the sweep and its documented
 exceptions) rather than conventions this repo invented — see the
@@ -137,23 +129,28 @@ session — both catch their own errors and always exit 0.
   merge. Requires `gh` on `PATH` and authenticated; silently skips (never
   removes anything) if either is missing, or if the GitHub API call itself
   fails — a fetch error is not the same as "nothing merged," so the script
-  fails closed rather than risk removing something with a live PR. Opt out
-  to a read-only nudge (report what *could* be pruned, remove nothing) by
-  setting `WORKTREE_AUTO_PRUNE=0` (or `false`/`no`/`off`) in the
-  environment; anything else, including unset, keeps auto-removal on.
+  fails closed rather than risk removing something with a live PR. Auto-prune
+  mode (highest priority first): the `WORKTREE_AUTO_PRUNE` env var
+  (`0`/`false`/`no`/`off` → nudge-only; `1`/`true`/`yes`/`on` →
+  auto-remove; anything else → from settings); `worktree.autoPrune` in
+  `.claude/settings.json` (`true` → auto-remove; `false` → nudge-only);
+  default `true`.
 
-- **`require-worktree-hook.sh`** is a `PreToolUse` hook that blocks the
-  `Edit` and `Write` tools when the current working directory is the main
-  git checkout rather than a linked worktree. It calls `git rev-parse
-  --git-dir` and compares the result: a path ending in
-  `.git/worktrees/<name>` is a linked worktree (allowed); `.git` or any
-  path ending directly at `.git` is the main checkout (blocked). The hook
-  prints an explanation and exits 1 so the model sees the block as an error
-  and can recover by calling `EnterWorktree` first. Escape hatch: set
-  `WORKTREE_ENFORCE=0` (or `false`/`no`/`off`) to bypass the check — useful
-  during a brief one-liner edit that doesn't warrant a worktree. Skipped
-  entirely in cloud/remote sessions (no worktrees exist there) and in
-  non-git directories.
+- **`require-worktree-hook.sh`** is a `PreToolUse` hook that enforces an
+  edit policy when the current working directory is the main git checkout
+  rather than a linked worktree. It checks `git rev-parse --git-dir`: a
+  path ending in `.git/worktrees/<name>` is a linked worktree (always
+  allowed); `.git` or any absolute path ending at `.git` is the main
+  checkout, where the configured enforce mode applies. Enforce mode
+  (highest priority first): the `WORKTREE_ENFORCE` env var
+  (`0`/`false`/`no`/`off` → off; `warn` → warn; anything else → from
+  settings); `worktree.enforce` in `.claude/settings.json` (`"block"` /
+  `"warn"` / `"off"`); default `"block"`. In `"block"` mode the hook exits
+  1 with an explanation so the model can recover by calling `EnterWorktree`
+  first. In `"warn"` mode it prints a notice and allows the edit through —
+  useful for repos where occasional main-checkout edits are acceptable but
+  a reminder is still wanted. Skipped entirely in cloud/remote sessions and
+  in non-git directories.
 
 Both underlying scripts (`verify-worktree-symlinks.sh`,
 `prune-merged-worktrees.sh`) are also usable standalone — real exit codes,
