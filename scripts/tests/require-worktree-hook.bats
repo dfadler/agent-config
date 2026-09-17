@@ -1,13 +1,13 @@
 #!/usr/bin/env bats
 #
 # Tests for plugins/dfadler-agent-config/skills/git-worktree-usage/scripts/
-# require-worktree-hook.sh — the PreToolUse hook that blocks Edit/Write in
-# the main git checkout and allows them in a linked worktree.
+# require-worktree-hook.sh — the PreToolUse hook that blocks/warns/allows
+# Edit/Write in the main git checkout based on configured enforce mode.
 #
-# Hermetic: the REAL hook script is copied into a throwaway directory
-# alongside a fake `git` shim that returns controllable git-dir output.
-# The shim is placed at the front of PATH so the hook sees it instead of
-# the real git — nothing touches a real git repo, worktree, or filesystem.
+# Hermetic: the REAL hook script is copied into a throwaway directory alongside
+# a fake `git` shim that returns controllable output for both --git-dir and
+# --show-toplevel. The shim is placed at the front of PATH; nothing touches a
+# real git repo, worktree, or filesystem.
 
 REAL_HOOK="$BATS_TEST_DIRNAME/../../plugins/dfadler-agent-config/skills/git-worktree-usage/scripts/require-worktree-hook.sh"
 
@@ -17,40 +17,55 @@ setup() {
   SCRIPT_UNDER_TEST="$TMP/require-worktree-hook.sh"
 
   GIT_SHIM="$TMP/shim-bin"
-  mkdir -p "$GIT_SHIM"
-  export GIT_SHIM
+  FAKE_TOPLEVEL="$TMP/toplevel"
+  mkdir -p "$GIT_SHIM" "$FAKE_TOPLEVEL/.claude"
+  export GIT_SHIM FAKE_TOPLEVEL
 
-  # Default: real git command is unavailable (not-a-git-repo case).
-  _install_fake_git ""
+  # Default: not inside a git repo.
+  _install_fake_git "" "$FAKE_TOPLEVEL"
 }
 
 teardown() {
   [ -n "${TMP:-}" ] && rm -rf "$TMP"
 }
 
-# Install a fake git that returns FAKE_GIT_DIR for `git rev-parse --git-dir`.
-# Pass an empty string to simulate not being inside a git repo (exit 128).
+# Install a fake git that returns FAKE_GIT_DIR for `git rev-parse --git-dir`
+# and FAKE_GIT_TOPLEVEL for `git rev-parse --show-toplevel`.
+# Pass an empty FAKE_GIT_DIR to simulate not being inside a git repo (exit 128).
 _install_fake_git() {
   local fake_dir="$1"
-  export FAKE_GIT_DIR="$fake_dir"
+  local fake_toplevel="${2:-$FAKE_TOPLEVEL}"
+  export FAKE_GIT_DIR="$fake_dir" FAKE_GIT_TOPLEVEL="$fake_toplevel"
   cat >"$GIT_SHIM/git" <<'EOF'
 #!/usr/bin/env bash
-if [ "${1:-}" = "rev-parse" ] && [ "${2:-}" = "--git-dir" ]; then
-  if [ -z "${FAKE_GIT_DIR:-}" ]; then
-    echo "fatal: not a git repository" >&2
-    exit 128
+if [ "${1:-}" = "rev-parse" ]; then
+  if [ "${2:-}" = "--git-dir" ]; then
+    if [ -z "${FAKE_GIT_DIR:-}" ]; then
+      echo "fatal: not a git repository" >&2
+      exit 128
+    fi
+    printf '%s\n' "$FAKE_GIT_DIR"
+    exit 0
   fi
-  printf '%s\n' "$FAKE_GIT_DIR"
-  exit 0
+  if [ "${2:-}" = "--show-toplevel" ]; then
+    printf '%s\n' "${FAKE_GIT_TOPLEVEL:-}"
+    exit 0
+  fi
 fi
 exec git "$@"
 EOF
   chmod +x "$GIT_SHIM/git"
 }
 
+_write_settings_enforce() {
+  printf '{"worktree":{"enforce":"%s"}}\n' "$1" >"$FAKE_TOPLEVEL/.claude/settings.json"
+}
+
 run_hook() {
   run env -u WORKTREE_ENFORCE -u CLAUDE_CODE_REMOTE \
     PATH="$GIT_SHIM:$PATH" \
+    FAKE_GIT_DIR="${FAKE_GIT_DIR:-}" \
+    FAKE_GIT_TOPLEVEL="$FAKE_TOPLEVEL" \
     "$@" /bin/bash "$SCRIPT_UNDER_TEST"
 }
 
@@ -77,7 +92,7 @@ run_hook() {
 }
 
 # ---------------------------------------------------------------------------
-# Main checkout: hook blocks.
+# Main checkout: default mode blocks.
 # ---------------------------------------------------------------------------
 
 @test "main checkout (.git): exits 1 with helpful message" {
@@ -113,50 +128,116 @@ run_hook() {
 }
 
 # ---------------------------------------------------------------------------
-# Escape hatch: WORKTREE_ENFORCE=0 (and variants) bypasses the check.
+# WORKTREE_ENFORCE env var: session-level override (highest priority).
 # ---------------------------------------------------------------------------
 
 @test "WORKTREE_ENFORCE=0: exits 0 even in main checkout" {
   _install_fake_git ".git"
   run env -u CLAUDE_CODE_REMOTE \
-    PATH="$GIT_SHIM:$PATH" \
-    WORKTREE_ENFORCE=0 \
-    /bin/bash "$SCRIPT_UNDER_TEST"
+    PATH="$GIT_SHIM:$PATH" FAKE_GIT_TOPLEVEL="$FAKE_TOPLEVEL" \
+    WORKTREE_ENFORCE=0 /bin/bash "$SCRIPT_UNDER_TEST"
   [ "$status" -eq 0 ]
 }
 
 @test "WORKTREE_ENFORCE=false: exits 0 even in main checkout" {
   _install_fake_git ".git"
   run env -u CLAUDE_CODE_REMOTE \
-    PATH="$GIT_SHIM:$PATH" \
-    WORKTREE_ENFORCE=false \
-    /bin/bash "$SCRIPT_UNDER_TEST"
+    PATH="$GIT_SHIM:$PATH" FAKE_GIT_TOPLEVEL="$FAKE_TOPLEVEL" \
+    WORKTREE_ENFORCE=false /bin/bash "$SCRIPT_UNDER_TEST"
   [ "$status" -eq 0 ]
 }
 
 @test "WORKTREE_ENFORCE=no: exits 0 even in main checkout" {
   _install_fake_git ".git"
   run env -u CLAUDE_CODE_REMOTE \
-    PATH="$GIT_SHIM:$PATH" \
-    WORKTREE_ENFORCE=no \
-    /bin/bash "$SCRIPT_UNDER_TEST"
+    PATH="$GIT_SHIM:$PATH" FAKE_GIT_TOPLEVEL="$FAKE_TOPLEVEL" \
+    WORKTREE_ENFORCE=no /bin/bash "$SCRIPT_UNDER_TEST"
   [ "$status" -eq 0 ]
 }
 
 @test "WORKTREE_ENFORCE=off: exits 0 even in main checkout" {
   _install_fake_git ".git"
   run env -u CLAUDE_CODE_REMOTE \
-    PATH="$GIT_SHIM:$PATH" \
-    WORKTREE_ENFORCE=off \
-    /bin/bash "$SCRIPT_UNDER_TEST"
+    PATH="$GIT_SHIM:$PATH" FAKE_GIT_TOPLEVEL="$FAKE_TOPLEVEL" \
+    WORKTREE_ENFORCE=off /bin/bash "$SCRIPT_UNDER_TEST"
+  [ "$status" -eq 0 ]
+}
+
+@test "WORKTREE_ENFORCE=warn: exits 0 with warning, does not block" {
+  _install_fake_git ".git"
+  run env -u CLAUDE_CODE_REMOTE \
+    PATH="$GIT_SHIM:$PATH" FAKE_GIT_TOPLEVEL="$FAKE_TOPLEVEL" \
+    WORKTREE_ENFORCE=warn /bin/bash "$SCRIPT_UNDER_TEST"
+  [ "$status" -eq 0 ]
+  [[ "$output" == *"Warning"* ]] || [[ "$output" == *"warning"* ]]
+}
+
+@test "WORKTREE_ENFORCE=warn overrides settings enforce=block" {
+  _install_fake_git ".git"
+  _write_settings_enforce "block"
+  run env -u CLAUDE_CODE_REMOTE \
+    PATH="$GIT_SHIM:$PATH" FAKE_GIT_TOPLEVEL="$FAKE_TOPLEVEL" \
+    WORKTREE_ENFORCE=warn /bin/bash "$SCRIPT_UNDER_TEST"
   [ "$status" -eq 0 ]
 }
 
 @test "WORKTREE_ENFORCE=1 (anything else): still blocks in main checkout" {
   _install_fake_git ".git"
   run env -u CLAUDE_CODE_REMOTE \
-    PATH="$GIT_SHIM:$PATH" \
-    WORKTREE_ENFORCE=1 \
-    /bin/bash "$SCRIPT_UNDER_TEST"
+    PATH="$GIT_SHIM:$PATH" FAKE_GIT_TOPLEVEL="$FAKE_TOPLEVEL" \
+    WORKTREE_ENFORCE=1 /bin/bash "$SCRIPT_UNDER_TEST"
+  [ "$status" -eq 1 ]
+}
+
+# ---------------------------------------------------------------------------
+# worktree.enforce in settings.json: project-level config.
+# ---------------------------------------------------------------------------
+
+@test "settings enforce=block: exits 1 (same as default)" {
+  _install_fake_git ".git"
+  _write_settings_enforce "block"
+  run_hook
+  [ "$status" -eq 1 ]
+  [[ "$output" == *"main git checkout"* ]]
+}
+
+@test "settings enforce=warn: exits 0 with warning" {
+  _install_fake_git ".git"
+  _write_settings_enforce "warn"
+  run_hook
+  [ "$status" -eq 0 ]
+  [[ "$output" == *"Warning"* ]] || [[ "$output" == *"warning"* ]]
+}
+
+@test "settings enforce=off: exits 0, no output" {
+  _install_fake_git ".git"
+  _write_settings_enforce "off"
+  run_hook
+  [ "$status" -eq 0 ]
+  [ -z "$output" ]
+}
+
+@test "settings unknown enforce value: falls back to block" {
+  _install_fake_git ".git"
+  _write_settings_enforce "maybe"
+  run_hook
+  [ "$status" -eq 1 ]
+}
+
+@test "no settings.json: defaults to block" {
+  _install_fake_git ".git"
+  # No settings.json written — FAKE_TOPLEVEL/.claude/ exists but is empty.
+  run_hook
+  [ "$status" -eq 1 ]
+}
+
+@test "jq fails: falls back to block even if settings says warn" {
+  _install_fake_git ".git"
+  _write_settings_enforce "warn"
+  # Put a broken jq in GIT_SHIM (first on PATH) that always exits 1.
+  # Simulates jq failing to parse; the hook should fall back to "block".
+  printf '#!/usr/bin/env bash\nexit 1\n' >"$GIT_SHIM/jq"
+  chmod +x "$GIT_SHIM/jq"
+  run_hook
   [ "$status" -eq 1 ]
 }
