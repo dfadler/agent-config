@@ -1,17 +1,19 @@
 ---
-name: fetch-execute-permission
+name: fetch-execute-guide
 description: |
-  Defines when Claude must stop and ask before running a command that
-  fetches code from a registry or URL and executes it in the same step —
-  `npx <pkg>@latest ...`, `pnpm dlx`/`bunx`/`uvx` one-off runs, `curl <url> |
-  sh`, `go run <url>`, or any similar ad hoc install-and-run for a tool that
-  isn't already a declared dependency of the current project. Use this
-  before running such a command on the user's behalf, including when a
-  setup script or another skill's own docs name one as an optional
-  companion install (e.g. the `skills` CLI referenced by this repo's
-  README). Does not cover an ordinary `npm install`/`pip install`/`cargo
-  add` against a project's own manifest and lockfile — that's a normal,
-  already-reviewed dependency change, not an ad hoc fetch-and-execute.
+  Behavioral reminder and scope definition for commands that fetch code from
+  a registry or URL and execute it in the same step — `npx <pkg>@latest`,
+  `pnpm dlx`/`bunx`/`uvx` one-off runs, `curl <url> | sh`, `go run <url>`,
+  or any similar ad hoc install-and-run for a tool that isn't already a
+  declared dependency of the current project. Defines what counts as a
+  fetch-and-execute install, what does not, and the three conditions that
+  must hold before running one. Load before running any such command on the
+  user's behalf, including when a setup script or another skill names one as
+  an optional companion install. Does not cover an ordinary `npm install`/
+  `pip install`/`cargo add` against a project's own manifest and lockfile —
+  that's a normal, already-reviewed dependency change. This skill is a
+  reminder of what to ask — not an enforcement gate; the policy is to ask
+  every time.
 license: MIT
 metadata:
   version: "1.0.0"
@@ -27,7 +29,7 @@ lockfile, no pinned version, and no prior review — a materially different
 risk than installing a dependency a project has already declared and
 audited. It's easy for a broad ask like "install the optional companion" or
 "set up the recommended extra" to quietly authorize this too, the same way
-`gh-publish-permission` describes a broad ask quietly expanding into a
+`gh-publish-guide` describes a broad ask quietly expanding into a
 publish action. The user should always know, in advance, exactly what
 command is about to fetch and run third-party code on their machine.
 
@@ -58,7 +60,7 @@ command is about to fetch and run third-party code on their machine.
 
 ## What counts as valid permission
 
-Same bar as `gh-publish-permission`'s: explicit, request-scoped, and
+Same bar as `gh-publish-guide`'s: explicit, request-scoped, and
 specific about the exact command.
 
 - **Explicit** — the user said yes to *this* command, not a generic "sounds
@@ -70,7 +72,7 @@ specific about the exact command.
   can't meaningfully consent to a command they haven't seen.
 
 There is no standing-exception file for this skill (contrast
-`gh-publish-permission`'s `~/.claude/gh-publish-exceptions.json`) — the
+`gh-publish-guide`'s `~/.claude/gh-publish-exceptions.json`) — the
 policy is to ask every time, not once-per-package, and Claude never creates
 or proposes a standing exception on its own initiative.
 

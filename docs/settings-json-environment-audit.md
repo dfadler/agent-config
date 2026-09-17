@@ -56,8 +56,8 @@ makes — see "Gaps and what changed in this PR" below):
 
 That's the entire environment-layer footprint: one `ask` list, no `allow`,
 no `deny`, plus the `disableBypassPermissionsMode` toggle this PR adds (see
-below). The `ask` list gates exactly the GitHub publish surface `gh-publish-permission`
-(`plugins/dfadler-agent-config/skills/gh-publish-permission/SKILL.md`)
+below). The `ask` list gates exactly the GitHub publish surface `gh-publish-guide`
+(`plugins/dfadler-agent-config/skills/gh-publish-guide/SKILL.md`)
 documents — issue/PR creation, comments, reviews, edits, and every `gh api`
 call — behind a confirmation prompt that, per Claude Code's own permission
 ordering (deny, then ask, then allow; first match wins), no blanket `gh *`
@@ -176,7 +176,7 @@ accumulated locally, not by an OS-enforced boundary.
    Code mode where the "regardless of model intent" property this whole
    audit is about actually stops holding: `bypassPermissions` skips
    permission prompts entirely, including the `ask` gate that backs
-   `gh-publish-permission`. Nothing in this repo's docs or skills documents
+   `gh-publish-guide`. Nothing in this repo's docs or skills documents
    a reliance on running Claude Code with `--dangerously-skip-permissions` or
    `bypassPermissions` mode against this repo (checked via grep across
    `docs/`, `claude/`, and `plugins/`), so disabling it costs nothing here.
@@ -246,7 +246,7 @@ accumulated locally, not by an OS-enforced boundary.
 - `docs/prompt-injection-defense.md` — the layered defense model this doc
   fills in layer 3 for; see its "environmental layer" bullet, which already
   points here.
-- `plugins/dfadler-agent-config/skills/gh-publish-permission/SKILL.md` — the
+- `plugins/dfadler-agent-config/skills/gh-publish-guide/SKILL.md` — the
   human-layer standard `.claude/settings.json`'s `ask` rules enforce.
 - `.claude/settings.json` — the file this audit covers; see the diff in this
   PR for the one change (`permissions.disableBypassPermissionsMode`).

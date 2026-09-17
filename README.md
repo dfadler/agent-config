@@ -137,7 +137,7 @@ rule to `~/.claude/settings.json` that pre-approves exactly that pinned command,
 agent session doesn't have to stop and ask. It's an exact-string match tied to one specific
 version and checksum — not a blanket `curl *` allow — and it only *allowlists* the command;
 it doesn't run the installer itself. This is the reference example the
-`dfadler-agent-config:fetch-execute-permission` skill points to for when a standing,
+`dfadler-agent-config:fetch-execute-guide` skill points to for when a standing,
 already-approved rule like this one is allowed to skip the ask-every-time default: the user
 approved this exact pinned command once, visibly, through this y/n prompt — a broad or
 wildcard rule never gets the same treatment. The prompt is skipped cleanly (no hang) when there's no
@@ -197,7 +197,7 @@ third-party package over the network on every `setup.sh` run. The same reasoning
 applies to an agent running the `skills add`/`npx skills@latest` command above on the
 user's behalf: it's a fetch-and-execute install, not an ordinary dependency change, so
 it needs explicit, per-run permission — see the
-`dfadler-agent-config:fetch-execute-permission` skill.
+`dfadler-agent-config:fetch-execute-guide` skill.
 
 An earlier version of this section vendored these two skills into their own plugin
 here instead of referencing them — reverted (#211's review) once it turned out `skills
@@ -352,7 +352,7 @@ Prefer the Homebrew tap or a pre-built binary from
 [GitHub Releases](https://github.com/rtk-ai/rtk/releases) over RTK's own
 `curl | sh` one-liner — piping a remote script into a shell is a fetch-and-execute
 install and needs the explicit, per-run permission the
-`dfadler-agent-config:fetch-execute-permission` skill describes, the same as any other
+`dfadler-agent-config:fetch-execute-guide` skill describes, the same as any other
 `curl | sh`/`npx <pkg>@latest` command. That gate applies whether a human runs it
 themselves or asks an agent to.
 
