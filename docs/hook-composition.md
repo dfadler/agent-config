@@ -80,7 +80,7 @@ If your plugin ships hooks for `PreToolUse` (Edit/Write) or `SessionStart`,
 follow the same pattern:
 
 1. **Check an inhibit signal early.** Pick a distinctive env var name for
-   your plugin (e.g. `ENG_STANDARDS_GIT_HOOK=off`) and exit 0 immediately
+   your plugin (e.g. `MY_PLUGIN_HOOK=off`) and exit 0 immediately
    when it is set. Optionally also read a project-level key from
    `.claude/settings.json`.
 
