@@ -160,8 +160,10 @@ migrate_personal_claude_md() {
     else
       # Either nothing is there yet, or it's already a symlink this script will
       # handle via link(). Create an empty personal file so @CLAUDE.personal.md
-      # in the repo's CLAUDE.md always resolves rather than erroring.
-      touch "$personal"
+      # in the repo's CLAUDE.md always resolves rather than erroring. The
+      # sidecar marks it as setup-owned so teardown.sh can safely remove it
+      # without risking a user-owned empty file with the same name.
+      touch "$personal" "${personal}.setup-managed"
       echo "Created empty $personal (add machine-specific instructions there)"
     fi
   fi
