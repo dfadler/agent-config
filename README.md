@@ -374,6 +374,24 @@ posture as `check_react_skills`: it never runs the installer or `rtk init --glob
 itself, since both are exactly the kind of side effect that needs asking first rather
 than happening automatically on every `setup.sh` run.
 
+## Removing from a machine
+
+```bash
+~/Development/agent-config/teardown.sh
+```
+
+`teardown.sh` is the inverse of `setup.sh`: it removes every symlink this repo
+created in `~/.claude` and restores `~/.claude/CLAUDE.md` from
+`~/.claude/CLAUDE.personal.md`. If `CLAUDE.personal.md` is non-empty (your original
+`CLAUDE.md` before setup.sh migrated it), it is moved back to `CLAUDE.md`. If it's
+empty (the placeholder setup.sh created when there was nothing to migrate), it is
+removed and `CLAUDE.md` is left absent.
+
+Only symlinks that point into this repo are removed. Foreign symlinks — including any
+other skills-dir plugins under `~/.claude/skills/` — are left untouched.
+
+It's safe to re-run: a second pass is silent.
+
 ## Adding something new
 
 1. Put it in the right place:
