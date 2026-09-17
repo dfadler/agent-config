@@ -12,14 +12,11 @@
 
 load helpers
 
-# A fake python3, in its own directory rather than helpers.bash's shim-bin, so
-# a test can drop back to the REAL interpreter (see the probe contract test at
-# the bottom) without also losing the network blockers.
-#
-# It answers setup.sh's probe from env vars and records what `-m pip install`
-# was asked to do. `pip install` also creates the marker file the probe reads,
-# so "pip ran" and "pyte is importable" are separate facts the way they are on
-# a real machine — which is what lets a test pin the difference.
+# A fake python3, in its own directory rather than helpers.bash's shim-bin.
+# setup.sh delegates to scripts/check-companions.sh, which runs the pyte
+# probe; these shims suppress advisory output in the linking tests so
+# unrelated assertions aren't buried in noise. The pyte-specific test cases
+# live in check-companions.bats; the shim structure is copied there too.
 #
 # Usage: shim_python3 <yes|no>   (is pyte importable to begin with)
 shim_python3() {
@@ -86,10 +83,6 @@ EOF
     *":$PY_SHIM_BIN:"*) ;;
     *) export PATH="$PY_SHIM_BIN:$PATH" ;;
   esac
-}
-
-unshim_python3() {
-  rm -f "$PY_SHIM_BIN/python3"
 }
 
 # A fake `claude` CLI, so check_mattpocock_skills never depends on (or is
@@ -220,6 +213,9 @@ setup() {
   chmod +x "$FAKE_REPO/scripts/offer-safe-chain-permission.sh"
   cp "$REPO_ROOT/scripts/git-identity.sh" "$FAKE_REPO/scripts/git-identity.sh"
   chmod +x "$FAKE_REPO/scripts/git-identity.sh"
+  cp "$REPO_ROOT/scripts/check-companions.sh" \
+    "$FAKE_REPO/scripts/check-companions.sh"
+  chmod +x "$FAKE_REPO/scripts/check-companions.sh"
   # Default: an interpreter that already has pyte, so the link tests below
   # don't depend on whatever is installed on the machine running them.
   shim_python3 yes
@@ -380,226 +376,6 @@ run_setup_with() {
   [ "$(readlink "$HOME/.claude/skills/unrelated")" = "$SANDBOX/elsewhere" ]
 }
 
-# --- git identity check -----------------------------------------------------
-#
-# scripts/git-identity.sh is the actual check (see its own bats suite); these
-# tests just pin that setup.sh calls it and treats the result as a warning,
-# not a failure. HOME is sandboxed by make_sandbox, so there's no global
-# gitconfig here unless a test sets one.
-
-@test "warns when git identity is not configured" {
-  run_setup
-  assert_success
-  assert_output_contains "git identity (user.name/user.email) is not fully configured"
-  assert_output_contains "git config --global user.name"
-  [ "$(readlink "$HOME/.claude/CLAUDE.md")" = "$FAKE_REPO/claude/CLAUDE.md" ]
-}
-
-@test "confirms git identity when configured" {
-  git config --global user.name "Dev Name"
-  git config --global user.email "dev@example.com"
-  run_setup
-  assert_success
-  assert_output_contains "git identity is configured"
-  refute_output_contains "not fully configured"
-}
-
-# The check must reflect REPO_ROOT's git config, not whatever directory
-# setup.sh happens to be invoked from — otherwise running it via an absolute
-# path from elsewhere silently checks the wrong repo (or none at all).
-@test "git identity check reflects REPO_ROOT, not the caller's cwd" {
-  git -C "$FAKE_REPO" init -q
-  git -C "$FAKE_REPO" config user.name "Repo Name"
-  git -C "$FAKE_REPO" config user.email "repo@example.com"
-
-  mkdir -p "$SANDBOX/elsewhere"
-  git -C "$SANDBOX/elsewhere" init -q
-  # No identity here, and no global config either (HOME is sandboxed) — if
-  # the check ran relative to this directory it would report unconfigured.
-
-  run bash -c 'cd "$1" && bash "$2/setup.sh"' -- "$SANDBOX/elsewhere" "$FAKE_REPO"
-  assert_success
-  assert_output_contains "git identity is configured"
-  refute_output_contains "not fully configured"
-}
-
-# --- runtime dependency check (#88) ----------------------------------------
-#
-# detached-terminal's agent_term.py runs under whatever python3 is first on
-# PATH, so setup.sh checks THAT interpreter. The fake python3 above stands in
-# for it; the last test in this file checks the probe against the real one.
-
-@test "reports a missing pyte against the interpreter that would run the skill" {
-  shim_python3 no
-  run_setup
-  # Linking is the script's job and it succeeded; a missing dependency is a
-  # warning, so `./setup.sh && ...` doesn't break over it.
-  assert_success
-  assert_output_contains "pyte is NOT installed for /fake/bin/python3"
-  assert_output_contains "python3 -m pip install --user pyte"
-  assert_output_contains "./setup.sh --install-deps"
-  [ "$(readlink "$HOME/.claude/CLAUDE.md")" = "$FAKE_REPO/claude/CLAUDE.md" ]
-}
-
-@test "verifying never installs anything on its own" {
-  shim_python3 no
-  run_setup
-  assert_success
-  [ ! -e "$FAKE_PIP_LOG" ]
-}
-
-@test "confirms a pyte that is already importable" {
-  shim_python3 yes
-  run_setup
-  assert_success
-  assert_output_contains "pyte is importable by /fake/bin/python3"
-  refute_output_contains "NOT installed"
-  [ ! -e "$FAKE_PIP_LOG" ]
-}
-
-@test "--install-deps installs into the user site" {
-  shim_python3 no
-  run_setup_with --install-deps
-  assert_success
-  assert_output_contains "pyte installed and importable"
-  [ "$(cat "$FAKE_PIP_LOG")" = "pip install --user pyte" ]
-}
-
-# --user is an error inside a virtualenv, so the flag has to come off there.
-@test "--install-deps drops --user inside a virtualenv" {
-  shim_python3 no
-  export FAKE_PY_VENV=yes
-  run_setup_with --install-deps
-  assert_success
-  [ "$(cat "$FAKE_PIP_LOG")" = "pip install pyte" ]
-}
-
-# PEP 668: pip would refuse with a wall of text. Say the useful thing instead.
-@test "--install-deps explains rather than running a doomed pip when externally managed" {
-  shim_python3 no
-  export FAKE_PY_MANAGED=yes
-  run_setup_with --install-deps
-  assert_failure
-  assert_output_contains "externally managed"
-  assert_output_contains "break-system-packages"
-  [ ! -e "$FAKE_PIP_LOG" ]
-}
-
-@test "--install-deps fails loudly when pip fails" {
-  shim_python3 no
-  export FAKE_PIP_EXIT=1
-  run_setup_with --install-deps
-  assert_failure
-  assert_output_contains "pip install failed"
-  assert_output_contains "python3 -m pip install --user pyte"
-}
-
-# pip can exit 0 having installed somewhere this interpreter doesn't search.
-# The import is the fact that matters, so it is re-checked afterwards.
-@test "--install-deps trusts the import, not pip's exit status" {
-  shim_python3 no
-  export FAKE_PIP_INSTALLS=no
-  run_setup_with --install-deps
-  assert_failure
-  assert_output_contains "pip reported success"
-  [ "$(cat "$FAKE_PIP_LOG")" = "pip install --user pyte" ]
-}
-
-@test "an unusable python3 is reported without failing the linking" {
-  shim_python3 no
-  export FAKE_PY_BROKEN=yes
-  run_setup
-  assert_success
-  assert_output_contains "Could not run python3"
-  [ "$(readlink "$HOME/.claude/CLAUDE.md")" = "$FAKE_REPO/claude/CLAUDE.md" ]
-}
-
-# --- companion plugin check (#134) ------------------------------------------
-#
-# Purely advisory — nothing here depends on mattpocock-skills, unlike pyte,
-# so every case below asserts linking still succeeds and there's no
-# --install-deps equivalent to test.
-
-@test "confirms mattpocock-skills when installed and enabled" {
-  shim_claude enabled
-  run_setup
-  assert_success
-  assert_output_contains "✓ mattpocock-skills is installed"
-}
-
-@test "warns when mattpocock-skills is installed but disabled" {
-  shim_claude disabled
-  run_setup
-  assert_success
-  assert_output_contains "installed but disabled"
-  assert_output_contains "claude plugin enable mattpocock-skills"
-}
-
-# Regression (review on #134): the original implementation grepped a fixed
-# line window after the id line for "enabled": true, which could pick up a
-# NEIGHBORING plugin's field instead of the matched one's.
-@test "a disabled target isn't misread as enabled via a neighboring plugin" {
-  shim_claude disabled-with-enabled-neighbor
-  run_setup
-  assert_success
-  assert_output_contains "installed but disabled"
-  refute_output_contains "✓ mattpocock-skills is installed"
-}
-
-# Regression (review on #134): field order within the JSON object shouldn't
-# matter to a real parser, unlike a positional/window-based read.
-@test "field order within the plugin object doesn't confuse detection" {
-  shim_claude enabled-field-before-id
-  run_setup
-  assert_success
-  assert_output_contains "✓ mattpocock-skills is installed"
-}
-
-@test "notes when mattpocock-skills is not installed" {
-  shim_claude other-plugin-only
-  run_setup
-  assert_success
-  assert_output_contains "mattpocock-skills is not installed"
-  assert_output_contains "claude plugin install mattpocock-skills"
-}
-
-@test "stays silent about mattpocock-skills when the claude CLI errors" {
-  shim_claude broken
-  run_setup
-  assert_success
-  refute_output_contains "mattpocock-skills"
-  [ "$(readlink "$HOME/.claude/CLAUDE.md")" = "$FAKE_REPO/claude/CLAUDE.md" ]
-}
-
-# --- Aikido Safe Chain permission offer (advisory) --------------------------
-#
-# offer-safe-chain-permission.sh has its own bats suite; these tests just pin
-# that setup.sh calls it as the final step and, unlike the checks above,
-# treats its failure as advisory via `|| true` rather than letting it end the
-# run — that script can genuinely return nonzero (missing jq, a corrupt
-# settings.json), unlike check_git_identity/check_python_deps/
-# check_mattpocock_skills, which always report 0 themselves.
-
-@test "runs the Aikido Safe Chain offer as the final step" {
-  run_setup
-  assert_success
-  assert_output_contains "Skipping Aikido Safe Chain permission prompt"
-  [ "$(readlink "$HOME/.claude/CLAUDE.md")" = "$FAKE_REPO/claude/CLAUDE.md" ]
-}
-
-@test "a failing Aikido Safe Chain offer does not fail setup.sh" {
-  cat > "$FAKE_REPO/scripts/offer-safe-chain-permission.sh" <<'EOF'
-#!/usr/bin/env bash
-echo "stub offer script: simulated failure" >&2
-exit 1
-EOF
-  chmod +x "$FAKE_REPO/scripts/offer-safe-chain-permission.sh"
-  run_setup
-  assert_success
-  assert_output_contains "stub offer script: simulated failure"
-  [ "$(readlink "$HOME/.claude/CLAUDE.md")" = "$FAKE_REPO/claude/CLAUDE.md" ]
-}
-
 @test "--help prints usage and links nothing" {
   run_setup_with --help
   assert_success
@@ -612,24 +388,4 @@ EOF
   [ "$status" -eq 2 ]
   assert_output_contains "Unknown argument: --nope"
   [ ! -e "$HOME/.claude" ]
-}
-
-# The fake python3 answers the probe by fiat, so none of the tests above can
-# catch a probe SCRIPT that doesn't work (wrong field names, an exception, a
-# Python version that lacks something it uses). This one runs the real
-# interpreter and pins the probe's answer to independently observed truth.
-# Still hermetic: reading the local interpreter touches no network.
-@test "the probe reports the real python3 correctly" {
-  unshim_python3
-  command -v python3 > /dev/null 2>&1 || skip "no python3 on PATH"
-  local exe expected
-  exe="$(python3 -c 'import sys; print(sys.executable)')"
-  if python3 -c 'import pyte' 2>/dev/null; then
-    expected="pyte is importable by $exe"
-  else
-    expected="pyte is NOT installed for $exe"
-  fi
-  run_setup
-  assert_success
-  assert_output_contains "$expected"
 }
