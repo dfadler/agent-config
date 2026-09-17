@@ -24,7 +24,7 @@ fi
 env_mode=""
 case "${WORKTREE_ENFORCE:-}" in
   0 | false | no | off) env_mode="off" ;;
-  warn)                  env_mode="warn" ;;
+  warn) env_mode="warn" ;;
 esac
 
 # Must be inside a git repo to apply.

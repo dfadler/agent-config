@@ -22,7 +22,7 @@ fi
 env_mode=""
 case "${WORKTREE_AUTO_PRUNE:-}" in
   0 | false | no | off) env_mode="--hook" ;;
-  1 | true  | yes | on) env_mode="--auto" ;;
+  1 | true | yes | on) env_mode="--auto" ;;
 esac
 
 # Resolve final mode.
