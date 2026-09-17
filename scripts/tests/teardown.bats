@@ -29,9 +29,24 @@ run_teardown() {
   run bash "$FAKE_REPO/teardown.sh"
 }
 
-# Lay out the three symlinks setup.sh would have created so each test starts
-# in a realistic post-setup state without depending on setup.sh itself.
+# Lay out the state current setup.sh produces: a generated CLAUDE.md with the
+# managed section, plus command and plugin symlinks.
 install_links() {
+  mkdir -p "$HOME/.claude/commands" "$HOME/.claude/skills"
+  # Generated CLAUDE.md (current format).
+  printf '%s\n%s\n%s\n%s\n' \
+    "# >>> agent-config managed begin <<<" \
+    "@CLAUDE.personal.md" \
+    "@$FAKE_REPO/claude/CLAUDE.md" \
+    "# >>> agent-config managed end <<<" \
+    > "$HOME/.claude/CLAUDE.md"
+  ln -s "$FAKE_REPO/claude/commands/demo.md" "$HOME/.claude/commands/demo.md"
+  ln -s "$FAKE_REPO/plugins/dfadler-agent-config" \
+    "$HOME/.claude/skills/dfadler-agent-config"
+}
+
+# Legacy state: a symlink to the repo (pre-managed-section format).
+install_legacy_links() {
   mkdir -p "$HOME/.claude/commands" "$HOME/.claude/skills"
   ln -s "$FAKE_REPO/claude/CLAUDE.md" "$HOME/.claude/CLAUDE.md"
   ln -s "$FAKE_REPO/claude/commands/demo.md" "$HOME/.claude/commands/demo.md"
@@ -39,7 +54,91 @@ install_links() {
     "$HOME/.claude/skills/dfadler-agent-config"
 }
 
-@test "removes the repo CLAUDE.md symlink and restores non-empty CLAUDE.personal.md" {
+@test "removes managed section from generated CLAUDE.md and restores non-empty CLAUDE.personal.md" {
+  mkdir -p "$HOME/.claude"
+  printf '%s\n%s\n%s\n%s\n' \
+    "# >>> agent-config managed begin <<<" \
+    "@CLAUDE.personal.md" \
+    "@$FAKE_REPO/claude/CLAUDE.md" \
+    "# >>> agent-config managed end <<<" \
+    > "$HOME/.claude/CLAUDE.md"
+  echo "personal content" > "$HOME/.claude/CLAUDE.personal.md"
+
+  run_teardown
+  assert_success
+  assert_output_contains "Removed empty"
+  # Managed section gone; CLAUDE.personal.md content restored.
+  [ ! -e "$HOME/.claude/CLAUDE.md" ] || ! grep -qF "agent-config managed" "$HOME/.claude/CLAUDE.md"
+  [ -f "$HOME/.claude/CLAUDE.md" ]
+  [ "$(cat "$HOME/.claude/CLAUDE.md")" = "personal content" ]
+  [ ! -e "$HOME/.claude/CLAUDE.personal.md" ]
+}
+
+@test "removes managed section but preserves user additions below it" {
+  mkdir -p "$HOME/.claude"
+  printf '%s\n%s\n%s\n%s\n\nUser-added: some custom instruction\n' \
+    "# >>> agent-config managed begin <<<" \
+    "@CLAUDE.personal.md" \
+    "@$FAKE_REPO/claude/CLAUDE.md" \
+    "# >>> agent-config managed end <<<" \
+    > "$HOME/.claude/CLAUDE.md"
+
+  run_teardown
+  assert_success
+  assert_output_contains "Removed managed section"
+  grep -q "User-added: some custom instruction" "$HOME/.claude/CLAUDE.md"
+  ! grep -qF "agent-config managed begin" "$HOME/.claude/CLAUDE.md"
+}
+
+@test "removes generated CLAUDE.md and removes empty CLAUDE.personal.md (with setup-managed marker)" {
+  mkdir -p "$HOME/.claude"
+  printf '%s\n%s\n%s\n%s\n' \
+    "# >>> agent-config managed begin <<<" \
+    "@CLAUDE.personal.md" \
+    "@$FAKE_REPO/claude/CLAUDE.md" \
+    "# >>> agent-config managed end <<<" \
+    > "$HOME/.claude/CLAUDE.md"
+  touch "$HOME/.claude/CLAUDE.personal.md"
+  touch "$HOME/.claude/CLAUDE.personal.md.setup-managed"
+
+  run_teardown
+  assert_success
+
+  [ ! -e "$HOME/.claude/CLAUDE.md" ]
+  [ ! -e "$HOME/.claude/CLAUDE.personal.md" ]
+  [ ! -e "$HOME/.claude/CLAUDE.personal.md.setup-managed" ]
+}
+
+@test "leaves a user-owned empty CLAUDE.personal.md untouched (no setup-managed marker)" {
+  mkdir -p "$HOME/.claude"
+  printf '%s\n%s\n%s\n%s\n' \
+    "# >>> agent-config managed begin <<<" \
+    "@CLAUDE.personal.md" \
+    "@$FAKE_REPO/claude/CLAUDE.md" \
+    "# >>> agent-config managed end <<<" \
+    > "$HOME/.claude/CLAUDE.md"
+  touch "$HOME/.claude/CLAUDE.personal.md"
+
+  run_teardown
+  assert_success
+
+  [ -f "$HOME/.claude/CLAUDE.personal.md" ]
+}
+
+@test "leaves CLAUDE.md alone when it has no managed section" {
+  mkdir -p "$HOME/.claude"
+  echo "standalone config" > "$HOME/.claude/CLAUDE.md"
+
+  run_teardown
+  assert_success
+
+  [ ! -L "$HOME/.claude/CLAUDE.md" ]
+  [ "$(cat "$HOME/.claude/CLAUDE.md")" = "standalone config" ]
+}
+
+# Legacy backward-compat: teardown.sh must still handle installations made
+# before the managed-section format was introduced (symlink format).
+@test "legacy: removes the repo CLAUDE.md symlink and restores non-empty CLAUDE.personal.md" {
   mkdir -p "$HOME/.claude"
   ln -s "$FAKE_REPO/claude/CLAUDE.md" "$HOME/.claude/CLAUDE.md"
   echo "personal content" > "$HOME/.claude/CLAUDE.personal.md"
@@ -47,15 +146,13 @@ install_links() {
   run_teardown
   assert_success
 
-  # Symlink is gone; real file is restored with the personal content.
   [ ! -L "$HOME/.claude/CLAUDE.md" ]
   [ -f "$HOME/.claude/CLAUDE.md" ]
   [ "$(cat "$HOME/.claude/CLAUDE.md")" = "personal content" ]
-  # CLAUDE.personal.md was moved, not copied.
   [ ! -e "$HOME/.claude/CLAUDE.personal.md" ]
 }
 
-@test "removes the repo CLAUDE.md symlink and removes an empty CLAUDE.personal.md (with setup-managed marker)" {
+@test "legacy: removes the repo CLAUDE.md symlink and removes an empty CLAUDE.personal.md (with setup-managed marker)" {
   mkdir -p "$HOME/.claude"
   ln -s "$FAKE_REPO/claude/CLAUDE.md" "$HOME/.claude/CLAUDE.md"
   touch "$HOME/.claude/CLAUDE.personal.md"
@@ -68,29 +165,6 @@ install_links() {
   [ ! -e "$HOME/.claude/CLAUDE.md" ]
   [ ! -e "$HOME/.claude/CLAUDE.personal.md" ]
   [ ! -e "$HOME/.claude/CLAUDE.personal.md.setup-managed" ]
-}
-
-@test "leaves a user-owned empty CLAUDE.personal.md untouched (no setup-managed marker)" {
-  mkdir -p "$HOME/.claude"
-  ln -s "$FAKE_REPO/claude/CLAUDE.md" "$HOME/.claude/CLAUDE.md"
-  touch "$HOME/.claude/CLAUDE.personal.md"
-
-  run_teardown
-  assert_success
-
-  [ ! -L "$HOME/.claude/CLAUDE.md" ]
-  [ -f "$HOME/.claude/CLAUDE.personal.md" ]
-}
-
-@test "leaves CLAUDE.md alone when it is not a repo symlink" {
-  mkdir -p "$HOME/.claude"
-  echo "standalone config" > "$HOME/.claude/CLAUDE.md"
-
-  run_teardown
-  assert_success
-
-  [ ! -L "$HOME/.claude/CLAUDE.md" ]
-  [ "$(cat "$HOME/.claude/CLAUDE.md")" = "standalone config" ]
 }
 
 @test "removes command symlinks pointing into this repo" {
@@ -131,7 +205,8 @@ install_links() {
   run_teardown
   assert_success
 
-  # CLAUDE.md was restored from CLAUDE.personal.md on the first run;
+  # Generated CLAUDE.md was removed (empty after stripping managed section)
+  # and CLAUDE.personal.md content was restored to CLAUDE.md on the first run;
   # a second run has nothing left to do.
   run_teardown
   assert_success

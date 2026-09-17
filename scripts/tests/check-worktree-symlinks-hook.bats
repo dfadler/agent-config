@@ -85,3 +85,49 @@ run_hook() {
   [ "$status" -eq 0 ]
   [[ "$output" == *"could not relink node_modules"* ]]
 }
+
+# --- Inhibit protocol ---
+
+@test "WORKTREE_SYMLINK_CHECK=off: exits 0 immediately without running verify" {
+  _install_fake_verify
+  run env -u CLAUDE_CODE_REMOTE WORKTREE_SYMLINK_CHECK=off /bin/bash "$SCRIPT_UNDER_TEST"
+  [ "$status" -eq 0 ]
+  [ ! -s "$CALL_LOG" ]
+  [ -z "$output" ]
+}
+
+@test "WORKTREE_SYMLINK_CHECK=false: exits 0 immediately without running verify" {
+  _install_fake_verify
+  run env -u CLAUDE_CODE_REMOTE WORKTREE_SYMLINK_CHECK=false /bin/bash "$SCRIPT_UNDER_TEST"
+  [ "$status" -eq 0 ]
+  [ ! -s "$CALL_LOG" ]
+}
+
+@test "WORKTREE_SYMLINK_CHECK=0: exits 0 immediately without running verify" {
+  _install_fake_verify
+  run env -u CLAUDE_CODE_REMOTE WORKTREE_SYMLINK_CHECK=0 /bin/bash "$SCRIPT_UNDER_TEST"
+  [ "$status" -eq 0 ]
+  [ ! -s "$CALL_LOG" ]
+}
+
+@test "worktree.symlinkCheck=off in settings.json: exits 0 without running verify" {
+  _install_fake_verify
+  # Create a fake git repo so the hook can find settings.json.
+  local git_root="$TMP/fake-repo"
+  mkdir -p "$git_root/.git" "$git_root/.claude"
+  printf '{"worktree":{"symlinkCheck":"off"}}\n' > "$git_root/.claude/settings.json"
+  # Stub git to return our fake toplevel.
+  mkdir -p "$TMP/git-shim"
+  cat > "$TMP/git-shim/git" <<GITEOF
+#!/usr/bin/env bash
+if [ "\$1" = "rev-parse" ] && [ "\$2" = "--show-toplevel" ]; then
+  echo "$git_root"
+  exit 0
+fi
+exec "$(command -v git)" "\$@"
+GITEOF
+  chmod +x "$TMP/git-shim/git"
+  run env -u CLAUDE_CODE_REMOTE PATH="$TMP/git-shim:$PATH" /bin/bash "$SCRIPT_UNDER_TEST"
+  [ "$status" -eq 0 ]
+  [ ! -s "$CALL_LOG" ]
+}

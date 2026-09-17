@@ -39,6 +39,10 @@ done
 
 REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 
+# Identical copy of the constants in setup.sh — must stay in sync.
+MANAGED_BEGIN="# >>> agent-config managed begin <<<"
+MANAGED_END="# >>> agent-config managed end <<<"
+
 # Remove a symlink only if it points exactly to the expected target.
 unlink_if_owned() {
   local dest="$1" src="$2"
@@ -83,27 +87,57 @@ unlink_dir_contents() {
 
 # --------------------------------------------------------------------------
 # Restore CLAUDE.md
-# setup.sh moved the user's real CLAUDE.md to CLAUDE.personal.md and linked
-# the repo's version in its place. Undo that: remove the repo symlink, then
-# if CLAUDE.personal.md has content, move it back to CLAUDE.md. If setup.sh
-# created an empty placeholder (marked by a .setup-managed sidecar), remove
-# both. A user-owned empty file with no sidecar is left untouched.
+# Handles two formats left by setup.sh:
+#   • Legacy (symlink): remove the repo symlink.
+#   • Current (generated file): strip the managed section; leave user
+#     additions below it intact.
+# Then, if CLAUDE.personal.md has content, move it back to CLAUDE.md. If
+# setup.sh created an empty placeholder (marked by a .setup-managed sidecar),
+# remove both. A user-owned empty file with no sidecar is left untouched.
 restore_claude_md() {
   local link="$HOME/.claude/CLAUDE.md"
   local personal="$HOME/.claude/CLAUDE.personal.md"
   local marker="${personal}.setup-managed"
 
-  # Remove the repo symlink.
-  unlink_if_owned "$link" "$REPO_ROOT/claude/CLAUDE.md"
+  if [[ -L "$link" ]]; then
+    # Legacy format: symlink. Remove only if it points to our repo.
+    unlink_if_owned "$link" "$REPO_ROOT/claude/CLAUDE.md"
+  elif [[ -f "$link" ]] && grep -qF "$MANAGED_BEGIN" "$link" 2>/dev/null; then
+    # Current format: generated regular file. Strip managed section.
+    local tmp in_section=0
+    tmp="$(mktemp)"
+    while IFS= read -r rawline || [[ -n "$rawline" ]]; do
+      if [[ "$rawline" == "$MANAGED_BEGIN" ]]; then
+        in_section=1
+        continue
+      fi
+      if [[ "$rawline" == "$MANAGED_END" ]]; then
+        in_section=0
+        continue
+      fi
+      [[ "$in_section" == 1 ]] && continue
+      printf '%s\n' "$rawline" >> "$tmp"
+    done < "$link"
+    # Drop leading blank lines left after removing the managed section.
+    local trimmed
+    trimmed="$(sed '/./,$!d' "$tmp")"
+    rm "$tmp"
+    if [[ -z "$trimmed" ]]; then
+      rm "$link"
+      echo "Removed empty $link"
+    else
+      printf '%s\n' "$trimmed" > "$link"
+      echo "Removed managed section from $link"
+    fi
+  fi
 
   [[ -f "$personal" ]] || return 0
 
   if [[ -s "$personal" ]]; then
     # Non-empty personal file — it was the user's original CLAUDE.md before
     # setup.sh ran; move it back to restore the pre-setup state.
-    # -L guards dangling foreign symlinks that -e would miss.
     if [[ -e "$link" || -L "$link" ]]; then
-      echo "Skipping restore: $link already exists (not a repo symlink)" >&2
+      echo "Skipping restore: $link already exists" >&2
     else
       mv "$personal" "$link"
       rm -f "$marker"
