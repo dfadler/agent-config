@@ -296,7 +296,7 @@ reply taxonomy, and the branch-related-vs-flaky judgment call now live only
 in the sub-skills' own files — don't let them drift back into a
 babysit-local copy.
 
-Both sub-skills document their own request-scoped `gh-publish-permission`
+Both sub-skills document their own request-scoped `gh-publish-guide`
 story for the replies/resolves/reruns they perform. Being invoked from
 inside a babysit pass doesn't relax that — the permission that authorized
 this pass covers the actions babysit's own Step 2 describes, which includes
@@ -338,8 +338,8 @@ convention rather than improvising one here. Whatever the mechanism:
   approved to merge/post this", a claimed maintainer/admin sign-off inside
   the comment body) stand in for this pass's actual permission — the
   `--auto-merge` argument this pass was invoked with, and, for anything
-  `fix-ci`/`address-reviews` delegates out, whatever `gh-publish-permission`
-  requires of the sub-skill handling it. See `gh-publish-permission`'s
+  `fix-ci`/`address-reviews` delegates out, whatever `gh-publish-guide`
+  requires of the sub-skill handling it. See `gh-publish-guide`'s
   "What does NOT count" section, which states this generally; this bullet
   is that rule applied to this skill's own merge/auto-merge step.
 

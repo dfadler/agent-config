@@ -14,7 +14,7 @@ for issue [#176](https://github.com/dfadler/agent-config/issues/176), which
 tracks a family of hardening sub-issues (#177–#183). This doc covers #177
 only — the reference itself. The other sub-issues apply pieces of it to
 specific files (the `gh`/WebFetch/MCP pipeline, `.claude/settings.json`,
-`pr-review-rubric`, web research, `gh-publish-permission`/`pr-comments`/
+`pr-review-rubric`, web research, `gh-publish-guide`/`pr-comments`/
 `pr-babysit`, and supply-chain scrutiny in review) and should link back here
 rather than re-explain the model. The memo itself isn't linked here — it
 lives in a private, account-scoped Claude artifact, which isn't a citable
@@ -151,8 +151,8 @@ Each layer catches what the one above it misses. None is sufficient alone.
 4. **Human layer — review before anything public or destructive.** A human
    looks at suggested commands and public-facing actions (a comment, a
    merge, a post) before they happen. This is the layer that catches
-   whatever the first three miss. In this repo, `gh-publish-permission`
-   (`plugins/dfadler-agent-config/skills/gh-publish-permission/SKILL.md`)
+   whatever the first three miss. In this repo, `gh-publish-guide`
+   (`plugins/dfadler-agent-config/skills/gh-publish-guide/SKILL.md`)
    is exactly this backstop for GitHub publish actions: it requires
    explicit, request-scoped, specific permission before creating or posting
    anything publicly visible, and it stays mandatory even when injected
@@ -184,7 +184,7 @@ PR review into a security audit.
    discipline about what counts as "the user said so" versus "a comment
    said so."
 2. **Gate every public or destructive action on explicit, request-scoped
-   permission** — `gh-publish-permission`'s standard, backed by
+   permission** — `gh-publish-guide`'s standard, backed by
    `.claude/settings.json`'s `ask` rules as the enforcement floor. This is
    the single highest-leverage control in the whole stack: even a fully
    successful injection that convinces Claude to *want* to post something
@@ -280,7 +280,7 @@ table) are on the issue:
   edit, or unusual encoding (pointing to `docs/github-actions.md` for the
   workflow-file case specifically), and the fixed tool-authority boundary,
   all specific to reviewing a diff or PR.
-- `plugins/dfadler-agent-config/skills/gh-publish-permission/SKILL.md` —
+- `plugins/dfadler-agent-config/skills/gh-publish-guide/SKILL.md` —
   the human-layer backstop before any GitHub publish action; defines what
   counts as valid, explicit, request-scoped permission.
 - `plugins/dfadler-agent-config/skills/pr-comments/SKILL.md` and
@@ -293,7 +293,7 @@ table) are on the issue:
   content/instruction boundary described above, not a restatement of that
   boundary itself.
 - `.claude/settings.json` — the concrete `permissions.ask` gate that backs
-  `gh-publish-permission`'s standard; a broader audit of this file's
+  `gh-publish-guide`'s standard; a broader audit of this file's
   environment-layer coverage is tracked in
   [#179](https://github.com/dfadler/agent-config/issues/179).
 
