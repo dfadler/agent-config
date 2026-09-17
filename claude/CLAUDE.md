@@ -1,5 +1,3 @@
-@CLAUDE.personal.md
-
 # Global instructions
 
 Conventions and habits that apply across projects, not just one repo. Project-level

@@ -41,6 +41,11 @@ done
 
 REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 
+# Markers that delimit the block setup.sh writes into ~/.claude/CLAUDE.md.
+# teardown.sh carries an identical copy — both must stay in sync.
+MANAGED_BEGIN="# >>> agent-config managed begin <<<"
+MANAGED_END="# >>> agent-config managed end <<<"
+
 # Every directory under plugins/ that carries a .claude-plugin/plugin.json is a
 # plugin this repo ships (currently dfadler-agent-config, bulletproof-react-skills,
 # and accessibility-skills) - discovered rather than hardcoded so adding one
@@ -168,18 +173,80 @@ migrate_personal_claude_md() {
     fi
   fi
 
-  # If CLAUDE.md is still a real file after the above (CLAUDE.personal.md
-  # already existed), remove it so link() can create the repo symlink — the
-  # personal content is already safe in CLAUDE.personal.md.
-  if [[ -f "$current" && ! -L "$current" ]]; then
-    rm "$current"
-    echo "Removed $current — personal content is safe in $personal"
+}
+
+# Write a thin host-local ~/.claude/CLAUDE.md that @-includes both the
+# user's personal instructions and this repo's global instructions. Using a
+# generated regular file rather than a symlink keeps the repo's working tree
+# clean: any tool that writes to ~/.claude/CLAUDE.md (e.g. eng-standards:git
+# recording a Team Label) modifies only the host-local generated file, never
+# a tracked repo file.
+#
+# Safe to re-run:
+#   • If the file is a legacy symlink to this repo, replace it.
+#   • If the file already has our managed section, update just the @include
+#     path (in case the repo was moved) and leave user additions intact.
+#   • If the file exists without our section, prepend the section and keep
+#     the user's existing content below it.
+#   • If the file doesn't exist, create it.
+ensure_claude_md_includes() {
+  local claude_md="$HOME/.claude/CLAUDE.md"
+  local l1="$MANAGED_BEGIN"
+  local l2="@CLAUDE.personal.md"
+  local l3="@$REPO_ROOT/claude/CLAUDE.md"
+  local l4="$MANAGED_END"
+
+  if [[ -L "$claude_md" ]]; then
+    # Legacy format: symlink to our repo. Replace with generated file.
+    rm "$claude_md"
+    printf '%s\n%s\n%s\n%s\n' "$l1" "$l2" "$l3" "$l4" > "$claude_md"
+    echo "Replaced repo symlink with generated $claude_md"
+    return 0
+  fi
+
+  if [[ ! -e "$claude_md" ]]; then
+    printf '%s\n%s\n%s\n%s\n' "$l1" "$l2" "$l3" "$l4" > "$claude_md"
+    echo "Created $claude_md"
+    return 0
+  fi
+
+  if grep -qF "$MANAGED_BEGIN" "$claude_md"; then
+    # Our section is present. If the @include path is already current (repo
+    # hasn't moved), nothing to do.
+    if grep -qF "$l3" "$claude_md"; then
+      return 0
+    fi
+    # Repo was moved: replace the stale @include path in-place.
+    local tmp in_section=0
+    tmp="$(mktemp)"
+    while IFS= read -r rawline || [[ -n "$rawline" ]]; do
+      if [[ "$rawline" == "$l1" ]]; then
+        printf '%s\n%s\n%s\n%s\n' "$l1" "$l2" "$l3" "$l4" >> "$tmp"
+        in_section=1
+        continue
+      fi
+      if [[ "$rawline" == "$l4" ]]; then
+        in_section=0
+        continue
+      fi
+      [[ "$in_section" == 1 ]] && continue
+      printf '%s\n' "$rawline" >> "$tmp"
+    done < "$claude_md"
+    mv "$tmp" "$claude_md"
+    echo "Updated managed section in $claude_md"
+  else
+    # No section yet: prepend, keeping user content below.
+    local tmp
+    tmp="$(mktemp)"
+    { printf '%s\n%s\n%s\n%s\n\n' "$l1" "$l2" "$l3" "$l4"; cat "$claude_md"; } > "$tmp"
+    mv "$tmp" "$claude_md"
+    echo "Prepended managed section to $claude_md"
   fi
 }
 
 mkdir -p "$HOME/.claude"
 migrate_personal_claude_md
-link "$REPO_ROOT/claude/CLAUDE.md" "$HOME/.claude/CLAUDE.md"
+ensure_claude_md_includes
 link_dir_contents "$REPO_ROOT/claude/commands" "$HOME/.claude/commands"
 
 prune_stale_plugin_links "$HOME/.claude/skills"
