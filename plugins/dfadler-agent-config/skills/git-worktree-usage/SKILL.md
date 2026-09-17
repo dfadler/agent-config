@@ -142,6 +142,19 @@ session — both catch their own errors and always exit 0.
   setting `WORKTREE_AUTO_PRUNE=0` (or `false`/`no`/`off`) in the
   environment; anything else, including unset, keeps auto-removal on.
 
+- **`require-worktree-hook.sh`** is a `PreToolUse` hook that blocks the
+  `Edit` and `Write` tools when the current working directory is the main
+  git checkout rather than a linked worktree. It calls `git rev-parse
+  --git-dir` and compares the result: a path ending in
+  `.git/worktrees/<name>` is a linked worktree (allowed); `.git` or any
+  path ending directly at `.git` is the main checkout (blocked). The hook
+  prints an explanation and exits 1 so the model sees the block as an error
+  and can recover by calling `EnterWorktree` first. Escape hatch: set
+  `WORKTREE_ENFORCE=0` (or `false`/`no`/`off`) to bypass the check — useful
+  during a brief one-liner edit that doesn't warrant a worktree. Skipped
+  entirely in cloud/remote sessions (no worktrees exist there) and in
+  non-git directories.
+
 Both underlying scripts (`verify-worktree-symlinks.sh`,
 `prune-merged-worktrees.sh`) are also usable standalone — real exit codes,
 `--help`, no hook-only quieting — for a human running them by hand or a
