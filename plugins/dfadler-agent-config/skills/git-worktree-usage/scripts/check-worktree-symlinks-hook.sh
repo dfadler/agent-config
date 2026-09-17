@@ -15,6 +15,18 @@ if [ "${CLAUDE_CODE_REMOTE:-}" = "true" ]; then
   exit 0
 fi
 
+# Inhibit: env var (session-level) or worktree.symlinkCheck in settings.json.
+case "${WORKTREE_SYMLINK_CHECK:-}" in
+  0 | false | no | off) exit 0 ;;
+esac
+if git_toplevel="$(git rev-parse --show-toplevel 2>/dev/null)"; then
+  settings="$git_toplevel/.claude/settings.json"
+  if [ -f "$settings" ] && command -v jq >/dev/null 2>&1; then
+    val="$(jq -r '.worktree.symlinkCheck // "on"' "$settings" 2>/dev/null)"
+    [ "$val" = "off" ] && exit 0
+  fi
+fi
+
 script_dir="$(cd "$(dirname "$0")" && pwd)"
 script="$script_dir/verify-worktree-symlinks.sh"
 
