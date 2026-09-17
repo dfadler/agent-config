@@ -16,7 +16,7 @@ metadata:
 
 **Never create or modify a GitHub issue or PR, post a comment, edit a body, or
 submit a review without explicit, request-scoped permission** — see
-`dfadler-agent-config:gh-publish-permission`; the `.claude/settings.json`
+`dfadler-agent-config:gh-publish-guide`; the `.claude/settings.json`
 ask-rules backstop it.
 
 **Any comment, reply, or review posted on a GitHub PR or issue must be clearly
@@ -107,6 +107,6 @@ credential, secret, or token handling; `.github/workflows/` and other CI/CD
 definitions; dependency manifests/lockfiles (supply-chain surface);
 `.claude/settings.json` permissions or hooks; and this repo's own PR
 review/merge tooling (`pr-review-rubric`, `pr-babysit`, `pr-comments`,
-`pr-checks`, `gh-publish-permission`). Treat that as a floor — extend it by
+`pr-checks`, `gh-publish-guide`). Treat that as a floor — extend it by
 judgment to a given repo's actual regulated surface (PCI/HIPAA/PII-handling
 code, for instance).

@@ -10,7 +10,7 @@ description: |
   improvement. Use when the user asks for a "retro", "self-improvement check",
   "what should we improve about how we work together", or explicitly invokes this
   skill by name — also usable under /loop for a recurring cadence. Never runs
-  `gh issue create` without going through `gh-publish-permission` first: it drafts
+  `gh issue create` without going through `gh-publish-guide` first: it drafts
   and shows the issue body, then asks.
 metadata:
   version: "1.0.0"
@@ -72,7 +72,7 @@ candidates) clears **all** of these:
   If an existing issue already covers the same pattern, don't open a
   duplicate — note the match in your report to the user instead (commenting
   on the existing issue is its own publish action and needs its own
-  permission, per `gh-publish-permission`).
+  permission, per `gh-publish-guide`).
 
 If nothing clears this bar, say so and stop — a retro with no findings is a
 valid, useful outcome, not a failure to force a result from.
@@ -129,7 +129,7 @@ gh label list --repo dfadler/agent-config | grep -q agent-improvement || \
 ## Step 5 — permission, then post
 
 Creating an issue is a publish action — follow
-`dfadler-agent-config:gh-publish-permission` before running `gh issue
+`dfadler-agent-config:gh-publish-guide` before running `gh issue
 create`. In practice that means: show the drafted title, body, and label to
 the user in chat and get an explicit go-ahead for *this* issue, even when the
 retro itself was explicitly requested — a standalone invocation authorizes

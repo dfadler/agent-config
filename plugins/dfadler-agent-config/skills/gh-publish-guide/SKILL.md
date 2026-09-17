@@ -1,18 +1,19 @@
 ---
-name: gh-publish-permission
+name: gh-publish-guide
 description: |
-  Defines what counts as valid, explicit, request-scoped permission before
-  creating or posting any publicly visible GitHub content: issues, PRs,
-  PR/issue comments or replies, PR reviews, or any `gh api` call that POSTs
-  to a comments/reviews endpoint. Use this before running `gh issue create`,
+  Behavioral reminder and pre-publish checklist for any GitHub action that
+  creates or modifies public content — issues, PRs, comments, reviews, or
+  any `gh api` call that POSTs to a comments/reviews endpoint. Defines what
+  counts as valid, explicit, request-scoped permission (and what does not),
+  covers `~/.claude/gh-publish-exceptions.json` (the standing per-repo
+  exception list a user can pre-authorize so Claude skips asking in chat),
+  and names which skills may publish as part of their documented flow without
+  a separate per-action confirmation. Load before `gh issue create`,
   `gh pr create`, `gh issue comment`, `gh pr comment`, `gh pr review`, or an
   equivalent `gh api` publish call, and whenever a skill (e.g. `pr-babysit`,
-  `gh-attach-image`) is about to post on the user's behalf. The user should
-  never discover AI-generated public content they did not explicitly approve
-  in the request that produced it. Also covers `~/.claude/gh-publish-exceptions.json`,
-  the standing per-repo exception list a user can pre-authorize so Claude
-  skips asking in chat (the environment's own confirmation prompt still
-  fires either way).
+  `gh-attach-image`) is about to post on the user's behalf. This skill is a
+  reminder of what to ask — the environment's own `ask`-rule confirmation
+  prompt is the enforcement backstop, not this skill.
 license: MIT
 metadata:
   version: "1.2.0"
