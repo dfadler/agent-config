@@ -267,13 +267,31 @@ run_setup_with() {
   refute_output_contains "Replacing"
 }
 
-@test "leaves a foreign file at the target alone" {
+@test "migrates a hand-maintained CLAUDE.md to CLAUDE.personal.md" {
   mkdir -p "$HOME/.claude"
   echo "hand-written config" > "$HOME/.claude/CLAUDE.md"
   run_setup
   assert_success
-  assert_output_contains "already exists and isn't a symlink"
-  [ "$(cat "$HOME/.claude/CLAUDE.md")" = "hand-written config" ]
+  assert_output_contains "Migrated"
+  [ "$(cat "$HOME/.claude/CLAUDE.personal.md")" = "hand-written config" ]
+  [ "$(readlink "$HOME/.claude/CLAUDE.md")" = "$FAKE_REPO/claude/CLAUDE.md" ]
+}
+
+@test "migration is a no-op when CLAUDE.personal.md already exists" {
+  mkdir -p "$HOME/.claude"
+  echo "personal content" > "$HOME/.claude/CLAUDE.personal.md"
+  echo "should not move" > "$HOME/.claude/CLAUDE.md"
+  run_setup
+  assert_success
+  refute_output_contains "Migrated"
+  [ "$(cat "$HOME/.claude/CLAUDE.personal.md")" = "personal content" ]
+}
+
+@test "creates empty CLAUDE.personal.md when no CLAUDE.md exists" {
+  run_setup
+  assert_success
+  [ -f "$HOME/.claude/CLAUDE.personal.md" ]
+  [ "$(readlink "$HOME/.claude/CLAUDE.md")" = "$FAKE_REPO/claude/CLAUDE.md" ]
 }
 
 # ~/.claude/skills is shared with every other skills-dir plugin. A live symlink
