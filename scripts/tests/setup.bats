@@ -239,7 +239,10 @@ run_setup_with() {
 @test "creates the expected links from a clean HOME" {
   run_setup
   assert_success
-  [ "$(readlink "$HOME/.claude/CLAUDE.md")" = "$FAKE_REPO/claude/CLAUDE.md" ]
+  # CLAUDE.md is now a generated regular file, not a symlink.
+  [ ! -L "$HOME/.claude/CLAUDE.md" ]
+  [ -f "$HOME/.claude/CLAUDE.md" ]
+  grep -qF "@$FAKE_REPO/claude/CLAUDE.md" "$HOME/.claude/CLAUDE.md"
   [ "$(readlink "$HOME/.claude/commands/demo.md")" = "$FAKE_REPO/claude/commands/demo.md" ]
   [ "$(readlink "$HOME/.claude/skills/dfadler-agent-config")" = "$FAKE_REPO/plugins/dfadler-agent-config" ]
 }
@@ -261,6 +264,9 @@ run_setup_with() {
   assert_success
   refute_output_contains "Linked"
   refute_output_contains "Replacing"
+  refute_output_contains "Created"
+  refute_output_contains "Updated"
+  refute_output_contains "Prepended"
 }
 
 @test "migrates a hand-maintained CLAUDE.md to CLAUDE.personal.md" {
@@ -270,10 +276,12 @@ run_setup_with() {
   assert_success
   assert_output_contains "Migrated"
   [ "$(cat "$HOME/.claude/CLAUDE.personal.md")" = "hand-written config" ]
-  [ "$(readlink "$HOME/.claude/CLAUDE.md")" = "$FAKE_REPO/claude/CLAUDE.md" ]
+  # CLAUDE.md is now the generated file, not a symlink.
+  [ ! -L "$HOME/.claude/CLAUDE.md" ]
+  grep -qF "@$FAKE_REPO/claude/CLAUDE.md" "$HOME/.claude/CLAUDE.md"
 }
 
-@test "when CLAUDE.personal.md exists, removes real CLAUDE.md to make room for symlink" {
+@test "when CLAUDE.personal.md exists, removes real CLAUDE.md to make room for generated file" {
   mkdir -p "$HOME/.claude"
   echo "personal content" > "$HOME/.claude/CLAUDE.personal.md"
   echo "stale real file" > "$HOME/.claude/CLAUDE.md"
@@ -281,14 +289,16 @@ run_setup_with() {
   assert_success
   refute_output_contains "Migrated"
   [ "$(cat "$HOME/.claude/CLAUDE.personal.md")" = "personal content" ]
-  [ "$(readlink "$HOME/.claude/CLAUDE.md")" = "$FAKE_REPO/claude/CLAUDE.md" ]
+  [ ! -L "$HOME/.claude/CLAUDE.md" ]
+  grep -qF "@$FAKE_REPO/claude/CLAUDE.md" "$HOME/.claude/CLAUDE.md"
 }
 
 @test "creates empty CLAUDE.personal.md when no CLAUDE.md exists" {
   run_setup
   assert_success
   [ -f "$HOME/.claude/CLAUDE.personal.md" ]
-  [ "$(readlink "$HOME/.claude/CLAUDE.md")" = "$FAKE_REPO/claude/CLAUDE.md" ]
+  [ ! -L "$HOME/.claude/CLAUDE.md" ]
+  grep -qF "@$FAKE_REPO/claude/CLAUDE.md" "$HOME/.claude/CLAUDE.md"
 }
 
 @test "writes a setup-managed marker alongside the empty CLAUDE.personal.md placeholder" {
@@ -315,21 +325,50 @@ run_setup_with() {
   [ "$(readlink "$HOME/.claude/skills/someone-elses")" = "$SANDBOX/other-plugin" ]
 }
 
-@test "replaces a stale symlink that points into this repo" {
+@test "replaces a legacy symlink to this repo with a generated file" {
+  mkdir -p "$HOME/.claude"
+  ln -s "$FAKE_REPO/claude/CLAUDE.md" "$HOME/.claude/CLAUDE.md"
+  run_setup
+  assert_success
+  assert_output_contains "Replaced repo symlink"
+  [ ! -L "$HOME/.claude/CLAUDE.md" ]
+  grep -qF "@$FAKE_REPO/claude/CLAUDE.md" "$HOME/.claude/CLAUDE.md"
+}
+
+@test "replaces a stale symlink into this repo with a generated file" {
   mkdir -p "$HOME/.claude"
   ln -s "$FAKE_REPO/claude/OLD-NAME.md" "$HOME/.claude/CLAUDE.md"
   run_setup
   assert_success
-  assert_output_contains "Replacing stale symlink"
-  [ "$(readlink "$HOME/.claude/CLAUDE.md")" = "$FAKE_REPO/claude/CLAUDE.md" ]
+  # The stale link is within the repo — link() replaces it; ensure_claude_md_includes sees a symlink.
+  [ ! -L "$HOME/.claude/CLAUDE.md" ]
+  grep -qF "@$FAKE_REPO/claude/CLAUDE.md" "$HOME/.claude/CLAUDE.md"
 }
 
-@test "takes over a broken symlink pointing outside the repo" {
+@test "prepends managed section to an existing user-owned CLAUDE.md" {
   mkdir -p "$HOME/.claude"
-  ln -s "$SANDBOX/nowhere/gone.md" "$HOME/.claude/CLAUDE.md"
+  echo "my own config" > "$HOME/.claude/CLAUDE.md"
+  # Prevent migrate_personal_claude_md from consuming it.
+  touch "$HOME/.claude/CLAUDE.personal.md"
   run_setup
   assert_success
-  [ "$(readlink "$HOME/.claude/CLAUDE.md")" = "$FAKE_REPO/claude/CLAUDE.md" ]
+  assert_output_contains "Prepended managed section"
+  grep -qF "@$FAKE_REPO/claude/CLAUDE.md" "$HOME/.claude/CLAUDE.md"
+  grep -q "my own config" "$HOME/.claude/CLAUDE.md"
+}
+
+@test "updating repo path on re-run preserves user additions below the managed section" {
+  mkdir -p "$HOME/.claude"
+  touch "$HOME/.claude/CLAUDE.personal.md"
+  run_setup
+  assert_success
+  # Simulate a user addition (e.g. Team Label written by eng-standards:git).
+  printf '\nTeam Label: Team: frontend\n' >> "$HOME/.claude/CLAUDE.md"
+  # Re-run: managed section updated, user addition preserved.
+  run_setup
+  assert_success
+  grep -q "Team Label: Team: frontend" "$HOME/.claude/CLAUDE.md"
+  grep -qF "@$FAKE_REPO/claude/CLAUDE.md" "$HOME/.claude/CLAUDE.md"
 }
 
 # Two generations of superseded links exist: per-skill entries from before the
