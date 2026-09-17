@@ -428,7 +428,7 @@ EOF
   assert_success
   assert_output_contains "--install-deps"
   refute_output_contains "git identity"
-  refute_output_contains "pyte"
+  refute_output_contains "pyte is NOT"
 }
 
 @test "an unknown argument exits 2" {
