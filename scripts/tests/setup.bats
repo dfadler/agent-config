@@ -362,12 +362,12 @@ run_setup_with() {
   touch "$HOME/.claude/CLAUDE.personal.md"
   run_setup
   assert_success
-  # Simulate a user addition (e.g. Team Label written by eng-standards:git).
-  printf '\nTeam Label: Team: frontend\n' >> "$HOME/.claude/CLAUDE.md"
+  # Simulate a user addition written by some external tool.
+  printf '\nUser-added: some custom instruction\n' >> "$HOME/.claude/CLAUDE.md"
   # Re-run: managed section updated, user addition preserved.
   run_setup
   assert_success
-  grep -q "Team Label: Team: frontend" "$HOME/.claude/CLAUDE.md"
+  grep -q "User-added: some custom instruction" "$HOME/.claude/CLAUDE.md"
   grep -qF "@$FAKE_REPO/claude/CLAUDE.md" "$HOME/.claude/CLAUDE.md"
 }
 

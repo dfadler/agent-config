@@ -76,7 +76,7 @@ install_legacy_links() {
 
 @test "removes managed section but preserves user additions below it" {
   mkdir -p "$HOME/.claude"
-  printf '%s\n%s\n%s\n%s\n\nTeam Label: Team: frontend\n' \
+  printf '%s\n%s\n%s\n%s\n\nUser-added: some custom instruction\n' \
     "# >>> agent-config managed begin <<<" \
     "@CLAUDE.personal.md" \
     "@$FAKE_REPO/claude/CLAUDE.md" \
@@ -86,7 +86,7 @@ install_legacy_links() {
   run_teardown
   assert_success
   assert_output_contains "Removed managed section"
-  grep -q "Team Label: Team: frontend" "$HOME/.claude/CLAUDE.md"
+  grep -q "User-added: some custom instruction" "$HOME/.claude/CLAUDE.md"
   ! grep -qF "agent-config managed begin" "$HOME/.claude/CLAUDE.md"
 }
 

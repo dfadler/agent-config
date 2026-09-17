@@ -1,7 +1,7 @@
 # Hook composition protocol
 
 This document describes how `dfadler-agent-config`'s hooks are designed to
-compose with hooks from other plugins (e.g. `eng-standards`) without
+compose with hooks from other plugins without
 producing collisions or conflicting behavior.
 
 ## The contract: hooks are additive
