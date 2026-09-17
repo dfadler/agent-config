@@ -151,12 +151,12 @@ for a human to take, not implied by having told the reporter it's done.
 ## Permission and the AI-authorship marker
 
 Every comment this skill posts is public GitHub content and is gated by
-`gh-publish-permission`'s rules — read that skill for the full definition
+`gh-publish-guide`'s rules — read that skill for the full definition
 of valid permission. **Invoking this skill for a specific issue is itself
 the request-scoped permission for the comments this skill documents itself
 making on that issue** (the acknowledgment, scope narration, milestone
 updates, and closing comment) — the same carve-out `pr-comments`'s
-"Permission" section and `gh-publish-permission`'s "Skills that publish as
+"Permission" section and `gh-publish-guide`'s "Skills that publish as
 part of their normal flow" section give `pr-babysit`. It does not extend to
 anything this skill doesn't itself describe: opening a new issue, closing
 the issue, editing someone else's comment, or posting on a different issue
@@ -174,5 +174,5 @@ used elsewhere in this repo, so it never reads as if a human wrote it:
 Nothing here requires `pr-babysit`, `pr-comments`, or any snapshot script —
 only `gh` (`gh issue comment`, `gh pr view`, `gh release list`, `git
 describe`, `git log`) and the cross-referenced conventions in
-`~/.claude/CLAUDE.md` and `gh-publish-permission`, which this skill points
+`~/.claude/CLAUDE.md` and `gh-publish-guide`, which this skill points
 to rather than restates.
