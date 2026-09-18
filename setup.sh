@@ -175,56 +175,78 @@ migrate_personal_claude_md() {
 
 }
 
-# Write a thin host-local ~/.claude/CLAUDE.md that @-includes both the
-# user's personal instructions and this repo's global instructions. Using a
-# generated regular file rather than a symlink keeps the repo's working tree
-# clean: any tool that writes to ~/.claude/CLAUDE.md modifies only the
-# host-local generated file, never a tracked repo file.
+# Print the managed-section body (everything between, not including, the
+# BEGIN/END markers): the personal-instructions include, this repo's CLAUDE.md,
+# then one @include per entry in claude/conventions/DEFAULT_ENABLED (skipping
+# blank lines and comments). Computed fresh each call so both "repo moved" and
+# "DEFAULT_ENABLED changed" are handled by regenerating the whole section,
+# rather than patching one line in place.
+managed_section_body() {
+  printf '@CLAUDE.personal.md\n'
+  printf '@%s/claude/CLAUDE.md\n' "$REPO_ROOT"
+  local manifest="$REPO_ROOT/claude/conventions/DEFAULT_ENABLED"
+  [[ -f "$manifest" ]] || return 0
+  local line
+  while IFS= read -r line || [[ -n "$line" ]]; do
+    line="${line%%#*}"
+    line="${line## }"
+    line="${line%% }"
+    [[ -n "$line" ]] || continue
+    printf '@%s/claude/conventions/%s\n' "$REPO_ROOT" "$line"
+  done <"$manifest"
+}
+
+# Write a thin host-local ~/.claude/CLAUDE.md whose managed section @-includes
+# the user's personal instructions, this repo's CLAUDE.md, and the default set
+# of convention files. Using a generated regular file rather than a symlink
+# keeps the repo's working tree clean: any tool that writes to
+# ~/.claude/CLAUDE.md modifies only the host-local generated file, never a
+# tracked repo file.
 #
 # Safe to re-run:
 #   • If the file is a legacy symlink to this repo, replace it.
-#   • If the file already has our managed section, update just the @include
-#     path (in case the repo was moved) and leave user additions intact.
+#   • If the file already has our managed section, replace its body with the
+#     freshly computed one (repo moved, or DEFAULT_ENABLED changed) and leave
+#     user additions below the section intact.
 #   • If the file exists without our section, prepend the section and keep
 #     the user's existing content below it.
 #   • If the file doesn't exist, create it.
 ensure_claude_md_includes() {
   local claude_md="$HOME/.claude/CLAUDE.md"
-  local l1="$MANAGED_BEGIN"
-  local l2="@CLAUDE.personal.md"
-  local l3="@$REPO_ROOT/claude/CLAUDE.md"
-  local l4="$MANAGED_END"
+  local body
+  body="$(managed_section_body)"
 
   if [[ -L "$claude_md" ]]; then
     # Legacy format: symlink to our repo. Replace with generated file.
     rm "$claude_md"
-    printf '%s\n%s\n%s\n%s\n' "$l1" "$l2" "$l3" "$l4" >"$claude_md"
+    printf '%s\n%s\n%s\n' "$MANAGED_BEGIN" "$body" "$MANAGED_END" >"$claude_md"
     echo "Replaced repo symlink with generated $claude_md"
     return 0
   fi
 
   if [[ ! -e "$claude_md" ]]; then
-    printf '%s\n%s\n%s\n%s\n' "$l1" "$l2" "$l3" "$l4" >"$claude_md"
+    printf '%s\n%s\n%s\n' "$MANAGED_BEGIN" "$body" "$MANAGED_END" >"$claude_md"
     echo "Created $claude_md"
     return 0
   fi
 
   if grep -qF "$MANAGED_BEGIN" "$claude_md"; then
-    # Our section is present. If the @include path is already current (repo
-    # hasn't moved), nothing to do.
-    if grep -qF "$l3" "$claude_md"; then
+    # Our section is present. If its body already matches, nothing to do.
+    local existing_body
+    existing_body="$(sed -n "/^${MANAGED_BEGIN//\//\\/}\$/,/^${MANAGED_END//\//\\/}\$/p" "$claude_md" | sed '1d;$d')"
+    if [[ "$existing_body" == "$body" ]]; then
       return 0
     fi
-    # Repo was moved: replace the stale @include path in-place.
+    # Body differs (repo moved, or DEFAULT_ENABLED changed): replace it.
     local tmp in_section=0
     tmp="$(mktemp)"
     while IFS= read -r rawline || [[ -n "$rawline" ]]; do
-      if [[ "$rawline" == "$l1" ]]; then
-        printf '%s\n%s\n%s\n%s\n' "$l1" "$l2" "$l3" "$l4" >>"$tmp"
+      if [[ "$rawline" == "$MANAGED_BEGIN" ]]; then
+        printf '%s\n%s\n%s\n' "$MANAGED_BEGIN" "$body" "$MANAGED_END" >>"$tmp"
         in_section=1
         continue
       fi
-      if [[ "$rawline" == "$l4" ]]; then
+      if [[ "$rawline" == "$MANAGED_END" ]]; then
         in_section=0
         continue
       fi
@@ -238,7 +260,7 @@ ensure_claude_md_includes() {
     local tmp
     tmp="$(mktemp)"
     {
-      printf '%s\n%s\n%s\n%s\n\n' "$l1" "$l2" "$l3" "$l4"
+      printf '%s\n%s\n%s\n\n' "$MANAGED_BEGIN" "$body" "$MANAGED_END"
       cat "$claude_md"
     } >"$tmp"
     mv "$tmp" "$claude_md"
