@@ -10,6 +10,7 @@ set -euo pipefail
 INSTALL_DEPS=0
 SKIP_LIST=""
 INCLUDE_LIST=""
+INCLUDE_SET=0
 LIST_FEATURES=0
 
 usage() {
@@ -42,7 +43,10 @@ run is rejected rather than guessing which one wins.
   --include=<list>   Comma-separated feature names to install (same names
                      --skip accepts); every feature not named is left
                      unlinked, and unlinked if a previous run linked it.
-                     Cannot be combined with --skip.
+                     At least one non-empty name is required — "--include"
+                     with nothing after the "=" is rejected rather than
+                     silently installing everything. Cannot be combined
+                     with --skip.
   --list-features    Print the feature names --skip and --include accept
                      and exit without linking anything.
   -h, --help         Show this message and exit.
@@ -53,7 +57,10 @@ while [[ $# -gt 0 ]]; do
   case "$1" in
     --install-deps) INSTALL_DEPS=1 ;;
     --skip=*) SKIP_LIST="${1#--skip=}" ;;
-    --include=*) INCLUDE_LIST="${1#--include=}" ;;
+    --include=*)
+      INCLUDE_LIST="${1#--include=}"
+      INCLUDE_SET=1
+      ;;
     --list-features) LIST_FEATURES=1 ;;
     -h | --help)
       usage
@@ -68,7 +75,7 @@ while [[ $# -gt 0 ]]; do
   shift
 done
 
-if [[ -n "$SKIP_LIST" && -n "$INCLUDE_LIST" ]]; then
+if [[ -n "$SKIP_LIST" && "$INCLUDE_SET" == 1 ]]; then
   echo "--skip and --include cannot be combined." >&2
   usage >&2
   exit 2
@@ -89,8 +96,31 @@ if [[ -n "$SKIP_LIST" ]]; then
 fi
 
 INCLUDE_FEATURES=()
-if [[ -n "$INCLUDE_LIST" ]]; then
+if [[ "$INCLUDE_SET" == 1 ]]; then
   IFS=',' read -r -a INCLUDE_FEATURES <<<"$INCLUDE_LIST"
+fi
+
+# --include's value, unlike --skip's, isn't harmless when empty: --skip=
+# (or no --skip at all) already means "everything installs," so an empty
+# skip list is a no-op consistent with the default. --include= means the
+# opposite (nothing named -> nothing installed), so silently treating it as
+# "no restriction" would flip that into installing everything -- the
+# opposite of what passing --include at all signals intent to do. Reject it
+# before any filesystem operation. A delimiter-only value ("--include=,,,")
+# already fails downstream via the unknown-feature check below (each empty
+# element matches no known name), but this catches the plain-empty case
+# that check never sees, since IFS splitting of "" produces zero elements
+# rather than one empty one.
+if [[ "$INCLUDE_SET" == 1 ]]; then
+  include_name_found=0
+  for name in ${INCLUDE_FEATURES[@]+"${INCLUDE_FEATURES[@]}"}; do
+    [[ -n "$name" ]] && include_name_found=1 && break
+  done
+  if [[ "$include_name_found" == 0 ]]; then
+    echo "--include requires at least one feature name." >&2
+    usage >&2
+    exit 2
+  fi
 fi
 
 # Feature names --skip and --include accept: every plugin's directory name,
@@ -129,7 +159,7 @@ fi
 # of SKIP_FEATURES/INCLUDE_FEATURES is non-empty here.
 UNKNOWN_FLAG="--skip"
 selected=(${SKIP_FEATURES[@]+"${SKIP_FEATURES[@]}"})
-if [[ -n "$INCLUDE_LIST" ]]; then
+if [[ "$INCLUDE_SET" == 1 ]]; then
   UNKNOWN_FLAG="--include"
   selected=(${INCLUDE_FEATURES[@]+"${INCLUDE_FEATURES[@]}"})
 fi
@@ -155,7 +185,7 @@ fi
 # everything below only ever has to reason about SKIP_FEATURES. --skip and
 # --include were already rejected together above, so this never overwrites a
 # user-supplied SKIP_FEATURES.
-if [[ ${#INCLUDE_FEATURES[@]} -gt 0 ]]; then
+if [[ "$INCLUDE_SET" == 1 ]]; then
   SKIP_FEATURES=()
   for known in ${COMMAND_NAMES[@]+"${COMMAND_NAMES[@]}"} ${PLUGIN_ALL_NAMES[@]+"${PLUGIN_ALL_NAMES[@]}"}; do
     included=0
@@ -178,7 +208,7 @@ is_skipped() {
 # unlinked — "--skip" when the user named it directly, or "not in --include"
 # when --include's complement (computed above) is what excluded it.
 exclude_reason() {
-  if [[ -n "$INCLUDE_LIST" ]]; then
+  if [[ "$INCLUDE_SET" == 1 ]]; then
     printf 'not in --include'
   else
     printf -- '--skip'
