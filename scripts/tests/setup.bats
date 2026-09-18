@@ -571,6 +571,34 @@ run_setup_with() {
   [ ! -e "$HOME/.claude" ]
 }
 
+@test "--include with no value exits 2 and links nothing, rather than installing everything" {
+  run_setup_with --include=
+  [ "$status" -eq 2 ]
+  assert_output_contains "--include requires at least one feature name."
+  [ ! -e "$HOME/.claude" ]
+}
+
+@test "--include with only delimiters exits 2 and links nothing" {
+  run_setup_with --include=,,,
+  [ "$status" -eq 2 ]
+  assert_output_contains "--include requires at least one feature name."
+  [ ! -e "$HOME/.claude" ]
+}
+
+@test "--skip=<feature> --include= (empty) is still treated as combining the flags" {
+  run_setup_with --skip=demo --include=
+  [ "$status" -eq 2 ]
+  assert_output_contains "--skip and --include cannot be combined."
+  [ ! -e "$HOME/.claude" ]
+}
+
+@test "--skip= (empty) alone is a no-op — still installs everything" {
+  run_setup_with --skip=
+  assert_success
+  [ "$(readlink "$HOME/.claude/commands/demo.md")" = "$FAKE_REPO/claude/commands/demo.md" ]
+  [ "$(readlink "$HOME/.claude/skills/dfadler-agent-config")" = "$FAKE_REPO/plugins/dfadler-agent-config" ]
+}
+
 @test "--include=<command> links only that command, not the plugin" {
   run_setup_with --include=demo
   assert_success
