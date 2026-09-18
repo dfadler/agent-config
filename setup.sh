@@ -3,29 +3,49 @@
 # claude/ -> ~/.claude/). Safe to re-run: fixes symlinks that already point
 # here, and reports (without touching) anything else already at the target.
 #
-# Usage: ./setup.sh [--install-deps]
+# Usage: ./setup.sh [--install-deps] [--skip=<feature,...>] [--list-features]
 
 set -euo pipefail
 
 INSTALL_DEPS=0
+SKIP_LIST=""
+LIST_FEATURES=0
 
 usage() {
   cat <<'USAGE'
-Usage: ./setup.sh [--install-deps]
+Usage: ./setup.sh [--install-deps] [--skip=<feature,...>] [--list-features]
 
 Symlinks this repo's config into ~/.claude, then checks that the runtime
 dependencies the linked skills need are importable by the interpreter that
 will actually run them.
 
-  --install-deps   Also install a missing dependency (python3 -m pip install
-                   --user pyte), when the interpreter allows it.
-  -h, --help       Show this message and exit.
+With no --skip, every command and every plugin is installed — the same
+all-or-nothing behavior this script has always had. --skip opts specific
+features out; everything not named stays in.
+
+  --install-deps     Also install a missing dependency (python3 -m pip
+                     install --user pyte), when the interpreter allows it.
+  --skip=<list>      Comma-separated feature names to leave unlinked (and
+                     to unlink if a previous run linked them). A feature is
+                     either a slash command's basename (e.g. "adversarial-
+                     review", from claude/commands/adversarial-review.md)
+                     or a plugin directory name (e.g. "dfadler-agent-config",
+                     from plugins/dfadler-agent-config/) — skipping a plugin
+                     removes it as a whole (skills, agents, and hooks
+                     together; hooks also stay off by default per-project
+                     regardless — see docs/hook-composition.md). Run with
+                     --list-features to see the available names.
+  --list-features    Print the feature names --skip accepts and exit
+                     without linking anything.
+  -h, --help         Show this message and exit.
 USAGE
 }
 
 while [[ $# -gt 0 ]]; do
   case "$1" in
     --install-deps) INSTALL_DEPS=1 ;;
+    --skip=*) SKIP_LIST="${1#--skip=}" ;;
+    --list-features) LIST_FEATURES=1 ;;
     -h | --help)
       usage
       exit 0
@@ -41,6 +61,70 @@ done
 
 REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 
+# --skip's value, split on commas into an array. Declared even when empty so
+# `set -u` never trips on ${SKIP_FEATURES[@]} below — bash's automatic
+# expansion of an empty array is fine under nounset in modern bash, but the
+# macOS-shipped bash (3.2) this repo has to stay compatible with does not
+# reliably agree, so every use below goes through the
+# ${arr[@]+"${arr[@]}"} guard already established by check-markdown-links.sh.
+SKIP_FEATURES=()
+if [[ -n "$SKIP_LIST" ]]; then
+  IFS=',' read -r -a SKIP_FEATURES <<<"$SKIP_LIST"
+fi
+
+is_skipped() {
+  local name="$1" f
+  for f in ${SKIP_FEATURES[@]+"${SKIP_FEATURES[@]}"}; do
+    [[ "$f" == "$name" ]] && return 0
+  done
+  return 1
+}
+
+# Feature names --skip accepts: every plugin's directory name, plus every
+# slash command's basename (without .md). Discovered rather than hardcoded,
+# same reasoning as PLUGIN_SRCS below — a new plugin or command becomes
+# skippable the moment it lands, with nothing here to update by hand.
+COMMAND_NAMES=()
+if [[ -d "$REPO_ROOT/claude/commands" ]]; then
+  for entry in "$REPO_ROOT"/claude/commands/*; do
+    [[ -f "$entry" ]] || continue
+    COMMAND_NAMES+=("$(basename "$entry" .md)")
+  done
+fi
+
+PLUGIN_ALL_NAMES=()
+for plugin_dir in "$REPO_ROOT"/plugins/*/; do
+  plugin_dir="${plugin_dir%/}"
+  [[ -f "$plugin_dir/.claude-plugin/plugin.json" ]] || continue
+  PLUGIN_ALL_NAMES+=("$(basename "$plugin_dir")")
+done
+
+if [[ "$LIST_FEATURES" == "1" ]]; then
+  echo "Commands:"
+  printf '  %s\n' ${COMMAND_NAMES[@]+"${COMMAND_NAMES[@]}"}
+  echo "Plugins:"
+  printf '  %s\n' ${PLUGIN_ALL_NAMES[@]+"${PLUGIN_ALL_NAMES[@]}"}
+  exit 0
+fi
+
+# Fail fast on a typo'd --skip name, before anything on disk is touched —
+# same posture as the unknown-argument case above. Without this, a typo
+# would silently install everything (the opposite of what --skip asked for)
+# rather than telling the user why.
+unknown_skip=()
+for name in ${SKIP_FEATURES[@]+"${SKIP_FEATURES[@]}"}; do
+  found=0
+  for known in ${COMMAND_NAMES[@]+"${COMMAND_NAMES[@]}"} ${PLUGIN_ALL_NAMES[@]+"${PLUGIN_ALL_NAMES[@]}"}; do
+    [[ "$known" == "$name" ]] && found=1 && break
+  done
+  [[ "$found" == 1 ]] || unknown_skip+=("$name")
+done
+if [[ ${#unknown_skip[@]} -gt 0 ]]; then
+  echo "Unknown --skip feature(s): ${unknown_skip[*]}" >&2
+  echo "Run './setup.sh --list-features' to see available names." >&2
+  exit 2
+fi
+
 # Markers that delimit the block setup.sh writes into ~/.claude/CLAUDE.md.
 # teardown.sh carries an identical copy — both must stay in sync.
 MANAGED_BEGIN="# >>> agent-config managed begin <<<"
@@ -52,13 +136,24 @@ MANAGED_END="# >>> agent-config managed end <<<"
 # list by hand. The trailing "/" restricts the glob to directories; if plugins/
 # is ever empty the pattern itself fails the -f test below and the loop body
 # never runs, so no nullglob/-e guard is needed.
+#
+# A plugin named in --skip is left out of PLUGIN_SRCS/PLUGIN_LINKS entirely
+# rather than linked-then-removed — which means prune_stale_plugin_links
+# below (it already removes any ~/.claude/{skills,agents} link into this
+# repo's plugins/ that isn't in PLUGIN_LINKS) also removes a previously
+# opted-in plugin the moment a later run opts it back out, for free.
 PLUGIN_SRCS=()
 PLUGIN_LINKS=()
 for plugin_dir in "$REPO_ROOT"/plugins/*/; do
   plugin_dir="${plugin_dir%/}"
   [[ -f "$plugin_dir/.claude-plugin/plugin.json" ]] || continue
+  plugin_name="$(basename "$plugin_dir")"
+  if is_skipped "$plugin_name"; then
+    echo "Skipping plugin (--skip): $plugin_name"
+    continue
+  fi
   PLUGIN_SRCS+=("$plugin_dir")
-  PLUGIN_LINKS+=("$HOME/.claude/skills/$(basename "$plugin_dir")")
+  PLUGIN_LINKS+=("$HOME/.claude/skills/$plugin_name")
 done
 
 link() {
@@ -90,10 +185,42 @@ link() {
 link_dir_contents() {
   local src_dir="$1" dest_dir="$2"
   mkdir -p "$dest_dir"
-  local entry
+  local entry name feature
   for entry in "$src_dir"/*; do
     [[ -e "$entry" ]] || continue
-    link "$entry" "$dest_dir/$(basename "$entry")"
+    name="$(basename "$entry")"
+    # Feature name matches how COMMAND_NAMES above was built: basename minus
+    # a .md suffix (the only caller of this function today is commands/).
+    feature="${name%.md}"
+    if is_skipped "$feature"; then
+      echo "Skipping $dest_dir/$name (--skip=$feature)"
+      continue
+    fi
+    link "$entry" "$dest_dir/$name"
+  done
+}
+
+# The inverse of the skip above: a command opted out AFTER a previous run
+# already linked it needs its now-stale symlink removed, or re-running with
+# a changed --skip list wouldn't actually be idempotent — the old link would
+# just sit there forever. Only touches a symlink that both points into
+# src_dir and whose feature name is currently skipped; anything else
+# (foreign symlinks, real files) is left alone, same caution as
+# prune_stale_plugin_links below.
+prune_skipped_dir_links() {
+  local dest_dir="$1" src_dir="$2"
+  [[ -d "$dest_dir" ]] || return 0
+  local entry target resolved name feature
+  for entry in "$dest_dir"/*; do
+    [[ -L "$entry" ]] || continue
+    target="$(readlink "$entry")"
+    resolved="$(resolve_target "$target" "$dest_dir")" || continue
+    [[ "$resolved" == "$src_dir/"* ]] || continue
+    name="$(basename "$entry")"
+    feature="${name%.md}"
+    is_skipped "$feature" || continue
+    rm "$entry"
+    echo "Removed opted-out symlink: $entry -> $target"
   done
 }
 
@@ -272,6 +399,7 @@ mkdir -p "$HOME/.claude"
 migrate_personal_claude_md
 ensure_claude_md_includes
 link_dir_contents "$REPO_ROOT/claude/commands" "$HOME/.claude/commands"
+prune_skipped_dir_links "$HOME/.claude/commands" "$REPO_ROOT/claude/commands"
 
 prune_stale_plugin_links "$HOME/.claude/skills"
 prune_stale_plugin_links "$HOME/.claude/agents"
