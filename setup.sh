@@ -47,11 +47,11 @@ MANAGED_BEGIN="# >>> agent-config managed begin <<<"
 MANAGED_END="# >>> agent-config managed end <<<"
 
 # Every directory under plugins/ that carries a .claude-plugin/plugin.json is a
-# plugin this repo ships (currently dfadler-agent-config, bulletproof-react-skills,
-# and accessibility-skills) - discovered rather than hardcoded so adding one
-# doesn't require touching this list by hand. The trailing "/" restricts the
-# glob to directories; if plugins/ is ever empty the pattern itself fails the
-# -f test below and the loop body never runs, so no nullglob/-e guard is needed.
+# plugin this repo ships (currently dfadler-agent-config and accessibility-skills)
+# - discovered rather than hardcoded so adding one doesn't require touching this
+# list by hand. The trailing "/" restricts the glob to directories; if plugins/
+# is ever empty the pattern itself fails the -f test below and the loop body
+# never runs, so no nullglob/-e guard is needed.
 PLUGIN_SRCS=()
 PLUGIN_LINKS=()
 for plugin_dir in "$REPO_ROOT"/plugins/*/; do

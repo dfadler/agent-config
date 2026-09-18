@@ -180,6 +180,31 @@ add first, and updates arrive automatically. `setup.sh` doesn't install this: th
 deliberate (#132, option A over B), so this repo's own setup only ever reaches into
 content it actually owns.
 
+### Recommended companion: dfadler/bulletproof-react-skills
+
+[dfadler/bulletproof-react-skills](https://github.com/dfadler/bulletproof-react-skills)
+is a standalone Claude Code plugin — 7 React project-convention skills distilled from
+[alan2207/bulletproof-react](https://github.com/alan2207/bulletproof-react)'s
+`docs/*.md` (MIT licensed): project structure, state and data fetching, testing,
+performance, security, components and styling, and project standards. It used to live
+here as `plugins/bulletproof-react-skills/`, but React-specific content riding along in
+a plugin every project on this machine loads didn't fit this repo's cross-project scope
+(the same reasoning behind reverting the vercel-labs vendoring attempt below, #211), so
+it was extracted to its own repo (#226) once its generator/polish blockers (#217, #218)
+were done. Same content, same generator, same provenance — now distributed standalone
+rather than bundled here:
+
+```bash
+claude plugin marketplace add dfadler/bulletproof-react-skills
+claude plugin install bulletproof-react-skills
+```
+
+Like `anthropics/skills` below, this is **not** in the official marketplace, so it needs
+the `marketplace add` step first. `setup.sh` doesn't install this — same reasoning as
+`mattpocock-skills` (#132, option A over B) — and has no advisory check for it either:
+unlike the other companions in this section, this repo has no ongoing tooling
+relationship to it beyond having originated it.
+
 ### Recommended companion: vercel-labs/agent-skills
 
 [vercel-labs/agent-skills](https://github.com/vercel-labs/agent-skills) is Vercel
