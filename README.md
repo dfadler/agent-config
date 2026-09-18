@@ -38,49 +38,12 @@ automatically, with no per-project copy to keep in sync.
       hardcoded path.
 - `docs/` — reference material specific to this repo's own tooling and CI, not
   general enough for `claude/CLAUDE.md` (which is loaded globally, for every
-  project). `github-actions.md` is the first entry.
+  project). See [Further reading](#further-reading) below for the full list.
 
 Agents and skills used to live under `claude/`; they moved into the plugin in commit
 89a34ce. Nothing else moved — `CLAUDE.md` and `commands/` still sit under `claude/`.
-
-### How the plugin gets loaded
-
-Claude Code auto-loads any directory under `~/.claude/skills/` that carries a
-`.claude-plugin/plugin.json`, as `<name>@skills-dir` — no marketplace and no install
-step. It follows symlinks, so `setup.sh` links the whole
-`plugins/dfadler-agent-config/` directory to `~/.claude/skills/dfadler-agent-config`,
-and the plugin loads straight out of this working copy. Edits here are live in the next
-session; there's nothing to commit, push, or update first.
-
-Linking the plugin as a unit (rather than fanning its skills and agents out as
-individual symlinks, which is what `setup.sh` used to do) is what buys the plugin an
-identity — `claude plugin list` shows it with a version, `claude plugin disable` turns
-it off, `claude plugin details dfadler-agent-config` prints its component inventory and
-projected token cost, and `claude plugin validate plugins/dfadler-agent-config` checks
-the manifest and every skill/agent it contains. The plugin's `agents/` are discovered from
-inside it, so they don't get linked separately.
-
-Loading it this way *does* namespace what it contains: the plugin's skills and agents
-are exposed as `dfadler-agent-config:<name>`, not under bare names — in a live session
-that's `dfadler-agent-config:pr-babysit`, and the agent as
-`dfadler-agent-config:adversarial-reviewer`. What decides this is the `skills/`
-subdirectory, not the manifest: a directory that keeps its `SKILL.md` at its own root
-loads as a single skill under a bare name even when it does carry a
-`.claude-plugin/plugin.json`. Only a `skills/` subdirectory produces the
-`<plugin>:<skill>` form.
-
-The namespace is the whole collision story, which is why skills and agents here are
-named plainly — `pr-babysit`, not `dfadler-agent-config-pr-babysit`. They used to carry
-that prefix, from back when they were linked in individually and shared a flat namespace
-with every project's own skills; inside a namespaced plugin it only produced
-`generic-tools:dfadler-agent-config-pr-babysit`, saying the same thing twice.
-
-Sharing the plugin with another machine or person would need a
-`.claude-plugin/marketplace.json` at the repo root; that isn't here yet, and adding it
-later wouldn't change how this machine loads the plugin.
-
-A future tool gets its own sibling directory (e.g. `codex/`) with whatever layout that
-tool expects, symlinked into its own config location the same way.
+See [`docs/plugin-loading.md`](docs/plugin-loading.md) for how the plugin directory
+actually gets picked up by Claude Code and namespaced as `dfadler-agent-config:<name>`.
 
 ## Setup on a new machine
 
@@ -89,547 +52,69 @@ git clone git@github.com:dfadler/agent-config.git ~/Development/agent-config
 ~/Development/agent-config/setup.sh
 ```
 
-`setup.sh` generates `~/.claude/CLAUDE.md`'s managed section (`@include`-ing
-`claude/CLAUDE.md` plus the default set from `claude/conventions/DEFAULT_ENABLED`),
-symlinks the contents of `claude/commands/`, and symlinks the
-`plugins/dfadler-agent-config/` directory into `~/.claude/` in one pass. It's idempotent
-— re-run it any time after pulling to pick up new entries. It only takes over a target
-this repo already owns, or a symlink that's already broken; a real file, or a live
-symlink pointing anywhere else, is reported and left alone. That matters most for
-`~/.claude/skills/`, since that directory is shared with every other skills-dir plugin.
-
-It also removes links this repo made that are no longer canonical: the per-entry skill
-and agent symlinks older versions created (which would load the same skills twice
-alongside the plugin), and the link under the plugin's old `generic-tools` name, which
-the rename would otherwise leave dangling. Anything under `~/.claude/{skills,agents}`
-pointing into this repo's `plugins/` that isn't the current plugin link is stale by
-definition; links pointing anywhere else are left alone.
-
-### Installing a subset of features
-
-By default `setup.sh` installs everything — every slash command under `claude/commands/`
-and every plugin under `plugins/` — the same all-or-nothing behavior it has always had.
-Two flags narrow that, over the same flat namespace of feature names: a slash command's
-basename (`adversarial-review`, from `claude/commands/adversarial-review.md`) or a
-plugin's directory name (`dfadler-agent-config`, `accessibility-skills`, from
-`plugins/`). `./setup.sh --list-features` prints the exact names available on this
-checkout without linking anything.
-
-To leave specific features out and keep everything else, pass `--skip` with a
-comma-separated list:
-
-```bash
-./setup.sh --skip=adversarial-review,accessibility-skills
-```
-
-To install *only* specific features and leave everything else out, pass `--include`
-instead:
-
-```bash
-./setup.sh --include=adversarial-review,dfadler-agent-config
-```
-
-The two are opposite selections over the same names, so passing both in one run is
-rejected with an error rather than guessing which one wins. Naming a plugin opts out (or
-in) its skills, agents, and hooks together — a plugin is linked into `~/.claude/skills/`
-as a single unit (see "How the plugin gets loaded" above), so there's no finer-grained
-way to symlink only part of one.
-
-Neither flag is remembered across runs — it only applies to the run it's passed on.
-Re-running plain `./setup.sh` relinks anything a previous `--skip` or `--include` left
-out, and re-running with a *different* `--skip`/`--include` list links or unlinks
-whatever the change affects. All directions are idempotent: a repeated run with the same
-flags changes nothing.
-
-This is a separate mechanism from the per-project hook toggles described in
-`docs/hook-composition.md` — every hook in `dfadler-agent-config` already ships off by
-default and stays off until a project's own `.claude/settings.json` (or a session env
-var) opts it in, regardless of `--skip`/`--include`. Those flags control whether this
-machine gets the plugin (and therefore its hooks' *code*) at all; the per-project
-settings control whether an installed hook actually *does* anything in a given repo.
-
-### Runtime dependency: `pyte`
-
-The `detached-terminal` skill's `agent_term.py` is `#!/usr/bin/env python3`, so it runs
-under whatever `python3` is first on `PATH` when an agent invokes it. Nothing activates
-this repo's `.venv` (the one `make venv` builds for CI) on the skill's behalf, so a green
-`make check` says nothing about whether the skill can start — [`pyte`](https://github.com/selectel/pyte)
-has to be importable by that *ambient* interpreter.
-
-`setup.sh` checks it at the end of a run. If it's missing, the run still succeeds (the
-symlinks are correct either way) but it names the interpreter and prints the command:
-
-```bash
-python3 -m pip install --user pyte
-```
-
-Or let `setup.sh` do it:
-
-```bash
-./setup.sh --install-deps
-```
-
-That's opt-in because installing into an interpreter this repo doesn't own is a bigger
-claim than symlinking config. On a PEP 668 externally-managed interpreter — a Homebrew or
-distro `python3` — `pip install --user` is refused; `setup.sh` detects that up front and
-prints the real options (the OS package, `--break-system-packages`, or putting an
-interpreter you own first on `PATH`) rather than letting pip fail confusingly. The skill
-still carries its own "pyte is not installed" error as the last line of defence for anyone
-who skips setup.
-
-### Optional: pre-approving the Aikido Safe Chain installer
-
-Some repos' `CONTRIBUTING.md` ask contributors to install
-[Aikido Safe Chain](https://github.com/AikidoSec/safe-chain) — a free, tokenless CLI that
-wraps `npm`/`pnpm`/`npx`/`yarn` and blocks installs of packages flagged as malware or
-published in the last 48 hours. Its documented installer is a `curl | sh` pipeline pinned
-to an exact version and verified against a published sha256 before it runs — but Claude
-Code's auto-mode classifier blocks any pipe-to-shell installer by default, checksum or not.
-
-At the end of a run, `setup.sh` asks (interactively, y/n) whether to add a Bash permission
-rule to `~/.claude/settings.json` that pre-approves exactly that pinned command, so a future
-agent session doesn't have to stop and ask. It's an exact-string match tied to one specific
-version and checksum — not a blanket `curl *` allow — and it only *allowlists* the command;
-it doesn't run the installer itself. This is the reference example the
-`dfadler-agent-config:fetch-execute-guide` skill points to for when a standing,
-already-approved rule like this one is allowed to skip the ask-every-time default: the user
-approved this exact pinned command once, visibly, through this y/n prompt — a broad or
-wildcard rule never gets the same treatment. The prompt is skipped cleanly (no hang) when there's no
-interactive terminal, e.g. in CI or a piped run.
-
-Answer no, or run non-interactively, and nothing is written. Add the rule later with:
-
-```bash
-./scripts/offer-safe-chain-permission.sh --yes
-```
-
-or remove it any time from `~/.claude/settings.json`'s `permissions.allow` array.
-
-### Recommended companion: mattpocock/skills
-
-[mattpocock/skills](https://github.com/mattpocock/skills) is a separately maintained
-Claude Code plugin (TDD, diagnosing bugs, domain modeling, code review, and more) that
-this repo has used as a prior-art reference for idiomatic skill authoring — see issues #15
-and #132 for how and why. Nothing from it is vendored into this plugin; it's recommended
-as a standalone companion install, kept current by its own maintainer:
-
-```bash
-claude plugin install mattpocock-skills
-```
-
-It's in Claude Code's official marketplace — confirmed directly against
-`anthropics/claude-plugins-official`'s own manifest, not assumed — so there's nothing to
-add first, and updates arrive automatically. `setup.sh` doesn't install this: that's
-deliberate (#132, option A over B), so this repo's own setup only ever reaches into
-content it actually owns.
-
-### Recommended companion: dfadler/bulletproof-react-skills
-
-[dfadler/bulletproof-react-skills](https://github.com/dfadler/bulletproof-react-skills)
-is a standalone Claude Code plugin — 7 React project-convention skills distilled from
-[alan2207/bulletproof-react](https://github.com/alan2207/bulletproof-react)'s
-`docs/*.md` (MIT licensed): project structure, state and data fetching, testing,
-performance, security, components and styling, and project standards. It used to live
-here as `plugins/bulletproof-react-skills/`, but React-specific content riding along in
-a plugin every project on this machine loads didn't fit this repo's cross-project scope
-(the same reasoning behind reverting the vercel-labs vendoring attempt below, #211), so
-it was extracted to its own repo (#226) once its generator/polish blockers (#217, #218)
-were done. Same content, same generator, same provenance — now distributed standalone
-rather than bundled here:
-
-```bash
-claude plugin marketplace add dfadler/bulletproof-react-skills
-claude plugin install bulletproof-react-skills
-```
-
-Like `anthropics/skills` below, this is **not** in the official marketplace, so it needs
-the `marketplace add` step first. `setup.sh` doesn't install this — same reasoning as
-`mattpocock-skills` (#132, option A over B) — and has no advisory check for it either:
-unlike the other companions in this section, this repo has no ongoing tooling
-relationship to it beyond having originated it.
-
-### Recommended companion: vercel-labs/agent-skills
-
-[vercel-labs/agent-skills](https://github.com/vercel-labs/agent-skills) is Vercel
-Engineering's own React/Next.js skill collection, MIT licensed. Two of its skills came
-up while evaluating third-party React tooling for a refactor: `react-best-practices`
-(40+ performance rules) and `composition-patterns` (avoiding boolean-prop
-proliferation via compound components and state lifting). Recommended as a standalone
-install, same posture as `mattpocock-skills` above — nothing here depends on it, and
-nothing from it is vendored into this repo:
-
-```bash
-skills add vercel-labs/agent-skills --agent claude-code -g \
-  --skill vercel-react-best-practices vercel-composition-patterns
-```
-
-This isn't a `claude plugin` at all — Vercel distributes via a separate `skills` CLI
-(the `skills` npm package, from the [Agent Skills](https://agentskills.io/) spec /
-[skills.sh](https://skills.sh/vercel-labs/agent-skills)), confirmed directly against
-`vercel-labs/agent-skills`: it ships no `.claude-plugin/marketplace.json`. Skill names
-for `--skill` are each `SKILL.md`'s own `name:` field
-(`vercel-react-best-practices`), not its directory name — confirmed against a real
-probe install, not assumed from the README. `setup.sh` runs an advisory-only check
-(`check_react_skills`) that only fires if the `skills` CLI is already on `PATH` — it
-never runs `npx skills@latest` itself, since that would fetch and execute a
-third-party package over the network on every `setup.sh` run. The same reasoning
-applies to an agent running the `skills add`/`npx skills@latest` command above on the
-user's behalf: it's a fetch-and-execute install, not an ordinary dependency change, so
-it needs explicit, per-run permission — see the
-`dfadler-agent-config:fetch-execute-guide` skill.
-
-An earlier version of this section vendored these two skills into their own plugin
-here instead of referencing them — reverted (#211's review) once it turned out `skills
-add` *does* support installing individual skills (`--skill <names>`), which was the
-premise vendoring was based on. Reference-only is more consistent with this repo's own
-#132 precedent: let upstream stay the source of truth with its own update story, rather
-than freezing a copy that goes stale silently.
-
-### Recommended companion: anthropics/skills (frontend-design)
-
-[anthropics/skills](https://github.com/anthropics/skills) is Anthropic's own example
-skills repo. Its `example-skills` plugin includes `frontend-design`, aimed at UI/CSS
-output quality — a useful companion to `composition-patterns` above, which covers
-component *architecture* rather than visual polish. Recommended as a standalone
-install, same posture as `mattpocock-skills` above — nothing here depends on it:
-
-```bash
-claude plugin marketplace add anthropics/skills
-claude plugin install example-skills
-```
-
-Unlike `mattpocock-skills`, this one is **not** in the official marketplace (checked
-directly against `anthropics/claude-plugins-official`'s manifest — absent), so it needs
-the `marketplace add` step first; updates after that arrive automatically the same way.
-`setup.sh` runs an advisory-only check (`check_frontend_design`) and prints the install
-command above if it's missing — it doesn't install it.
-
-### Linux administration skill: first-party, not vendored
-
-Issue #214 asked whether this repo should add a skill/agent for Linux system
-administration (package management, systemd, users/permissions, SSH/firewall
-hardening, log/service triage). A deep-research pass (5 search angles, 21
-sources, 82 claims, 25 adversarially verified) found two candidate
-third-party bundles:
-
-- [HermeticOrmus/linux-sysadmin-skills](https://github.com/HermeticOrmus/linux-sysadmin-skills) —
-  five Debian/Ubuntu-targeted skills (`sysadmin-security`,
-  `sysadmin-performance`, `sysadmin-diagnose`, `sysadmin-monitor`,
-  `sysadmin-maintain`).
-- [billyfranklim1/claude-skills](https://github.com/billyfranklim1/claude-skills) —
-  `linux-service-triage` and `sysadmin-toolbox`.
-
-Neither cleared the bar this repo has applied to every other companion
-recommendation above (mattpocock/skills, vercel-labs/agent-skills,
-anthropics/skills): a maintained, reasonably adopted source with checkable
-provenance.
-
-- **HermeticOrmus/linux-sysadmin-skills**: 3 stars, created and last pushed
-  the same calendar day, no activity since. The author's ~100-repo history
-  is a templated "-skills" bundle churned out across dozens of unrelated
-  domains (`auto-docs-skills`, `dx-audit-skills`, `git-workflow-skills`,
-  `commit-standard-skills`, `google-docs-drive-toolkit`, …), almost all
-  with 0-2 stars — evidence of a generator pattern, not a maintained,
-  dogfooded tool.
-- **billyfranklim1/claude-skills**: 0 stars, 0 forks.
-- Both READMEs claim their skills are "read-first" and "confirm before
-  anything destructive runs." Reading the actual `SKILL.md` content
-  directly (not just the README) shows this is unenforced prose — a
-  checklist plus a one-line "explain the risks first" instruction, no
-  `allowed-tools` restriction or scripted confirmation gate. This repo's
-  own skills take the same posture (see "Why skills here don't declare
-  `allowed-tools`" below) but don't market themselves as
-  "safe-by-default" — these READMEs make a safety claim their content
-  doesn't back up.
-- No first-party (Anthropic or major-vendor) Linux-administration skill
-  exists, and no mainstream skill directory treats it as a category.
-
-**Decision: no-go on vendoring either bundle.** Recommending either would
-mean pointing users at unvetted, low-adoption, single-author content on the
-strength of marketing language in its own README — a materially lower bar
-than every other companion in this section. Recorded here so this isn't
-re-investigated from scratch by the next issue or session — see #214 for
-the full research trail.
-
-Issue #238 followed up by writing this repo's own Linux administration
-skill from scratch instead, to the bar the third-party bundles above
-failed: `dfadler-agent-config:linux-administration`
-(`plugins/dfadler-agent-config/skills/linux-administration/`). It sorts
-package management, systemd service management, filesystem operations,
-user/permission management, disk partitioning, and firewall/network
-configuration into three mechanical tiers (safe / needs-confirmation /
-never-autonomous) rather than a prose safety reminder, scopes itself
-explicitly to systemd-based distros (Debian/Ubuntu, Fedora/RHEL, Arch), and
-requires citing the relevant man page or official docs for any
-version-sensitive command-behavior claim. See that skill's `SKILL.md` for
-the full model.
-
-### Recommended companion: aws/agent-toolkit-for-aws (aws-core)
-
-[Agent Toolkit for AWS](https://github.com/aws/agent-toolkit-for-aws) is AWS's own,
-GA-status, Amazon Web Services-authored successor to the older `awslabs/mcp` server
-collection and the now-deprecated `aws-dev-toolkit` sample plugin — both surfaced by
-an earlier investigation into AWS administration support (#213) and found, on
-re-verification, to already be mid-migration to this toolkit. Its `aws-core` plugin
-bundles CDK/CloudFormation authoring, core AWS services, and cost/billing tooling
-(Cost Explorer, Savings Plans, Compute Optimizer) together with the toolkit's AWS MCP
-Server configuration — covering the IaC and cost/FinOps areas #213 asked about in one
-install. Recommended as a standalone companion, same posture as `mattpocock-skills`
-above — nothing here depends on it, and nothing from it is vendored:
-
-```bash
-claude plugin install aws-core@claude-plugins-official
-```
-
-It's in Claude Code's official marketplace — confirmed directly against
-`anthropics/claude-plugins-official`'s own manifest, the same as `mattpocock-skills`
-— so there's nothing to add first, and updates arrive automatically. Live AWS API
-calls (deployments, cost queries) need local AWS credentials configured the normal
-way (`aws configure`); documentation search and skill guidance work without them.
-Credential and permission handling for those live calls is the toolkit's own concern,
-not something this repo wraps — the tradeoff of reference-don't-vendor, same as the
-other companions in this section. `setup.sh` doesn't install this — same reasoning as
-`mattpocock-skills` (#132, option A over B) — but does run an advisory check
-(`check_aws_core`).
-
-For the third area #213 asked about, security auditing, the same toolkit ships
-`aws-agents-for-devsecops` (vulnerability scanning and an AWS Security Agent for
-release-readiness review), also listed directly in the official marketplace:
-
-```bash
-claude plugin install aws-agents-for-devsecops@claude-plugins-official
-```
-
-Not given its own `setup.sh` check: unlike `aws-core`, it needs a plugin-specific
-`/aws-agents-for-devsecops:setup` step before use, so a plain installed/not-installed
-check would understate what "ready to use" means for it.
-
-### Recommended companion: rtk-ai/rtk (token compression)
-
-[RTK](https://www.rtk-ai.app/) ([rtk-ai/rtk](https://github.com/rtk-ai/rtk)) is a
-standalone Rust CLI, Apache-2.0 licensed, that sits between Claude Code and the shell:
-a `PreToolUse` hook rewrites a Bash tool call before it runs (`git status` becomes
-`rtk git status`, and likewise for 100+ other git/test/lint/build/infra commands) so
-noisy, repetitive output gets filtered, grouped, truncated, and deduplicated before it
-ever reaches the model's context — real error messages and failures are preserved.
-Per RTK's own docs, the hook only covers Bash tool calls; built-in tools like `Read`,
-`Grep`, and `Glob` bypass it entirely. Provenance checked directly against
-`rtk-ai/rtk`'s GitHub API (not taken from its marketing page): Apache-2.0 confirmed,
-80K+ stars, 5,100+ forks, 30 contributors, and an active multi-times-daily release
-cadence as of 2026-09 — worth noting the repo itself is young (created 2026-01), so
-that's a lot of adoption in under eight months; nothing here changes because of that,
-it's just context for whoever reads this next.
-
-Recommended as a standalone companion, same reference-don't-vendor posture as every
-other entry in this section — nothing here depends on it:
-
-```bash
-brew install rtk-ai/tap/rtk
-```
-
-Prefer the Homebrew tap or a pre-built binary from
-[GitHub Releases](https://github.com/rtk-ai/rtk/releases) over RTK's own
-`curl | sh` one-liner — piping a remote script into a shell is a fetch-and-execute
-install and needs the explicit, per-run permission the
-`dfadler-agent-config:fetch-execute-guide` skill describes, the same as any other
-`curl | sh`/`npx <pkg>@latest` command. That gate applies whether a human runs it
-themselves or asks an agent to.
-
-Installing the binary does not activate anything — that needs a separate
-`rtk init --global`, which (per RTK's own docs) modifies shell rc files *and* adds a
-`PreToolUse` hook entry to Claude Code's own settings, then requires restarting
-Claude Code to take effect. Modifying `.claude/settings.json` hooks is itself a
-security-critical action under this repo's own standing rule (see global `CLAUDE.md`'s
-GitHub-workflow section on security-critical paths) — so an agent should never run
-`rtk init --global` (or the installer above) on the user's behalf without asking
-first, the same as it would never silently edit a hooks file for any other reason.
-`rtk init --show` previews what the hook would change without applying it, and
-`rtk init -g --uninstall` reverts the hook, `RTK.md`, and the settings entries it
-added.
-
-`setup.sh` runs an advisory-only check (`check_rtk`) that reports whether the `rtk`
-binary is on `PATH` and prints the install command above if it's missing — same
-posture as `check_react_skills`: it never runs the installer or `rtk init --global`
-itself, since both are exactly the kind of side effect that needs asking first rather
-than happening automatically on every `setup.sh` run.
-
-## Removing from a machine
+`setup.sh` symlinks `claude/commands/`, generates `~/.claude/CLAUDE.md`'s managed
+section, and links the `plugins/dfadler-agent-config/` directory into `~/.claude/` in
+one idempotent pass. It supports installing only a subset of features
+(`--skip`/`--include`), can install an optional runtime dependency (`pyte`) for the
+`detached-terminal` skill, and can pre-approve one pinned installer command. Full
+details: [`docs/setup.md`](docs/setup.md).
 
 ```bash
 ~/Development/agent-config/teardown.sh
 ```
 
-`teardown.sh` is the inverse of `setup.sh`: it removes every symlink this repo
-created in `~/.claude` and restores `~/.claude/CLAUDE.md` from
-`~/.claude/CLAUDE.personal.md`. If `CLAUDE.personal.md` is non-empty (your original
-`CLAUDE.md` before setup.sh migrated it), it is moved back to `CLAUDE.md`. If it's
-empty (the placeholder setup.sh created when there was nothing to migrate), it is
-removed and `CLAUDE.md` is left absent.
+`teardown.sh` is the inverse — removes every symlink this repo created and restores
+your original `~/.claude/CLAUDE.md`. Safe to re-run. See
+[`docs/setup.md`](docs/setup.md#removing-from-a-machine).
 
-Only symlinks that point into this repo are removed. Foreign symlinks — including any
-other skills-dir plugins under `~/.claude/skills/` — are left untouched.
+### Recommended companions
 
-It's safe to re-run: a second pass is silent.
+A handful of separately maintained plugins and tools (mattpocock/skills,
+bulletproof-react-skills, vercel-labs/agent-skills, anthropics/skills'
+`frontend-design`, AWS's Agent Toolkit, rtk) pair well with this repo but aren't
+vendored into it. See [`docs/companion-plugins.md`](docs/companion-plugins.md) for
+what each one does and how to install it.
 
 ## Adding something new
 
-1. Put it in the right place:
-   - A **skill** → a new directory under `plugins/dfadler-agent-config/skills/`,
-     containing a `SKILL.md`.
-   - An **agent** → a new `.md` file under `plugins/dfadler-agent-config/agents/`.
-   - A **slash command** → a new `.md` file under `claude/commands/`.
-   - A **hook** → an entry in `plugins/dfadler-agent-config/hooks/hooks.json`,
-     pointing (via `${CLAUDE_PLUGIN_ROOT}`) at a script under wherever fits — a
-     related skill's own `scripts/`, if the hook is that skill's companion. Unlike
-     everything else in this list, a hook activates for every project this plugin
-     is enabled in the moment it's added — there's no opt-in step on the
-     project's side — so it needs to be safe to run unconditionally: no-op
-     cleanly (exit 0, no output) whenever its precondition doesn't hold (wrong
-     project type, feature not configured, required CLI missing), and never let
-     the hook's own failure block a session start. The `git-worktree-usage`
-     skill's two `SessionStart` hooks are the reference example.
-   - A whole new **plugin** (a set of skills/agents that belong together) → a new
-     directory under `plugins/`, with its own `.claude-plugin/plugin.json`, `agents/`,
-     and `skills/`. Give it a `PLUGIN_SRC`/`PLUGIN_LINK` pair and a `link` line in
-     `setup.sh`, which only knows about `dfadler-agent-config`. Keep the directory name
-     and the manifest `name` identical.
-2. Name skills and agents plainly — `pr-babysit`, not `dfadler-agent-config-pr-babysit`
-   — in both the directory/filename and the frontmatter `name:`. The plugin namespace
-   already prevents collisions with a project's own skills, so a prefix here would just
-   repeat it. Commands stay unprefixed for a different reason: `claude/commands/` is
-   linked entry-by-entry into `~/.claude/commands/`, outside any plugin, so those names
-   really are flat.
-3. Run `claude plugin validate plugins/dfadler-agent-config` — it checks the manifest
-   and parses the frontmatter of every skill and agent inside.
-4. Run `make check` (see below) before pushing.
-5. Commit and push. A new skill or agent inside an already-linked plugin needs no
-   `setup.sh` re-run; anything under `claude/`, or a whole new plugin, does.
-
-### Why skills here don't declare `allowed-tools`
-
-An automated reviewer (SkillSpector, via CodeRabbit on #51) flags every `SKILL.md`
-under `plugins/dfadler-agent-config/skills/` for "unrestricted tool access" and
-recommends adding `allowed-tools` frontmatter as a remediation. This was decided
-deliberately in #63, not overlooked — recorded here so it isn't re-litigated by the
-next bot or reviewer that runs the same check.
-
-`allowed-tools` doesn't do what the finding assumes. In Claude Code, it's a
-pre-approval list, not a restriction: tools it names skip the permission prompt for
-that turn, but every tool remains callable regardless of what's listed — governed by
-the user's own permission settings, the same as if the skill didn't exist. The field
-that actually removes tools from the pool is `disallowed-tools`, which the finding
-doesn't ask for and which doesn't fit here anyway (see below). Declaring
-`allowed-tools` in the spirit the finding wants — as a security boundary — would
-misrepresent what the field does to the next reader, which is worse than the current
-silence.
-
-Even setting the mechanism aside, an allowlist doesn't fit this plugin's actual
-skills:
-
-- **Advisory/methodology skills** (`pr-review-rubric`) don't call tools themselves —
-  they're guidance the orchestrating turn follows. An allowlist on a skill like this
-  describes nothing real; the tools in play belong to whatever task invoked it.
-- **Legitimately broad skills** (`pr-babysit`) read, edit, run `gh`, push, and rerun
-  CI as its actual job. A "minimal" list for it would just restate "most tools,"
-  adding a maintenance burden with no corresponding safety gain.
-- **Narrow skills** (`gh-attach-image`, `pr-visual-capture`) could carry an accurate
-  short list, but accuracy for two skills isn't worth an inconsistent, partially-
-  fictional convention across the other three.
-
-The real boundary is the one this repo's global `CLAUDE.md` and every session already
-operate under: Claude Code's permission rules, hooks, and the active permission mode
-enforce tool access, regardless of what any skill's frontmatter claims. `CLAUDE.md`
-and skill instructions — including a skill's own `allowed-tools` — are behavioral
-guidance the model follows, not an enforcement layer; only `settings.json`
-permission rules and hooks actually gate a tool call. A skill-level allowlist that
-can't restrict anything would be a paper boundary layered on top of the real one —
-worth avoiding on those grounds even before the mechanism question above.
-
-## Checks
-
-`make check` runs everything CI runs, and CI calls these same targets — so a green
-run locally means the same thing a green PR does.
-
-```bash
-make check          # lint + structure + typecheck + test + actionlint + coverage
-```
-
-| Target | What it does |
-| --- | --- |
-| `make lint-sh` | `shellcheck`, `shfmt -i 2 -ci -d`, and the `set -uo pipefail` convention |
-| `make lint-py` | `ruff check` and `ruff format --check` |
-| `make typecheck` | `mypy --strict` over the Python sources |
-| `make structure` | Plugin manifests and skill/agent frontmatter agree with their directories |
-| `make test-sh` | `bats` suites under `scripts/tests/` |
-| `make test-py` | `pytest` suite under `scripts/tests/` |
-| `make coverage` | Re-runs the `bats` suites under `kcov` and enforces the coverage floor (Linux only) |
-| `make fmt` | Rewrites sources to the repo's `shfmt` / `ruff` style |
-| `make lint-actions` | `actionlint` over `.github/workflows/` |
-
-```bash
-brew install shellcheck shfmt bats-core actionlint
-make venv          # Python side: .venv from requirements-dev.txt
-```
-
-`make check` uses `.venv` when it exists and otherwise falls back to whatever
-`python3` is on `PATH`, so a shell-only change doesn't require building one.
-
-`make coverage` needs `kcov` and `jq` on top of the tools above. It only measures
-anything on Linux: kcov instruments bash by injecting a library into the traced
-shell, and macOS SIP strips that from `/bin/bash`, so on a Mac the target says so
-and skips rather than reporting a meaningless 0%. The floor it enforces is a
-measured baseline (see the `coverage` target in the `Makefile` for the number, how
-it was taken, and what is and isn't in the denominator) — a regression gate, not a
-target to design tests around.
-
-Two checks exist because a linter can't express them. `check-shell-set-flags.sh`
-enforces the `set -uo pipefail` opener from the global `CLAUDE.md`, which shellcheck
-has no rule for. `check-plugin-structure.sh` is the closest thing to a typechecker a
-shell-and-Markdown repo can have: this repo's *product* is declarative metadata, and a
-skill whose `name:` drifts from its directory fails silently at load time rather than
-loudly in review — which is exactly what the plugin rename could have caused.
-
-The `bats` suites are hermetic: `HOME` is redirected into a sandbox and the network
-binaries are shimmed to fail loudly, so a test can never touch your real `~/.claude`
-even though `setup.sh`'s whole job is writing symlinks into it. The `pytest` suite
-forks real PTYs, with `AGENT_TERM_STATE` redirected per test and every session torn
-down in a fixture, so it can't collide with a live session either.
-
-## GitHub operations
-
-This repo uses the `gh` CLI for all GitHub operations — issues and PRs, review
-comments, CI checks, labels, and repo settings changes like branch protection.
-Not the web UI, not raw `curl` against the REST API, not a GitHub MCP
-connector. When `gh` has no dedicated subcommand, `gh api` is the escape
-hatch — still authenticated and scriptable — rather than dropping to `curl`
-with a hand-managed token. Non-obvious ones worth knowing: `gh run view
-<run-id> --log-failed` to diagnose a CI failure without opening a browser,
-`gh api repos/<owner>/<repo>/pulls/<pr>/comments/<id>/replies` to reply to an
-inline review comment, and `gh api -X PUT .../branches/main/protection` for
-repo settings that have no `gh` subcommand.
+Skills, agents, and slash commands each have a specific place to go, a naming
+convention (no `dfadler-agent-config-` prefix — the plugin namespace already prevents
+collisions), and a `make check` pass before pushing. See
+[`docs/contributing.md`](docs/contributing.md) for the full checklist, why skills
+here don't declare `allowed-tools`, the `make check` target reference, and this
+repo's `gh`-only convention for GitHub operations.
 
 ## What belongs here vs. in a project
 
 If a rule/skill/agent only makes sense with a specific repo's paths, scripts, or stack
 knowledge baked in, it stays in that project's own `.claude/`. This repo is for the
-parts that would otherwise get copy-pasted into every new project's config.
+parts that would otherwise get copy-pasted into every new project's config, and it's a
+**portable-subset collector**, not a single upstream source of truth — content flows in
+both directions depending on where the work actually happens. See
+[`docs/scope.md`](docs/scope.md) for the full reasoning, including when a project's own
+copy of something is a deliberate fork rather than drift to reconcile.
 
-This repo is a **portable-subset collector**, not a single upstream source of truth.
-In practice, a skill's substantive work often happens in whichever project needs it
-first — under that project's own PR review, with that project's context — and a
-genericized version lands here afterward, stripped of repo-specific paths and
-tooling references. Content flows in both directions depending on where the work
-actually happens; there's no fixed "canonical" side.
+## Further reading
 
-One consequence: a project may keep its own copy of something that also lives here,
-if that project's CI needs it — GitHub Actions runners check out only the repo, not
-this machine's `~/.claude`, so anything a CI job invokes (a skill it `cat`s into a
-prompt, a rubric it loads) has to physically exist in that repo. Some of these copies
-are meant to diverge permanently and by design — a project's copy keeps repo-specific
-sections that never belonged here, while this repo keeps only the generic structure —
-and that's a legitimate fork, not drift to reconcile. Others are copies that happened
-to fall out of sync with no one noticing; those are worth fixing when the cost of the
-divergence actually shows up (the same bug fixed twice, independently), not on a fixed
-sync schedule or via automated tooling. When in doubt about which kind a given copy
-is, check whether the divergence is a deliberate structural choice (different
-architecture, not just newer content) before assuming it needs reconciling.
+- [`docs/setup.md`](docs/setup.md) — setup, subset installs, teardown, and the
+  optional `pyte`/Aikido Safe Chain pieces.
+- [`docs/plugin-loading.md`](docs/plugin-loading.md) — how the plugin directory
+  becomes `dfadler-agent-config:<name>` in a live session.
+- [`docs/companion-plugins.md`](docs/companion-plugins.md) — recommended standalone
+  installs (mattpocock/skills, bulletproof-react-skills, vercel-labs/agent-skills,
+  anthropics/skills, AWS Agent Toolkit, rtk) and the Linux-administration
+  vendor-vs-build-it-here decision.
+- [`docs/contributing.md`](docs/contributing.md) — adding a skill/agent/command/hook,
+  the `allowed-tools` decision, `make check`, and GitHub operations via `gh`.
+- [`docs/scope.md`](docs/scope.md) — what belongs in this repo vs. a project's own
+  `.claude/`.
+- [`docs/hook-composition.md`](docs/hook-composition.md) — how this plugin's hooks
+  compose with hooks from other plugins.
+- [`docs/prompt-injection-defense.md`](docs/prompt-injection-defense.md) — the
+  layered defense model for content Claude reads via web search, PRs, or issues.
+- [`docs/settings-json-environment-audit.md`](docs/settings-json-environment-audit.md) —
+  environment-layer companion to the prompt-injection doc.
+- [`docs/github-actions.md`](docs/github-actions.md) — writing, hardening, and
+  debugging this repo's own `.github/workflows/`.
+- [`docs/usage-optimization.md`](docs/usage-optimization.md) — where Claude Code cost
+  is spent in this repo.

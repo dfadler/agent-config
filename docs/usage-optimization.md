@@ -279,9 +279,10 @@ first shipped) are all on-demand (loaded only on invocation, per the
 plugin-details always-on/on-invoke split in §3) rather than baked into
 `CLAUDE.md`, which is
 the correct default per the docs' own "Move instructions from CLAUDE.md to
-skills" guidance. `README.md:170-181` shows this was a deliberate design
-choice (weighing whether to add `allowed-tools` per-skill vs. leaning on
-`settings.json`), not an accident.
+skills" guidance. [`docs/contributing.md`'s "Why skills here don't declare
+`allowed-tools`"](./contributing.md#why-skills-here-dont-declare-allowed-tools)
+shows this was a deliberate design choice (weighing whether to add
+`allowed-tools` per-skill vs. leaning on `settings.json`), not an accident.
 
 The one thing genuinely mismatched between "always loaded" and "often
 irrelevant" is `CLAUDE.md` itself, covered in depth in §2 — restated briefly
