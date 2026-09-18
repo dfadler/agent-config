@@ -7,6 +7,10 @@ set -uo pipefail
 # SessionStart entry, and verify-worktree-symlinks.sh's own header for what
 # it checks and why.
 #
+# Off by default — a project must opt in (WORKTREE_SYMLINK_CHECK=on, or
+# worktree.symlinkCheck: "on" in .claude/settings.json) before this hook
+# does anything.
+#
 # Runs ONLY locally — a cloud/remote session has no worktrees to check.
 # Always exits 0, regardless of what the underlying check finds; a session
 # start must never be blocked by a symlink health check.
@@ -15,17 +19,23 @@ if [ "${CLAUDE_CODE_REMOTE:-}" = "true" ]; then
   exit 0
 fi
 
-# Inhibit: env var (session-level) or worktree.symlinkCheck in settings.json.
+# Resolve env-var level (session override).
 case "${WORKTREE_SYMLINK_CHECK:-}" in
   0 | false | no | off) exit 0 ;;
+  1 | true | yes | on) : ;; # explicit opt-in, fall through to run the check
+  *)
+    # Not set via env var — fall back to settings.json; default off.
+    enabled=0
+    if git_toplevel="$(git rev-parse --show-toplevel 2>/dev/null)"; then
+      settings="$git_toplevel/.claude/settings.json"
+      if [ -f "$settings" ] && command -v jq >/dev/null 2>&1; then
+        val="$(jq -r '.worktree.symlinkCheck // "off"' "$settings" 2>/dev/null)"
+        [ "$val" = "on" ] && enabled=1
+      fi
+    fi
+    [ "$enabled" = "1" ] || exit 0
+    ;;
 esac
-if git_toplevel="$(git rev-parse --show-toplevel 2>/dev/null)"; then
-  settings="$git_toplevel/.claude/settings.json"
-  if [ -f "$settings" ] && command -v jq >/dev/null 2>&1; then
-    val="$(jq -r '.worktree.symlinkCheck // "on"' "$settings" 2>/dev/null)"
-    [ "$val" = "off" ] && exit 0
-  fi
-fi
 
 script_dir="$(cd "$(dirname "$0")" && pwd)"
 script="$script_dir/verify-worktree-symlinks.sh"

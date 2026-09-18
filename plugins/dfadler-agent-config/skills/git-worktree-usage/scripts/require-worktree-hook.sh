@@ -4,12 +4,14 @@ set -uo pipefail
 # PreToolUse hook: block/warn/allow Edit and Write tool calls based on whether
 # the cwd is the main git checkout rather than a linked worktree.
 #
+# Off by default — a project must opt in before this hook does anything.
+#
 # Enforce mode (highest priority first):
 #   1. WORKTREE_ENFORCE env var (session-level override):
-#      0/false/no/off → off; warn → warn; anything else → from settings
+#      0/false/no/off → off; warn → warn; block → block; anything else → from settings
 #   2. worktree.enforce in .claude/settings.json (project config):
 #      "block" | "warn" | "off"
-#   3. Default: block
+#   3. Default: off
 #
 # Always skipped in cloud/remote sessions (no worktrees there).
 
@@ -25,6 +27,7 @@ env_mode=""
 case "${WORKTREE_ENFORCE:-}" in
   0 | false | no | off) env_mode="off" ;;
   warn) env_mode="warn" ;;
+  block) env_mode="block" ;;
 esac
 
 # Must be inside a git repo to apply.
@@ -40,9 +43,9 @@ enforce_mode="$env_mode"
 if [ -z "$enforce_mode" ]; then
   toplevel="$(git rev-parse --show-toplevel 2>/dev/null)"
   settings="$toplevel/.claude/settings.json"
-  enforce_mode="block"
+  enforce_mode="off"
   if [ -f "$settings" ] && command -v jq >/dev/null 2>&1; then
-    val="$(jq -r '.worktree.enforce // "block"' "$settings" 2>/dev/null)"
+    val="$(jq -r '.worktree.enforce // "off"' "$settings" 2>/dev/null)"
     case "$val" in
       off | warn | block) enforce_mode="$val" ;;
     esac
