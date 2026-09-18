@@ -36,30 +36,55 @@ see the PR this ships in for why.
 
 ### 1. Model tier selection
 
-**Confirmed.** Exactly one `model:` override exists anywhere in the plugin:
-`plugins/dfadler-agent-config/agents/adversarial-reviewer.md:12` sets
-`model: opus`. No other agent or skill sets a model. This is also the *only*
-subagent defined in the whole repo (`plugins/dfadler-agent-config/agents/`
-has one file), so there's no fan-out of cheap-task-on-expensive-model to find
-— the finding is narrower than the issue anticipated: there's one override,
-and it's arguably the right kind of task for it.
+**Confirmed — updated since this audit first shipped (2026-08-29).** Three
+`model:` overrides now exist in the plugin, one per agent (`grep -rn
+'^model:' plugins/dfadler-agent-config/agents/*.md`):
+
+- `plugins/dfadler-agent-config/agents/adversarial-reviewer.md:12` — `model: opus`
+- `plugins/dfadler-agent-config/agents/docs-staleness-checker.md:17` — `model: sonnet`
+- `plugins/dfadler-agent-config/agents/shell-script-reviewer.md:13` — `model: haiku`
+
+No skill sets a model — only agents carry a `model:` field in this plugin.
+The original version of this finding said "exactly one override" and "the
+only subagent defined in the whole repo"; both are now stale —
+`plugins/dfadler-agent-config/agents/` has three files, not one, and each
+picks a different tier.
 
 The official guidance: "Sonnet handles most coding tasks well and costs less
 than Opus. Reserve Opus for complex architectural decisions or multi-step
 reasoning... For simple subagent tasks, specify `model: haiku` in your
 subagent configuration." ([code.claude.com/docs/en/costs](https://code.claude.com/docs/en/costs))
-`adversarial-reviewer.md` is explicitly a "hunt for hidden bugs, security
-flaws, concurrency issues... follow calls into their definitions and check
-the callers of anything you touch" agent (`adversarial-reviewer.md:19-51`) —
-that's multi-step, cross-file reasoning, which is the exact class Opus is
-reserved for, not the "simple subagent task" class the docs point at Haiku.
-The file has no comment explaining *why* Opus was chosen, so the choice reads
-as plausible-by-task-shape rather than a documented decision.
+Read against that guidance, each of the three choices matches the task shape
+it's assigned to:
 
-Confidence: model-tier fact is Confirmed (grep + read). Whether Opus is
-*necessary* here vs. Sonnet-with-escalation is Speculative — that would need
-a real before/after comparison of review quality on the same diffs, which
-this audit can't run.
+- **`adversarial-reviewer` → opus.** "Hunt for hidden bugs, security flaws,
+  concurrency issues... follow calls into their definitions and check the
+  callers of anything you touch" (`adversarial-reviewer.md:19-51`) is
+  multi-step, cross-file reasoning — the class the docs reserve Opus for.
+- **`docs-staleness-checker` → sonnet.** Cross-referencing prose claims
+  against code/config across a whole doc tree, checking named scripts,
+  commands, and counts still match reality (`docs-staleness-checker.md:19-40`),
+  is ordinary coding-adjacent reasoning — the "most coding tasks" class the
+  docs point at Sonnet.
+- **`shell-script-reviewer` → haiku.** Running shellcheck/shfmt and checking
+  a fixed checklist (`set -uo pipefail` placement, a justification comment
+  above each disable, `-h`/`--help` handling) against explicit named rules
+  (`shell-script-reviewer.md:33-79`) is the "simple subagent task" class the
+  docs point at Haiku.
+
+None of the three files has a comment explaining *why* that tier was chosen,
+so all three still read as plausible-by-task-shape rather than documented
+decisions. But this changes the shape of the finding from the original
+version: it's no longer one isolated, unexplained override to question —
+it's a small, undocumented but seemingly well-calibrated tier ladder, with
+each agent's cost matched to its reasoning complexity per the docs' own
+criteria.
+
+Confidence: the three overrides and their task-shape match are Confirmed
+(grep + read of all three files). Whether Opus specifically is *necessary*
+for `adversarial-reviewer` vs. Sonnet-with-escalation remains Speculative —
+that would need a real before/after comparison of review quality on the same
+diffs, which this audit can't run.
 
 ### 2. Prompt caching: is CLAUDE.md a stable, cache-friendly prefix?
 
@@ -129,7 +154,14 @@ relevant every session.
 **Confirmed: no problematic fan-out found in this repo.**
 `claude/commands/adversarial-review.md` launches exactly one subagent
 (`dfadler-agent-config:adversarial-reviewer`, `adversarial-review.md:5`) per
-invocation — no parallel fan-out to audit here. The issue's own text names
+invocation — no parallel fan-out to audit here. The plugin now defines two
+more agents, `shell-script-reviewer` and `docs-staleness-checker` (§1), but
+neither is wired to a slash command or any other in-repo caller (`grep -rln`
+for either name across `claude/commands/` and
+`plugins/dfadler-agent-config/skills/` returns nothing) — they're invoked
+only via the generic Agent-tool selection a session makes from their
+descriptions, one at a time, not fanned out from a command. This finding
+still holds with three agents in the repo instead of one. The issue's own text names
 `pr-review-rubric` as an example to check for fan-out, but
 `plugins/dfadler-agent-config/skills/pr-review-rubric/SKILL.md` is a
 **methodology/rubric skill**, not an orchestrator — it explicitly says "This
@@ -147,45 +179,79 @@ this audit's visibility.
 
 **One real, sizeable cost exists within this repo's own boundary:** the
 rubric's *own* size. `claude plugin details dfadler-agent-config` (measured,
-not estimated by hand) reports:
+not estimated by hand, re-run for this update) now reports:
 
 ```text
-Projected token cost
-  Always-on:   ~1,243 tok   added to every session
+Component inventory
+  Skills (16)  changesets-authoring, collab-retro, detached-terminal,
+               fetch-execute-guide, gh-attach-image, gh-publish-guide,
+               git-worktree-usage, github-pr-workflow,
+               issue-reporter-etiquette, linux-administration, pr-babysit,
+               pr-checks, pr-comments, pr-review-rubric, pr-visual-capture,
+               typescript-conventions
+  Agents (3)   adversarial-reviewer, shell-script-reviewer,
+               docs-staleness-checker
 
-Per-component (rounded)
-  component             always-on  on-invoke
-  gh-attach-image            ~210      ~1.5k
-  pr-visual-capture          ~160      ~4.1k
-  pr-babysit                 ~230      ~3.5k
-  pr-review-rubric           ~250      ~8.8k
-  detached-terminal          ~270      ~2.3k
-  adversarial-reviewer       ~130       ~880
+Projected token cost
+  Always-on:   ~4,121 tok   added to every session
+
+Per-component (rounded, highest on-invoke first)
+  component                 always-on  on-invoke
+  pr-review-rubric               ~340     ~10.4k
+  pr-visual-capture              ~210      ~6.1k
+  linux-administration           ~340      ~5.5k
+  pr-comments                    ~210      ~4.6k
+  pr-babysit                     ~260      ~4.4k
+  git-worktree-usage             ~250        ~4k
+  changesets-authoring           ~220      ~2.7k
+  detached-terminal              ~270      ~2.3k
+  issue-reporter-etiquette       ~220        ~2k
+  gh-publish-guide               ~240      ~1.9k
+  shell-script-reviewer          ~160      ~1.9k
+  gh-attach-image                ~210      ~1.5k
+  collab-retro                   ~210      ~1.5k
+  github-pr-workflow              ~80      ~1.4k
+  fetch-execute-guide            ~230      ~1.1k
+  typescript-conventions         ~160       ~940
+  adversarial-reviewer           ~130       ~880
+  docs-staleness-checker         ~220       ~870
 ```
 
-`pr-review-rubric` is the single most expensive on-invoke skill in the
-plugin at ~8.8k tokens per load — consistent with it being the longest file
-in scope (576 lines, `wc -l`). Since the rubric documents a "push-path
-re-check... re-verifying your own open threads on every push with no human
-in the loop" (`SKILL.md:493-494`) as part of its intended usage pattern in a
-consuming repo, an automation that reloads this skill fresh on every push to
-every open PR pays that ~8.8k-token cost per reload, per PR, per push — that
-compounds fast in a busy repo, but the actual reload frequency lives in a
-CI config this repo doesn't contain, so the multiplier is unknown from here.
+**This section's numbers were more stale than the two new agents alone
+account for.** Since this audit shipped (2026-08-29), the plugin grew from 5
+skills to 16 (11 new: `changesets-authoring`, `collab-retro`,
+`fetch-execute-guide`, `git-worktree-usage`, `github-pr-workflow`,
+`issue-reporter-etiquette`, `linux-administration`, `pr-checks`,
+`pr-comments`, plus two more) and from 1 agent to 3. Always-on cost more
+than tripled, ~1,243 → ~4,121 tokens. A full re-audit of the 11 newly-added
+skills is outside what this pass was asked to do (it was scoped to the two
+new *agents*) — flagged here rather than left silently wrong, since the raw
+numbers in this section are directly measurable and were wrong.
 
-Always-on cost across the whole plugin (~1,243 tokens) is the sum of six
-component *descriptions* — the five skills' plus `adversarial-reviewer`'s
-agent description — not the six components' full content, which only loads
-on invoke (that's the ~1.5k–8.8k on-invoke column above). Small in absolute
-terms — for comparison, it's about a fifth of `CLAUDE.md`'s own ~6,200-token
-footprint (§2) — and is the unavoidable cost of triggering descriptions;
-skills (and agents) are already the correct on-demand mechanism here (see
-§5).
+`pr-review-rubric` is still the single most expensive on-invoke component in
+the plugin, now ~10.4k tokens per load (up from ~8.8k, consistent with the
+file growing from 576 to 677 lines, `wc -l`). Since the rubric documents a
+"push-path re-check... re-verifying your own open threads on every push with
+no human in the loop" (`SKILL.md:493-494`) as part of its intended usage
+pattern in a consuming repo, an automation that reloads this skill fresh on
+every push to every open PR pays that ~10.4k-token cost per reload, per PR,
+per push — that compounds fast in a busy repo, but the actual reload
+frequency lives in a CI config this repo doesn't contain, so the multiplier
+is unknown from here.
+
+Always-on cost across the whole plugin (~4,121 tokens) is the sum of 19
+component *descriptions* — 16 skills' plus the 3 agents' — not the
+components' full content, which only loads on invoke (that's the
+~870–~10.4k on-invoke column above). Still small relative to `CLAUDE.md`'s
+own ~6,200-token footprint (§2), though the margin has narrowed as the
+plugin has grown — and it's still the unavoidable cost of triggering
+descriptions; skills (and agents) are already the correct on-demand
+mechanism here (see §5).
 
 Confidence: the plugin-details numbers are Confirmed (tool output, this
-session, this checkout). The claim about compounding cost from repeated
-push-path reloads in a consuming repo is Speculative — no such repo's CI
-config is in scope here.
+session, this checkout, re-run for this update). The claim about compounding
+cost from repeated push-path reloads in a consuming repo is Speculative — no
+such repo's CI config is in scope here.
 
 ### 4. Background task / polling patterns
 
@@ -207,9 +273,11 @@ this area, and a repo-wide grep confirming nothing else does.
 
 ### 5. Session/context hygiene
 
-**Confirmed, mixed.** The skill/agent split itself is sound: five skills plus
-one agent are all on-demand (loaded only on invocation, per the plugin-details
-always-on/on-invoke split in §3) rather than baked into `CLAUDE.md`, which is
+**Confirmed, mixed.** The skill/agent split itself is sound: the plugin's 16
+skills and 3 agents (§3; grown from 5 skills and 1 agent when this audit
+first shipped) are all on-demand (loaded only on invocation, per the
+plugin-details always-on/on-invoke split in §3) rather than baked into
+`CLAUDE.md`, which is
 the correct default per the docs' own "Move instructions from CLAUDE.md to
 skills" guidance. `README.md:170-181` shows this was a deliberate design
 choice (weighing whether to add `allowed-tools` per-skill vs. leaning on
@@ -308,18 +376,21 @@ constraints; they're recommendations only.
    `Makefile`); the recommendation itself is a design suggestion, not a
    measured claim.
 
-3. **Document (or reconsider) why `adversarial-reviewer` is pinned to
-   Opus.** Effort: trivial (a one-line comment in the frontmatter, or a
-   swap to Sonnet with an escalation path). Savings: per-invocation, Opus
-   vs. Sonnet is a meaningful per-token multiplier, but this agent is
-   invoked on-demand (not fanned out, not scheduled) so the *aggregate*
-   savings depend entirely on how often `/adversarial-review` actually gets
-   run — unknown from static analysis. Confidence: Confirmed the override
-   exists and is undocumented; Speculative on whether it's actually
-   miscalibrated (the task shape — deep cross-file, security/concurrency
-   reasoning — is a legitimate Opus use case per the docs' own criteria, so
-   this is closer to "worth a one-line justification comment" than "clear
-   waste").
+3. **Document why each agent is pinned to its model tier — one comment per
+   agent, three agents now, not one.** Effort: trivial (a one-line comment
+   in each of the three frontmatter blocks). Savings: none of the three
+   overrides look miscalibrated against the docs' own criteria (§1) — opus
+   for `adversarial-reviewer`'s cross-file reasoning, sonnet for
+   `docs-staleness-checker`'s doc/code cross-referencing, haiku for
+   `shell-script-reviewer`'s checklist — so this is a documentation gap, not
+   a cost-savings opportunity. All three are invoked on-demand (not fanned
+   out, not scheduled), so even if one were miscalibrated the *aggregate*
+   savings would depend entirely on how often it's actually invoked —
+   unknown from static analysis. Confidence: Confirmed all three overrides
+   exist and are undocumented; Speculative on whether any is actually
+   miscalibrated (each matches a legitimate use case for its tier per the
+   docs' own criteria, so this is closer to "worth a one-line justification
+   comment per agent" than "clear waste").
 
 4. **If `pr-review-rubric` or `pr-babysit` get wired into a consuming
    repo's CI, confirm that automation runs the smallest model that holds
@@ -345,9 +416,9 @@ constraints; they're recommendations only.
 
 | Area | Verdict | Confidence |
 |---|---|---|
-| Model tier selection | One override (Opus), plausibly justified, undocumented | Override: Confirmed. Justification: Speculative |
+| Model tier selection | Three overrides (opus/sonnet/haiku, one per agent), each plausibly matched to its task's reasoning complexity, all undocumented | Overrides: Confirmed. Justification: Speculative |
 | Prompt caching / CLAUDE.md structure | Cache-friendly append shape; oversized (352 vs. 200-line guideline); ~13% TS-irrelevant-here content | Confirmed |
-| Subagent/workflow fan-out | No fan-out in this repo; rubric skill is large (~8.8k tok) and built for external reuse | In-repo facts: Confirmed. External impact: Speculative |
+| Subagent/workflow fan-out | No fan-out in this repo (3 agents now, still one per caller, no parallel launch); rubric skill is large (~10.4k tok) and built for external reuse | In-repo facts: Confirmed. External impact: Speculative |
 | Background task/polling | Clean — dynamic pacing already implemented, no fixed-interval polling found | Confirmed |
 | Session/context hygiene | Skill/agent split is sound; CLAUDE.md is the one always-on/rarely-relevant mismatch | Confirmed |
 | Effort/reasoning defaults | No knob exists anywhere in scope — nothing to miscalibrate | Confirmed |
