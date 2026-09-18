@@ -111,11 +111,15 @@ session — both catch their own errors and always exit 0.
   convention described above, confirms each configured directory's symlink
   in the current worktree still resolves to the main checkout, and repairs
   it if not (relinks; never touches a directory that isn't a symlink, e.g.
-  one already materialized into a real copy). No-ops immediately on a
-  project that hasn't set `worktree.symlinkDirectories` at all — the
-  underlying script reads that key from `.claude/settings.json` and exits
-  clean when it's empty or the file doesn't exist. Prints a `🔗`-prefixed
-  summary only when it actually found (and fixed) something.
+  one already materialized into a real copy). **Off by default** — the hook
+  itself does nothing until a project opts in: the `WORKTREE_SYMLINK_CHECK`
+  env var (`1`/`true`/`yes`/`on` → run it; `0`/`false`/`no`/`off` → skip) or
+  `worktree.symlinkCheck` in `.claude/settings.json` (`"on"` → run it;
+  anything else, or no key at all → skip); default off. Once enabled, it
+  additionally no-ops on a project that hasn't set
+  `worktree.symlinkDirectories` — the underlying script reads that key
+  separately and exits clean when it's empty. Prints a `🔗`-prefixed summary
+  only when it actually found (and fixed) something.
 - **`prune-merged-worktrees-hook.sh`** runs `prune-merged-worktrees.sh
   --auto`: removes any worktree under `.claude/worktrees/` (on a
   `worktree-*` or `claude/*` branch) whose pull request has already merged,
@@ -129,28 +133,30 @@ session — both catch their own errors and always exit 0.
   merge. Requires `gh` on `PATH` and authenticated; silently skips (never
   removes anything) if either is missing, or if the GitHub API call itself
   fails — a fetch error is not the same as "nothing merged," so the script
-  fails closed rather than risk removing something with a live PR. Auto-prune
+  fails closed rather than risk removing something with a live PR. **Off by
+  default** — the hook does nothing until a project opts in. Auto-prune
   mode (highest priority first): the `WORKTREE_AUTO_PRUNE` env var
   (`0`/`false`/`no`/`off` → nudge-only; `1`/`true`/`yes`/`on` →
   auto-remove; anything else → from settings); `worktree.autoPrune` in
-  `.claude/settings.json` (`true` → auto-remove; `false` → nudge-only);
-  default `true`.
+  `.claude/settings.json` (`true` → auto-remove; `false` → nudge-only; no
+  key at all → skip entirely — no nudge, no removal); default: skip.
 
 - **`require-worktree-hook.sh`** is a `PreToolUse` hook that enforces an
   edit policy when the current working directory is the main git checkout
   rather than a linked worktree. It checks `git rev-parse --git-dir`: a
   path ending in `.git/worktrees/<name>` is a linked worktree (always
   allowed); `.git` or any absolute path ending at `.git` is the main
-  checkout, where the configured enforce mode applies. Enforce mode
-  (highest priority first): the `WORKTREE_ENFORCE` env var
-  (`0`/`false`/`no`/`off` → off; `warn` → warn; anything else → from
-  settings); `worktree.enforce` in `.claude/settings.json` (`"block"` /
-  `"warn"` / `"off"`); default `"block"`. In `"block"` mode the hook exits
-  1 with an explanation so the model can recover by calling `EnterWorktree`
-  first. In `"warn"` mode it prints a notice and allows the edit through —
-  useful for repos where occasional main-checkout edits are acceptable but
-  a reminder is still wanted. Skipped entirely in cloud/remote sessions and
-  in non-git directories.
+  checkout, where the configured enforce mode applies. **Off by default** —
+  the hook does nothing until a project opts in. Enforce mode (highest
+  priority first): the `WORKTREE_ENFORCE` env var (`0`/`false`/`no`/`off` →
+  off; `warn` → warn; `block` → block; anything else → from settings);
+  `worktree.enforce` in `.claude/settings.json` (`"block"` / `"warn"` /
+  `"off"`); default `"off"`. In `"block"` mode the hook exits 1 with an
+  explanation so the model can recover by calling `EnterWorktree` first. In
+  `"warn"` mode it prints a notice and allows the edit through — useful for
+  repos where occasional main-checkout edits are acceptable but a reminder
+  is still wanted. Skipped entirely in cloud/remote sessions and in non-git
+  directories.
 
 Both underlying scripts (`verify-worktree-symlinks.sh`,
 `prune-merged-worktrees.sh`) are also usable standalone — real exit codes,

@@ -92,22 +92,20 @@ run_hook() {
 }
 
 # ---------------------------------------------------------------------------
-# Main checkout: default mode blocks.
+# Main checkout: off by default — a project must opt in before this blocks.
 # ---------------------------------------------------------------------------
 
-@test "main checkout (.git): exits 1 with helpful message" {
+@test "main checkout (.git), nothing configured: exits 0, no output" {
   _install_fake_git ".git"
   run_hook
-  [ "$status" -eq 1 ]
-  [[ "$output" == *"main git checkout"* ]]
-  [[ "$output" == *"EnterWorktree"* ]]
+  [ "$status" -eq 0 ]
+  [ -z "$output" ]
 }
 
-@test "main checkout (absolute path ending .git): exits 1" {
+@test "main checkout (absolute path ending .git), nothing configured: exits 0" {
   _install_fake_git "/home/user/project/.git"
   run_hook
-  [ "$status" -eq 1 ]
-  [[ "$output" == *"main git checkout"* ]]
+  [ "$status" -eq 0 ]
 }
 
 # ---------------------------------------------------------------------------
@@ -181,19 +179,28 @@ run_hook() {
   [ "$status" -eq 0 ]
 }
 
-@test "WORKTREE_ENFORCE=1 (anything else): still blocks in main checkout" {
+@test "WORKTREE_ENFORCE=block: forces block for this session, overriding no config" {
+  _install_fake_git ".git"
+  run env -u CLAUDE_CODE_REMOTE \
+    PATH="$GIT_SHIM:$PATH" FAKE_GIT_TOPLEVEL="$FAKE_TOPLEVEL" \
+    WORKTREE_ENFORCE=block /bin/bash "$SCRIPT_UNDER_TEST"
+  [ "$status" -eq 1 ]
+  [[ "$output" == *"main git checkout"* ]]
+}
+
+@test "WORKTREE_ENFORCE=1 (anything else, not a recognized value): falls through to settings/default (off)" {
   _install_fake_git ".git"
   run env -u CLAUDE_CODE_REMOTE \
     PATH="$GIT_SHIM:$PATH" FAKE_GIT_TOPLEVEL="$FAKE_TOPLEVEL" \
     WORKTREE_ENFORCE=1 /bin/bash "$SCRIPT_UNDER_TEST"
-  [ "$status" -eq 1 ]
+  [ "$status" -eq 0 ]
 }
 
 # ---------------------------------------------------------------------------
-# worktree.enforce in settings.json: project-level config.
+# worktree.enforce in settings.json: project-level config (opt-in).
 # ---------------------------------------------------------------------------
 
-@test "settings enforce=block: exits 1 (same as default)" {
+@test "settings enforce=block: exits 1 (explicit opt-in)" {
   _install_fake_git ".git"
   _write_settings_enforce "block"
   run_hook
@@ -217,27 +224,27 @@ run_hook() {
   [ -z "$output" ]
 }
 
-@test "settings unknown enforce value: falls back to block" {
+@test "settings unknown enforce value: falls back to off" {
   _install_fake_git ".git"
   _write_settings_enforce "maybe"
   run_hook
-  [ "$status" -eq 1 ]
+  [ "$status" -eq 0 ]
 }
 
-@test "no settings.json: defaults to block" {
+@test "no settings.json: defaults to off" {
   _install_fake_git ".git"
   # No settings.json written — FAKE_TOPLEVEL/.claude/ exists but is empty.
   run_hook
-  [ "$status" -eq 1 ]
+  [ "$status" -eq 0 ]
 }
 
-@test "jq fails: falls back to block even if settings says warn" {
+@test "jq fails: falls back to off even if settings says block" {
   _install_fake_git ".git"
-  _write_settings_enforce "warn"
+  _write_settings_enforce "block"
   # Put a broken jq in GIT_SHIM (first on PATH) that always exits 1.
-  # Simulates jq failing to parse; the hook should fall back to "block".
+  # Simulates jq failing to parse; the hook should fall back to "off".
   printf '#!/usr/bin/env bash\nexit 1\n' >"$GIT_SHIM/jq"
   chmod +x "$GIT_SHIM/jq"
   run_hook
-  [ "$status" -eq 1 ]
+  [ "$status" -eq 0 ]
 }
