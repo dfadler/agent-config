@@ -21,6 +21,23 @@ setup() {
   CALL_LOG="$TMP/calls.log"
   : >"$CALL_LOG"
   export CALL_LOG
+
+  # A fake git reporting TMP as --show-toplevel, with no .claude/settings.json
+  # there — without this, the "not set via env var" branch falls through to a
+  # REAL `git rev-parse --show-toplevel` in whatever repo bats happens to run
+  # from, reading ITS real settings.json instead of a hermetic fixture.
+  GIT_SHIM="$TMP/git-shim"
+  mkdir -p "$GIT_SHIM"
+  cat >"$GIT_SHIM/git" <<EOF
+#!/usr/bin/env bash
+if [ "\$1" = "rev-parse" ] && [ "\$2" = "--show-toplevel" ]; then
+  echo "$TMP"
+  exit 0
+fi
+exec "$(command -v git)" "\$@"
+EOF
+  chmod +x "$GIT_SHIM/git"
+  export GIT_SHIM
 }
 
 teardown() {
@@ -41,7 +58,7 @@ EOF
 }
 
 run_hook() {
-  run env -u CLAUDE_CODE_REMOTE "$@" /bin/bash "$SCRIPT_UNDER_TEST"
+  run env -u CLAUDE_CODE_REMOTE PATH="$GIT_SHIM:$PATH" "$@" /bin/bash "$SCRIPT_UNDER_TEST"
 }
 
 @test "remote: exits 0 immediately, never invokes the verify script" {
@@ -52,41 +69,59 @@ run_hook() {
   [ -z "$output" ]
 }
 
-@test "verify script missing: exits 0 with no output, no crash" {
+@test "default (nothing configured): exits 0, never invokes verify" {
+  _install_fake_verify
   run_hook
+  [ "$status" -eq 0 ]
+  [ ! -s "$CALL_LOG" ]
+  [ -z "$output" ]
+}
+
+@test "opted in (WORKTREE_SYMLINK_CHECK=on), verify script missing: exits 0 with no output, no crash" {
+  run_hook WORKTREE_SYMLINK_CHECK=on
   [ "$status" -eq 0 ]
   [ -z "$output" ]
 }
 
-@test "verify script runs with --fix" {
+@test "opted in (WORKTREE_SYMLINK_CHECK=on): verify script runs with --fix" {
   _install_fake_verify
-  run_hook
+  run_hook WORKTREE_SYMLINK_CHECK=on
   [ "$status" -eq 0 ]
   grep -q -- "--fix" "$CALL_LOG"
 }
 
-@test "verify script prints nothing: the hook stays silent" {
+@test "opted in, verify script prints nothing: the hook stays silent" {
   _install_fake_verify
-  run_hook
+  run_hook WORKTREE_SYMLINK_CHECK=on
   [ "$status" -eq 0 ]
   [ -z "$output" ]
 }
 
-@test "verify script prints a mismatch: the hook echoes it with the 🔗 prefix" {
+@test "opted in, verify script prints a mismatch: the hook echoes it with the 🔗 prefix" {
   _install_fake_verify
-  run_hook FAKE_OUTPUT="node_modules resolves to a stale worktree"
+  run_hook WORKTREE_SYMLINK_CHECK=on FAKE_OUTPUT="node_modules resolves to a stale worktree"
   [ "$status" -eq 0 ]
   [[ "$output" == "🔗"*"node_modules resolves to a stale worktree"* ]]
 }
 
-@test "a failing verify script (mismatch not fixed) is swallowed — the hook still exits 0" {
+@test "opted in, a failing verify script (mismatch not fixed) is swallowed — the hook still exits 0" {
   _install_fake_verify
-  run_hook FAKE_OUTPUT="could not relink node_modules" FAKE_EXIT=1
+  run_hook WORKTREE_SYMLINK_CHECK=on FAKE_OUTPUT="could not relink node_modules" FAKE_EXIT=1
   [ "$status" -eq 0 ]
   [[ "$output" == *"could not relink node_modules"* ]]
 }
 
-# --- Inhibit protocol ---
+@test "WORKTREE_SYMLINK_CHECK=1/true/yes/on all opt in and run verify" {
+  _install_fake_verify
+  for val in 1 true yes on; do
+    : >"$CALL_LOG"
+    run env -u CLAUDE_CODE_REMOTE WORKTREE_SYMLINK_CHECK="$val" /bin/bash "$SCRIPT_UNDER_TEST"
+    [ "$status" -eq 0 ]
+    grep -q -- "--fix" "$CALL_LOG"
+  done
+}
+
+# --- Enable/inhibit protocol ---
 
 @test "WORKTREE_SYMLINK_CHECK=off: exits 0 immediately without running verify" {
   _install_fake_verify
@@ -117,6 +152,46 @@ run_hook() {
   mkdir -p "$git_root/.git" "$git_root/.claude"
   printf '{"worktree":{"symlinkCheck":"off"}}\n' > "$git_root/.claude/settings.json"
   # Stub git to return our fake toplevel.
+  mkdir -p "$TMP/git-shim"
+  cat > "$TMP/git-shim/git" <<GITEOF
+#!/usr/bin/env bash
+if [ "\$1" = "rev-parse" ] && [ "\$2" = "--show-toplevel" ]; then
+  echo "$git_root"
+  exit 0
+fi
+exec "$(command -v git)" "\$@"
+GITEOF
+  chmod +x "$TMP/git-shim/git"
+  run env -u CLAUDE_CODE_REMOTE PATH="$TMP/git-shim:$PATH" /bin/bash "$SCRIPT_UNDER_TEST"
+  [ "$status" -eq 0 ]
+  [ ! -s "$CALL_LOG" ]
+}
+
+@test "worktree.symlinkCheck=on in settings.json: runs verify" {
+  _install_fake_verify
+  local git_root="$TMP/fake-repo"
+  mkdir -p "$git_root/.git" "$git_root/.claude"
+  printf '{"worktree":{"symlinkCheck":"on"}}\n' > "$git_root/.claude/settings.json"
+  mkdir -p "$TMP/git-shim"
+  cat > "$TMP/git-shim/git" <<GITEOF
+#!/usr/bin/env bash
+if [ "\$1" = "rev-parse" ] && [ "\$2" = "--show-toplevel" ]; then
+  echo "$git_root"
+  exit 0
+fi
+exec "$(command -v git)" "\$@"
+GITEOF
+  chmod +x "$TMP/git-shim/git"
+  run env -u CLAUDE_CODE_REMOTE PATH="$TMP/git-shim:$PATH" /bin/bash "$SCRIPT_UNDER_TEST"
+  [ "$status" -eq 0 ]
+  grep -q -- "--fix" "$CALL_LOG"
+}
+
+@test "settings.json exists but has no worktree.symlinkCheck key: skips (never runs verify)" {
+  _install_fake_verify
+  local git_root="$TMP/fake-repo"
+  mkdir -p "$git_root/.git" "$git_root/.claude"
+  printf '{}\n' > "$git_root/.claude/settings.json"
   mkdir -p "$TMP/git-shim"
   cat > "$TMP/git-shim/git" <<GITEOF
 #!/usr/bin/env bash
