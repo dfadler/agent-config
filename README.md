@@ -105,6 +105,38 @@ the rename would otherwise leave dangling. Anything under `~/.claude/{skills,age
 pointing into this repo's `plugins/` that isn't the current plugin link is stale by
 definition; links pointing anywhere else are left alone.
 
+### Installing a subset of features
+
+By default `setup.sh` installs everything — every slash command under `claude/commands/`
+and every plugin under `plugins/` — the same all-or-nothing behavior it has always had.
+To leave specific features out, pass `--skip` with a comma-separated list of feature
+names:
+
+```bash
+./setup.sh --skip=adversarial-review,bulletproof-react-skills
+```
+
+A feature name is either a slash command's basename (`adversarial-review`, from
+`claude/commands/adversarial-review.md`) or a plugin's directory name
+(`dfadler-agent-config`, `bulletproof-react-skills`, `accessibility-skills`, from
+`plugins/`). Skipping a plugin opts out its skills, agents, and hooks together — a
+plugin is linked into `~/.claude/skills/` as a single unit (see "How the plugin gets
+loaded" above), so there's no finer-grained way to symlink only part of one. `./setup.sh
+--list-features` prints the exact names available on this checkout without linking
+anything.
+
+`--skip` is remembered only for the run it's passed on — re-running plain `./setup.sh`
+relinks anything a previous `--skip` left out, and re-running with a *different*
+`--skip` list unlinks whatever newly falls out of it. Both directions are idempotent: a
+repeated run with the same flags changes nothing.
+
+This is a separate mechanism from the per-project hook toggles described in
+`docs/hook-composition.md` — every hook in `dfadler-agent-config` already ships off by
+default and stays off until a project's own `.claude/settings.json` (or a session env
+var) opts it in, regardless of `--skip`. `--skip` controls whether this machine gets the
+plugin (and therefore its hooks' *code*) at all; the per-project settings control whether
+an installed hook actually *does* anything in a given repo.
+
 ### Runtime dependency: `pyte`
 
 The `detached-terminal` skill's `agent_term.py` is `#!/usr/bin/env python3`, so it runs
