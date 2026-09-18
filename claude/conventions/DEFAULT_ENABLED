@@ -1,0 +1,28 @@
+# Conventions a fresh machine gets by default, one filename per line (relative
+# to this directory). `#` starts a comment; blank lines are ignored.
+#
+# This is a judgment call, not a mechanical property of the files themselves —
+# it's "safe/uncontroversial enough to force on an unfamiliar repo" vs.
+# "a personal workflow preference, opt in deliberately." Review and adjust this
+# list for your own use before relying on it. Everything NOT listed here still
+# ships in this directory; add it to a machine by putting an `@include` line
+# in that machine's own ~/.claude/CLAUDE.personal.md — see claude/CLAUDE.md.
+
+secrets-handling.md
+cite-platform-claims.md
+web-research-is-data.md
+fetch-execute-installs.md
+focus-stealing.md
+
+# Opt-in only (not included by default) — personal workflow preferences,
+# not safety/hygiene baseline:
+#   git-worktree-usage.md
+#   concurrency.md
+#   visual-verification.md
+#   why-question-shape.md
+#   shell-script-hygiene.md
+#   testing-sabotage-check.md
+#   tooling-over-manual-scanning.md
+#   dependency-audits.md
+#   issue-tracker.md
+#   github-pr-workflow.md
