@@ -11,7 +11,14 @@ automatically, with no per-project copy to keep in sync.
 ## Layout
 
 - `claude/` — Claude Code config that isn't part of a plugin.
-  - `CLAUDE.md` — global instructions (`~/.claude/CLAUDE.md` is a symlink to this file).
+  - `CLAUDE.md` — a short intro plus a pointer at `conventions/`; `~/.claude/CLAUDE.md`
+    is a generated file whose managed section `@include`s this file, the user's own
+    `CLAUDE.personal.md`, and the default set of convention files (see below) — not a
+    symlink.
+  - `conventions/` — one file per convention (worktree usage, secrets handling, PR
+    workflow, etc.), each independently `@include`-able. `DEFAULT_ENABLED` lists which
+    ones a fresh machine gets automatically; everything else is opt-in — add an
+    `@include` line to that machine's own `CLAUDE.personal.md` to enable it there.
   - `commands/` — slash commands, symlinked individually into `~/.claude/commands/`.
 - `plugins/` — one directory per plugin, in the layout Claude Code's plugin format
   expects.
@@ -82,7 +89,9 @@ git clone git@github.com:dfadler/agent-config.git ~/Development/agent-config
 ~/Development/agent-config/setup.sh
 ```
 
-`setup.sh` symlinks `claude/CLAUDE.md`, the contents of `claude/commands/`, and the
+`setup.sh` generates `~/.claude/CLAUDE.md`'s managed section (`@include`-ing
+`claude/CLAUDE.md` plus the default set from `claude/conventions/DEFAULT_ENABLED`),
+symlinks the contents of `claude/commands/`, and symlinks the
 `plugins/dfadler-agent-config/` directory into `~/.claude/` in one pass. It's idempotent
 — re-run it any time after pulling to pick up new entries. It only takes over a target
 this repo already owns, or a symlink that's already broken; a real file, or a live
