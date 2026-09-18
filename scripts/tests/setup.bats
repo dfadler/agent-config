@@ -476,3 +476,81 @@ run_setup_with() {
   assert_output_contains "Unknown argument: --nope"
   [ ! -e "$HOME/.claude" ]
 }
+
+# --- --skip / --list-features ------------------------------------------
+
+@test "--list-features prints commands and plugins and links nothing" {
+  run_setup_with --list-features
+  assert_success
+  assert_output_contains "Commands:"
+  assert_output_contains "demo"
+  assert_output_contains "Plugins:"
+  assert_output_contains "dfadler-agent-config"
+  [ ! -e "$HOME/.claude" ]
+}
+
+@test "an unknown --skip feature exits 2 and links nothing" {
+  run_setup_with --skip=not-a-real-feature
+  [ "$status" -eq 2 ]
+  assert_output_contains "Unknown --skip feature(s): not-a-real-feature"
+  [ ! -e "$HOME/.claude" ]
+}
+
+@test "--skip=<command> leaves that command unlinked but links everything else" {
+  run_setup_with --skip=demo
+  assert_success
+  [ ! -e "$HOME/.claude/commands/demo.md" ]
+  [ "$(readlink "$HOME/.claude/skills/dfadler-agent-config")" = "$FAKE_REPO/plugins/dfadler-agent-config" ]
+}
+
+@test "--skip=<plugin> leaves that plugin unlinked but links commands" {
+  run_setup_with --skip=dfadler-agent-config
+  assert_success
+  [ ! -e "$HOME/.claude/skills/dfadler-agent-config" ]
+  [ "$(readlink "$HOME/.claude/commands/demo.md")" = "$FAKE_REPO/claude/commands/demo.md" ]
+}
+
+@test "--skip accepts a comma-separated list across both namespaces" {
+  run_setup_with --skip=demo,dfadler-agent-config
+  assert_success
+  [ ! -e "$HOME/.claude/commands/demo.md" ]
+  [ ! -e "$HOME/.claude/skills/dfadler-agent-config" ]
+}
+
+@test "opting a command back out on a later run removes its previously-linked symlink" {
+  run_setup
+  assert_success
+  [ -L "$HOME/.claude/commands/demo.md" ]
+  run_setup_with --skip=demo
+  assert_success
+  assert_output_contains "Removed opted-out symlink"
+  [ ! -e "$HOME/.claude/commands/demo.md" ]
+}
+
+@test "opting a plugin back out on a later run removes its previously-linked symlink" {
+  run_setup
+  assert_success
+  [ -L "$HOME/.claude/skills/dfadler-agent-config" ]
+  run_setup_with --skip=dfadler-agent-config
+  assert_success
+  assert_output_contains "Removed superseded symlink"
+  [ ! -e "$HOME/.claude/skills/dfadler-agent-config" ]
+}
+
+@test "re-running with the same --skip list is idempotent" {
+  run_setup_with --skip=demo
+  assert_success
+  run_setup_with --skip=demo
+  assert_success
+  refute_output_contains "Linked"
+  refute_output_contains "Removed"
+}
+
+@test "opting a command back in after a skip re-links it" {
+  run_setup_with --skip=demo
+  assert_success
+  [ ! -e "$HOME/.claude/commands/demo.md" ]
+  run_setup
+  assert_success
+  [ "$(readlink "$HOME/.claude/commands/demo.md")" = "$FAKE_REPO/claude/commands/demo.md" ]
+}
