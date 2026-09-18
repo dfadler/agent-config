@@ -129,5 +129,5 @@ fi
 if [[ "$ANSWER" == "yes" ]]; then
   add_rule
 else
-  echo "Skipped. Re-run this script anytime, or add the rule manually — see README.md."
+  echo "Skipped. Re-run this script anytime, or add the rule manually — see docs/setup.md."
 fi
