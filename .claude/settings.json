@@ -19,5 +19,10 @@
       "Bash(gh pr edit *)",
       "Bash(gh api *)"
     ]
+  },
+  "worktree": {
+    "enforce": "block",
+    "autoPrune": true,
+    "symlinkCheck": "on"
   }
 }

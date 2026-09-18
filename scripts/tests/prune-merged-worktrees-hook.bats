@@ -80,12 +80,11 @@ run_hook() {
   [ -z "$output" ]
 }
 
-@test "default (WORKTREE_AUTO_PRUNE unset): invokes prune in --auto mode" {
+@test "default (nothing configured): never invokes prune at all" {
   _install_fake_prune
   run_hook
   [ "$status" -eq 0 ]
-  grep -q -- "--auto" "$CALL_LOG"
-  ! grep -q -- "--hook" "$CALL_LOG"
+  [ ! -s "$CALL_LOG" ]
 }
 
 @test "WORKTREE_AUTO_PRUNE=0 opts out: invokes prune in --hook mode" {
@@ -116,23 +115,23 @@ run_hook() {
   done
 }
 
-@test "prune script's stdout passes through the hook" {
+@test "opted in, prune script's stdout passes through the hook" {
   _install_fake_prune
-  run_hook FAKE_STDOUT="removed 2 merged worktrees"
+  run_hook WORKTREE_AUTO_PRUNE=on FAKE_STDOUT="removed 2 merged worktrees"
   [ "$status" -eq 0 ]
   [[ "$output" == *"removed 2 merged worktrees"* ]]
 }
 
-@test "prune script's stderr is suppressed" {
+@test "opted in, prune script's stderr is suppressed" {
   _install_fake_prune
-  run_hook FAKE_STDERR="a warning nobody should see"
+  run_hook WORKTREE_AUTO_PRUNE=on FAKE_STDERR="a warning nobody should see"
   [ "$status" -eq 0 ]
   [[ "$output" != *"a warning nobody should see"* ]]
 }
 
-@test "a failing prune script is swallowed — the hook still exits 0" {
+@test "opted in, a failing prune script is swallowed — the hook still exits 0" {
   _install_fake_prune
-  run_hook FAKE_EXIT=1
+  run_hook WORKTREE_AUTO_PRUNE=on FAKE_EXIT=1
   [ "$status" -eq 0 ]
   [ -s "$CALL_LOG" ]
 }
@@ -175,14 +174,23 @@ run_hook() {
   grep -q -- "--auto" "$CALL_LOG"
 }
 
-@test "jq fails: falls back to --auto even if settings says false" {
+@test "jq fails: falls back to skip (never invokes prune) even if settings says false" {
   _install_fake_prune
   _write_settings_auto_prune "false"
   # Put a broken jq in GIT_SHIM (first on PATH) that always exits 1.
-  # Simulates jq failing to parse; the hook should fall back to "--auto".
+  # Simulates jq failing to parse; the hook can't read settings, so it should
+  # fall back to the off-by-default skip rather than guessing a mode.
   printf '#!/usr/bin/env bash\nexit 1\n' >"$GIT_SHIM/jq"
   chmod +x "$GIT_SHIM/jq"
   run_hook
   [ "$status" -eq 0 ]
-  grep -q -- "--auto" "$CALL_LOG"
+  [ ! -s "$CALL_LOG" ]
+}
+
+@test "settings.json exists but has no worktree.autoPrune key: skips (never invokes prune)" {
+  _install_fake_prune
+  printf '{}\n' >"$TMP/.claude/settings.json"
+  run_hook
+  [ "$status" -eq 0 ]
+  [ ! -s "$CALL_LOG" ]
 }
