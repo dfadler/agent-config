@@ -14,8 +14,9 @@ regrouped under the same category headings as the source, with its WCAG 2.2
 success-criterion link preserved.
 
 The checklist page has no version or release tag to pin against, so there is no
-automated re-pin workflow here (unlike `bulletproof-react-skills/NOTICE.md`'s
-generator, which pins a commit SHA). To refresh: re-fetch
+automated re-pin workflow here (unlike
+[dfadler/bulletproof-react-skills](https://github.com/dfadler/bulletproof-react-skills)'s
+`NOTICE.md`/generator, which pins a commit SHA). To refresh: re-fetch
 `https://www.a11yproject.com/checklist/`, diff its current items against
 `references/checklist.md` by hand, and update the retrieval date above.
 
