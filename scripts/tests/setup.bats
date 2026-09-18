@@ -554,3 +554,107 @@ run_setup_with() {
   assert_success
   [ "$(readlink "$HOME/.claude/commands/demo.md")" = "$FAKE_REPO/claude/commands/demo.md" ]
 }
+
+# --- --include -----------------------------------------------------------
+
+@test "--skip and --include together exits 2 and links nothing" {
+  run_setup_with --skip=demo --include=dfadler-agent-config
+  [ "$status" -eq 2 ]
+  assert_output_contains "--skip and --include cannot be combined."
+  [ ! -e "$HOME/.claude" ]
+}
+
+@test "an unknown --include feature exits 2 and links nothing" {
+  run_setup_with --include=not-a-real-feature
+  [ "$status" -eq 2 ]
+  assert_output_contains "Unknown --include feature(s): not-a-real-feature"
+  [ ! -e "$HOME/.claude" ]
+}
+
+@test "--include with no value exits 2 and links nothing, rather than installing everything" {
+  run_setup_with --include=
+  [ "$status" -eq 2 ]
+  assert_output_contains "--include requires at least one feature name."
+  [ ! -e "$HOME/.claude" ]
+}
+
+@test "--include with only delimiters exits 2 and links nothing" {
+  run_setup_with --include=,,,
+  [ "$status" -eq 2 ]
+  assert_output_contains "--include requires at least one feature name."
+  [ ! -e "$HOME/.claude" ]
+}
+
+@test "--skip=<feature> --include= (empty) is still treated as combining the flags" {
+  run_setup_with --skip=demo --include=
+  [ "$status" -eq 2 ]
+  assert_output_contains "--skip and --include cannot be combined."
+  [ ! -e "$HOME/.claude" ]
+}
+
+@test "--skip= (empty) alone is a no-op — still installs everything" {
+  run_setup_with --skip=
+  assert_success
+  [ "$(readlink "$HOME/.claude/commands/demo.md")" = "$FAKE_REPO/claude/commands/demo.md" ]
+  [ "$(readlink "$HOME/.claude/skills/dfadler-agent-config")" = "$FAKE_REPO/plugins/dfadler-agent-config" ]
+}
+
+@test "--include=<command> links only that command, not the plugin" {
+  run_setup_with --include=demo
+  assert_success
+  [ "$(readlink "$HOME/.claude/commands/demo.md")" = "$FAKE_REPO/claude/commands/demo.md" ]
+  [ ! -e "$HOME/.claude/skills/dfadler-agent-config" ]
+}
+
+@test "--include=<plugin> links only that plugin, not the command" {
+  run_setup_with --include=dfadler-agent-config
+  assert_success
+  [ "$(readlink "$HOME/.claude/skills/dfadler-agent-config")" = "$FAKE_REPO/plugins/dfadler-agent-config" ]
+  [ ! -e "$HOME/.claude/commands/demo.md" ]
+}
+
+@test "--include accepts a comma-separated list across both namespaces" {
+  run_setup_with --include=demo,dfadler-agent-config
+  assert_success
+  [ "$(readlink "$HOME/.claude/commands/demo.md")" = "$FAKE_REPO/claude/commands/demo.md" ]
+  [ "$(readlink "$HOME/.claude/skills/dfadler-agent-config")" = "$FAKE_REPO/plugins/dfadler-agent-config" ]
+}
+
+@test "narrowing --include on a later run removes the previously-linked command" {
+  run_setup_with --include=demo,dfadler-agent-config
+  assert_success
+  [ -L "$HOME/.claude/commands/demo.md" ]
+  run_setup_with --include=dfadler-agent-config
+  assert_success
+  assert_output_contains "Removed opted-out symlink"
+  [ ! -e "$HOME/.claude/commands/demo.md" ]
+  [ "$(readlink "$HOME/.claude/skills/dfadler-agent-config")" = "$FAKE_REPO/plugins/dfadler-agent-config" ]
+}
+
+@test "narrowing --include on a later run removes the previously-linked plugin" {
+  run_setup_with --include=demo,dfadler-agent-config
+  assert_success
+  [ -L "$HOME/.claude/skills/dfadler-agent-config" ]
+  run_setup_with --include=demo
+  assert_success
+  assert_output_contains "Removed superseded symlink"
+  [ ! -e "$HOME/.claude/skills/dfadler-agent-config" ]
+}
+
+@test "re-running with the same --include list is idempotent" {
+  run_setup_with --include=demo
+  assert_success
+  run_setup_with --include=demo
+  assert_success
+  refute_output_contains "Linked"
+  refute_output_contains "Removed"
+}
+
+@test "dropping --include on a later run re-links everything" {
+  run_setup_with --include=demo
+  assert_success
+  [ ! -e "$HOME/.claude/skills/dfadler-agent-config" ]
+  run_setup
+  assert_success
+  [ "$(readlink "$HOME/.claude/skills/dfadler-agent-config")" = "$FAKE_REPO/plugins/dfadler-agent-config" ]
+}
