@@ -3,25 +3,30 @@
 # claude/ -> ~/.claude/). Safe to re-run: fixes symlinks that already point
 # here, and reports (without touching) anything else already at the target.
 #
-# Usage: ./setup.sh [--install-deps] [--skip=<feature,...>] [--list-features]
+# Usage: ./setup.sh [--install-deps] [--skip=<feature,...>] [--include=<feature,...>] [--list-features]
 
 set -euo pipefail
 
 INSTALL_DEPS=0
 SKIP_LIST=""
+INCLUDE_LIST=""
+INCLUDE_SET=0
 LIST_FEATURES=0
 
 usage() {
   cat <<'USAGE'
-Usage: ./setup.sh [--install-deps] [--skip=<feature,...>] [--list-features]
+Usage: ./setup.sh [--install-deps] [--skip=<feature,...>] [--include=<feature,...>] [--list-features]
 
 Symlinks this repo's config into ~/.claude, then checks that the runtime
 dependencies the linked skills need are importable by the interpreter that
 will actually run them.
 
-With no --skip, every command and every plugin is installed — the same
-all-or-nothing behavior this script has always had. --skip opts specific
-features out; everything not named stays in.
+With neither --skip nor --include, every command and every plugin is
+installed — the same all-or-nothing behavior this script has always had.
+--skip opts specific features out (everything not named stays in);
+--include opts specific features in (everything not named stays out). The
+two are opposite selections over the same names, so combining them in one
+run is rejected rather than guessing which one wins.
 
   --install-deps     Also install a missing dependency (python3 -m pip
                      install --user pyte), when the interpreter allows it.
@@ -35,8 +40,15 @@ features out; everything not named stays in.
                      together; hooks also stay off by default per-project
                      regardless — see docs/hook-composition.md). Run with
                      --list-features to see the available names.
-  --list-features    Print the feature names --skip accepts and exit
-                     without linking anything.
+  --include=<list>   Comma-separated feature names to install (same names
+                     --skip accepts); every feature not named is left
+                     unlinked, and unlinked if a previous run linked it.
+                     At least one non-empty name is required — "--include"
+                     with nothing after the "=" is rejected rather than
+                     silently installing everything. Cannot be combined
+                     with --skip.
+  --list-features    Print the feature names --skip and --include accept
+                     and exit without linking anything.
   -h, --help         Show this message and exit.
 USAGE
 }
@@ -45,6 +57,10 @@ while [[ $# -gt 0 ]]; do
   case "$1" in
     --install-deps) INSTALL_DEPS=1 ;;
     --skip=*) SKIP_LIST="${1#--skip=}" ;;
+    --include=*)
+      INCLUDE_LIST="${1#--include=}"
+      INCLUDE_SET=1
+      ;;
     --list-features) LIST_FEATURES=1 ;;
     -h | --help)
       usage
@@ -59,31 +75,59 @@ while [[ $# -gt 0 ]]; do
   shift
 done
 
+if [[ -n "$SKIP_LIST" && "$INCLUDE_SET" == 1 ]]; then
+  echo "--skip and --include cannot be combined." >&2
+  usage >&2
+  exit 2
+fi
+
 REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 
-# --skip's value, split on commas into an array. Declared even when empty so
-# `set -u` never trips on ${SKIP_FEATURES[@]} below — bash's automatic
-# expansion of an empty array is fine under nounset in modern bash, but the
-# macOS-shipped bash (3.2) this repo has to stay compatible with does not
-# reliably agree, so every use below goes through the
-# ${arr[@]+"${arr[@]}"} guard already established by check-markdown-links.sh.
+# --skip's and --include's values, each split on commas into an array.
+# Declared even when empty so `set -u` never trips on ${arr[@]} below —
+# bash's automatic expansion of an empty array is fine under nounset in
+# modern bash, but the macOS-shipped bash (3.2) this repo has to stay
+# compatible with does not reliably agree, so every use below goes through
+# the ${arr[@]+"${arr[@]}"} guard already established by
+# check-markdown-links.sh.
 SKIP_FEATURES=()
 if [[ -n "$SKIP_LIST" ]]; then
   IFS=',' read -r -a SKIP_FEATURES <<<"$SKIP_LIST"
 fi
 
-is_skipped() {
-  local name="$1" f
-  for f in ${SKIP_FEATURES[@]+"${SKIP_FEATURES[@]}"}; do
-    [[ "$f" == "$name" ]] && return 0
-  done
-  return 1
-}
+INCLUDE_FEATURES=()
+if [[ "$INCLUDE_SET" == 1 ]]; then
+  IFS=',' read -r -a INCLUDE_FEATURES <<<"$INCLUDE_LIST"
+fi
 
-# Feature names --skip accepts: every plugin's directory name, plus every
-# slash command's basename (without .md). Discovered rather than hardcoded,
-# same reasoning as PLUGIN_SRCS below — a new plugin or command becomes
-# skippable the moment it lands, with nothing here to update by hand.
+# --include's value, unlike --skip's, isn't harmless when empty: --skip=
+# (or no --skip at all) already means "everything installs," so an empty
+# skip list is a no-op consistent with the default. --include= means the
+# opposite (nothing named -> nothing installed), so silently treating it as
+# "no restriction" would flip that into installing everything -- the
+# opposite of what passing --include at all signals intent to do. Reject it
+# before any filesystem operation. A delimiter-only value ("--include=,,,")
+# already fails downstream via the unknown-feature check below (each empty
+# element matches no known name), but this catches the plain-empty case
+# that check never sees, since IFS splitting of "" produces zero elements
+# rather than one empty one.
+if [[ "$INCLUDE_SET" == 1 ]]; then
+  include_name_found=0
+  for name in ${INCLUDE_FEATURES[@]+"${INCLUDE_FEATURES[@]}"}; do
+    [[ -n "$name" ]] && include_name_found=1 && break
+  done
+  if [[ "$include_name_found" == 0 ]]; then
+    echo "--include requires at least one feature name." >&2
+    usage >&2
+    exit 2
+  fi
+fi
+
+# Feature names --skip and --include accept: every plugin's directory name,
+# plus every slash command's basename (without .md). Discovered rather than
+# hardcoded, same reasoning as PLUGIN_SRCS below — a new plugin or command
+# becomes selectable the moment it lands, with nothing here to update by
+# hand.
 COMMAND_NAMES=()
 if [[ -d "$REPO_ROOT/claude/commands" ]]; then
   for entry in "$REPO_ROOT"/claude/commands/*; do
@@ -107,23 +151,69 @@ if [[ "$LIST_FEATURES" == "1" ]]; then
   exit 0
 fi
 
-# Fail fast on a typo'd --skip name, before anything on disk is touched —
-# same posture as the unknown-argument case above. Without this, a typo
-# would silently install everything (the opposite of what --skip asked for)
-# rather than telling the user why.
-unknown_skip=()
-for name in ${SKIP_FEATURES[@]+"${SKIP_FEATURES[@]}"}; do
+# Fail fast on a typo'd --skip/--include name, before anything on disk is
+# touched — same posture as the unknown-argument case above. Without this, a
+# typo'd --skip name would silently install everything (the opposite of what
+# was asked), and a typo'd --include name would silently install nothing.
+# --skip and --include were already rejected together above, so at most one
+# of SKIP_FEATURES/INCLUDE_FEATURES is non-empty here.
+UNKNOWN_FLAG="--skip"
+selected=(${SKIP_FEATURES[@]+"${SKIP_FEATURES[@]}"})
+if [[ "$INCLUDE_SET" == 1 ]]; then
+  UNKNOWN_FLAG="--include"
+  selected=(${INCLUDE_FEATURES[@]+"${INCLUDE_FEATURES[@]}"})
+fi
+unknown_selected=()
+for name in ${selected[@]+"${selected[@]}"}; do
   found=0
   for known in ${COMMAND_NAMES[@]+"${COMMAND_NAMES[@]}"} ${PLUGIN_ALL_NAMES[@]+"${PLUGIN_ALL_NAMES[@]}"}; do
     [[ "$known" == "$name" ]] && found=1 && break
   done
-  [[ "$found" == 1 ]] || unknown_skip+=("$name")
+  [[ "$found" == 1 ]] || unknown_selected+=("$name")
 done
-if [[ ${#unknown_skip[@]} -gt 0 ]]; then
-  echo "Unknown --skip feature(s): ${unknown_skip[*]}" >&2
+if [[ ${#unknown_selected[@]} -gt 0 ]]; then
+  echo "Unknown $UNKNOWN_FLAG feature(s): ${unknown_selected[*]}" >&2
   echo "Run './setup.sh --list-features' to see available names." >&2
   exit 2
 fi
+
+# --include is the positive form of the same selection --skip makes
+# negatively. Rather than teach every downstream consumer (is_skipped,
+# link_dir_contents, prune_skipped_dir_links, the PLUGIN_SRCS loop) a second
+# "is it included" concept, --include is turned into its equivalent --skip
+# list right here — every known feature *not* named by --include — so
+# everything below only ever has to reason about SKIP_FEATURES. --skip and
+# --include were already rejected together above, so this never overwrites a
+# user-supplied SKIP_FEATURES.
+if [[ "$INCLUDE_SET" == 1 ]]; then
+  SKIP_FEATURES=()
+  for known in ${COMMAND_NAMES[@]+"${COMMAND_NAMES[@]}"} ${PLUGIN_ALL_NAMES[@]+"${PLUGIN_ALL_NAMES[@]}"}; do
+    included=0
+    for name in "${INCLUDE_FEATURES[@]}"; do
+      [[ "$known" == "$name" ]] && included=1 && break
+    done
+    [[ "$included" == 1 ]] || SKIP_FEATURES+=("$known")
+  done
+fi
+
+is_skipped() {
+  local name="$1" f
+  for f in ${SKIP_FEATURES[@]+"${SKIP_FEATURES[@]}"}; do
+    [[ "$f" == "$name" ]] && return 0
+  done
+  return 1
+}
+
+# Human-readable reason shown next to a feature this run is leaving
+# unlinked — "--skip" when the user named it directly, or "not in --include"
+# when --include's complement (computed above) is what excluded it.
+exclude_reason() {
+  if [[ "$INCLUDE_SET" == 1 ]]; then
+    printf 'not in --include'
+  else
+    printf -- '--skip'
+  fi
+}
 
 # Markers that delimit the block setup.sh writes into ~/.claude/CLAUDE.md.
 # teardown.sh carries an identical copy — both must stay in sync.
@@ -137,11 +227,12 @@ MANAGED_END="# >>> agent-config managed end <<<"
 # glob to directories; if plugins/ is ever empty the pattern itself fails the
 # -f test below and the loop body never runs, so no nullglob/-e guard is needed.
 #
-# A plugin named in --skip is left out of PLUGIN_SRCS/PLUGIN_LINKS entirely
-# rather than linked-then-removed — which means prune_stale_plugin_links
-# below (it already removes any ~/.claude/{skills,agents} link into this
-# repo's plugins/ that isn't in PLUGIN_LINKS) also removes a previously
-# opted-in plugin the moment a later run opts it back out, for free.
+# A plugin excluded by --skip or --include's complement is left out of
+# PLUGIN_SRCS/PLUGIN_LINKS entirely rather than linked-then-removed — which
+# means prune_stale_plugin_links below (it already removes any
+# ~/.claude/{skills,agents} link into this repo's plugins/ that isn't in
+# PLUGIN_LINKS) also removes a previously opted-in plugin the moment a later
+# run opts it back out, for free.
 PLUGIN_SRCS=()
 PLUGIN_LINKS=()
 for plugin_dir in "$REPO_ROOT"/plugins/*/; do
@@ -149,7 +240,7 @@ for plugin_dir in "$REPO_ROOT"/plugins/*/; do
   [[ -f "$plugin_dir/.claude-plugin/plugin.json" ]] || continue
   plugin_name="$(basename "$plugin_dir")"
   if is_skipped "$plugin_name"; then
-    echo "Skipping plugin (--skip): $plugin_name"
+    echo "Skipping plugin ($(exclude_reason)): $plugin_name"
     continue
   fi
   PLUGIN_SRCS+=("$plugin_dir")
@@ -193,20 +284,20 @@ link_dir_contents() {
     # a .md suffix (the only caller of this function today is commands/).
     feature="${name%.md}"
     if is_skipped "$feature"; then
-      echo "Skipping $dest_dir/$name (--skip=$feature)"
+      echo "Skipping $dest_dir/$name ($(exclude_reason): $feature)"
       continue
     fi
     link "$entry" "$dest_dir/$name"
   done
 }
 
-# The inverse of the skip above: a command opted out AFTER a previous run
-# already linked it needs its now-stale symlink removed, or re-running with
-# a changed --skip list wouldn't actually be idempotent — the old link would
-# just sit there forever. Only touches a symlink that both points into
-# src_dir and whose feature name is currently skipped; anything else
-# (foreign symlinks, real files) is left alone, same caution as
-# prune_stale_plugin_links below.
+# The inverse of the skip above: a command excluded AFTER a previous run
+# already linked it (whether via --skip or by falling outside a changed
+# --include list) needs its now-stale symlink removed, or re-running
+# wouldn't actually be idempotent — the old link would just sit there
+# forever. Only touches a symlink that both points into src_dir and whose
+# feature name is currently excluded; anything else (foreign symlinks, real
+# files) is left alone, same caution as prune_stale_plugin_links below.
 prune_skipped_dir_links() {
   local dest_dir="$1" src_dir="$2"
   [[ -d "$dest_dir" ]] || return 0
