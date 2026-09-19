@@ -19,11 +19,12 @@ self-hosted option, license, and maturity (stars/last release).
 | Candidate | Native MCP | Multi-project | Free self-host | License |
 |---|---|---|---|---|
 | **engram** | ✅ | ✅ automatic (cwd/env project detection) | ✅ single binary | MIT |
-| mem0 | ⚠️ bridge-only now (native OpenMemory MCP sunset ~2026-07-29) | tenant-style (`user_id`), not project-aware | ✅ Docker + Postgres | Apache-2.0 |
-| Zep | ✅ | ✅ | ❌ paid Enterprise/BYOC only (Graphiti core is free but lacks the MCP layer) | Apache-2.0 / commercial |
+| mem0 | ⚠️ hosted Platform MCP is the current official path — both prior self-hostable options (OpenMemory, sunset ~2026-07-29; the separate `mem0-mcp-server` package) are now archived/unmaintained | tenant-style (`user_id`), not project-aware | ✅ Docker + Postgres | Apache-2.0 |
+| Zep | ✅ | ✅ | ⚠️ free self-host exists via Graphiti's own experimental MCP server; Zep's polished multi-user/identity layer is paid Enterprise/BYOC only | Apache-2.0 / commercial |
 | Letta | ❌ wrong direction — consumes MCP, doesn't serve it | manual env-var workaround | ✅ | Apache-2.0 |
 | Cognee | ✅ | ✅ but client-scoped, not filesystem-scoped | ✅ Direct Mode | Apache-2.0 |
 | Supermemory | ✅ | ⚠️ manual `containerTag` | ✅ self-hosted binary | MIT |
+| MCP reference memory server | ✅ (it's the reference impl) | ❌ single flat file | ✅ always local | MIT |
 
 ## Bottom line
 

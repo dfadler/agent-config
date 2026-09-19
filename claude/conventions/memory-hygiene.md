@@ -36,21 +36,29 @@ is only for "this is the corrected version of that."
 ### Session-close habit
 
 The built-in system has no prompt to write a wrap-up memory before a session ends —
-unlike engram, which enforces this via a `SessionEnd` hook. Claude Code's hook
-system supports `SessionEnd` generally (it isn't an engram-specific mechanism); a
-project or user `SessionEnd` hook that reminds "write a memory update if anything
-durable happened this session, before it's lost" would close this gap without
-adopting engram. Not implemented yet — evaluate as a follow-up if the manual habit
-of writing memories mid-session (rather than at close) turns out to be lossy in
-practice.
+unlike engram, which enforces this via a hook. The right mechanism here is a `Stop`
+hook, not `SessionEnd`: `SessionEnd` fires after the session has already terminated,
+can't block anything, and its output is shown to the user only, never added to
+Claude's context, so Claude has no way to act on it. `Stop` fires while Claude can
+still act — it can block (exit code 2 or `decision: "block"`) to keep the
+conversation going, and its `additionalContext` output does reach Claude. A project
+or user `Stop` hook that reminds "write a memory update if anything durable happened
+this turn, before it's lost" would close this gap without adopting engram. Not
+implemented yet — evaluate as a follow-up if the manual habit of writing memories
+mid-session (rather than at close) turns out to be lossy in practice.
 
 ### Revisit-engram trigger
 
-Claude Code caps auto memory at the first 200 lines / 25KB of `MEMORY.md`, loaded
-in full every session — there's no on-demand search. If `MEMORY.md` approaches that
-cap (roughly 160 lines / 20KB, ~80%) rather than staying small and pruned, that's
-the concrete signal to reopen the engram evaluation in
+Claude Code caps auto memory at the first 200 lines / 25KB of `MEMORY.md`, loaded in
+full every session. Topic files aren't auto-loaded — Claude reads one on demand with
+its standard file tools once it knows which one it needs — but there's no automatic
+or semantic retrieval across them: no query/search over memory content the way an
+MCP-backed store provides, only what the index already points at or what a manual
+grep turns up. If `MEMORY.md` itself approaches the cap (roughly 160 lines / 20KB,
+~80%) rather than staying small and pruned — i.e. the number of distinct memories,
+not any one topic file's size, becomes the bottleneck — that's the concrete signal
+to reopen the engram evaluation in
 [agent-config#273](https://github.com/dfadler/agent-config/issues/273), since a
-pull-based store (engram, Cognee) solves the scale problem that a flat always-loaded
-index structurally cannot. Check this whenever doing a memory review pass (e.g. via
-the `consolidate-memory` skill) rather than on a schedule.
+pull-based store (engram, Cognee) solves that indexing/retrieval problem structurally.
+Check this whenever doing a memory review pass (e.g. via the `consolidate-memory`
+skill) rather than on a schedule.
