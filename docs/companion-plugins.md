@@ -205,6 +205,26 @@ Not given its own `setup.sh` check: unlike `aws-core`, it needs a plugin-specifi
 `/aws-agents-for-devsecops:setup` step before use, so a plain installed/not-installed
 check would understate what "ready to use" means for it.
 
+## DietrichGebert/ponytail (lazy-mode decision ladder)
+
+[ponytail](https://github.com/DietrichGebert/ponytail) is a standalone, MIT-licensed
+plugin that injects a "write the least code that works" decision ladder (necessity →
+existing codebase → stdlib → native platform → existing deps → one-liner → new code)
+as a standing instruction, plus `/ponytail-review`, `/ponytail-audit`, and
+`/ponytail-debt` commands for advisory over-engineering review. Overlaps in spirit
+with this repo's own terse-code conventions but adds the ladder as an explicit,
+invokable checklist rather than prose. Recommended as a standalone install, same
+posture as `mattpocock-skills` above — nothing here depends on it:
+
+```bash
+claude plugin marketplace add DietrichGebert/ponytail
+claude plugin install ponytail
+```
+
+Not in the official marketplace, so it needs the `marketplace add` step first;
+updates after that arrive automatically the same way. `setup.sh` doesn't install
+this — same reasoning as `mattpocock-skills` (#132, option A over B).
+
 ## rtk-ai/rtk (token compression)
 
 [RTK](https://www.rtk-ai.app/) ([rtk-ai/rtk](https://github.com/rtk-ai/rtk)) is a
