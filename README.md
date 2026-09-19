@@ -15,8 +15,8 @@ automatically, with no per-project copy to keep in sync.
     is a generated file whose managed section `@include`s this file, the user's own
     `CLAUDE.personal.md`, and the default set of convention files (see below) — not a
     symlink.
-  - `conventions/` — one file per convention (worktree usage, secrets handling, PR
-    workflow, etc.), each independently `@include`-able. `DEFAULT_ENABLED` lists which
+  - `conventions/` — one file per convention (worktree usage, secrets handling, memory
+    hygiene, PR workflow, etc.), each independently `@include`-able. `DEFAULT_ENABLED` lists which
     ones a fresh machine gets automatically; everything else is opt-in — add an
     `@include` line to that machine's own `CLAUDE.personal.md` to enable it there.
   - `commands/` — slash commands, symlinked individually into `~/.claude/commands/`.
