@@ -221,9 +221,13 @@ claude plugin marketplace add DietrichGebert/ponytail
 claude plugin install ponytail
 ```
 
-Not in the official marketplace, so it needs the `marketplace add` step first;
-updates after that arrive automatically the same way. `setup.sh` doesn't install
-this — same reasoning as `mattpocock-skills` (#132, option A over B).
+Not in the official marketplace, so it needs the `marketplace add` step first.
+Third-party marketplaces default to auto-update *disabled* (confirmed against
+[code.claude.com/docs/en/discover-plugins](https://code.claude.com/docs/en/discover-plugins)
+— only official Anthropic and claude.ai-added marketplaces default to enabled), so
+pick up updates with `claude plugin marketplace update ponytail`, or enable
+auto-update for it via `/plugin` → Marketplaces. `setup.sh` doesn't install this —
+same reasoning as `mattpocock-skills` (#132, option A over B).
 
 ## rtk-ai/rtk (token compression)
 

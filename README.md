@@ -103,7 +103,7 @@ copy of something is a deliberate fork rather than drift to reconcile.
   becomes `dfadler-agent-config:<name>` in a live session.
 - [`docs/companion-plugins.md`](docs/companion-plugins.md) — recommended standalone
   installs (mattpocock/skills, bulletproof-react-skills, vercel-labs/agent-skills,
-  anthropics/skills, AWS Agent Toolkit, rtk) and the Linux-administration
+  anthropics/skills, AWS Agent Toolkit, rtk, ponytail) and the Linux-administration
   vendor-vs-build-it-here decision.
 - [`docs/contributing.md`](docs/contributing.md) — adding a skill/agent/command/hook,
   the `allowed-tools` decision, `make check`, and GitHub operations via `gh`.
