@@ -22,12 +22,11 @@ move multi-step procedures and part-of-the-codebase instructions into a skill or
 path-scoped rule
 ([memory docs](https://code.claude.com/docs/en/memory#when-to-add-to-claude-md)).
 
-CLAUDE.md files, and anything `@include`d into them, are context, not enforcement.
-If a rule has to hold even when the model decides otherwise, it needs a hook or a
-`settings.json` permission rule
+CLAUDE.md files are context, not enforcement — a rule that must hold needs a hook
+or `settings.json` permission rule instead
 ([memory docs](https://code.claude.com/docs/en/memory#claude-md-vs-auto-memory)).
-[`contributing.md`](./contributing.md#why-skills-here-dont-declare-allowed-tools)
-makes the same point about skill frontmatter.
+Full rationale, plus the same point about skill frontmatter:
+[research notes](https://github.com/dfadler/agent-config/issues/280#issuecomment-5783291566).
 
 ## Path-scoped rules
 
@@ -42,26 +41,21 @@ Candidates for scoping are tracked in #280 and #278.
 
 ## Stop vs. SessionEnd hooks
 
-These two get mixed up when picking an end-of-turn or end-of-session reminder.
-
-- `Stop` fires when Claude finishes responding. It can block, either by exit code 2
-  or by `decision: "block"`, which keeps the conversation going. Its
-  `hookSpecificOutput.additionalContext` reaches Claude
-  ([hooks docs: Stop](https://code.claude.com/docs/en/hooks#stop)).
-- `SessionEnd` fires when the session terminates. It has no decision control and
-  can't block. Claude Code discards its JSON output, and it gets a 1.5-second
-  default timeout. It's only good for cleanup or logging
-  ([hooks docs: SessionEnd](https://code.claude.com/docs/en/hooks#sessionend)).
-
-So anything that needs Claude to act, such as the wrap-up reminder that
+`Stop` fires when Claude finishes responding and can block, either by exit code 2 or
+`decision: "block"` ([hooks docs: Stop](https://code.claude.com/docs/en/hooks#stop)).
+`SessionEnd` fires at session termination, can't block, and Claude Code discards its
+JSON output ([hooks docs: SessionEnd](https://code.claude.com/docs/en/hooks#sessionend)).
+So anything that needs Claude to act, such as the wrap-up reminder
 [`memory-hygiene.md`](../claude/conventions/memory-hygiene.md#session-close-habit)
-describes, has to be a `Stop` hook.
+describes, has to be a `Stop` hook. Full quotes:
+[research notes](https://github.com/dfadler/agent-config/issues/280#issuecomment-5783291566).
 
 ## Output styles and `--append-system-prompt`: deliberately unused
 
-Output styles replace Claude Code's default instructions to change its role or tone.
+Output styles replace Claude Code's default instructions to change its role or tone;
 `--append-system-prompt` adds a one-off per-launch addition
 ([output styles docs: comparisons](https://code.claude.com/docs/en/output-styles#comparisons-to-related-features)).
-This repo does neither on purpose. It ships conventions that sit on top of the default
-software-engineering role, not a different role. A per-launch flag also can't be
-versioned or `@include`d the way a convention file can.
+This repo does neither on purpose — it ships conventions on top of the default role,
+not a different one, and a per-launch flag can't be versioned or `@include`d. Full
+rationale:
+[research notes](https://github.com/dfadler/agent-config/issues/280#issuecomment-5783291566).
