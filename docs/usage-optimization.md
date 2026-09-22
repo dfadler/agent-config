@@ -296,19 +296,91 @@ evidence as §2) for the CLAUDE.md relevance-mismatch claim.
 
 ### 6. Effort / reasoning-level defaults
 
-**Confirmed: no reasoning-effort knob exists anywhere in this repo.**
-`grep -rln 'effort'` across `plugins/` and `claude/` returns exactly one
-file, `pr-review-rubric/SKILL.md`, and every hit there
+**Confirmed: no reasoning-effort knob exists anywhere in this repo's own
+config.** `grep -rln 'effort'` across `plugins/` and `claude/` returns
+exactly one file, `pr-review-rubric/SKILL.md`, and every hit there
 (`SKILL.md:7,150,220,226,527`) is the review-severity-taxonomy field
 `**Effort:** Quick win | Heavy lift` — i.e., how much work a *reported
 finding* is to fix, not a model reasoning-effort/thinking-budget setting.
-There is no `/effort`, no `MAX_THINKING_TOKENS`, no thinking-budget
-configuration anywhere in scope. This means there's also no *misconfigured*
-effort knob to fix — the issue's "effort set higher than the task warrants"
-concern doesn't apply here because the knob is never touched at all; every
+There is no `effort:` frontmatter on any skill or agent, no `settings.json`
+`effortLevel`/`maxEffortLevel`/`modelSettings`, and no `MAX_THINKING_TOKENS`
+anywhere in scope. This means there's also no *misconfigured* effort knob to
+fix today — the issue's "effort set higher than the task warrants" concern
+doesn't apply here yet because the knob is never touched at all; every
 invocation runs at whatever the ambient session default is.
 
 Confidence: Confirmed (exhaustive grep, all 5 hits inspected).
+
+**What the knob actually is, researched for [#231](https://github.com/dfadler/agent-config/issues/231).**
+"Effort" is a real, documented control, separate from model choice and from
+the `/fast` toggle:
+
+- **What it controls.** The `effort` parameter "lets you control how many
+  tokens Claude spends when responding to requests" — it "affects **all**
+  tokens in the response, including: Text responses and explanations, Tool
+  calls and function arguments, Thinking (when active)." Lower effort also
+  means "fewer and terser tool calls."
+  ([platform.claude.com/docs/en/build-with-claude/effort](https://platform.claude.com/docs/en/build-with-claude/effort))
+- **Levels.** `low`, `medium`, `high`, `xhigh`, `max` (model-dependent — not
+  every model supports `xhigh`/`max`), plus a Claude-Code-specific
+  `ultracode` setting that "plans a dynamic workflow for each substantive
+  task with `xhigh` per-message reasoning."
+  ([code.claude.com/docs/en/model-config#adjust-effort-level](https://code.claude.com/docs/en/model-config))
+- **Current default.** `high` on most models that support effort, including
+  Sonnet 5 (the model this audit update ran on) and Opus 5; `medium` on Opus
+  5.5; `xhigh` on Opus 4.7. Setting `effort` to a model's own default
+  produces identical behavior to omitting it.
+  ([platform.claude.com/docs/en/build-with-claude/effort](https://platform.claude.com/docs/en/build-with-claude/effort))
+- **How to set it in Claude Code** (six independent mechanisms, in
+  resolution order from most to least specific): the `CLAUDE_CODE_EFFORT_LEVEL`
+  env var or `--effort <level>` CLI flag or the interactive `/effort`
+  command/slider (session-level, explicit); a per-model level in the
+  `modelSettings` settings key, or a fallback `effortLevel` settings key;
+  the model's own built-in default. Session-level changes can be saved as a
+  future default (`Enter`) or scoped to just that session (`s`).
+  ([code.claude.com/docs/en/model-config#adjust-effort-level](https://code.claude.com/docs/en/model-config))
+- **Skill and subagent frontmatter — directly relevant to this repo.** Both
+  skill and subagent Markdown files support an `effort:` frontmatter field
+  that "override[s] the effort level when that skill or subagent runs,"
+  applying "when that skill or subagent is active, overriding the session
+  level but not the environment variable."
+  ([code.claude.com/docs/en/model-config#adjust-effort-level](https://code.claude.com/docs/en/model-config))
+  This is the same frontmatter surface this repo's three agents already use
+  for `model:` (§1) — `effort:` would sit right next to it in
+  `plugins/dfadler-agent-config/agents/*.md`.
+- **Documented token/cost impact.** The official effort-levels table:
+  `low` = "Most efficient. Significant token savings with some capability
+  reduction... simpler tasks that need the best speed and lowest costs,
+  **such as subagents**"; `medium` = "Balanced approach with moderate token
+  savings." The costs doc lists lowering effort via `/effort` or `/model`
+  as one of two documented ways to reduce extended-thinking spend (the
+  other is disabling thinking outright, which isn't possible on every
+  model). It also notes effort is "a behavioral signal, not a strict token
+  budget" — at lower levels Claude still thinks on genuinely hard problems,
+  just less.
+  ([platform.claude.com/docs/en/build-with-claude/effort](https://platform.claude.com/docs/en/build-with-claude/effort),
+  [code.claude.com/docs/en/costs](https://code.claude.com/docs/en/costs))
+
+**Recommendation (not applied in this PR — see task constraints, same as
+the rest of this doc's ranked list): adopt a habit of setting `effort: low`
+in the frontmatter of mechanical, checklist-style subagents**, starting
+with `shell-script-reviewer.md` (already pinned to `model: haiku` for the
+same reason — a fixed checklist against shellcheck/shfmt output, §1) and
+evaluating `docs-staleness-checker.md` (currently `model: sonnet`, defaults
+to `high` effort) the same way once there's a quality baseline to compare
+against. Leave `adversarial-reviewer.md` (`model: opus`) alone — its job is
+explicitly the "follow calls into their definitions, check callers"
+cross-file reasoning that effort's `low`/`medium` tiers are documented to
+trade away. This mirrors the existing model-tier ladder in §1 (match the knob to
+the task's reasoning complexity) using a second, independent knob the docs
+say stacks with model choice rather than duplicating it.
+
+Confidence: the mechanism, levels, defaults, frontmatter support, and
+documented cost impact are Confirmed (official docs, quoted above, fetched
+2026-09-22). Whether `effort: low` actually holds output quality on this
+repo's specific subagents is Speculative/Unmeasured — the docs' own best
+practice is "test your use case" before adopting a lower level broadly, and
+this repo has no before/after eval to point to yet.
 
 ### 7. Subscription vs. API usage tradeoffs
 
@@ -405,13 +477,23 @@ constraints; they're recommendations only.
    — but entirely unmeasured from this repo. Confidence: Speculative
    throughout (§7) — flagged for the record, not sized.
 
-5. **No action needed: fan-out, polling cadence, and effort-knob usage are
-   already clean.** §3, §4, and §6 found no fan-out beyond a single subagent
-   launch, a polling pattern that already implements dynamic long/short
-   pacing, and zero reasoning-effort knobs set anywhere (so nothing is
-   pinned too high). Restating this so the ranked list doesn't read as if
-   everything needs fixing — three of the issue's seven investigation areas
-   turned up nothing to change.
+5. **No action needed: fan-out and polling cadence are already clean.** §3
+   and §4 found no fan-out beyond a single subagent launch, and a polling
+   pattern that already implements dynamic long/short pacing. Restating this
+   so the ranked list doesn't read as if everything needs fixing — two of
+   the issue's investigation areas turned up nothing to change.
+
+6. **Add `effort: low` frontmatter to `shell-script-reviewer.md` (and
+   evaluate it for `docs-staleness-checker.md`), per [#231](https://github.com/dfadler/agent-config/issues/231).**
+   Effort: trivial (one frontmatter line per agent, same surface as the
+   existing `model:` field, §1). Savings: per the official effort-levels
+   table, `low` effort is documented to give "significant token savings"
+   and is explicitly recommended for subagent-shaped work — stacks with,
+   rather than duplicates, the model-tier savings already in place.
+   Confidence: the mechanism and documented savings are Confirmed (§6);
+   whether it holds output quality on this repo's specific agents is
+   Speculative/Unmeasured — not applied in this PR, see §6 for the full
+   writeup and the "test your use case" caveat.
 
 ## Confidence summary
 
@@ -422,5 +504,5 @@ constraints; they're recommendations only.
 | Subagent/workflow fan-out | No fan-out in this repo (3 agents now, still one per caller, no parallel launch); rubric skill is large (~10.4k tok) and built for external reuse | In-repo facts: Confirmed. External impact: Speculative |
 | Background task/polling | Clean — dynamic pacing already implemented, no fixed-interval polling found | Confirmed |
 | Session/context hygiene | Skill/agent split is sound; CLAUDE.md is the one always-on/rarely-relevant mismatch | Confirmed |
-| Effort/reasoning defaults | No knob exists anywhere in scope — nothing to miscalibrate | Confirmed |
+| Effort/reasoning defaults | No knob set in this repo's own config today; researched for #231 — `effort:` frontmatter on skills/subagents is a real, documented lever, recommended for mechanical subagents, not yet applied | Mechanism/docs: Confirmed. Quality-preserving in this repo: Speculative |
 | Subscription vs. API tradeoffs | Repo's own CI never touches Claude; exported skills are designed for external CI reuse where API billing likely applies | Speculative |
