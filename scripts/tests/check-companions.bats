@@ -148,6 +148,16 @@ shim_claude() {
   }
 ]'
       ;;
+    ponytail-enabled | ponytail-disabled)
+      local on=true
+      [ "$mode" = "ponytail-disabled" ] && on=false
+      body='[
+  {
+    "id": "ponytail@ponytail",
+    "enabled": '"$on"'
+  }
+]'
+      ;;
     broken) body="" ;;
     *)
       echo "shim_claude: unknown mode $mode" >&2
@@ -394,6 +404,40 @@ run_companions() {
   run_companions
   assert_success
   refute_output_contains "mattpocock-skills"
+}
+
+# --- ponytail companion check (#275) ----------------------------------------
+#
+# Same advisory posture as mattpocock-skills above; pins the
+# "ponytail@ponytail" id prefix and the marketplace-add install hint.
+
+@test "confirms ponytail when installed and enabled" {
+  shim_claude ponytail-enabled
+  run_companions
+  assert_success
+  assert_output_contains "✓ ponytail is installed"
+}
+
+@test "warns when ponytail is installed but disabled" {
+  shim_claude ponytail-disabled
+  run_companions
+  assert_success
+  assert_output_contains "claude plugin enable ponytail"
+}
+
+@test "notes when ponytail is not installed" {
+  shim_claude other-plugin-only
+  run_companions
+  assert_success
+  assert_output_contains "ponytail is not installed"
+  assert_output_contains "claude plugin marketplace add DietrichGebert/ponytail"
+}
+
+@test "stays silent about ponytail when the claude CLI errors" {
+  shim_claude broken
+  run_companions
+  assert_success
+  refute_output_contains "ponytail"
 }
 
 # --- Aikido Safe Chain permission offer (advisory) --------------------------

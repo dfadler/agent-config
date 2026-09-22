@@ -38,6 +38,28 @@
    `setup.sh` re-run; anything under `claude/`, or a whole new plugin, does — see
    [`docs/setup.md`](./setup.md).
 
+### Adding a companion
+
+A recommended companion plugin or tool (referenced, never vendored) touches three
+places, and nothing enforces that they stay in sync:
+
+- [ ] README's "Recommended companions" list names it.
+- [ ] [`docs/companion-plugins.md`](./companion-plugins.md) has its own section: what
+      it is, license, provenance checked against the actual repo/GitHub API rather
+      than marketing copy, install commands, and what `setup.sh` does about it.
+- [ ] `scripts/check-companions.sh` has an advisory `check_<name>` function (plus a
+      bats case in `scripts/tests/check-companions.bats`), **or** the
+      companion-plugins.md section documents why it's excluded. Take the install id
+      from the upstream's own `.claude-plugin/marketplace.json`, not a guess.
+- [ ] Every platform-capability claim (official-vs-third-party marketplace,
+      auto-update defaults, install ids) is checked against current official docs
+      and cited, per
+      [`claude/conventions/cite-platform-claims.md`](../claude/conventions/cite-platform-claims.md)
+      — don't copy it from a similar prior entry.
+- [ ] If the install is fetch-and-execute (`curl | sh`, `npx <pkg>@latest`), say so
+      and point at the `dfadler-agent-config:fetch-execute-guide` skill, as the
+      `rtk-ai/rtk` entry does; the advisory check must never run it.
+
 ### Why skills here don't declare `allowed-tools`
 
 An automated reviewer (SkillSpector, via CodeRabbit on #51) flags every `SKILL.md`
