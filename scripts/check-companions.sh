@@ -2,7 +2,13 @@
 # Advisory companion checks run by setup.sh after the core symlinking is done.
 # Checks: git identity, Python deps (pyte for the detached-terminal skill), and
 # recommended companion plugins/tools (mattpocock-skills, anthropics/skills,
-# vercel-labs react-skills, aws-core, rtk, Aikido Safe Chain permission offer).
+# vercel-labs react-skills, aws-core, rtk, ponytail, Aikido Safe Chain
+# permission offer).
+#
+# Policy: every companion documented in docs/companion-plugins.md gets an
+# advisory check here unless its section there documents an explicit reason
+# for exclusion (currently bulletproof-react-skills and
+# aws-agents-for-devsecops).
 #
 # All checks are informational — they never affect the symlinks setup.sh
 # created, and `./setup.sh && something-else` shouldn't break over any of
@@ -506,6 +512,64 @@ check_rtk() {
   } >&2
 }
 
+# Same posture as check_mattpocock_skills above: purely informational, nothing
+# here depends on it, no --install-deps. DietrichGebert/ponytail isn't in the
+# official marketplace; its own .claude-plugin/marketplace.json names both the
+# marketplace and the plugin "ponytail", so the install id is
+# "ponytail@ponytail". Matched by id prefix only, same as the checks above.
+check_ponytail() {
+  command -v claude >/dev/null 2>&1 || return 0
+
+  local listing
+  listing="$(claude plugin list --json 2>/dev/null)" || return 0
+
+  local state rc
+  if state="$(printf '%s' "$listing" | python3 -c '
+import json, sys
+try:
+    data = json.load(sys.stdin)
+except Exception:
+    sys.exit(2)
+for entry in data:
+    if str(entry.get("id", "")).startswith("ponytail@"):
+        print("enabled" if entry.get("enabled") else "disabled")
+        sys.exit(0)
+sys.exit(1)
+' 2>/dev/null)"; then
+    rc=0
+  else
+    rc=$?
+  fi
+
+  case "$rc:$state" in
+    0:enabled)
+      echo "✓ ponytail is installed"
+      ;;
+    0:disabled)
+      {
+        echo
+        echo "⚠ ponytail is installed but disabled."
+        echo "  Re-enable it with: claude plugin enable ponytail"
+        echo
+      } >&2
+      ;;
+    1:*)
+      {
+        echo
+        echo "ℹ ponytail is not installed — a recommended companion plugin, not"
+        echo "  required by anything here. See README's \"Recommended companion\""
+        echo "  section. Install it with:"
+        echo "    claude plugin marketplace add DietrichGebert/ponytail"
+        echo "    claude plugin install ponytail"
+        echo
+      } >&2
+      ;;
+    *)
+      return 0
+      ;;
+  esac
+}
+
 check_git_identity
 check_python_deps
 check_mattpocock_skills
@@ -513,6 +577,7 @@ check_frontend_design
 check_react_skills
 check_aws_core
 check_rtk
+check_ponytail
 
 # Also last: offers (opt-in, y/n) to pre-approve Aikido Safe Chain's pinned
 # installer command in Claude Code's permission settings. See
