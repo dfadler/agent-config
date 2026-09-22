@@ -95,8 +95,8 @@ under `fetch-execute-guide`.
    the APIs, a low price (`tts-1` about $0.15 per article), a real voice upgrade, and
    steerable delivery through `instructions`. It needs chunking at 4096 chars.
 3. **Deferred:** Piper (license caveats plus a pip install and a model download, for
-   a voice-quality gain nobody has measured against `say` yet), ElevenLabs (largest
-   voice library, but 3–7× the cost of `tts-1`), and Polly/Google (cheap, but heavy cloud-credential setup for a personal skill).
+   a voice-quality gain nobody has measured against `say` yet), ElevenLabs (big
+   voice library and cloning, but 3–7× the cost of `tts-1`), and Polly/Google (cheap, but heavy cloud-credential setup for a personal skill).
 
 ## Open decision
 
