@@ -6,6 +6,12 @@ freezing a copy here that goes stale silently. `setup.sh` never installs any
 of these on its own; most get an advisory-only check that reports whether
 they're present and prints the install command if not.
 
+**Policy:** every companion documented here gets an advisory check in
+`scripts/check-companions.sh` unless its section below documents an explicit
+reason for exclusion (as `bulletproof-react-skills` and
+`aws-agents-for-devsecops` do). Adding one? See the checklist in
+[`docs/contributing.md`](./contributing.md#adding-a-companion).
+
 ## mattpocock/skills
 
 [mattpocock/skills](https://github.com/mattpocock/skills) is a separately maintained
@@ -227,7 +233,10 @@ Third-party marketplaces default to auto-update *disabled* (confirmed against
 — only official Anthropic and claude.ai-added marketplaces default to enabled), so
 pick up updates with `claude plugin marketplace update ponytail`, or enable
 auto-update for it via `/plugin` → Marketplaces. `setup.sh` doesn't install this —
-same reasoning as `mattpocock-skills` (#132, option A over B).
+same reasoning as `mattpocock-skills` (#132, option A over B) — but does run an
+advisory check (`check_ponytail`) against the `ponytail@ponytail` id, which is
+what the repo's own `.claude-plugin/marketplace.json` defines (marketplace and
+plugin both named `ponytail`).
 
 ## rtk-ai/rtk (token compression)
 
