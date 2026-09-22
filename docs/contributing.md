@@ -7,6 +7,9 @@
      containing a `SKILL.md`.
    - An **agent** → a new `.md` file under `plugins/dfadler-agent-config/agents/`.
    - A **slash command** → a new `.md` file under `claude/commands/`.
+   - A **convention** (global guidance for `CLAUDE.md`) → first check
+     [`claude/conventions/README.md`](../claude/conventions/README.md). Most
+     task-shaped guidance should be a skill, not an `@include`.
    - A **hook** → an entry in `plugins/dfadler-agent-config/hooks/hooks.json`,
      pointing (via `${CLAUDE_PLUGIN_ROOT}`) at a script under wherever fits — a
      related skill's own `scripts/`, if the hook is that skill's companion. Unlike
