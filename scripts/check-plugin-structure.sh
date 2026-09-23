@@ -187,11 +187,14 @@ check_hooks() {
 
   local output
   if ! output="$(python3 -c '
-import json, sys
+import json, os, sys
 
-path = sys.argv[1]
+hooks_file = sys.argv[1]
+plugin_dir = sys.argv[2]
+prefix = "${CLAUDE_PLUGIN_ROOT}/"
+
 try:
-    with open(path) as fh:
+    with open(hooks_file) as fh:
         data = json.load(fh)
 except (json.JSONDecodeError, UnicodeDecodeError):
     print("not valid JSON")
@@ -203,7 +206,23 @@ except OSError as exc:
 if not isinstance(data, dict):
     print("top level is not a JSON object")
     sys.exit(1)
-' "$hooks_file" 2>&1)"; then
+
+for event_hooks in data.values():
+    if not isinstance(event_hooks, list):
+        continue
+    for hook in event_hooks:
+        cmd = hook.get("command", "") if isinstance(hook, dict) else ""
+        if not cmd.startswith(prefix):
+            continue
+        rel = cmd[len(prefix):]
+        full = os.path.join(plugin_dir, rel)
+        if not os.path.isfile(full):
+            print("command path not found: %s" % cmd)
+            sys.exit(1)
+        if not os.access(full, os.X_OK):
+            print("command path not executable: %s" % cmd)
+            sys.exit(1)
+' "$hooks_file" "$plugin_dir" 2>&1)"; then
     fail "$hooks_file: $output"
   fi
 }

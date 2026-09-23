@@ -206,60 +206,60 @@ check_python_deps() {
   report_missing_pyte "$exe" "$managed"
 }
 
-# Purely informational: nothing in this repo depends on mattpocock-skills
-# being installed (see README's "Recommended companion" section, and #132's
-# decision to document rather than auto-install it) - unlike pyte or git
-# identity, there's no --install-deps for this, and there never should be.
-# `claude plugin list --json` is the stable, documented interface; grepping
-# its output avoids adding a jq dependency to setup.sh for one advisory
-# check. The id can be "mattpocock-skills@mattpocock" (the self-hosted
-# fallback marketplace) or "@claude-plugins-official" (the official one) -
-# either satisfies the check, so the marketplace suffix is deliberately not
-# matched.
-check_mattpocock_skills() {
-  command -v claude >/dev/null 2>&1 || return 0
-
+# Query `claude plugin list --json` for one plugin by id prefix and return a
+# single word: enabled | disabled | absent | error.
+#
+# A grep window over raw JSON isn't safe with multiple plugins installed: an
+# "enabled" line from a neighboring entry falls inside a context window and
+# gets attributed to the wrong plugin (reported and reproduced in #134).
+# python3 is already required elsewhere in this script, so using it here adds
+# no new dependency. `if py_out=$(...)` rather than a plain assignment: under
+# set -euo pipefail a plain `var="$(cmd)"` whose command exits non-zero aborts
+# the script; an if-condition is the one place set -e doesn't trigger on
+# failure, so this is the correct idiom, not a stylistic one.
+claude_plugin_state() {
+  local id_prefix="$1"
+  command -v claude >/dev/null 2>&1 || { echo "error"; return 0; }
   local listing
-  listing="$(claude plugin list --json 2>/dev/null)" || return 0
-
-  # A grep window over the raw JSON isn't safe here: with more than one
-  # plugin installed, an "enabled" line belonging to a NEIGHBORING entry can
-  # fall inside the window and get attributed to mattpocock-skills instead -
-  # reported and reproduced in review on #134. Parsing properly with python3
-  # (already required elsewhere in this script, so not a new dependency)
-  # is immune to that by construction: json.load builds a dict keyed by
-  # field name, so neither a neighboring object nor field order within the
-  # matched object can be misread as belonging to a different entry.
-  # `if var=$(cmd)` rather than a plain assignment: this script runs under
-  # set -euo pipefail, and a plain `var="$(cmd)"` whose command exits
-  # non-zero (exactly what "not installed" and "unparseable" both are here)
-  # would abort setup.sh entirely instead of falling through to the case
-  # below. A command tested as an if-condition is the one place set -e
-  # doesn't trigger on failure, so this is the correct idiom, not a
-  # stylistic one.
-  local state rc
-  if state="$(printf '%s' "$listing" | python3 -c '
+  listing="$(claude plugin list --json 2>/dev/null)" || { echo "error"; return 0; }
+  local py_out py_rc
+  if py_out="$(printf '%s' "$listing" | python3 -c '
 import json, sys
 try:
     data = json.load(sys.stdin)
 except Exception:
     sys.exit(2)
 for entry in data:
-    if str(entry.get("id", "")).startswith("mattpocock-skills@"):
+    if str(entry.get("id", "")).startswith(sys.argv[1]):
         print("enabled" if entry.get("enabled") else "disabled")
         sys.exit(0)
 sys.exit(1)
-' 2>/dev/null)"; then
-    rc=0
+' "$id_prefix" 2>/dev/null)"; then
+    py_rc=0
   else
-    rc=$?
+    py_rc=$?
   fi
+  case "$py_rc:$py_out" in
+    0:enabled)  echo "enabled" ;;
+    0:disabled) echo "disabled" ;;
+    1:*)        echo "absent" ;;
+    *)          echo "error" ;;
+  esac
+}
 
-  case "$rc:$state" in
-    0:enabled)
+# Purely informational: nothing in this repo depends on mattpocock-skills
+# being installed (see README's "Recommended companion" section, and #132's
+# decision to document rather than auto-install it) - unlike pyte or git
+# identity, there's no --install-deps for this, and there never should be.
+# The id can be "mattpocock-skills@mattpocock" (self-hosted fallback) or
+# "@claude-plugins-official" - either satisfies the check, so the marketplace
+# suffix is deliberately not matched.
+check_mattpocock_skills() {
+  case "$(claude_plugin_state "mattpocock-skills@")" in
+    enabled)
       echo "✓ mattpocock-skills is installed"
       ;;
-    0:disabled)
+    disabled)
       {
         echo
         echo "⚠ mattpocock-skills is installed but disabled."
@@ -267,7 +267,7 @@ sys.exit(1)
         echo
       } >&2
       ;;
-    1:*)
+    absent)
       {
         echo
         echo "ℹ mattpocock-skills is not installed — a recommended companion plugin,"
@@ -276,12 +276,6 @@ sys.exit(1)
         echo "    claude plugin install mattpocock-skills"
         echo
       } >&2
-      ;;
-    *)
-      # python3 unusable, or claude printed something that isn't the JSON
-      # array the interface documents - can't determine, so stay silent
-      # rather than guess (same posture as an unreachable claude CLI).
-      return 0
       ;;
   esac
 }
@@ -294,34 +288,11 @@ sys.exit(1)
 # therefore always "example-skills@anthropic-agent-skills", never a
 # "@claude-plugins-official" variant.
 check_frontend_design() {
-  command -v claude >/dev/null 2>&1 || return 0
-
-  local listing
-  listing="$(claude plugin list --json 2>/dev/null)" || return 0
-
-  local state rc
-  if state="$(printf '%s' "$listing" | python3 -c '
-import json, sys
-try:
-    data = json.load(sys.stdin)
-except Exception:
-    sys.exit(2)
-for entry in data:
-    if str(entry.get("id", "")).startswith("example-skills@"):
-        print("enabled" if entry.get("enabled") else "disabled")
-        sys.exit(0)
-sys.exit(1)
-' 2>/dev/null)"; then
-    rc=0
-  else
-    rc=$?
-  fi
-
-  case "$rc:$state" in
-    0:enabled)
+  case "$(claude_plugin_state "example-skills@")" in
+    enabled)
       echo "✓ anthropics/skills (frontend-design) is installed"
       ;;
-    0:disabled)
+    disabled)
       {
         echo
         echo "⚠ anthropics/skills is installed but disabled."
@@ -329,7 +300,7 @@ sys.exit(1)
         echo
       } >&2
       ;;
-    1:*)
+    absent)
       {
         echo
         echo "ℹ anthropics/skills (frontend-design) is not installed — a recommended"
@@ -340,14 +311,11 @@ sys.exit(1)
         echo
       } >&2
       ;;
-    *)
-      return 0
-      ;;
   esac
 }
 
-# Same posture as the two checks above: purely informational, nothing here
-# depends on it, no --install-deps. Unlike mattpocock-skills/frontend-design,
+# Same posture as check_mattpocock_skills above: purely informational, nothing
+# here depends on it, no --install-deps. Unlike mattpocock-skills/frontend-design,
 # vercel-labs/agent-skills isn't a `claude plugin` at all - it distributes
 # through a separate `skills` CLI (see README's "Recommended companion"
 # section), so this check only fires when that CLI is already resolvable on
@@ -430,34 +398,11 @@ sys.exit(0)
 # /aws-agents-for-devsecops:setup step before use, so installed/not-installed
 # alone would misstate whether it's actually ready.
 check_aws_core() {
-  command -v claude >/dev/null 2>&1 || return 0
-
-  local listing
-  listing="$(claude plugin list --json 2>/dev/null)" || return 0
-
-  local state rc
-  if state="$(printf '%s' "$listing" | python3 -c '
-import json, sys
-try:
-    data = json.load(sys.stdin)
-except Exception:
-    sys.exit(2)
-for entry in data:
-    if str(entry.get("id", "")).startswith("aws-core@"):
-        print("enabled" if entry.get("enabled") else "disabled")
-        sys.exit(0)
-sys.exit(1)
-' 2>/dev/null)"; then
-    rc=0
-  else
-    rc=$?
-  fi
-
-  case "$rc:$state" in
-    0:enabled)
+  case "$(claude_plugin_state "aws-core@")" in
+    enabled)
       echo "✓ aws-core is installed"
       ;;
-    0:disabled)
+    disabled)
       {
         echo
         echo "⚠ aws-core is installed but disabled."
@@ -465,7 +410,7 @@ sys.exit(1)
         echo
       } >&2
       ;;
-    1:*)
+    absent)
       {
         echo
         echo "ℹ aws-core is not installed — a recommended companion plugin, not"
@@ -474,9 +419,6 @@ sys.exit(1)
         echo "    claude plugin install aws-core@claude-plugins-official"
         echo
       } >&2
-      ;;
-    *)
-      return 0
       ;;
   esac
 }
@@ -518,34 +460,11 @@ check_rtk() {
 # marketplace and the plugin "ponytail", so the install id is
 # "ponytail@ponytail". Matched by id prefix only, same as the checks above.
 check_ponytail() {
-  command -v claude >/dev/null 2>&1 || return 0
-
-  local listing
-  listing="$(claude plugin list --json 2>/dev/null)" || return 0
-
-  local state rc
-  if state="$(printf '%s' "$listing" | python3 -c '
-import json, sys
-try:
-    data = json.load(sys.stdin)
-except Exception:
-    sys.exit(2)
-for entry in data:
-    if str(entry.get("id", "")).startswith("ponytail@"):
-        print("enabled" if entry.get("enabled") else "disabled")
-        sys.exit(0)
-sys.exit(1)
-' 2>/dev/null)"; then
-    rc=0
-  else
-    rc=$?
-  fi
-
-  case "$rc:$state" in
-    0:enabled)
+  case "$(claude_plugin_state "ponytail@")" in
+    enabled)
       echo "✓ ponytail is installed"
       ;;
-    0:disabled)
+    disabled)
       {
         echo
         echo "⚠ ponytail is installed but disabled."
@@ -553,7 +472,7 @@ sys.exit(1)
         echo
       } >&2
       ;;
-    1:*)
+    absent)
       {
         echo
         echo "ℹ ponytail is not installed — a recommended companion plugin, not"
@@ -563,9 +482,6 @@ sys.exit(1)
         echo "    claude plugin install ponytail"
         echo
       } >&2
-      ;;
-    *)
-      return 0
       ;;
   esac
 }
