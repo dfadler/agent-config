@@ -20,7 +20,7 @@ if [ "${CLAUDE_CODE_REMOTE:-}" = "true" ]; then
 fi
 
 script_dir="$(cd "$(dirname "$0")" && pwd)"
-# shellcheck source=worktree-hook-lib.sh
+# shellcheck source=/dev/null
 source "$script_dir/worktree-hook-lib.sh"
 
 # Resolve enable signal (env var → settings.json → off).
