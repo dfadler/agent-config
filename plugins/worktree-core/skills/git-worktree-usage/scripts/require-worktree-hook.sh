@@ -19,7 +19,7 @@ EXIT_OK=0
 EXIT_FAILURE=1
 
 script_dir="$(cd "$(dirname "$0")" && pwd)"
-# shellcheck source=worktree-hook-lib.sh
+# shellcheck source=/dev/null
 source "$script_dir/worktree-hook-lib.sh"
 
 if [ "${CLAUDE_CODE_REMOTE:-}" = "true" ]; then

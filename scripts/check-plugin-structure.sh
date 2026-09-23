@@ -186,6 +186,7 @@ check_hooks() {
   [[ -e "$hooks_file" || -L "$hooks_file" ]] || return 0
 
   local output
+  # shellcheck disable=SC2016  # ${CLAUDE_PLUGIN_ROOT} is a literal Python string, not a shell variable
   if ! output="$(python3 -c '
 import json, os, sys
 
