@@ -267,7 +267,7 @@ EOF
   assert_output_contains "hooks/hooks.json"
 }
 
-@test "passes when hooks/hooks.json references an existing executable command" {
+@test "passes when hooks/hooks.json references an existing executable command (flat format)" {
   add_skill "$ROOT" demo my-skill
   mkdir -p "$ROOT/plugins/demo/hooks"
   local cmd="$ROOT/plugins/demo/scripts/run.sh"
@@ -283,6 +283,54 @@ EOF
 JSON
   check
   assert_success
+}
+
+# The real hooks.json format used by worktree-core ships commands 3 levels
+# deep: {"hooks": {"Event": [{"hooks": [{"command": "..."}]}]}}. A flat
+# data.values() traversal misses them entirely (the first level is a dict,
+# not a list). Also tests the quoted-root form "..."/path used in prod.
+@test "passes with the real nested hooks.json format and quoted-prefix command" {
+  add_skill "$ROOT" demo my-skill
+  mkdir -p "$ROOT/plugins/demo/hooks" "$ROOT/plugins/demo/scripts"
+  printf '#!/usr/bin/env bash\n' > "$ROOT/plugins/demo/scripts/run.sh"
+  chmod +x "$ROOT/plugins/demo/scripts/run.sh"
+  cat > "$ROOT/plugins/demo/hooks/hooks.json" <<'JSON'
+{
+  "hooks": {
+    "SessionStart": [
+      {
+        "hooks": [
+          { "type": "command", "command": "\"${CLAUDE_PLUGIN_ROOT}\"/scripts/run.sh" }
+        ]
+      }
+    ]
+  }
+}
+JSON
+  check
+  assert_success
+}
+
+@test "fails when a nested hooks command path does not exist" {
+  add_skill "$ROOT" demo my-skill
+  mkdir -p "$ROOT/plugins/demo/hooks"
+  cat > "$ROOT/plugins/demo/hooks/hooks.json" <<'JSON'
+{
+  "hooks": {
+    "SessionStart": [
+      {
+        "hooks": [
+          { "type": "command", "command": "\"${CLAUDE_PLUGIN_ROOT}\"/scripts/ghost.sh" }
+        ]
+      }
+    ]
+  }
+}
+JSON
+  check
+  assert_failure
+  assert_output_contains "command path not found"
+  assert_output_contains "scripts/ghost.sh"
 }
 
 @test "fails when a hooks command path does not exist" {

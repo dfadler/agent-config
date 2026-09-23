@@ -85,6 +85,12 @@ TOKEN="$(gh auth token)" || {
   exit 1
 }
 
+# Write the auth header to a temp file so the token stays out of process
+# arguments (which are visible to `ps aux` and similar tools).
+AUTH_HDR="$(mktemp)"
+printf 'Authorization: Bearer %s\n' "$TOKEN" > "$AUTH_HDR"
+trap 'rm -f "$AUTH_HDR"' EXIT
+
 REPO_ID="$(gh api "repos/${REPO}" --jq .id)" || {
   echo "Error: could not resolve repository id for '${REPO}' — check the repo exists and you have access" >&2
   exit 1
@@ -120,7 +126,7 @@ for f in "${FILES[@]}"; do
 
   response="$(curl -sS "https://uploads.github.com/user-attachments/assets?name=$(python3 -c "import urllib.parse,sys; print(urllib.parse.quote(sys.argv[1]))" "$name")&content_type=$(python3 -c "import urllib.parse,sys; print(urllib.parse.quote(sys.argv[1]))" "$ctype")&repository_id=${REPO_ID}" \
     -X POST \
-    -H "Authorization: Bearer ${TOKEN}" \
+    --header @"${AUTH_HDR}" \
     -H "Accept: application/json" \
     --data-binary "@${f}")" || {
     echo "Error: upload request failed for '$f'" >&2
@@ -169,7 +175,7 @@ if [[ "$AS_COMMENT" -eq 1 ]]; then
 else
   CURRENT_BODY="$(gh "$TARGET_KIND" view "$TARGET_NUM" --repo "$REPO" --json body --jq .body)"
   TMP="$(mktemp)"
-  trap 'rm -f "$TMP"' EXIT
+  trap 'rm -f "$AUTH_HDR" "$TMP"' EXIT
   printf '%s\n\n%s\n' "$CURRENT_BODY" "$BLOCK" >"$TMP"
   gh "$TARGET_KIND" edit "$TARGET_NUM" --repo "$REPO" --body-file "$TMP"
   echo "Appended to ${TARGET_KIND} #${TARGET_NUM}'s body in ${REPO} (this save is what makes the URLs above resolve)." >&2
