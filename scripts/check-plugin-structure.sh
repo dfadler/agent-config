@@ -186,13 +186,17 @@ check_hooks() {
   [[ -e "$hooks_file" || -L "$hooks_file" ]] || return 0
 
   local output
-  # shellcheck disable=SC2016  # ${CLAUDE_PLUGIN_ROOT} is a literal Python string, not a shell variable
+  # shellcheck disable=SC2016  # ${CLAUDE_PLUGIN_ROOT} prefix strings are shell single-quoted so they reach Python literally
   if ! output="$(python3 -c '
 import json, os, sys
 
 hooks_file = sys.argv[1]
 plugin_dir = sys.argv[2]
-prefix = "${CLAUDE_PLUGIN_ROOT}/"
+# Both command prefix forms Claude Code ships (passed as positional args so
+# shell single-quoting keeps the ${} literal — no expansion on either side):
+#   sys.argv[3]: "${CLAUDE_PLUGIN_ROOT}"/ (quoted root, spaces-safe)
+#   sys.argv[4]: ${CLAUDE_PLUGIN_ROOT}/   (unquoted root)
+PREFIXES = (sys.argv[3], sys.argv[4])
 
 try:
     with open(hooks_file) as fh:
@@ -208,22 +212,46 @@ if not isinstance(data, dict):
     print("top level is not a JSON object")
     sys.exit(1)
 
-for event_hooks in data.values():
-    if not isinstance(event_hooks, list):
+def find_commands(obj):
+    """Recursively yield every "command" string value anywhere in obj.
+
+    hooks.json can nest commands at arbitrary depth — the top-level "hooks"
+    wrapper, per-event group objects, and their inner "hooks" lists — so a
+    flat traversal of data.values() misses anything beyond one level deep.
+    Walking the whole tree handles every known nesting variant without needing
+    to hard-code the schema.
+    """
+    if isinstance(obj, dict):
+        if "command" in obj and isinstance(obj["command"], str):
+            yield obj["command"]
+        for v in obj.values():
+            for cmd in find_commands(v):
+                yield cmd
+    elif isinstance(obj, list):
+        for item in obj:
+            for cmd in find_commands(item):
+                yield cmd
+
+for cmd in find_commands(data):
+    matched_prefix = None
+    for p in PREFIXES:
+        if cmd.startswith(p):
+            matched_prefix = p
+            break
+    if matched_prefix is None:
         continue
-    for hook in event_hooks:
-        cmd = hook.get("command", "") if isinstance(hook, dict) else ""
-        if not cmd.startswith(prefix):
-            continue
-        rel = cmd[len(prefix):]
-        full = os.path.join(plugin_dir, rel)
-        if not os.path.isfile(full):
-            print("command path not found: %s" % cmd)
-            sys.exit(1)
-        if not os.access(full, os.X_OK):
-            print("command path not executable: %s" % cmd)
-            sys.exit(1)
-' "$hooks_file" "$plugin_dir" 2>&1)"; then
+    # Strip the plugin-root prefix, then isolate the executable path by
+    # dropping any trailing arguments (e.g. "--flag" or "ARG=value").
+    rest = cmd[len(matched_prefix):]
+    executable = rest.split()[0] if rest.strip() else rest
+    full = os.path.join(plugin_dir, executable)
+    if not os.path.isfile(full):
+        print("command path not found: %s" % cmd)
+        sys.exit(1)
+    if not os.access(full, os.X_OK):
+        print("command path not executable: %s" % cmd)
+        sys.exit(1)
+' "$hooks_file" "$plugin_dir" '"${CLAUDE_PLUGIN_ROOT}"/' '${CLAUDE_PLUGIN_ROOT}/' 2>&1)"; then
     fail "$hooks_file: $output"
   fi
 }
