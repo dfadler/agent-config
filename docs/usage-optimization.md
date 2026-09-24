@@ -296,19 +296,32 @@ evidence as §2) for the CLAUDE.md relevance-mismatch claim.
 
 ### 6. Effort / reasoning-level defaults
 
-**Confirmed: no reasoning-effort knob exists anywhere in this repo.**
-`grep -rln 'effort'` across `plugins/` and `claude/` returns exactly one
-file, `pr-review-rubric/SKILL.md`, and every hit there
+**Confirmed: no reasoning-effort knob exists anywhere in this repo's own
+config.** `grep -rln 'effort'` across `plugins/` and `claude/` returns
+exactly one file, `pr-review-rubric/SKILL.md`, and every hit there
 (`SKILL.md:7,150,220,226,527`) is the review-severity-taxonomy field
 `**Effort:** Quick win | Heavy lift` — i.e., how much work a *reported
 finding* is to fix, not a model reasoning-effort/thinking-budget setting.
-There is no `/effort`, no `MAX_THINKING_TOKENS`, no thinking-budget
-configuration anywhere in scope. This means there's also no *misconfigured*
-effort knob to fix — the issue's "effort set higher than the task warrants"
-concern doesn't apply here because the knob is never touched at all; every
+There is no `effort:` frontmatter on any skill or agent, no `settings.json`
+`effortLevel`/`maxEffortLevel`/`modelSettings`, and no `MAX_THINKING_TOKENS`
+anywhere in scope. This means there's also no *misconfigured* effort knob to
+fix today — the issue's "effort set higher than the task warrants" concern
+doesn't apply here yet because the knob is never touched at all; every
 invocation runs at whatever the ambient session default is.
 
 Confidence: Confirmed (exhaustive grep, all 5 hits inspected).
+
+**Researched for [#231](https://github.com/dfadler/agent-config/issues/231)**
+([full notes](https://github.com/dfadler/agent-config/issues/231#issuecomment-5782833851)).
+`effort` is a documented control, separate from model and `/fast`, that
+scales all output tokens including thinking. Skills and subagents accept an
+`effort:` frontmatter field next to `model:`, and the docs recommend `low`
+("significant token savings") for subagent-shaped work
+([effort docs](https://platform.claude.com/docs/en/build-with-claude/effort),
+[model config](https://code.claude.com/docs/en/model-config#adjust-effort-level)).
+Recommendation: set `effort: low` on `shell-script-reviewer.md`, evaluate
+`docs-staleness-checker.md`, leave `adversarial-reviewer.md` alone.
+Confidence: mechanism Confirmed; quality impact on these agents Unmeasured.
 
 ### 7. Subscription vs. API usage tradeoffs
 
@@ -405,13 +418,17 @@ constraints; they're recommendations only.
    — but entirely unmeasured from this repo. Confidence: Speculative
    throughout (§7) — flagged for the record, not sized.
 
-5. **No action needed: fan-out, polling cadence, and effort-knob usage are
-   already clean.** §3, §4, and §6 found no fan-out beyond a single subagent
-   launch, a polling pattern that already implements dynamic long/short
-   pacing, and zero reasoning-effort knobs set anywhere (so nothing is
-   pinned too high). Restating this so the ranked list doesn't read as if
-   everything needs fixing — three of the issue's seven investigation areas
-   turned up nothing to change.
+5. **No action needed: fan-out and polling cadence are already clean.** §3
+   and §4 found no fan-out beyond a single subagent launch, and a polling
+   pattern that already implements dynamic long/short pacing. Restating this
+   so the ranked list doesn't read as if everything needs fixing — two of
+   the issue's investigation areas turned up nothing to change.
+
+6. **Add `effort: low` frontmatter to `shell-script-reviewer.md` (and
+   evaluate it for `docs-staleness-checker.md`), per [#231](https://github.com/dfadler/agent-config/issues/231).**
+   Effort: trivial (one frontmatter line). Savings: documented as
+   significant, stacking with model tiers. Confidence: Confirmed mechanism,
+   Unmeasured quality impact (§6).
 
 ## Confidence summary
 
@@ -422,5 +439,5 @@ constraints; they're recommendations only.
 | Subagent/workflow fan-out | No fan-out in this repo (3 agents now, still one per caller, no parallel launch); rubric skill is large (~10.4k tok) and built for external reuse | In-repo facts: Confirmed. External impact: Speculative |
 | Background task/polling | Clean — dynamic pacing already implemented, no fixed-interval polling found | Confirmed |
 | Session/context hygiene | Skill/agent split is sound; CLAUDE.md is the one always-on/rarely-relevant mismatch | Confirmed |
-| Effort/reasoning defaults | No knob exists anywhere in scope — nothing to miscalibrate | Confirmed |
+| Effort/reasoning defaults | No knob set today; `effort:` frontmatter is a documented lever for mechanical subagents (#231) | Mechanism: Confirmed. Quality impact: Speculative |
 | Subscription vs. API tradeoffs | Repo's own CI never touches Claude; exported skills are designed for external CI reuse where API billing likely applies | Speculative |
