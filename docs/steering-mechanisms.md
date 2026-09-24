@@ -30,32 +30,19 @@ Full rationale, plus the same point about skill frontmatter:
 
 ## Path-scoped rules
 
-A `.claude/rules/*.md` file with a `paths:` glob list in its frontmatter loads only
-when Claude reads a matching file, not on every tool use. A rule without `paths:`
-loads at launch like `.claude/CLAUDE.md`. User-level rules live in
-`~/.claude/rules/` and apply to every project on the machine
-([memory docs: path-specific rules](https://code.claude.com/docs/en/memory#path-specific-rules)).
-
-This repo doesn't use them yet. Conventions are opted in wholesale per machine instead.
-Candidates for scoping are tracked in #280 and #278.
+Not used yet — conventions are opted in wholesale per machine instead of scoped by
+file path. Candidates are tracked in #280 and #278. Details, sourcing:
+[research notes](https://github.com/dfadler/agent-config/issues/280#issuecomment-5783291566).
 
 ## Stop vs. SessionEnd hooks
 
-`Stop` fires when Claude finishes responding and can block, either by exit code 2 or
-`decision: "block"` ([hooks docs: Stop](https://code.claude.com/docs/en/hooks#stop)).
-`SessionEnd` fires at session termination, can't block, and Claude Code discards its
-JSON output ([hooks docs: SessionEnd](https://code.claude.com/docs/en/hooks#sessionend)).
-So anything that needs Claude to act, such as the wrap-up reminder
-[`memory-hygiene.md`](../claude/conventions/memory-hygiene.md#session-close-habit)
-describes, has to be a `Stop` hook. Full quotes:
+`Stop` can block and reach Claude; `SessionEnd` can't and its output is discarded —
+so a wrap-up reminder like [`memory-hygiene.md`](../claude/conventions/memory-hygiene.md#session-close-habit)
+needs `Stop`, not `SessionEnd`. Details, sourcing:
 [research notes](https://github.com/dfadler/agent-config/issues/280#issuecomment-5783291566).
 
 ## Output styles and `--append-system-prompt`: deliberately unused
 
-Output styles replace Claude Code's default instructions to change its role or tone;
-`--append-system-prompt` adds a one-off per-launch addition
-([output styles docs: comparisons](https://code.claude.com/docs/en/output-styles#comparisons-to-related-features)).
-This repo does neither on purpose — it ships conventions on top of the default role,
-not a different one, and a per-launch flag can't be versioned or `@include`d. Full
-rationale:
+This repo ships conventions on top of Claude Code's default role, not a different
+one, and a per-launch flag can't be versioned or `@include`d. Details, sourcing:
 [research notes](https://github.com/dfadler/agent-config/issues/280#issuecomment-5783291566).
