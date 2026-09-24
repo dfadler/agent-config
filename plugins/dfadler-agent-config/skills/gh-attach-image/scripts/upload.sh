@@ -173,10 +173,53 @@ if [[ "$AS_COMMENT" -eq 1 ]]; then
   gh "$TARGET_KIND" comment "$TARGET_NUM" --repo "$REPO" --body "$BLOCK"
   echo "Posted comment on ${TARGET_KIND} #${TARGET_NUM} in ${REPO}." >&2
 else
-  CURRENT_BODY="$(gh "$TARGET_KIND" view "$TARGET_NUM" --repo "$REPO" --json body --jq .body)"
+  # gh/GitHub expose no atomic conditional PATCH for an issue/PR body (no
+  # If-Match/ETag enforcement on write), so a true compare-and-swap isn't
+  # available here. This is optimistic concurrency instead: read the body,
+  # then re-read it again immediately before writing — right next to the
+  # write, with no other work in between — and bail out to retry if it
+  # moved. A body-text compare is used rather than `updatedAt` because
+  # GitHub's timestamp only has second resolution and two rapid edits can
+  # share one; comparing the actual content catches any real change. A
+  # window between that final check and the `gh edit` call below still
+  # technically exists (gh CLI has no way to close it), but this keeps it as
+  # small as this tool can make it, and retries rather than ever silently
+  # overwriting a body that changed underneath it.
+  MAX_ATTEMPTS=3
   TMP="$(mktemp)"
   trap 'rm -f "$AUTH_HDR" "$TMP"' EXIT
-  printf '%s\n\n%s\n' "$CURRENT_BODY" "$BLOCK" >"$TMP"
-  gh "$TARGET_KIND" edit "$TARGET_NUM" --repo "$REPO" --body-file "$TMP"
-  echo "Appended to ${TARGET_KIND} #${TARGET_NUM}'s body in ${REPO} (this save is what makes the URLs above resolve)." >&2
+  attempt=1
+  while :; do
+    CURRENT_BODY="$(gh "$TARGET_KIND" view "$TARGET_NUM" --repo "$REPO" --json body --jq .body)" || {
+      echo "Error: could not read current ${TARGET_KIND} body" >&2
+      exit 1
+    }
+
+    if [[ "$CURRENT_BODY" == *"$BLOCK"* ]]; then
+      # Already applied — e.g. a previous attempt's edit landed but this
+      # script didn't get to report success. Nothing left to write.
+      echo "Appended to ${TARGET_KIND} #${TARGET_NUM}'s body in ${REPO} (this save is what makes the URLs above resolve)." >&2
+      break
+    fi
+
+    printf '%s\n\n%s\n' "$CURRENT_BODY" "$BLOCK" >"$TMP"
+
+    LATEST_BODY="$(gh "$TARGET_KIND" view "$TARGET_NUM" --repo "$REPO" --json body --jq .body)" || {
+      echo "Error: could not re-read current ${TARGET_KIND} body" >&2
+      exit 1
+    }
+    if [[ "$LATEST_BODY" != "$CURRENT_BODY" ]]; then
+      if [[ "$attempt" -ge "$MAX_ATTEMPTS" ]]; then
+        echo "Error: ${TARGET_KIND} #${TARGET_NUM}'s body changed concurrently ${MAX_ATTEMPTS} times in a row — giving up without overwriting the newer body. Re-run the upload to retry." >&2
+        exit 1
+      fi
+      attempt=$((attempt + 1))
+      sleep 1
+      continue
+    fi
+
+    gh "$TARGET_KIND" edit "$TARGET_NUM" --repo "$REPO" --body-file "$TMP"
+    echo "Appended to ${TARGET_KIND} #${TARGET_NUM}'s body in ${REPO} (this save is what makes the URLs above resolve)." >&2
+    break
+  done
 fi
