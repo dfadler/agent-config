@@ -14,3 +14,7 @@ given machine, add an `@include` line for the file you want (e.g.
 machine's own `~/.claude/CLAUDE.personal.md`; nothing in this repo needs to change
 for that. See `claude/conventions/DEFAULT_ENABLED` for the full list of what's
 available and what ships by default.
+
+Before adding a new convention file, check `claude/conventions/README.md` to see
+whether it belongs as an include at all. Anything with a recognizable task trigger
+should be a skill instead.

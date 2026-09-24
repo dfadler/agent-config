@@ -19,6 +19,12 @@ a new one" (already required by the base memory instructions) actually checkable
 grep the family prefix in `MEMORY.md` before creating a new file — and keeps
 evolving topics landing in one file instead of scattering across near-duplicates.
 
+Slug anti-patterns (adapted from engram's `topic_key` rules): no camelCase or
+uppercase, no spaces or underscores, no more than one `/` (two segments max), and
+nothing session- or date-specific (`bug/fix-from-tuesday`) — name the topic, not the
+event, so the slug stays stable as the memory is updated. Keep each segment short
+(a few words); if it needs a sentence, that belongs in `description:`.
+
 ### Supersedes / superseded-by
 
 When a memory turns out to be wrong or outdated, don't silently delete and replace
@@ -46,6 +52,12 @@ or user `Stop` hook that reminds "write a memory update if anything durable happ
 this turn, before it's lost" would close this gap without adopting engram. Not
 implemented yet — evaluate as a follow-up if the manual habit of writing memories
 mid-session (rather than at close) turns out to be lossy in practice.
+
+Until then, make it a manual habit: before wrapping up a session that produced
+anything durable, do one pass modeled on engram's session summary — what was the
+goal, what was discovered, what got done, what's the next step — and write or update
+a memory only for the parts that will matter in a future session (skip what the
+diff, commit messages, or issue already record).
 
 ### Revisit-engram trigger
 

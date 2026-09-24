@@ -13,10 +13,12 @@
 # the fake without touching any real symlink, git repo, or `jq` dependency.
 
 REAL_HOOK="$BATS_TEST_DIRNAME/../../plugins/dfadler-agent-config/skills/git-worktree-usage/scripts/check-worktree-symlinks-hook.sh"
+HOOK_LIB="$BATS_TEST_DIRNAME/../../plugins/dfadler-agent-config/skills/git-worktree-usage/scripts/worktree-hook-lib.sh"
 
 setup() {
   TMP="$(mktemp -d)"
   cp "$REAL_HOOK" "$TMP/check-worktree-symlinks-hook.sh"
+  cp "$HOOK_LIB" "$TMP/worktree-hook-lib.sh"
   SCRIPT_UNDER_TEST="$TMP/check-worktree-symlinks-hook.sh"
   CALL_LOG="$TMP/calls.log"
   : >"$CALL_LOG"
