@@ -88,7 +88,7 @@ TOKEN="$(gh auth token)" || {
 # Write the auth header to a temp file so the token stays out of process
 # arguments (which are visible to `ps aux` and similar tools).
 AUTH_HDR="$(mktemp)"
-printf 'Authorization: Bearer %s\n' "$TOKEN" > "$AUTH_HDR"
+printf 'Authorization: Bearer %s\n' "$TOKEN" >"$AUTH_HDR"
 trap 'rm -f "$AUTH_HDR"' EXIT
 
 REPO_ID="$(gh api "repos/${REPO}" --jq .id)" || {
