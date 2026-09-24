@@ -13,6 +13,8 @@ setup() {
   mkdir -p "$FAKE_REPO"
   cp "$REPO_ROOT/teardown.sh" "$FAKE_REPO/teardown.sh"
   chmod +x "$FAKE_REPO/teardown.sh"
+  mkdir -p "$FAKE_REPO/scripts"
+  cp "$REPO_ROOT/scripts/claude-md-lib.sh" "$FAKE_REPO/scripts/claude-md-lib.sh"
   mkdir -p "$FAKE_REPO/claude/commands"
   echo "# global instructions" > "$FAKE_REPO/claude/CLAUDE.md"
   echo "# a command" > "$FAKE_REPO/claude/commands/demo.md"

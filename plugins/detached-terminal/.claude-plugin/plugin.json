@@ -1,0 +1,12 @@
+{
+  "$schema": "https://json.schemastore.org/claude-code-plugin-manifest.json",
+  "name": "detached-terminal",
+  "version": "2.0.0",
+  "description": "Standalone detached-terminal skill: run and drive a real interactive terminal (TUI, REPL, alternate-screen app) on a headless PTY without stealing focus. Requires Python 3.10+ and pyte (pip install pyte).",
+  "author": {
+    "name": "Dustin Fadler",
+    "url": "https://github.com/dfadler"
+  },
+  "homepage": "https://github.com/dfadler/agent-config",
+  "repository": "https://github.com/dfadler/agent-config"
+}
