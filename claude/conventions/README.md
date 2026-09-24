@@ -42,7 +42,6 @@ Full reasoning for each verdict, plus the duplication check and follow-up list:
 | `fetch-execute-installs.md` | Include (default) |
 | `focus-stealing.md` | Include (default) |
 | `git-worktree-usage.md` | Opt-in include |
-| `github-pr-workflow.md` | Delete (follow-up) |
 | `tooling-over-manual-scanning.md` | Opt-in include |
 | `why-question-shape.md` | Opt-in include |
 | `visual-verification.md` | Merge into skill |
