@@ -11,10 +11,12 @@
 # substitutes the fake without touching any real git, worktree, or network.
 
 REAL_HOOK="$BATS_TEST_DIRNAME/../../plugins/dfadler-agent-config/skills/git-worktree-usage/scripts/prune-merged-worktrees-hook.sh"
+HOOK_LIB="$BATS_TEST_DIRNAME/../../plugins/dfadler-agent-config/skills/git-worktree-usage/scripts/worktree-hook-lib.sh"
 
 setup() {
   TMP="$(mktemp -d)"
   cp "$REAL_HOOK" "$TMP/prune-merged-worktrees-hook.sh"
+  cp "$HOOK_LIB" "$TMP/worktree-hook-lib.sh"
   SCRIPT_UNDER_TEST="$TMP/prune-merged-worktrees-hook.sh"
   CALL_LOG="$TMP/calls.log"
   GIT_SHIM="$TMP/shim-bin"

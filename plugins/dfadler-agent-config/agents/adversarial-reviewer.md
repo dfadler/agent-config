@@ -9,6 +9,11 @@ description: >-
   Bash strictly for read-only inspection (git diff, grep) and never mutates code,
   files, or infrastructure.
 tools: Read, Grep, Glob, Bash
+# Pinned to opus, not sonnet/haiku: hostile cross-file security/concurrency
+# review is multi-step reasoning, the case the official cost guidance
+# reserves Opus for (https://code.claude.com/docs/en/costs). See
+# claude/conventions/cheap-model-delegation.md and docs/usage-optimization.md
+# §1 for the fuller tiering rationale across this plugin's agents.
 model: opus
 ---
 
