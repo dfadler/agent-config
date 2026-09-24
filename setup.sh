@@ -3,11 +3,12 @@
 # claude/ -> ~/.claude/). Safe to re-run: fixes symlinks that already point
 # here, and reports (without touching) anything else already at the target.
 #
-# Usage: ./setup.sh [--install-deps] [--skip=<feature,...>] [--include=<feature,...>] [--list-features]
+# Usage: ./setup.sh [--install-deps] [--skip=<feature,...>] [--include=<feature,...>] [--list-features] [--no-companions]
 
 set -euo pipefail
 
 INSTALL_DEPS=0
+NO_COMPANIONS=0
 SKIP_LIST=""
 INCLUDE_LIST=""
 INCLUDE_SET=0
@@ -49,6 +50,9 @@ run is rejected rather than guessing which one wins.
                      with --skip.
   --list-features    Print the feature names --skip and --include accept
                      and exit without linking anything.
+  --no-companions    Skip the advisory companion checks (git identity, pyte,
+                     companion plugins). Linking still runs normally; only the
+                     check-companions.sh step is omitted.
   -h, --help         Show this message and exit.
 USAGE
 }
@@ -56,6 +60,7 @@ USAGE
 while [[ $# -gt 0 ]]; do
   case "$1" in
     --install-deps) INSTALL_DEPS=1 ;;
+    --no-companions) NO_COMPANIONS=1 ;;
     --skip=*) SKIP_LIST="${1#--skip=}" ;;
     --include=*)
       INCLUDE_LIST="${1#--include=}"
@@ -215,10 +220,10 @@ exclude_reason() {
   fi
 }
 
-# Markers that delimit the block setup.sh writes into ~/.claude/CLAUDE.md.
-# teardown.sh carries an identical copy — both must stay in sync.
-MANAGED_BEGIN="# >>> agent-config managed begin <<<"
-MANAGED_END="# >>> agent-config managed end <<<"
+# Markers that delimit the block setup.sh writes into ~/.claude/CLAUDE.md,
+# and that teardown.sh strips back out — single source of truth.
+# shellcheck source=scripts/claude-md-lib.sh
+source "$REPO_ROOT/scripts/claude-md-lib.sh"
 
 # Every directory under plugins/ that carries a .claude-plugin/plugin.json is a
 # plugin this repo ships (currently dfadler-agent-config and accessibility-skills)
@@ -512,9 +517,13 @@ done
 # Last, so the linking work is already done and reported when these speak up.
 # Advisory checks (git identity, pyte, companion plugins/tools, Aikido Safe
 # Chain permission offer) are extracted into scripts/check-companions.sh.
+# Skipped when --no-companions is passed (useful for tests that only exercise
+# linking behavior and shouldn't depend on the companion-check shim setup).
 # An explicitly requested --install-deps that doesn't install is still a failure.
-if [[ "$INSTALL_DEPS" == "1" ]]; then
-  "$REPO_ROOT/scripts/check-companions.sh" --install-deps
-else
-  "$REPO_ROOT/scripts/check-companions.sh"
+if [[ "$NO_COMPANIONS" != "1" ]]; then
+  if [[ "$INSTALL_DEPS" == "1" ]]; then
+    "$REPO_ROOT/scripts/check-companions.sh" --install-deps
+  else
+    "$REPO_ROOT/scripts/check-companions.sh"
+  fi
 fi

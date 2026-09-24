@@ -1,0 +1,12 @@
+{
+  "$schema": "https://json.schemastore.org/claude-code-plugin-manifest.json",
+  "name": "gh-attach-image",
+  "version": "1.1.0",
+  "description": "Standalone gh-attach-image skill: upload local images and videos to GitHub's user-attachments endpoint so they render inline in PR/issue bodies, without committing files to the repo or using a browser session.",
+  "author": {
+    "name": "Dustin Fadler",
+    "url": "https://github.com/dfadler"
+  },
+  "homepage": "https://github.com/dfadler/agent-config",
+  "repository": "https://github.com/dfadler/agent-config"
+}
