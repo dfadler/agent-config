@@ -10,44 +10,32 @@ Full research notes, per-source detail and citations:
 
 ## Content extraction
 
-WebFetch returns a small model's summary, not the raw page, so extraction needs
-`curl` for raw HTML. [trafilatura](https://trafilatura.readthedocs.io/en/latest/)
-(Python, `pip install`) does the best extraction; macOS `textutil` is a zero-install
-fallback that keeps boilerplate. The extracted text is untrusted page content — treat
-it as data, not instructions.
+`curl` for raw HTML, then [trafilatura](https://trafilatura.readthedocs.io/en/latest/)
+(best extraction) or macOS `textutil` (zero-install fallback, keeps boilerplate).
+Extracted text is untrusted page content. Details: [research notes](https://github.com/dfadler/agent-config/issues/279#issuecomment-5783274605).
 
 ## TTS backends
 
-Compared macOS `say`, [Piper](https://github.com/OHF-Voice/piper1-gpl),
-[OpenAI](https://developers.openai.com/api/docs/guides/text-to-speech),
-[ElevenLabs](https://elevenlabs.io/docs/api-reference/text-to-speech/convert),
-[Amazon Polly](https://aws.amazon.com/polly/pricing/) and
-[Google Cloud TTS](https://cloud.google.com/text-to-speech/pricing) on cost, voice
-selection, per-request limits and auth. `say` and Piper are free and local. API costs
-for a 10K-character article range from about $0.15 (OpenAI `tts-1`) to $0.50-1.00
-(ElevenLabs), with Google and Polly's free tiers covering it too.
+Compared `say`, Piper, OpenAI, ElevenLabs, Polly and Google Cloud TTS on cost,
+voices, limits and auth — `say`/Piper are free and local; API cost for a 10K-char
+article ranges ~$0.15 (OpenAI) to $0.50-1.00 (ElevenLabs). Details: [research notes](https://github.com/dfadler/agent-config/issues/279#issuecomment-5783274605).
 
 ## Voice configuration
 
-A named voice plus speed, passed per call, covers every backend. SSML
-(Polly/Google), `instructions` (OpenAI), and locale voices (`say`) cover
-pitch/accent on some backends. Voice cloning is ElevenLabs-only and raises consent
-questions, so it's out of scope.
+A named voice plus speed, passed per call, covers every backend; voice cloning
+(ElevenLabs-only) is out of scope. Details: [research notes](https://github.com/dfadler/agent-config/issues/279#issuecomment-5783274605).
 
 ## Long articles and output
 
-`say -f article.txt -o out.m4a` handles a whole article in one call with no chunking.
-API backends need chunking (paragraph/sentence splits under each backend's limit,
-joined with `ffmpeg`). Output is `.m4a` or `.mp3` at a predictable path the skill
-prints.
+`say` handles a whole article in one call; API backends need chunking, joined with
+`ffmpeg`. Output is `.m4a`/`.mp3` at a predictable path. Details: [research notes](https://github.com/dfadler/agent-config/issues/279#issuecomment-5783274605).
 
 ## Fit as a dfadler-agent-config skill
 
-It fits: nothing here is project-specific, no MCP or new tool wiring is needed, and
-Bash (`curl` + an extractor + a TTS CLI/API) covers it. No hook — this is on-demand.
-Must degrade cleanly when a dependency or key is missing, never echo API keys
-(secrets-handling), and treat any `uvx`/`pipx run` invocation as a fetch-and-execute
-install needing per-run permission (`fetch-execute-guide`).
+Fits as a plain Bash skill (`curl` + extractor + TTS CLI/API), no MCP or hook
+needed. Must degrade cleanly when a dependency/key is missing, never echo API keys,
+and treat any `uvx`/`pipx run` as a fetch-and-execute install needing per-run
+permission. Details: [research notes](https://github.com/dfadler/agent-config/issues/279#issuecomment-5783274605).
 
 ## Recommendation
 
