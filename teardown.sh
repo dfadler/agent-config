@@ -39,9 +39,8 @@ done
 
 REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 
-# Identical copy of the constants in setup.sh — must stay in sync.
-MANAGED_BEGIN="# >>> agent-config managed begin <<<"
-MANAGED_END="# >>> agent-config managed end <<<"
+# shellcheck source=scripts/claude-md-lib.sh
+source "$REPO_ROOT/scripts/claude-md-lib.sh"
 
 # Remove a symlink only if it points exactly to the expected target.
 unlink_if_owned() {
