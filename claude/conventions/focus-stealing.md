@@ -14,7 +14,7 @@ there's no way to tell which one did it. So:
   fine as written — the rule is about not regressing it.
 - **Never `open -a Terminal` (or drive Terminal.app via `osascript`) to get a shell.**
   For an interactive TUI/REPL an agent must drive and read back, use the
-  `dfadler-agent-config:detached-terminal` skill — a real PTY that's never
+  `detached-terminal:detached-terminal` skill — a real PTY that's never
   displayed, with a screen model the agent can query. For anything
   non-interactive, the headless `Bash` tool (with `run_in_background` for long jobs)
   already covers it and needs no terminal. **It is not a sandbox** — the program runs

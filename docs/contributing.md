@@ -10,16 +10,17 @@
    - A **convention** (global guidance for `CLAUDE.md`) → first check
      [`claude/conventions/README.md`](../claude/conventions/README.md). Most
      task-shaped guidance should be a skill, not an `@include`.
-   - A **hook** → an entry in `plugins/dfadler-agent-config/hooks/hooks.json`,
-     pointing (via `${CLAUDE_PLUGIN_ROOT}`) at a script under wherever fits — a
-     related skill's own `scripts/`, if the hook is that skill's companion. Unlike
-     everything else in this list, a hook activates for every project this plugin
-     is enabled in the moment it's added — there's no opt-in step on the
-     project's side — so it needs to be safe to run unconditionally: no-op
-     cleanly (exit 0, no output) whenever its precondition doesn't hold (wrong
-     project type, feature not configured, required CLI missing), and never let
-     the hook's own failure block a session start. The `git-worktree-usage`
-     skill's two `SessionStart` hooks are the reference example.
+   - A **hook** → an entry in that plugin's own `hooks/hooks.json`, pointing (via
+     `${CLAUDE_PLUGIN_ROOT}`) at a script under wherever fits — a related skill's
+     own `scripts/`, if the hook is that skill's companion. Unlike everything
+     else in this list, a hook activates for every project this plugin is
+     enabled in the moment it's added — there's no opt-in step on the project's
+     side — so it needs to be safe to run unconditionally: no-op cleanly (exit
+     0, no output) whenever its precondition doesn't hold (wrong project type,
+     feature not configured, required CLI missing), and never let the hook's
+     own failure block a session start. The `worktree-core` plugin's
+     `git-worktree-usage` skill and its two `SessionStart` hooks are the
+     reference example.
    - A whole new **plugin** (a set of skills/agents that belong together) → a new
      directory under `plugins/`, with its own `.claude-plugin/plugin.json`, `agents/`,
      and `skills/`. Give it a `PLUGIN_SRC`/`PLUGIN_LINK` pair and a `link` line in
