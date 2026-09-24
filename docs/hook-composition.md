@@ -84,9 +84,15 @@ follow the same pattern:
    project-level key in `.claude/settings.json`; check both near the top of
    the script and exit 0 immediately when neither opts in.
 
-2. **Exit 0 to pass, non-zero to block.** Exit 0 means "proceed"; a non-zero
-   exit from a `PreToolUse` hook blocks the tool call (Claude Code convention).
-   Never exit non-zero just because another hook's work is already done.
+2. **Exit 0 to pass, exit 2 with stderr to block.** Exit 0 means "proceed".
+   To block, a `PreToolUse` hook must exit **2** and write its message to
+   **stderr** — that is the only exit code the official docs describe as
+   reliably blocking without printing JSON. Exit 1 (or any other non-zero
+   code) with plain-text stdout is a *non-blocking* error: Claude Code shows
+   a `<hook name> hook error` notice, but the tool call still proceeds. See
+   the "Exit code 2" and "Other exit codes" sections of
+   https://code.claude.com/docs/en/hooks. Never exit non-zero just because
+   another hook's work is already done.
 
 3. **Don't try to detect or suppress other plugins' hooks.** Assume they
    are running concurrently. If two hooks both check the same condition
