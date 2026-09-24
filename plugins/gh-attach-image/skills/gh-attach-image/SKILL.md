@@ -86,11 +86,16 @@ broken-image icon instead).
 TOKEN="$(gh auth token)"
 REPO_ID="$(gh api repos/OWNER/NAME --jq .id)"
 
+# Write the auth header to a temp file — keeps the token out of process args.
+AUTH_HDR="$(mktemp)"
+printf 'Authorization: Bearer %s\n' "$TOKEN" > "$AUTH_HDR"
+
 curl -s "https://uploads.github.com/user-attachments/assets?name=<filename>&content_type=<mime-type>&repository_id=${REPO_ID}" \
   -X POST \
-  -H "Authorization: Bearer ${TOKEN}" \
+  --header @"$AUTH_HDR" \
   -H "Accept: application/json" \
   --data-binary "@<local-file-path>"
+rm -f "$AUTH_HDR"
 # -> {"url":"https://github.com/user-attachments/assets/<uuid>"}
 ```
 
