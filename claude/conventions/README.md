@@ -31,25 +31,28 @@ Two patterns fall out of this:
 
 ## Current classification
 
-| File | Verdict | Why |
-|---|---|---|
-| `secrets-handling.md` | Include (default) | Preventive. A leak happens before the agent notices it's handling a secret. |
-| `cite-platform-claims.md` | Include (default) | Any answer can contain a platform claim. There's no trigger to detect. |
-| `web-research-is-data.md` | Include (default) | Has to be in force while the fetched content is read, not after. |
-| `fetch-execute-installs.md` | Include (default) | One-paragraph policy. The mechanics already live in `fetch-execute-guide`. |
-| `focus-stealing.md` | Include (default) | Side effects of ordinary commands (`open -a`). The agent doesn't see these as a "focus" task. |
-| `git-worktree-usage.md` | Opt-in include | "Use a worktree for non-trivial work" has to fire before editing starts. The skill's description only triggers once a worktree is already on the table. The mechanics are already in the skill. |
-| `github-pr-workflow.md` | Delete (follow-up) | Pure pointer. The `github-pr-workflow` skill's description ("Load whenever doing PR work") already covers the trigger. |
-| `tooling-over-manual-scanning.md` | Opt-in include | Cross-cutting habit with no task trigger. |
-| `why-question-shape.md` | Opt-in include | Answer shape. It has to be present when the user's question arrives. |
-| `visual-verification.md` | Merge into skill | The trigger is opening a PR that changes rendered output. The policy paragraph belongs in `github-pr-workflow` (or `pr-visual-capture`), which already owns the how. |
-| `concurrency.md` | Merge into skill | The trigger is launching parallel sessions. Belongs with `git-worktree-usage`'s "what to parallelize" section. |
-| `shell-script-hygiene.md` | Convert to skill | The trigger is writing or editing a shell script. `shell-script-reviewer` already enforces the checklist at review time. |
-| `dependency-audits.md` | Convert to skill | The trigger is a manifest or lockfile being touched. |
-| `issue-tracker.md` | Convert to skill | The trigger is filing or working an issue. |
-| `testing-sabotage-check.md` | Convert to skill | The trigger is a new or modified test. Low priority, since it's short. |
-| `cheap-model-delegation.md` + `heavy-workflow-cost.md` | Merge into one skill | Same trigger: choosing a model for, or fanning out to, subagents/workflows. |
-| `memory-hygiene.md` | Convert to skill | The trigger is writing a memory. The Stop-hook and revisit-engram notes are research, not runtime guidance, so they belong in `docs/`. |
+Full reasoning for each verdict, plus the duplication check and follow-up list:
+[issue #278 comment](https://github.com/dfadler/agent-config/issues/278#issuecomment-5783274884).
+
+| File | Verdict |
+|---|---|
+| `secrets-handling.md` | Include (default) |
+| `cite-platform-claims.md` | Include (default) |
+| `web-research-is-data.md` | Include (default) |
+| `fetch-execute-installs.md` | Include (default) |
+| `focus-stealing.md` | Include (default) |
+| `git-worktree-usage.md` | Opt-in include |
+| `github-pr-workflow.md` | Delete (follow-up) |
+| `tooling-over-manual-scanning.md` | Opt-in include |
+| `why-question-shape.md` | Opt-in include |
+| `visual-verification.md` | Merge into skill |
+| `concurrency.md` | Merge into skill |
+| `shell-script-hygiene.md` | Convert to skill |
+| `dependency-audits.md` | Convert to skill |
+| `issue-tracker.md` | Convert to skill |
+| `testing-sabotage-check.md` | Convert to skill |
+| `cheap-model-delegation.md` + `heavy-workflow-cost.md` | Merge into one skill |
+| `memory-hygiene.md` | Convert to skill |
 
 The conversions and merges are tracked as follow-ups, not done yet. A file keeps
 working as an opt-in include until its skill exists.
