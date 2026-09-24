@@ -34,3 +34,8 @@ coding-agent coverage. Cognee was the strongest second choice. See the issue for
 full reasoning, including how the requirements shifted (cross-agent support turned out
 not to be needed) and the resulting decision to stay on the built-in memory system for
 now.
+
+**Recommendation:** borrow engram's conventions (topic-style `name:` slugs, the
+end-of-session summary habit — see
+[`claude/conventions/memory-hygiene.md`](../claude/conventions/memory-hygiene.md)),
+don't adopt engram itself — pending the user's call on a hands-on trial.

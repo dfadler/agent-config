@@ -10,10 +10,12 @@
 # real git repo, worktree, or filesystem.
 
 REAL_HOOK="$BATS_TEST_DIRNAME/../../plugins/dfadler-agent-config/skills/git-worktree-usage/scripts/require-worktree-hook.sh"
+HOOK_LIB="$BATS_TEST_DIRNAME/../../plugins/dfadler-agent-config/skills/git-worktree-usage/scripts/worktree-hook-lib.sh"
 
 setup() {
   TMP="$(mktemp -d)"
   cp "$REAL_HOOK" "$TMP/require-worktree-hook.sh"
+  cp "$HOOK_LIB" "$TMP/worktree-hook-lib.sh"
   SCRIPT_UNDER_TEST="$TMP/require-worktree-hook.sh"
 
   GIT_SHIM="$TMP/shim-bin"
