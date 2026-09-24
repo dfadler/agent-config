@@ -9,6 +9,8 @@
 # --show-toplevel. The shim is placed at the front of PATH; nothing touches a
 # real git repo, worktree, or filesystem.
 
+bats_require_minimum_version 1.5.0 # for `run --separate-stderr`
+
 REAL_HOOK="$BATS_TEST_DIRNAME/../../plugins/dfadler-agent-config/skills/git-worktree-usage/scripts/require-worktree-hook.sh"
 HOOK_LIB="$BATS_TEST_DIRNAME/../../plugins/dfadler-agent-config/skills/git-worktree-usage/scripts/worktree-hook-lib.sh"
 
@@ -64,7 +66,9 @@ _write_settings_enforce() {
 }
 
 run_hook() {
-  run env -u WORKTREE_ENFORCE -u CLAUDE_CODE_REMOTE \
+  # --separate-stderr splits stdout into $output/$stdout and stderr into
+  # $stderr, so tests can assert which stream a message went to.
+  run --separate-stderr env -u WORKTREE_ENFORCE -u CLAUDE_CODE_REMOTE \
     PATH="$GIT_SHIM:$PATH" \
     FAKE_GIT_DIR="${FAKE_GIT_DIR:-}" \
     FAKE_GIT_TOPLEVEL="$FAKE_TOPLEVEL" \
@@ -183,11 +187,12 @@ run_hook() {
 
 @test "WORKTREE_ENFORCE=block: forces block for this session, overriding no config" {
   _install_fake_git ".git"
-  run env -u CLAUDE_CODE_REMOTE \
-    PATH="$GIT_SHIM:$PATH" FAKE_GIT_TOPLEVEL="$FAKE_TOPLEVEL" \
-    WORKTREE_ENFORCE=block /bin/bash "$SCRIPT_UNDER_TEST"
-  [ "$status" -eq 1 ]
-  [[ "$output" == *"main git checkout"* ]]
+  run_hook WORKTREE_ENFORCE=block
+  # Only exit 2 (not 1) reliably blocks a PreToolUse hook per the Claude Code
+  # hooks docs: https://code.claude.com/docs/en/hooks#exit-code-2
+  [ "$status" -eq 2 ]
+  [[ "$stderr" == *"main git checkout"* ]]
+  [ -z "$output" ]
 }
 
 @test "WORKTREE_ENFORCE=1 (anything else, not a recognized value): falls through to settings/default (off)" {
@@ -202,12 +207,15 @@ run_hook() {
 # worktree.enforce in settings.json: project-level config (opt-in).
 # ---------------------------------------------------------------------------
 
-@test "settings enforce=block: exits 1 (explicit opt-in)" {
+@test "settings enforce=block: exits 2 with the blocking message on stderr (explicit opt-in)" {
   _install_fake_git ".git"
   _write_settings_enforce "block"
   run_hook
-  [ "$status" -eq 1 ]
-  [[ "$output" == *"main git checkout"* ]]
+  # Claude Code only treats exit 2 as a blocking PreToolUse error; exit 1
+  # with plain-text stdout is a non-blocking error and the tool proceeds.
+  [ "$status" -eq 2 ]
+  [[ "$stderr" == *"main git checkout"* ]]
+  [ -z "$output" ]
 }
 
 @test "settings enforce=warn: exits 0 with warning" {
