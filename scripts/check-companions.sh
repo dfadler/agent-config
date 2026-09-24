@@ -219,9 +219,15 @@ check_python_deps() {
 # failure, so this is the correct idiom, not a stylistic one.
 claude_plugin_state() {
   local id_prefix="$1"
-  command -v claude >/dev/null 2>&1 || { echo "error"; return 0; }
+  command -v claude >/dev/null 2>&1 || {
+    echo "error"
+    return 0
+  }
   local listing
-  listing="$(claude plugin list --json 2>/dev/null)" || { echo "error"; return 0; }
+  listing="$(claude plugin list --json 2>/dev/null)" || {
+    echo "error"
+    return 0
+  }
   local py_out py_rc
   if py_out="$(printf '%s' "$listing" | python3 -c '
 import json, sys
@@ -240,10 +246,10 @@ sys.exit(1)
     py_rc=$?
   fi
   case "$py_rc:$py_out" in
-    0:enabled)  echo "enabled" ;;
+    0:enabled) echo "enabled" ;;
     0:disabled) echo "disabled" ;;
-    1:*)        echo "absent" ;;
-    *)          echo "error" ;;
+    1:*) echo "absent" ;;
+    *) echo "error" ;;
   esac
 }
 
