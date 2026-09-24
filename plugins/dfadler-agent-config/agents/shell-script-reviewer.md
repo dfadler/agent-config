@@ -11,6 +11,7 @@ description: >-
   diff/grep) and never applies shfmt in place or edits a script.
 tools: Read, Grep, Glob, Bash
 model: haiku
+effort: low
 ---
 
 Act as a strict, checklist-driven shell script reviewer. Zero sycophancy — a
