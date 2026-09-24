@@ -19,6 +19,14 @@ UPLOAD_SCRIPT="$REPO_ROOT/plugins/dfadler-agent-config/skills/gh-attach-image/sc
 # `pr`/`issue` view/edit/comment for the --pr/--issue append and --comment
 # modes — logging each call's body/args to $FAKE_GH_LOG so a test can assert
 # on what upload.sh actually sent without a real GitHub call.
+#
+# `view` serves a different body per call, driven by $FAKE_BODY_SEQUENCE (one
+# body per line; the last line repeats once calls exceed it) — upload.sh's
+# retry loop reads the body twice per attempt (once at the top, once as the
+# pre-write recheck), so a test simulates a concurrent edit landing between
+# reads just by giving the sequence more than one line. The default sequence
+# (set in setup(), below) is a single line, so every call returns the same
+# body and the existing single-read-then-write tests are unaffected.
 shim_gh() {
   cat >"$SHIM_BIN/gh" <<'EOF'
 #!/usr/bin/env bash
@@ -42,7 +50,12 @@ case "${1:-}" in
     printf '%s %s %s\n' "$kind" "$sub" "$*" >> "$FAKE_GH_LOG"
     case "$sub" in
       view)
-        echo "$FAKE_CURRENT_BODY"
+        n=$(($(cat "$FAKE_VIEW_COUNT" 2>/dev/null || echo 0) + 1))
+        echo "$n" > "$FAKE_VIEW_COUNT"
+        total=$(wc -l < "$FAKE_BODY_SEQUENCE" | tr -d ' ')
+        line=$n
+        [ "$line" -gt "$total" ] && line=$total
+        sed -n "${line}p" "$FAKE_BODY_SEQUENCE"
         exit 0
         ;;
       edit)
@@ -112,8 +125,12 @@ setup() {
   FAKE_GH_LOG="$SANDBOX/gh.log"
   FAKE_SAVED_BODY="$SANDBOX/saved-body.txt"
   FAKE_CURRENT_BODY="existing body text"
+  FAKE_VIEW_COUNT="$SANDBOX/view.count"
+  FAKE_BODY_SEQUENCE="$SANDBOX/body-sequence.txt"
   : >"$FAKE_GH_LOG"
-  export FAKE_CURL_LOG FAKE_CURL_COUNTER FAKE_GH_LOG FAKE_SAVED_BODY FAKE_CURRENT_BODY
+  printf '%s\n' "$FAKE_CURRENT_BODY" >"$FAKE_BODY_SEQUENCE"
+  export FAKE_CURL_LOG FAKE_CURL_COUNTER FAKE_GH_LOG FAKE_SAVED_BODY \
+    FAKE_CURRENT_BODY FAKE_VIEW_COUNT FAKE_BODY_SEQUENCE
   FILES_DIR="$SANDBOX/files"
   mkdir -p "$FILES_DIR"
 }
@@ -168,6 +185,54 @@ teardown() {
   grep -q "$FAKE_CURRENT_BODY" "$FAKE_SAVED_BODY"
   grep -q '## Screenshots' "$FAKE_SAVED_BODY"
   grep -q '!\[before\](https://github.com/user-attachments/assets/fake-1)' "$FAKE_SAVED_BODY"
+}
+
+@test "--pr succeeds with exactly one edit when nothing changed concurrently" {
+  printf 'fake png bytes' >"$FILES_DIR/before.png"
+
+  run bash "$UPLOAD_SCRIPT" --repo owner/name --pr 42 "$FILES_DIR/before.png"
+  assert_success
+  # One attempt: a top-of-loop read plus the pre-write recheck (both see the
+  # same body since FAKE_BODY_SEQUENCE has one line), then a single edit.
+  [ "$(grep -c '^pr view ' "$FAKE_GH_LOG")" -eq 2 ]
+  [ "$(grep -c '^pr edit ' "$FAKE_GH_LOG")" -eq 1 ]
+}
+
+@test "--pr retries and preserves a concurrent body edit instead of clobbering it" {
+  printf 'fake png bytes' >"$FILES_DIR/before.png"
+  # First read sees the original body; every read after that sees a body
+  # someone else already changed (simulating an edit landing between
+  # upload.sh's read and its pre-write recheck) — and it stays that way, so
+  # the retry's own recheck matches and the write goes through.
+  printf '%s\n%s\n' "$FAKE_CURRENT_BODY" "$FAKE_CURRENT_BODY -- edited by someone else" \
+    >"$FAKE_BODY_SEQUENCE"
+
+  run bash "$UPLOAD_SCRIPT" --repo owner/name --pr 42 "$FILES_DIR/before.png"
+  assert_success
+  # Detected the conflict once, retried, then wrote exactly once.
+  [ "$(grep -c '^pr edit ' "$FAKE_GH_LOG")" -eq 1 ]
+  # The newer, concurrently-edited body is preserved in what got saved...
+  grep -q "edited by someone else" "$FAKE_SAVED_BODY"
+  # ...with the attachment markdown appended on top of it, not instead of it.
+  grep -q '!\[before\]' "$FAKE_SAVED_BODY"
+}
+
+@test "--pr gives up without overwriting when the body keeps changing every read" {
+  printf 'fake png bytes' >"$FILES_DIR/before.png"
+  # Every gh view call returns a distinct body, so the pre-write recheck
+  # never matches what was just read — a permanent, unresolvable conflict.
+  for i in 1 2 3 4 5 6 7 8; do
+    echo "body version $i"
+  done >"$FAKE_BODY_SEQUENCE"
+
+  run bash "$UPLOAD_SCRIPT" --repo owner/name --pr 42 "$FILES_DIR/before.png"
+  assert_failure
+  assert_output_contains "changed concurrently"
+  assert_output_contains "without overwriting the newer body"
+  # Never wrote anything — no edit call, no saved body.
+  run grep -q '^pr edit ' "$FAKE_GH_LOG"
+  [ "$status" -ne 0 ]
+  [ ! -s "$FAKE_SAVED_BODY" ]
 }
 
 @test "--issue appends via gh issue edit, not gh pr edit" {
