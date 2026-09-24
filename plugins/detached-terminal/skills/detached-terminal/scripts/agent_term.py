@@ -251,7 +251,19 @@ class Session:
         view = memoryview(payload)
         deadline = time.time() + WRITE_TIMEOUT
         while view:
-            if not select.select([], [self.fd], [], 0.2)[1]:
+            r, w, _ = select.select([self.fd], [self.fd], [], 0.2)
+            # Drain any pending output from the child before checking
+            # writability. Without this, a program that echoes every input
+            # character can fill the kernel's PTY output buffer while this
+            # loop is writing, causing os.write to block and deadlock: the
+            # child waits for its stdout to be drained, but we're stuck
+            # waiting for the child to read more stdin.
+            if r:
+                try:
+                    os.read(self.fd, 4096)
+                except OSError:
+                    pass
+            if not w:
                 if time.time() > deadline:
                     raise RuntimeError(
                         f"timed out writing {len(view)} of {len(payload)} bytes; "
