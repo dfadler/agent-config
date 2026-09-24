@@ -16,7 +16,10 @@ set -uo pipefail
 # Always skipped in cloud/remote sessions (no worktrees there).
 
 EXIT_OK=0
-EXIT_FAILURE=1
+# Claude Code only treats exit 2 as a blocking PreToolUse error; exit 1 with
+# plain-text stdout is a non-blocking error and the tool call proceeds.
+# https://code.claude.com/docs/en/hooks#exit-code-2
+EXIT_FAILURE=2
 
 script_dir="$(cd "$(dirname "$0")" && pwd)"
 # shellcheck source=/dev/null
@@ -62,9 +65,9 @@ case "$enforce_mode" in
     exit $EXIT_OK
     ;;
   *)
-    printf 'Cannot modify files in the main git checkout.\n'
-    printf 'Use the EnterWorktree tool to create a linked worktree first,\n'
-    printf 'or set worktree.enforce in .claude/settings.json to "warn" or "off".\n'
+    printf 'Cannot modify files in the main git checkout.\n' >&2
+    printf 'Use the EnterWorktree tool to create a linked worktree first,\n' >&2
+    printf 'or set worktree.enforce in .claude/settings.json to "warn" or "off".\n' >&2
     exit $EXIT_FAILURE
     ;;
 esac
