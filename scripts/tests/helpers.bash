@@ -272,6 +272,184 @@ prune() {
   (cd "$cwd" && bash "$script" "$@")
 }
 
+# A fake python3 placed ahead of PATH in its own bin, so a test can suppress or
+# control the pyte-probe output that check-companions.sh emits. The fake binary
+# only intercepts calls shaped like the pyte probe (ones whose -c argument
+# contains "EXTERNALLY-MANAGED"); everything else is forwarded to the real
+# interpreter, so the plugin-listing JSON parse gets exercised for real.
+#
+# Usage: shim_python3 <yes|no>   (is pyte already importable)
+shim_python3() {
+  PY_SHIM_BIN="$SANDBOX/py-shim"
+  mkdir -p "$PY_SHIM_BIN"
+  # Resolved once, before this function's own directory ever reaches PATH -
+  # a second call within the same test must not re-resolve into the shim
+  # it already installed.
+  : "${REAL_PYTHON3:=$(command -v python3)}"
+  export REAL_PYTHON3
+  export FAKE_PY_EXE="/fake/bin/python3"
+  export FAKE_PY_MARKER="$SANDBOX/pyte-installed"
+  export FAKE_PIP_LOG="$SANDBOX/pip.log"
+  export FAKE_PY_MANAGED="no"
+  export FAKE_PY_VENV="no"
+  export FAKE_PY_BROKEN="no"
+  export FAKE_PIP_EXIT="0"
+  export FAKE_PIP_INSTALLS="yes"
+  if [ "$1" = "yes" ]; then
+    : > "$FAKE_PY_MARKER"
+  else
+    rm -f "$FAKE_PY_MARKER"
+  fi
+  cat > "$PY_SHIM_BIN/python3" <<'EOF'
+#!/usr/bin/env bash
+set -uo pipefail
+if [ "$FAKE_PY_BROKEN" = "yes" ]; then
+  echo "fake python3: unusable interpreter" >&2
+  exit 1
+fi
+case "${1:-}" in
+  -c)
+    case "${2:-}" in
+      *EXTERNALLY-MANAGED*)
+        echo "exe=$FAKE_PY_EXE"
+        if [ -e "$FAKE_PY_MARKER" ]; then echo "pyte=yes"; else echo "pyte=no"; fi
+        echo "managed=$FAKE_PY_MANAGED"
+        echo "venv=$FAKE_PY_VENV"
+        ;;
+      *)
+        exec "$REAL_PYTHON3" "$@"
+        ;;
+    esac
+    ;;
+  -m)
+    shift
+    printf '%s\n' "$*" >> "$FAKE_PIP_LOG"
+    if [ "$FAKE_PIP_INSTALLS" = "yes" ] && [ "$FAKE_PIP_EXIT" = "0" ]; then
+      : > "$FAKE_PY_MARKER"
+    fi
+    exit "$FAKE_PIP_EXIT"
+    ;;
+  *)
+    echo "fake python3: unexpected args: $*" >&2
+    exit 3
+    ;;
+esac
+EOF
+  chmod +x "$PY_SHIM_BIN/python3"
+  case ":$PATH:" in
+    *":$PY_SHIM_BIN:"*) ;;
+    *) export PATH="$PY_SHIM_BIN:$PATH" ;;
+  esac
+}
+
+unshim_python3() {
+  rm -f "$PY_SHIM_BIN/python3"
+}
+
+# A fake `claude` CLI placed ahead of PATH so check-companions.sh companion
+# checks never depend on whatever the real binary would do inside the sandbox.
+# Pretty-printed JSON (one field per line) to match the real CLI's output shape
+# and exercise the grep-window-bug fix from #134: a compact single-line fixture
+# wouldn't catch an "enabled" field preceding "id" in a neighboring object.
+#
+# Usage: shim_claude <mode>
+# Modes: enabled | disabled | other-plugin-only | disabled-with-enabled-neighbor
+#        | enabled-field-before-id | ponytail-enabled | ponytail-disabled | broken
+shim_claude() {
+  CLAUDE_SHIM_BIN="$SANDBOX/claude-shim"
+  mkdir -p "$CLAUDE_SHIM_BIN"
+  local mode="$1" body=""
+  case "$mode" in
+    enabled)
+      body='[
+  {
+    "id": "mattpocock-skills@mattpocock",
+    "enabled": true
+  }
+]'
+      ;;
+    disabled)
+      body='[
+  {
+    "id": "mattpocock-skills@mattpocock",
+    "enabled": false
+  }
+]'
+      ;;
+    other-plugin-only)
+      body='[
+  {
+    "id": "dfadler-agent-config@skills-dir",
+    "enabled": true
+  }
+]'
+      ;;
+    # Regression for the exact case review reproduced: a disabled target
+    # sitting next to an unrelated ENABLED plugin. A window-based grep can
+    # attribute the neighbor's "enabled": true to mattpocock-skills; a real
+    # JSON parse can't, since it keys strictly by object.
+    disabled-with-enabled-neighbor)
+      body='[
+  {
+    "id": "mattpocock-skills@mattpocock",
+    "enabled": false
+  },
+  {
+    "id": "other-plugin@example",
+    "enabled": true
+  }
+]'
+      ;;
+    # Field order within the object shouldn't matter to a real parser,
+    # unlike a positional/window-based read.
+    enabled-field-before-id)
+      body='[
+  {
+    "enabled": true,
+    "id": "mattpocock-skills@mattpocock"
+  }
+]'
+      ;;
+    ponytail-enabled | ponytail-disabled)
+      local on=true
+      [ "$mode" = "ponytail-disabled" ] && on=false
+      body='[
+  {
+    "id": "ponytail@ponytail",
+    "enabled": '"$on"'
+  }
+]'
+      ;;
+    broken) body="" ;;
+    *)
+      echo "shim_claude: unknown mode $mode" >&2
+      return 1
+      ;;
+  esac
+  if [ "$mode" = "broken" ]; then
+    cat > "$CLAUDE_SHIM_BIN/claude" <<'EOF'
+#!/usr/bin/env bash
+echo "fake claude: broken" >&2
+exit 1
+EOF
+  else
+    cat > "$CLAUDE_SHIM_BIN/claude" <<EOF
+#!/usr/bin/env bash
+if [ "\$1" = "plugin" ] && [ "\$2" = "list" ]; then
+  echo '$body'
+  exit 0
+fi
+echo "fake claude: unexpected args: \$*" >&2
+exit 1
+EOF
+  fi
+  chmod +x "$CLAUDE_SHIM_BIN/claude"
+  case ":$PATH:" in
+    *":$CLAUDE_SHIM_BIN:"*) ;;
+    *) export PATH="$CLAUDE_SHIM_BIN:$PATH" ;;
+  esac
+}
+
 # --- assertions (dependency-free; no bats-assert needed) --------------------
 assert_success() {
   if [ "$status" -ne 0 ]; then
