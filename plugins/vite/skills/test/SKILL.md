@@ -13,241 +13,147 @@ metadata:
 # Testing a Vite Plugin
 
 Vite plugins are plain objects with hook functions. Test them by calling hooks
-directly — no need to spin up a full Vite dev server for unit tests. Use Vitest
-(`vi.fn()`, `vi.mock()`, `describe`/`it`/`expect`).
+directly — no need to spin up a full Vite dev server for unit tests.
+
+Check the project for existing test helpers, shared fake factories, or a
+`setupTests` file before writing new ones. Many monorepos already provide
+`makeChunk`, fake server builders, or a configured test environment.
 
 ## Pattern 1: `transform` hook
 
-Call the hook directly. Assert on the returned `code` or `map`.
+Call the hook directly with `(code, id, options)`. Assert on the returned
+`{ code, map }` object, or that the hook returned `null` for files it skips.
+
+**Key gotchas:**
+- A hook may be an object `{ handler, order, ... }` rather than a bare function.
+  Unwrap it before calling:
+  ```ts
+  const raw = plugin.transform
+  const transform = typeof raw === 'function' ? raw : raw?.handler
+  ```
+- Returning `null` (not `undefined`) is the convention for "I didn't handle
+  this file." Test both the handled and unhandled cases.
+- Pass `{ ssr: true }` in the options argument to test SSR guard branches.
 
 ```ts
-import { describe, it, expect } from 'vitest'
-import { myPlugin } from './myPlugin'
+it('transforms matching files', () => {
+  const plugin = myPlugin()
+  const raw = plugin.transform
+  const transform = typeof raw === 'function' ? raw : raw?.handler
 
-describe('myPlugin', () => {
-  it('has the correct name', () => {
-    const plugin = myPlugin()
-    expect(plugin.name).toBe('my-plugin')
-  })
+  const result = transform?.('const x = 1', '/src/file.ts', {})
+  expect(result).not.toBeNull()
+  expect(result.code).toContain('/* transformed */')
+})
 
-  it('transforms matching files', () => {
-    const plugin = myPlugin()
-    // Vite supports both callable hooks and object hooks with a `handler` property
-    const rawTransform = plugin.transform
-    const transform = typeof rawTransform === 'function' ? rawTransform : rawTransform?.handler
-    const result = transform?.('const x = 1', '/path/to/file.ts', {})
-
-    expect(result).not.toBeNull()
-    expect(result.code).toContain('/* transformed */')
-  })
-
-  it('returns null for non-matching files', () => {
-    const plugin = myPlugin()
-    const rawTransform = plugin.transform
-    const transform = typeof rawTransform === 'function' ? rawTransform : rawTransform?.handler
-    const result = transform?.('body {}', '/path/to/style.css', {})
-
-    expect(result).toBeNull()
-  })
-
-  it('skips SSR builds', () => {
-    const plugin = myPlugin()
-    const rawTransform = plugin.transform
-    const transform = typeof rawTransform === 'function' ? rawTransform : rawTransform?.handler
-    const result = transform?.('const x = 1', '/path/to/file.ts', { ssr: true })
-
-    expect(result).toBeNull()
-  })
+it('returns null for non-matching files', () => {
+  const raw = myPlugin().transform
+  const transform = typeof raw === 'function' ? raw : raw?.handler
+  expect(transform?.('body {}', '/src/style.css', {})).toBeNull()
 })
 ```
 
 ## Pattern 2: `generateBundle` hook
 
-Build a minimal fake `bundle` object with the entries you need to assert on.
-`generateBundle` mutates `bundle` in place; assert on its state after the call.
+Build a minimal fake `bundle` object containing only the entries your
+assertions need. `generateBundle` **mutates `bundle` in place** — the return
+value is ignored by Vite. Assert on bundle state after the call.
+
+**Key gotchas:**
+- Call the hook with `.call(context, options, bundle)` so `this.emitFile` and
+  other plugin-context methods are available. Provide `vi.fn()` stubs for the
+  methods the plugin actually calls; you don't need to stub the full context.
+- Import output types from the bundler your Vite version uses:
+  - Vite 7 (Rollup-based): `import type { OutputBundle, OutputChunk } from 'rollup'`
+  - Vite 8+ / rolldown-vite: `import type { OutputBundle, OutputChunk } from 'rolldown'`
+- Only fill in the chunk fields your plugin reads. A minimal chunk needs
+  `type: 'chunk'`, `fileName`, and `code`; add more only as needed.
 
 ```ts
-import { describe, it, expect, vi } from 'vitest'
-// Vite 7 bundles on top of Rollup — import types from 'rollup', not 'rolldown'
-import type { OutputBundle, OutputChunk } from 'rollup'
-import { myPlugin } from './myPlugin'
+it('rewrites import paths in output chunks', () => {
+  const plugin = myPlugin()
+  const generateBundle = plugin.generateBundle as Function
+  const ctx = { emitFile: vi.fn() }  // add other vi.fn() stubs as needed
 
-function makeChunk(overrides: Partial<OutputChunk> = {}): OutputChunk {
-  return {
-    type: 'chunk',
-    fileName: 'output.js',
-    code: 'export const x = 1',
-    imports: [],
-    exports: [],
-    modules: {},
-    moduleIds: [],
-    isDynamicEntry: false,
-    isEntry: true,
-    isImplicitEntry: false,
-    facadeModuleId: null,
-    name: 'output',
-    map: null,
-    sourcemapFileName: null,
-    preliminaryFileName: 'output.js',
-    dynamicImports: [],
-    implicitlyLoadedBefore: [],
-    referencedFiles: [],
-    viteMetadata: undefined,
-    ...overrides,
+  const bundle = {
+    'output.js': { type: 'chunk', fileName: 'output.js', code: "import './dep.js'" },
   }
-}
 
-// Minimal fake plugin context — add vi.fn() stubs for methods the plugin actually calls
-function makeFakeContext() {
-  return { emitFile: vi.fn() }
-}
+  generateBundle.call(ctx, {}, bundle)
 
-describe('myPlugin generateBundle', () => {
-  it('rewrites import paths in output chunks', () => {
-    const plugin = myPlugin()
-    const generateBundle = plugin.generateBundle as Function
-
-    const bundle: OutputBundle = {
-      'output.js': makeChunk({
-        code: "import './dep.js'",
-      }),
-    }
-
-    generateBundle.call(makeFakeContext(), {}, bundle)
-
-    expect((bundle['output.js'] as OutputChunk).code).toContain("import './dep'")
-  })
+  expect(bundle['output.js'].code).toContain("import './dep'")
 })
 ```
 
-## Pattern 3: `configureServer` hook (fake server)
+## Pattern 3: `configureServer` hook
 
 Build a minimal fake `ViteDevServer` with only the surface the plugin touches.
-For `configureServer`, the pattern is:
-1. Capture what gets registered on `middlewares.use` and `httpServer.on`
-2. Fire those handlers with fabricated request/response objects
-3. Assert on the handler's side effects
+Stub `middlewares.use` and `httpServer.on` with `vi.fn()`, then inspect what
+was registered and invoke the handlers yourself.
+
+**Key gotchas:**
+- `configureServer` may **return a function** (the post-hook, which Vite calls
+  after its own internal middleware). Always capture the return value and invoke
+  it if present before asserting:
+  ```ts
+  const postHook = await configureServer(fakeServer)
+  if (typeof postHook === 'function') await postHook()
+  ```
+- `middlewares.use` accepts both `use(handler)` and `use(path, handler)`. When
+  extracting the registered handler, check which signature was used:
+  ```ts
+  const args = useMock.mock.calls[0]
+  const handler = typeof args[0] === 'function' ? args[0] : args[1]
+  ```
+- Fake only what the plugin accesses. A plugin that only calls
+  `server.middlewares.use(fn)` doesn't need a fake `httpServer`.
 
 ```ts
-import { describe, it, expect, vi, beforeEach } from 'vitest'
-import type { ViteDevServer } from 'vite'
-import type { IncomingMessage, ServerResponse } from 'node:http'
-import { myPlugin } from './myPlugin'
-
-function makeFakeServer(): Pick<ViteDevServer, 'middlewares' | 'httpServer'> {
-  return {
-    middlewares: {
-      use: vi.fn(),
-    } as unknown as ViteDevServer['middlewares'],
-    httpServer: {
-      on: vi.fn(),
-    } as unknown as ViteDevServer['httpServer'],
+it('registers a middleware and handles /my-route', async () => {
+  const plugin = myPlugin()
+  const fakeServer = {
+    middlewares: { use: vi.fn() },
   }
-}
 
-function makeFakeRequest(overrides: Partial<IncomingMessage> = {}): IncomingMessage {
-  return {
-    url: '/',
-    method: 'GET',
-    headers: {},
-    ...overrides,
-  } as IncomingMessage
-}
+  const postHook = await (plugin.configureServer as Function)(fakeServer)
+  if (typeof postHook === 'function') await postHook()
 
-function makeFakeResponse(): Partial<ServerResponse> & { writeHead: ReturnType<typeof vi.fn>; end: ReturnType<typeof vi.fn> } {
-  return {
-    writeHead: vi.fn(),
-    setHeader: vi.fn(),
-    end: vi.fn(),
-  }
-}
+  expect(fakeServer.middlewares.use).toHaveBeenCalledOnce()
 
-// Extract the middleware handler from a middlewares.use() call.
-// Handles both use(handler) and use(path, handler) call signatures.
-function extractHandler(useMock: ReturnType<typeof vi.fn>) {
-  const args = useMock.mock.calls[0]
-  return typeof args[0] === 'function' ? args[0] : args[1]
-}
+  const args = fakeServer.middlewares.use.mock.calls[0]
+  const handler = typeof args[0] === 'function' ? args[0] : args[1]
 
-describe('myPlugin configureServer', () => {
-  it('registers middleware on the dev server', async () => {
-    const plugin = myPlugin()
-    const fakeServer = makeFakeServer()
+  const req = { url: '/my-route', method: 'GET', headers: {} }
+  const res = { writeHead: vi.fn(), end: vi.fn() }
+  const next = vi.fn()
 
-    const configureServer = plugin.configureServer as Function
-    // configureServer may return a post-hook function (runs after Vite's internal
-    // middleware). Invoke it if present before asserting.
-    const postHook = await configureServer(fakeServer)
-    if (typeof postHook === 'function') await postHook()
+  await handler(req, res, next)
 
-    expect(fakeServer.middlewares.use).toHaveBeenCalledOnce()
-  })
-
-  it('serves /my-route with a 200 response', async () => {
-    const plugin = myPlugin()
-    const fakeServer = makeFakeServer()
-
-    const configureServer = plugin.configureServer as Function
-    const postHook = await configureServer(fakeServer)
-    if (typeof postHook === 'function') await postHook()
-
-    const handler = extractHandler(fakeServer.middlewares.use as ReturnType<typeof vi.fn>)
-    const req = makeFakeRequest({ url: '/my-route' })
-    const res = makeFakeResponse()
-    const next = vi.fn()
-
-    await handler(req, res, next)
-
-    expect(res.writeHead).toHaveBeenCalledWith(200, expect.objectContaining({ 'Content-Type': expect.any(String) }))
-    expect(next).not.toHaveBeenCalled()
-  })
-
-  it('calls next() for unhandled routes', async () => {
-    const plugin = myPlugin()
-    const fakeServer = makeFakeServer()
-
-    const configureServer = plugin.configureServer as Function
-    const postHook = await configureServer(fakeServer)
-    if (typeof postHook === 'function') await postHook()
-
-    const handler = extractHandler(fakeServer.middlewares.use as ReturnType<typeof vi.fn>)
-    const req = makeFakeRequest({ url: '/unrelated' })
-    const res = makeFakeResponse()
-    const next = vi.fn()
-
-    await handler(req, res, next)
-
-    expect(next).toHaveBeenCalledOnce()
-  })
+  expect(res.writeHead).toHaveBeenCalledWith(200, expect.any(Object))
+  expect(next).not.toHaveBeenCalled()
 })
 ```
 
 ## Mocking heavy dependencies
 
-Use `vi.hoisted()` when a mock must be hoisted above module imports (e.g., mocking
-a module whose side effect fires at import time). Use `memfs` to replace `fs`
-operations without touching disk:
+Use `vi.hoisted()` when a mock must be hoisted above module imports. Use
+`memfs` to replace `fs` operations without touching disk:
 
 ```ts
-import { vi } from 'vitest'
-import { createFsFromVolume, Volume } from 'memfs'
-
 vi.mock('node:fs/promises', async () => {
+  const { createFsFromVolume, Volume } = await import('memfs')
   const vol = new Volume()
-  const fs = createFsFromVolume(vol)
   vol.fromJSON({ '/project/package.json': JSON.stringify({ name: 'my-app' }) })
-  return fs.promises
+  return createFsFromVolume(vol).promises
 })
 ```
 
 ## File placement
 
-Test files live adjacent to the plugin they test, in the project's `__tests__`
-directory or with a `.test.ts` suffix:
+Follow the project's existing convention. Common patterns:
 
 ```
 src/vite/plugins/myPlugin.ts
-src/vite/__tests__/myPlugin.test.ts   ← preferred
-# or
-src/vite/plugins/myPlugin.test.ts
+src/vite/__tests__/myPlugin.test.ts   ← co-located __tests__ directory
+src/vite/plugins/myPlugin.test.ts     ← alongside source
 ```
