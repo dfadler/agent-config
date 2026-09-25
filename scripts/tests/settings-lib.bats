@@ -106,13 +106,17 @@ assert 'SessionStart' in d['hooks'], 'SessionStart key lost'
 }
 
 @test "registered: no-op with warning when python3 absent" {
-  # Create an empty fake_bin dir that precedes /usr/bin so python3 is not found.
   # The absent-python3 code path uses only bash builtins (printf, return), so
-  # /usr/bin is not needed for the code under test. bash itself lives at /bin/bash.
-  local fake_bin="$SANDBOX/no-python3-bin"
+  # we can use PATH=$fake_bin (empty dir, no python3) without breaking anything.
+  # bash is invoked by absolute path so env -i doesn't need bash in PATH.
+  # On Linux with merged /usr, /bin is a symlink to /usr/bin, so PATH=/bin:/usr/bin
+  # would still expose /bin/python3 — that's why we use an empty PATH instead.
+  local fake_bin bash_bin
+  fake_bin="$SANDBOX/no-python3-bin"
+  bash_bin="$(command -v bash)"
   mkdir "$fake_bin"
-  run env -i "HOME=$HOME" "PATH=$fake_bin:/bin" \
-    bash -c "source '$SETTINGS_LIB'; ensure_hook_registered PreToolUse 'Edit|Write' /hook.sh '$SETTINGS' 2>&1"
+  run env -i "HOME=$HOME" "PATH=$fake_bin" \
+    "$bash_bin" -c "source '$SETTINGS_LIB'; ensure_hook_registered PreToolUse 'Edit|Write' /hook.sh '$SETTINGS' 2>&1"
   [ "$status" -eq 0 ]
   [ ! -f "$SETTINGS" ]
   [[ "$output" == *"Warning"* ]]
