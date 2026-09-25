@@ -15,6 +15,7 @@ setup() {
   chmod +x "$FAKE_REPO/teardown.sh"
   mkdir -p "$FAKE_REPO/scripts"
   cp "$REPO_ROOT/scripts/claude-md-lib.sh" "$FAKE_REPO/scripts/claude-md-lib.sh"
+  cp "$REPO_ROOT/scripts/settings-lib.sh" "$FAKE_REPO/scripts/settings-lib.sh"
   mkdir -p "$FAKE_REPO/claude/commands"
   echo "# global instructions" > "$FAKE_REPO/claude/CLAUDE.md"
   echo "# a command" > "$FAKE_REPO/claude/commands/demo.md"
@@ -228,4 +229,35 @@ install_legacy_links() {
   assert_status 2
   assert_output_contains "Unknown argument: --nope"
   [ ! -e "$HOME/.claude" ]
+}
+
+# ---------------------------------------------------------------------------
+# Hook deregistration from ~/.claude/settings.json
+# ---------------------------------------------------------------------------
+
+@test "hook deregistration: removes worktree-core PreToolUse hook from settings.json" {
+  HOOK_CMD="$HOME/.claude/skills/worktree-core/skills/git-worktree-usage/scripts/require-worktree-hook.sh"
+  mkdir -p "$HOME/.claude"
+  python3 -c "
+import json
+d = {'hooks': {'PreToolUse': [{'matcher': 'Edit|Write', 'hooks': [{'type': 'command', 'command': '$HOOK_CMD'}]}]}}
+open('$HOME/.claude/settings.json', 'w').write(json.dumps(d))
+"
+  run_teardown
+  assert_success
+  run python3 -c "
+import json
+d = json.load(open('$HOME/.claude/settings.json'))
+cmds = [h['command'] for e in d.get('hooks', {}).get('PreToolUse', []) for h in e.get('hooks', [])]
+assert '$HOOK_CMD' not in cmds, 'hook still present after teardown'
+"
+  [ "$status" -eq 0 ]
+}
+
+@test "hook deregistration: no-op when settings.json has no PreToolUse hook" {
+  mkdir -p "$HOME/.claude"
+  printf '{}' >"$HOME/.claude/settings.json"
+  install_links
+  run_teardown
+  assert_success
 }
