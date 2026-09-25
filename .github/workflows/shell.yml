@@ -195,3 +195,19 @@ jobs:
         run: kcov --version
       - name: Coverage (kcov, 70% floor)
         run: make coverage
+
+  # Sentinel job required by branch protection. Requiring each job by name
+  # would need a settings update every time a job is added or renamed; this
+  # job depends on all of them and is the only name that needs to be required.
+  # `if: always()` prevents skipped jobs from skipping this one too, and the
+  # shell step turns any failure or cancellation into a non-zero exit.
+  all-checks:
+    name: all-checks
+    runs-on: ubuntu-latest
+    if: always()
+    needs: [shellcheck, shfmt, set-flags, claude-md-size, structure, test-sh, coverage]
+    steps:
+      - name: All checks passed
+        run: |
+          results="${{ join(needs.*.result, ' ') }}"
+          [[ "$results" =~ failure|cancelled ]] && exit 1 || exit 0
