@@ -1,6 +1,6 @@
 #!/usr/bin/env bats
 #
-# Tests for plugins/dfadler-agent-config/skills/git-worktree-usage/scripts/
+# Tests for plugins/worktree-core/skills/git-worktree-usage/scripts/
 # prune-merged-worktrees-hook.sh — the SessionStart hook that auto-removes
 # merged worktrees or nudges only, based on configured auto-prune mode.
 #
@@ -10,8 +10,8 @@
 # hook locates its sibling via $(dirname "$0"), so copying both into one dir
 # substitutes the fake without touching any real git, worktree, or network.
 
-REAL_HOOK="$BATS_TEST_DIRNAME/../../plugins/dfadler-agent-config/skills/git-worktree-usage/scripts/prune-merged-worktrees-hook.sh"
-HOOK_LIB="$BATS_TEST_DIRNAME/../../plugins/dfadler-agent-config/skills/git-worktree-usage/scripts/worktree-hook-lib.sh"
+REAL_HOOK="$BATS_TEST_DIRNAME/../../plugins/worktree-core/skills/git-worktree-usage/scripts/prune-merged-worktrees-hook.sh"
+HOOK_LIB="$BATS_TEST_DIRNAME/../../plugins/worktree-core/skills/git-worktree-usage/scripts/worktree-hook-lib.sh"
 
 setup() {
   TMP="$(mktemp -d)"
