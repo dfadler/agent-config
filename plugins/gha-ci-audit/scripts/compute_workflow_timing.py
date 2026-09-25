@@ -6,17 +6,20 @@ Reads a GitHub Actions workflow runs JSON array from stdin
 
 Output: one line — "<avg_min>  <p90_min>" or "?  ?" if no data.
 """
+
+from __future__ import annotations
+
 import json
 import statistics
 import sys
 from datetime import datetime
 
 
-def parse_dt(s):
+def parse_dt(s: str) -> datetime:
     return datetime.fromisoformat(s.replace("Z", "+00:00"))
 
 
-def main():
+def main() -> None:
     try:
         runs = json.load(sys.stdin)
     except (json.JSONDecodeError, ValueError):

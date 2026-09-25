@@ -29,7 +29,22 @@ SH_FIND := find scripts plugins setup.sh -type f -name '*.sh' -print0
 
 # Python sources: the skill's implementation plus its tests.
 PY_SOURCES := plugins/dfadler-agent-config/skills/detached-terminal/scripts/agent_term.py \
-              scripts/tests/test_agent_term.py
+              scripts/tests/test_agent_term.py \
+              plugins/gha-ci-audit/scripts/aggregate.py \
+              plugins/gha-ci-audit/scripts/analyze_jobs.py \
+              plugins/gha-ci-audit/scripts/analyze_runs.py \
+              plugins/gha-ci-audit/scripts/check_failures.py \
+              plugins/gha-ci-audit/scripts/check_status.py \
+              plugins/gha-ci-audit/scripts/compute_workflow_timing.py \
+              plugins/gha-ci-audit/scripts/detect_primary_workflow.py \
+              plugins/gha-ci-audit/scripts/find_p50_run.py \
+              plugins/gha-ci-audit/scripts/grade.py \
+              plugins/gha-ci-audit/scripts/merge_timing.py \
+              plugins/gha-ci-audit/scripts/write_assertions.py \
+              plugins/gha-ci-audit/scripts/write_collect_summary.py \
+              plugins/gha-ci-audit/scripts/write_collect_timing.py \
+              plugins/gha-ci-audit/scripts/write_render_timing.py \
+              plugins/gha-ci-audit/tests/test_gha_ci_audit.py
 
 # The non-test entries of PY_SOURCES, reduced to their containing
 # directories, is what `coverage-py` points pytest-cov at. This is
@@ -45,7 +60,7 @@ PY_SOURCES := plugins/dfadler-agent-config/skills/detached-terminal/scripts/agen
 # list too, same as it already needs manually adding to PY_SOURCES itself for
 # lint-py/typecheck (neither of those uses `find`, unlike SH_FIND above) —
 # this is not a new gap `coverage-py` introduces, just one it inherits.
-PY_COVERAGE_DIRS := $(sort $(dir $(filter-out scripts/tests/%,$(PY_SOURCES))))
+PY_COVERAGE_DIRS := $(sort $(dir $(filter-out scripts/tests/% plugins/gha-ci-audit/tests/%,$(PY_SOURCES))))
 
 VENV := .venv
 VENV_BIN := $(VENV)/bin
@@ -100,10 +115,12 @@ KCOV_EXCLUDE := /scripts/tests
 # (cmd_start, serve, bind_control_socket, the socket request/response loop)
 # is exercised only by real usage, not by scripts/tests/test_agent_term.py's
 # suite of pure-function/unit tests — a real gap, not a measurement error.
-# Lowering this line takes a deliberate commit; raising it as coverage
-# improves is welcome.
+# Raised from 33 to 52 when the gha-ci-audit plugin scripts and their 72
+# tests were wired in: `make coverage-py` measured 52.04% on macOS (Python
+# 3.14.7, same pinned pytest-cov). Lowering this line takes a deliberate
+# commit; raising it as coverage improves is welcome.
 COVERAGE_PY_DIR := coverage-py
-COVERAGE_PY_MIN := 33
+COVERAGE_PY_MIN := 52
 
 # What lands in the denominator, and what doesn't — the Python-side mirror of
 # the KCOV_INCLUDE/KCOV_EXCLUDE comment above:
@@ -219,7 +236,7 @@ test-sh: ## Run the bats suites
 	@bats scripts/tests
 
 test-py: venv ## Run the pytest suite
-	@$(PY) -m pytest scripts/tests -q
+	@$(PY) -m pytest scripts/tests plugins/gha-ci-audit/tests -q
 
 # Re-runs the bats suite under kcov and enforces COVERAGE_MIN above. CI calls
 # this exact target, so the local and CI numbers come from the same command.
@@ -254,7 +271,7 @@ coverage: ## Measure bats coverage with kcov and enforce the floor (Linux only)
 coverage-py: venv ## Measure pytest coverage and enforce the floor
 	@rm -rf $(COVERAGE_PY_DIR)
 	@mkdir -p $(COVERAGE_PY_DIR)
-	@$(PY) -m pytest scripts/tests -q \
+	@$(PY) -m pytest scripts/tests plugins/gha-ci-audit/tests -q \
 	  $(addprefix --cov=,$(PY_COVERAGE_DIRS)) \
 	  --cov-report=term-missing \
 	  --cov-report=json:$(COVERAGE_PY_JSON)

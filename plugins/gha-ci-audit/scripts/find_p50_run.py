@@ -9,36 +9,45 @@ Usage:
 Output (one line): <run_id>  <duration_min>m  <created_at>
 Use the run_id with analyze_jobs.py for critical-path analysis.
 """
-import json, sys, statistics
+
+from __future__ import annotations
+
+import json
+import statistics
+import sys
 from datetime import datetime
+from typing import Any, cast
 
 
-def parse_dt(s):
+def parse_dt(s: str | None) -> datetime | None:
     if not s:
         return None
-    return datetime.fromisoformat(s.replace('Z', '+00:00'))
+    return datetime.fromisoformat(s.replace("Z", "+00:00"))
 
 
-def duration_min(r):
-    s = parse_dt(r.get('run_started_at'))
-    e = parse_dt(r.get('updated_at'))
+def duration_min(r: dict[str, Any]) -> float | None:
+    s = parse_dt(r.get("run_started_at"))
+    e = parse_dt(r.get("updated_at"))
     if not s or not e:
         return None
     d = (e - s).total_seconds() / 60
     return d if d >= 0 else None
 
 
-def main():
+def main() -> None:
     src = open(sys.argv[1]) if len(sys.argv) > 1 else sys.stdin
     raw = json.load(src)
-    runs = raw.get('workflow_runs', raw) if isinstance(raw, dict) else raw
+    runs = raw.get("workflow_runs", raw) if isinstance(raw, dict) else raw
 
-    successful = [r for r in runs if r.get('conclusion') == 'success']
-    with_dur = [(duration_min(r), r) for r in successful]
-    with_dur = [(d, r) for d, r in with_dur if d is not None]
+    successful = [r for r in runs if r.get("conclusion") == "success"]
+    with_dur_raw = [(duration_min(r), r) for r in successful]
+    with_dur: list[tuple[float, dict[str, Any]]] = cast(
+        "list[tuple[float, dict[str, Any]]]",
+        [(d, r) for d, r in with_dur_raw if d is not None],
+    )
 
     if not with_dur:
-        print('No successful runs with duration data found.', file=sys.stderr)
+        print("No successful runs with duration data found.", file=sys.stderr)
         sys.exit(1)
 
     durations = [d for d, _ in with_dur]
@@ -49,5 +58,5 @@ def main():
     print(f"# p50={p50:.1f}m  n={len(durations)} successful runs", file=sys.stderr)
 
 
-if __name__ == '__main__':
+if __name__ == "__main__":
     main()

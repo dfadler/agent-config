@@ -23,7 +23,7 @@ from datetime import datetime, timezone
 from pathlib import Path
 
 
-def main():
+def main() -> None:
     if len(sys.argv) != 8:
         print(
             "Usage: write_collect_summary.py <outputs_dir> <repo> <primary_workflow_id> "
