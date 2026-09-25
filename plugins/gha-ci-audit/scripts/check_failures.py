@@ -48,9 +48,7 @@ def main() -> None:
     parser.add_argument(
         "runs_file", nargs="?", help="Path to runs.json (default: stdin)"
     )
-    parser.add_argument(
-        "--output", help="Write a structured JSON summary to this path"
-    )
+    parser.add_argument("--output", help="Write a structured JSON summary to this path")
     args = parser.parse_args()
 
     src = open(args.runs_file) if args.runs_file else sys.stdin
