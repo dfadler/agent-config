@@ -169,8 +169,10 @@ After all graders complete, run `check_status.py` again and confirm all three sh
 ## Step 8: Aggregate
 
 ```bash
-python3 $SCRIPTS/aggregate.py $ITER --skill-name gha-ci-audit
+python3 $SCRIPTS/aggregate.py $ITER --skill-name gha-ci-audit --model "<the model you are running as, e.g. claude-sonnet-4-6>"
 ```
+
+Pass `--model` explicitly so the benchmark metadata records the model actually used for this run, not a stale default.
 
 This produces `$ITER/benchmark.json` and `$ITER/benchmark.md`. Print the pass rate line from the output.
 
