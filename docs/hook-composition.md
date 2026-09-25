@@ -41,6 +41,18 @@ the hook did not run at all.
 | `require-worktree-hook.sh` | `PreToolUse` (Edit/Write) | `WORKTREE_ENFORCE=block\|warn\|off` | `worktree.enforce: "block"\|"warn"\|"off"` | off (no block, no warn) |
 | `prune-merged-worktrees-hook.sh` | `SessionStart` | `WORKTREE_AUTO_PRUNE=on\|off` | `worktree.autoPrune: true\|false` | off (skipped entirely) |
 | `check-worktree-symlinks-hook.sh` | `SessionStart` | `WORKTREE_SYMLINK_CHECK=on\|off` | `worktree.symlinkCheck: "on"\|"off"` | off (skipped entirely) |
+| `memory-hygiene-stop-hook.sh` | `Stop` | `MEMORY_HYGIENE_REMINDER=on\|off` | `env.MEMORY_HYGIENE_REMINDER: "on"` (settings.json's built-in `env` key — no bespoke key; see below) | off (skipped entirely) |
+
+`Stop` fires once per turn, not once per session
+([hooks docs](https://code.claude.com/docs/en/hooks#stop)), so
+`memory-hygiene-stop-hook.sh` throttles itself to at most one reminder per
+session (a marker file keyed on `session_id`) and only fires when `git
+status` shows uncommitted changes — see the script's own header for the
+full reasoning and known gaps. It has no project-settings key of its own
+because the CLI's own settings validation rejects unrecognized top-level
+keys (confirmed while building this hook — a `memoryHygiene.reminder` key
+was refused as "Unrecognized field"); project-level opt-in instead sets the
+env var through settings.json's own `env` field.
 
 For `require-worktree-hook.sh`, `warn` is a middle ground: it prints an
 advisory instead of blocking (see the hook script's own header for the full
