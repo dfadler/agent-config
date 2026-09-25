@@ -10,7 +10,7 @@
    - A **convention** (global guidance for `CLAUDE.md`) → first check
      [`claude/conventions/README.md`](../claude/conventions/README.md). Most
      task-shaped guidance should be a skill, not an `@include`.
-   - A **hook** → an entry in `plugins/dfadler-agent-config/hooks/hooks.json`,
+   - A **hook** → an entry in the plugin's `hooks/hooks.json`,
      pointing (via `${CLAUDE_PLUGIN_ROOT}`) at a script under wherever fits — a
      related skill's own `scripts/`, if the hook is that skill's companion. Unlike
      everything else in this list, a hook activates for every project this plugin
@@ -19,12 +19,19 @@
      cleanly (exit 0, no output) whenever its precondition doesn't hold (wrong
      project type, feature not configured, required CLI missing), and never let
      the hook's own failure block a session start. The `git-worktree-usage`
-     skill's two `SessionStart` hooks are the reference example.
+     skill's hooks (shared identically by `dfadler-agent-config` and `worktree-core`)
+     are the reference example; see `docs/hook-composition.md` for the
+     `dfadler-agent-config`/`worktree-core` mutual-exclusion note.
    - A whole new **plugin** (a set of skills/agents that belong together) → a new
      directory under `plugins/`, with its own `.claude-plugin/plugin.json`, `agents/`,
-     and `skills/`. Give it a `PLUGIN_SRC`/`PLUGIN_LINK` pair and a `link` line in
-     `setup.sh`, which only knows about `dfadler-agent-config`. Keep the directory name
-     and the manifest `name` identical.
+     and `skills/`. Keep the directory name and the manifest `name` identical.
+     `setup.sh` auto-discovers any directory under `plugins/` that carries a
+     `plugin.json`, so no manual changes to `setup.sh` are needed.
+     **If the plugin ships hooks** that overlap with another plugin's hooks (e.g. the
+     git-worktree hooks that `dfadler-agent-config` and `worktree-core` share), document
+     that the two plugins are intended to be mutually exclusive — install one or the
+     other, not both — and note this in the new plugin's README and in
+     `docs/hook-composition.md`.
 2. Name skills and agents plainly — `pr-babysit`, not `dfadler-agent-config-pr-babysit`
    — in both the directory/filename and the frontmatter `name:`. The plugin namespace
    already prevents collisions with a project's own skills, so a prefix here would just
@@ -111,7 +118,7 @@ make check          # lint + structure + typecheck + test + actionlint + coverag
 
 | Target | What it does |
 | --- | --- |
-| `make lint-sh` | `shellcheck`, `shfmt -i 2 -ci -d`, and the `set -uo pipefail` convention |
+| `make lint-sh` | `shellcheck`, `shfmt -i 2 -ci -d`, the `set -uo pipefail` convention, and the `claude/CLAUDE.md` line-count ceiling (`scripts/check-claude-md-lines.sh`) |
 | `make lint-py` | `ruff check` and `ruff format --check` |
 | `make typecheck` | `mypy --strict` over the Python sources |
 | `make structure` | Plugin manifests and skill/agent frontmatter agree with their directories |

@@ -50,13 +50,25 @@ makes — see "Gaps and what changed in this PR" below):
       "Bash(gh pr edit *)",
       "Bash(gh api *)"
     ]
+  },
+  "worktree": {
+    "enforce": "block",
+    "autoPrune": true,
+    "symlinkCheck": "on"
   }
 }
 ```
 
-That's the entire environment-layer footprint: one `ask` list, no `allow`,
-no `deny`, plus the `disableBypassPermissionsMode` toggle this PR adds (see
-below). The `ask` list gates exactly the GitHub publish surface `gh-publish-guide`
+**Note:** the `worktree` block was added after this audit was written (see
+`docs/hook-composition.md` for what each key does). It is the project-level
+hook opt-in mechanism — the per-hook enable signals the hooks read from
+`settings.json` to decide whether to do anything — not a permissions entry.
+It does not change the audit's security conclusions; the `permissions` section
+is unchanged.
+
+The environment-layer footprint from this audit's perspective remains: one `ask` list,
+no `allow`, no `deny`, plus the `disableBypassPermissionsMode` toggle this PR adds
+(see below). The `ask` list gates exactly the GitHub publish surface `gh-publish-guide`
 (`plugins/dfadler-agent-config/skills/gh-publish-guide/SKILL.md`)
 documents — issue/PR creation, comments, reviews, edits, and every `gh api`
 call — behind a confirmation prompt that, per Claude Code's own permission
