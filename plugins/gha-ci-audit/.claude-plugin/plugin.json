@@ -1,0 +1,12 @@
+{
+  "$schema": "https://json.schemastore.org/claude-code-plugin-manifest.json",
+  "name": "gha-ci-audit",
+  "version": "1.0.0",
+  "description": "Audit GitHub Actions usage for any repository: workflow volumes, critical path analysis, cost/performance improvement opportunities.",
+  "author": {
+    "name": "Dustin Fadler",
+    "url": "https://github.com/dfadler"
+  },
+  "homepage": "https://github.com/dfadler/agent-config",
+  "repository": "https://github.com/dfadler/agent-config"
+}

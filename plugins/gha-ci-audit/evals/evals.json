@@ -1,0 +1,99 @@
+{
+  "skill_name": "gha-ci-audit",
+  "evals": [
+    {
+      "id": 1,
+      "prompt": "Audit GitHub Actions for vitejs/vite. I want to understand where time and money are being spent in CI and what the biggest opportunities are for cost savings or performance improvements. Generate a dashboard artifact.",
+      "expected_output": "A published HTML artifact with: KPI tiles showing run counts and success rates, ranked opportunity cards with quantified estimates, a critical path visualization, and a workflow summary table. Should identify the primary CI workflow, find what's on the critical path, and give at least 2 concrete actionable recommendations.",
+      "files": [],
+      "assertions": [
+        {
+          "id": "artifact_published",
+          "text": "An HTML artifact dashboard was published (not just described in prose)",
+          "type": "qualitative"
+        },
+        {
+          "id": "workflow_count_found",
+          "text": "At least 2 distinct workflows identified by name",
+          "type": "qualitative"
+        },
+        {
+          "id": "critical_path_identified",
+          "text": "At least one critical path job named with a duration estimate in minutes",
+          "type": "qualitative"
+        },
+        {
+          "id": "failure_rate_computed",
+          "text": "Failure rate expressed as a percentage (e.g. '12%' or '0.12')",
+          "type": "qualitative"
+        },
+        {
+          "id": "ranked_opportunities",
+          "text": "At least 2 improvement opportunities ranked by estimated impact",
+          "type": "qualitative"
+        },
+        {
+          "id": "quantified_estimates",
+          "text": "At least one opportunity includes a quantified time or run-count estimate",
+          "type": "qualitative"
+        }
+      ]
+    },
+    {
+      "id": 2,
+      "prompt": "Our CI pipelines feel slow and expensive. Can you pull the GitHub Actions data for this repo and show me what's on the critical path and where we can cut time? I'm in the dfadler/agent-config repo.",
+      "expected_output": "Should parse the repo from context (dfadler/agent-config), find workflows, identify the primary CI workflow, analyze durations and outcomes, find the critical path job(s), and surface improvement opportunities in a dashboard artifact.",
+      "files": [],
+      "assertions": [
+        {
+          "id": "repo_inferred_from_context",
+          "text": "dfadler/agent-config correctly identified as the target repo from conversational context without user re-stating the full name",
+          "type": "qualitative"
+        },
+        {
+          "id": "artifact_published",
+          "text": "A dashboard artifact was published",
+          "type": "qualitative"
+        },
+        {
+          "id": "critical_path_jobs_named",
+          "text": "At least one critical path job identified by name with its duration",
+          "type": "qualitative"
+        },
+        {
+          "id": "time_reduction_estimated",
+          "text": "At least one concrete time savings estimate provided (e.g. 'could save X minutes')",
+          "type": "qualitative"
+        }
+      ]
+    },
+    {
+      "id": 3,
+      "prompt": "What does the GitHub Actions usage look like for facebook/react? I'm curious about the failure rate and what jobs are taking the longest.",
+      "expected_output": "Should query the facebook/react repo's GHA data, find the primary CI workflow, report on failure rates and duration patterns, identify critical path jobs, and render a dashboard. Should work with a public repo.",
+      "files": [],
+      "assertions": [
+        {
+          "id": "correct_repo_targeted",
+          "text": "facebook/react data retrieved (not a different repo)",
+          "type": "qualitative"
+        },
+        {
+          "id": "failure_rate_quantified",
+          "text": "Failure rate expressed as a percentage or ratio",
+          "type": "qualitative"
+        },
+        {
+          "id": "slowest_jobs_identified",
+          "text": "At least 2 job names reported with their durations",
+          "type": "qualitative"
+        },
+        {
+          "id": "handles_large_public_repo",
+          "text": "Completes successfully for a large well-known public repo with many workflows",
+          "type": "qualitative"
+        }
+      ]
+    }
+  ]
+}
