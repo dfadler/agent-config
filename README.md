@@ -11,39 +11,34 @@ automatically, with no per-project copy to keep in sync.
 ## Layout
 
 - `claude/` — Claude Code config that isn't part of a plugin.
-  - `CLAUDE.md` — a short intro plus a pointer at `conventions/`; `~/.claude/CLAUDE.md`
-    is a generated file whose managed section `@include`s this file, the user's own
-    `CLAUDE.personal.md`, and the default set of convention files (see below) — not a
-    symlink.
-  - `conventions/` — one file per convention (worktree usage, secrets handling, memory
-    hygiene, PR workflow, etc.), each independently `@include`-able. `DEFAULT_ENABLED` lists which
-    ones a fresh machine gets automatically; everything else is opt-in — add an
-    `@include` line to that machine's own `CLAUDE.personal.md` to enable it there.
+  - `CLAUDE.md` — `~/.claude/CLAUDE.md` is a generated file whose managed section
+    `@include`s this file, the user's own `CLAUDE.personal.md`, and the default
+    convention files — not a symlink.
+  - `conventions/` — one file per convention (worktree usage, secrets handling, etc.),
+    each independently `@include`-able. `DEFAULT_ENABLED` controls which ones a fresh
+    machine gets; everything else is opt-in via `~/.claude/CLAUDE.personal.md`.
   - `commands/` — slash commands, symlinked individually into `~/.claude/commands/`.
-- `plugins/` — one directory per plugin, in the layout Claude Code's plugin format
-  expects.
-  - `dfadler-agent-config/` — the only plugin so far. Its directory name matches the
-    `name` in its manifest, which is what makes its contents resolve as
-    `dfadler-agent-config:<skill>`.
-    - `.claude-plugin/plugin.json` — the plugin manifest (name, version, description).
-    - `agents/` — subagent definitions.
-    - `skills/` — skills, a directory each containing a `SKILL.md` plus any scripts.
-    - `hooks/hooks.json` — hook events (e.g. `SessionStart`) the plugin wires up.
-      Unlike a skill, a hook here is registered for every project the plugin is
-      enabled in, but each hook is off by default and does nothing until that
-      project's `.claude/settings.json` (or a session env var) explicitly opts
-      it in — see `docs/hook-composition.md`. Scripts a hook invokes live
-      wherever makes sense (a skill's own `scripts/`, if the hook is that
-      skill's companion) and are addressed via `${CLAUDE_PLUGIN_ROOT}`, never a
-      hardcoded path.
-- `docs/` — reference material specific to this repo's own tooling and CI, not
-  general enough for `claude/CLAUDE.md` (which is loaded globally, for every
-  project). See [Further reading](#further-reading) below for the full list.
+- `plugins/` — one directory per plugin. Each plugin's directory name matches its
+  manifest `name`, which is what makes skills resolve as `<plugin-name>:<skill>`.
+  - `dfadler-agent-config/` — the main plugin: cross-project agents and skills
+    (PR shepherding, PR review rubric, adversarial code reviewer, worktree usage).
+  - `accessibility-skills/` — WCAG 2.2 code review for web markup and CSS, graded
+    with an evidence-basis/severity system.
+  - `detached-terminal/` — run and drive an interactive terminal (TUI, REPL,
+    alternate-screen app) on a headless PTY without stealing focus. Requires `pyte`.
+  - `gh-attach-image/` — upload local images and videos to GitHub's
+    user-attachments endpoint so they render inline in PR/issue bodies.
+  - `gha-ci-audit/` — audit GitHub Actions usage for any repository: workflow
+    volumes, critical-path analysis, cost/performance improvement opportunities.
+  - `pr-visual-capture/` — produce screenshot (PNG) and walkthrough video (MP4)
+    files for PR/issue visual verification using headless Chrome and CDP. Requires
+    `gh-attach-image` to upload results.
+  - `worktree-core/` — `git-worktree-usage` skill plus hooks that enforce worktree
+    isolation and auto-prune merged worktrees.
+- `docs/` — reference material for this repo's own tooling and CI.
 
-Agents and skills used to live under `claude/`; they moved into the plugin in commit
-89a34ce. Nothing else moved — `CLAUDE.md` and `commands/` still sit under `claude/`.
-See [`docs/plugin-loading.md`](docs/plugin-loading.md) for how the plugin directory
-actually gets picked up by Claude Code and namespaced as `dfadler-agent-config:<name>`.
+See [`docs/plugin-loading.md`](docs/plugin-loading.md) for how a plugin directory
+becomes `<plugin-name>:<skill>` in a live session.
 
 ## Setup on a new machine
 
@@ -52,20 +47,59 @@ git clone git@github.com:dfadler/agent-config.git ~/Development/agent-config
 ~/Development/agent-config/setup.sh
 ```
 
-`setup.sh` symlinks `claude/commands/`, generates `~/.claude/CLAUDE.md`'s managed
-section, and links the `plugins/dfadler-agent-config/` directory into `~/.claude/` in
-one idempotent pass. It supports installing only a subset of features
-(`--skip`/`--include`), can install an optional runtime dependency (`pyte`) for the
-`detached-terminal` skill, and can pre-approve one pinned installer command. Full
-details: [`docs/setup.md`](docs/setup.md).
+`setup.sh` generates `~/.claude/CLAUDE.md`'s managed section, symlinks
+`claude/commands/` entry-by-entry, and links each plugin under `plugins/` into
+`~/.claude/skills/` — all in one idempotent pass. Re-run it any time after pulling
+to pick up new entries.
+
+### Install a subset of features
+
+See available feature names first (slash-command basenames and plugin directory names):
+
+```bash
+./setup.sh --list-features
+```
+
+Install everything **except** specific features (`--skip`):
+
+```bash
+./setup.sh --skip=accessibility-skills,gha-ci-audit
+```
+
+Install **only** specific features, leaving everything else out (`--include`):
+
+```bash
+./setup.sh --include=dfadler-agent-config,worktree-core
+```
+
+`--skip` and `--include` cannot be combined. Neither flag is remembered across runs —
+re-running plain `./setup.sh` relinks anything a previous `--skip` or `--include` left
+out. See [`docs/setup.md`](docs/setup.md) for the full details including subset
+installs and the optional `pyte` dependency.
+
+### Optional: install the `pyte` runtime dependency
+
+The `detached-terminal` skill requires `pyte` to be importable by the ambient
+`python3`. Pass `--install-deps` to let `setup.sh` install it:
+
+```bash
+./setup.sh --install-deps
+```
+
+Without the flag, a missing `pyte` is reported at the end of the run but doesn't
+block setup. See [`docs/setup.md`](docs/setup.md) for caveats on
+PEP 668 externally-managed interpreters.
+
+## Teardown
 
 ```bash
 ~/Development/agent-config/teardown.sh
 ```
 
-`teardown.sh` is the inverse — removes every symlink this repo created and restores
-your original `~/.claude/CLAUDE.md`. Safe to re-run. See
-[`docs/setup.md`](docs/setup.md#removing-from-a-machine).
+Removes every symlink this repo created in `~/.claude/` and restores
+`~/.claude/CLAUDE.md` from `~/.claude/CLAUDE.personal.md`. Only symlinks that point
+into this repo are touched; foreign symlinks (other skills-dir plugins, etc.) are left
+alone. Safe to re-run. See [`docs/setup.md`](docs/setup.md#removing-from-a-machine).
 
 ### Recommended companions
 
@@ -100,7 +134,7 @@ copy of something is a deliberate fork rather than drift to reconcile.
 - [`docs/setup.md`](docs/setup.md) — setup, subset installs, teardown, and the
   optional `pyte`/Aikido Safe Chain pieces.
 - [`docs/plugin-loading.md`](docs/plugin-loading.md) — how the plugin directory
-  becomes `dfadler-agent-config:<name>` in a live session.
+  becomes `<plugin-name>:<skill>` in a live session.
 - [`docs/companion-plugins.md`](docs/companion-plugins.md) — recommended standalone
   installs (mattpocock/skills, bulletproof-react-skills, vercel-labs/agent-skills,
   anthropics/skills, AWS Agent Toolkit, rtk, ponytail) and the Linux-administration
@@ -109,9 +143,6 @@ copy of something is a deliberate fork rather than drift to reconcile.
   the `allowed-tools` decision, `make check`, and GitHub operations via `gh`.
 - [`docs/scope.md`](docs/scope.md) — what belongs in this repo vs. a project's own
   `.claude/`.
-- [`docs/steering-mechanisms.md`](docs/steering-mechanisms.md) — when to use a
-  convention, skill, hook, subagent, or path-scoped rule here, and why output
-  styles and `--append-system-prompt` aren't used.
 - [`docs/hook-composition.md`](docs/hook-composition.md) — how this plugin's hooks
   compose with hooks from other plugins.
 - [`docs/prompt-injection-defense.md`](docs/prompt-injection-defense.md) — the
@@ -122,3 +153,6 @@ copy of something is a deliberate fork rather than drift to reconcile.
   debugging this repo's own `.github/workflows/`.
 - [`docs/usage-optimization.md`](docs/usage-optimization.md) — where Claude Code cost
   is spent in this repo.
+- [`docs/memory-tooling-alternatives.md`](docs/memory-tooling-alternatives.md) —
+  survey of memory tooling alternatives (mem0, Zep, Letta, Cognee, Supermemory, MCP
+  reference server) evaluated against this repo's own auto-memory conventions.
