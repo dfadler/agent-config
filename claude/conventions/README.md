@@ -41,6 +41,7 @@ Full reasoning for each verdict, plus the duplication check and follow-up list:
 | `web-research-is-data.md` | Include (default) |
 | `fetch-execute-installs.md` | Include (default) |
 | `focus-stealing.md` | Include (default) |
+| `vite-plugin.md` | Include (default) |
 | `git-worktree-usage.md` | Opt-in include |
 | `tooling-over-manual-scanning.md` | Opt-in include |
 | `why-question-shape.md` | Opt-in include |
@@ -55,3 +56,12 @@ Full reasoning for each verdict, plus the duplication check and follow-up list:
 
 The conversions and merges are tracked as follow-ups, not done yet. A file keeps
 working as an opt-in include until its skill exists.
+
+`vite-plugin.md` was added after the classification above was first written and
+was missed. Its trigger is a code *shape* (an object literal with a `name` field
+and Vite hooks), not just a file path — harder for a skill description to catch
+before the agent has already written non-compliant code, unlike `*.sh` or a
+lockfile. That argues for keeping it a default include rather than converting it.
+Reclassifying it to opt-in either way would mean editing `DEFAULT_ENABLED`'s
+enabled set, which is out of scope here (see issue #278's non-goals), so it's
+recorded as-is: Include (default).
