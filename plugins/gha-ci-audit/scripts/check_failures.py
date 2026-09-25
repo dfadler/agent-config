@@ -14,44 +14,50 @@ Exit code:
   0 — no chronic failure signal
   1 — chronic failure detected (rate >40% OR streak >=5 consecutive failures)
 """
-import json, sys
+
+from __future__ import annotations
+
+import json
+import sys
 from datetime import datetime
 
 
-def parse_dt(s):
+def parse_dt(s: str | None) -> datetime | None:
     if not s:
         return None
-    return datetime.fromisoformat(s.replace('Z', '+00:00'))
+    return datetime.fromisoformat(s.replace("Z", "+00:00"))
 
 
-def main():
+def main() -> None:
     src = open(sys.argv[1]) if len(sys.argv) > 1 else sys.stdin
     raw = json.load(src)
-    runs = raw.get('workflow_runs', raw) if isinstance(raw, dict) else raw
+    runs = raw.get("workflow_runs", raw) if isinstance(raw, dict) else raw
 
-    completed = [r for r in runs if r.get('conclusion') and r['conclusion'] != 'skipped']
+    completed = [
+        r for r in runs if r.get("conclusion") and r["conclusion"] != "skipped"
+    ]
     if not completed:
-        print('no_data')
+        print("no_data")
         sys.exit(0)
 
     # Failure rate across all completed runs
-    failures = [r for r in completed if r['conclusion'] == 'failure']
+    failures = [r for r in completed if r["conclusion"] == "failure"]
     rate = len(failures) / len(completed)
 
     # Consecutive failures at the head of the list (most recent first)
     streak = 0
     for r in completed:
-        if r['conclusion'] == 'failure':
+        if r["conclusion"] == "failure":
             streak += 1
         else:
             break
 
     # Earliest failure timestamp in the streak
     streak_runs = completed[:streak] if streak else []
-    earliest_streak_ts = ''
+    earliest_streak_ts = ""
     if streak_runs:
-        ts_list = [r.get('created_at', '') for r in streak_runs if r.get('created_at')]
-        earliest_streak_ts = min(ts_list) if ts_list else ''
+        ts_list = [r.get("created_at", "") for r in streak_runs if r.get("created_at")]
+        earliest_streak_ts = min(ts_list) if ts_list else ""
 
     chronic = rate > 0.40 or streak >= 5
 
@@ -62,5 +68,5 @@ def main():
     sys.exit(1 if chronic else 0)
 
 
-if __name__ == '__main__':
+if __name__ == "__main__":
     main()

@@ -11,15 +11,19 @@ Usage:
                               --grading-out <path/to/grading.json>
 """
 
+from __future__ import annotations
+
 import argparse
 import json
 import os
 import re
+from typing import Any
 
 
 # ---------------------------------------------------------------------------
 # Helpers
 # ---------------------------------------------------------------------------
+
 
 def _read_text(path: str) -> str | None:
     try:
@@ -39,6 +43,7 @@ def _file_nonempty(path: str, min_bytes: int = 1) -> bool:
 # ---------------------------------------------------------------------------
 # Per-assertion checks
 # ---------------------------------------------------------------------------
+
 
 def check_artifact_published(outputs_dir: str) -> tuple[bool | None, str]:
     report = os.path.join(outputs_dir, "report.html")
@@ -76,7 +81,10 @@ def check_workflow_count_found(outputs_dir: str) -> tuple[bool | None, str]:
     )
     rows = workflow_row_pattern.findall(report)
     if len(rows) >= 2:
-        return True, f"report.html contains {len(rows)} table rows (likely workflow entries)"
+        return (
+            True,
+            f"report.html contains {len(rows)} table rows (likely workflow entries)",
+        )
 
     return False, "Could not confirm 2+ workflows in workflows.json or report.html"
 
@@ -118,8 +126,8 @@ def check_ranked_opportunities(outputs_dir: str) -> tuple[bool | None, str]:
     if not report:
         return False, "report.html not found"
 
-    high = len(re.findall(r'sev-high', report, re.IGNORECASE))
-    med = len(re.findall(r'sev-med', report, re.IGNORECASE))
+    high = len(re.findall(r"sev-high", report, re.IGNORECASE))
+    med = len(re.findall(r"sev-med", report, re.IGNORECASE))
     total = high + med
     if total >= 2:
         return True, f"Found {high} sev-high and {med} sev-med badges in report.html"
@@ -128,15 +136,21 @@ def check_ranked_opportunities(outputs_dir: str) -> tuple[bool | None, str]:
 
     # Fallback: look for opportunity card patterns without the CSS class
     card_pattern = re.compile(
-        r'(?:opportunity|recommendation|suggestion)[^<]{0,300}?'
-        r'(?:high|medium|low|critical)[^<]{0,300}?(?:save|reduce|improve)',
+        r"(?:opportunity|recommendation|suggestion)[^<]{0,300}?"
+        r"(?:high|medium|low|critical)[^<]{0,300}?(?:save|reduce|improve)",
         re.IGNORECASE | re.DOTALL,
     )
     cards = card_pattern.findall(report)
     if len(cards) >= 2:
-        return True, f"Found {len(cards)} opportunity cards in report.html (no sev-* badges)"
+        return (
+            True,
+            f"Found {len(cards)} opportunity cards in report.html (no sev-* badges)",
+        )
 
-    return False, "Could not find 2+ ranked opportunity cards (sev-high/sev-med) in report.html"
+    return (
+        False,
+        "Could not find 2+ ranked opportunity cards (sev-high/sev-med) in report.html",
+    )
 
 
 def check_data_files_saved(outputs_dir: str) -> tuple[bool | None, str]:
@@ -171,7 +185,9 @@ PROGRAMMATIC_IDS = {
 }
 
 
-def grade_assertion(assertion_id: str, assertion_text: str, outputs_dir: str) -> dict:
+def grade_assertion(
+    assertion_id: str, assertion_text: str, outputs_dir: str
+) -> dict[str, Any]:
     """Return a grading dict for one assertion."""
     if assertion_id == "artifact_published":
         passed, evidence = check_artifact_published(outputs_dir)
@@ -194,6 +210,7 @@ def grade_assertion(assertion_id: str, assertion_text: str, outputs_dir: str) ->
 # ---------------------------------------------------------------------------
 # Main
 # ---------------------------------------------------------------------------
+
 
 def main() -> None:
     parser = argparse.ArgumentParser(

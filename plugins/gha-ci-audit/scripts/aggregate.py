@@ -21,15 +21,18 @@ Output:
     <iteration_dir>/benchmark.md
 """
 
+from __future__ import annotations
+
 import argparse
 import json
 import math
 import sys
 from datetime import datetime, timezone
 from pathlib import Path
+from typing import Any
 
 
-def stats(values: list[float]) -> dict:
+def stats(values: list[float]) -> dict[str, float]:
     if not values:
         return {"mean": 0.0, "stddev": 0.0, "min": 0.0, "max": 0.0}
     n = len(values)
@@ -43,7 +46,7 @@ def stats(values: list[float]) -> dict:
     }
 
 
-def load_run(run_dir: Path) -> dict | None:
+def load_run(run_dir: Path) -> dict[str, Any] | None:
     grading_path = run_dir / "grading.json"
     metadata_path = run_dir / "eval_metadata.json"
 
@@ -93,7 +96,9 @@ def load_run(run_dir: Path) -> dict | None:
         except json.JSONDecodeError:
             pass
     if result["time_seconds"] == 0.0:
-        result["time_seconds"] = grading.get("timing", {}).get("total_duration_seconds", 0.0)
+        result["time_seconds"] = grading.get("timing", {}).get(
+            "total_duration_seconds", 0.0
+        )
 
     # Notes from grading
     notes_summary = grading.get("user_notes_summary", {})
@@ -103,7 +108,7 @@ def load_run(run_dir: Path) -> dict | None:
     return result
 
 
-def load_all(iteration_dir: Path) -> list[dict]:
+def load_all(iteration_dir: Path) -> list[dict[str, Any]]:
     runs = []
     for eval_dir in sorted(iteration_dir.iterdir()):
         if not eval_dir.is_dir():
@@ -119,9 +124,15 @@ def load_all(iteration_dir: Path) -> list[dict]:
     return runs
 
 
-def aggregate(runs: list[dict]) -> dict:
+def aggregate(runs: list[dict[str, Any]]) -> dict[str, Any]:
     if not runs:
-        return {"with_skill": {"pass_rate": stats([]), "time_seconds": stats([]), "tokens": stats([])}}
+        return {
+            "with_skill": {
+                "pass_rate": stats([]),
+                "time_seconds": stats([]),
+                "tokens": stats([]),
+            }
+        }
     return {
         "with_skill": {
             "pass_rate": stats([r["pass_rate"] for r in runs]),
@@ -131,7 +142,9 @@ def aggregate(runs: list[dict]) -> dict:
     }
 
 
-def generate_benchmark(runs: list[dict], skill_name: str, skill_path: str) -> dict:
+def generate_benchmark(
+    runs: list[dict[str, Any]], skill_name: str, skill_path: str
+) -> dict[str, Any]:
     run_summary = aggregate(runs)
     eval_ids = sorted(set(r["eval_id"] for r in runs))
 
@@ -143,7 +156,9 @@ def generate_benchmark(runs: list[dict], skill_name: str, skill_path: str) -> di
             "analyzer_model": "claude-sonnet-4-6",
             "timestamp": datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ"),
             "evals_run": eval_ids,
-            "runs_per_configuration": len([r for r in runs if r["configuration"] == "with_skill"]),
+            "runs_per_configuration": len(
+                [r for r in runs if r["configuration"] == "with_skill"]
+            ),
         },
         "runs": [
             {
@@ -171,17 +186,17 @@ def generate_benchmark(runs: list[dict], skill_name: str, skill_path: str) -> di
     }
 
 
-def generate_markdown(benchmark: dict) -> str:
+def generate_markdown(benchmark: dict[str, Any]) -> str:
     meta = benchmark["metadata"]
     rs = benchmark["run_summary"]
 
     ws = rs.get("with_skill", {})
 
-    def fmt(d: dict, key: str, pct: bool = False) -> str:
+    def fmt(d: dict[str, Any], key: str, pct: bool = False) -> str:
         v = d.get(key, {})
         m, s = v.get("mean", 0), v.get("stddev", 0)
         if pct:
-            return f"{m*100:.0f}% ± {s*100:.0f}%"
+            return f"{m * 100:.0f}% ± {s * 100:.0f}%"
         return f"{m:.1f} ± {s:.1f}"
 
     lines = [
@@ -206,7 +221,7 @@ def generate_markdown(benchmark: dict) -> str:
         r = run["result"]
         lines.append(
             f"- **{run['eval_name']}** ({run['configuration']}): "
-            f"{r['pass_rate']*100:.0f}% ({r['passed']}/{r['total']}) "
+            f"{r['pass_rate'] * 100:.0f}% ({r['passed']}/{r['total']}) "
             f"— {r['time_seconds']:.0f}s"
         )
 
@@ -218,8 +233,10 @@ def generate_markdown(benchmark: dict) -> str:
     return "\n".join(lines)
 
 
-def main():
-    parser = argparse.ArgumentParser(description="Aggregate gha-ci-audit eval results into benchmark.json")
+def main() -> None:
+    parser = argparse.ArgumentParser(
+        description="Aggregate gha-ci-audit eval results into benchmark.json"
+    )
     parser.add_argument("iteration_dir", type=Path)
     parser.add_argument("--skill-name", default="gha-ci-audit")
     parser.add_argument("--skill-path", default="skills/gha-ci-audit")
@@ -248,7 +265,7 @@ def main():
 
     rs = benchmark["run_summary"]
     ws_pr = rs.get("with_skill", {}).get("pass_rate", {}).get("mean", 0)
-    print(f"\nPass rate: {ws_pr*100:.1f}%")
+    print(f"\nPass rate: {ws_pr * 100:.1f}%")
 
 
 if __name__ == "__main__":
