@@ -1,8 +1,8 @@
 {
   "$schema": "https://json.schemastore.org/claude-code-plugin-manifest.json",
-  "name": "pr-visual-capture",
-  "version": "2.0.0",
-  "description": "Deprecated: working wrapper shim that sequences the screen-capture plugin's capture/compare/attach skills for PR/issue visual verification. See plugins/screen-capture.",
+  "name": "screen-capture",
+  "version": "0.1.0",
+  "description": "Canonical replacement for pr-visual-capture: screenshot, video, comparison, and Lighthouse capture skills for PR/issue visual verification. Scaffold only; skills land in follow-up issues.",
   "author": {
     "name": "Dustin Fadler",
     "url": "https://github.com/dfadler"
