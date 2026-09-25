@@ -224,6 +224,9 @@ exclude_reason() {
 # and that teardown.sh strips back out — single source of truth.
 # shellcheck source=scripts/claude-md-lib.sh
 source "$REPO_ROOT/scripts/claude-md-lib.sh"
+# Helpers for adding/removing hook entries in ~/.claude/settings.json.
+# shellcheck source=scripts/settings-lib.sh
+source "$REPO_ROOT/scripts/settings-lib.sh"
 
 # Every directory under plugins/ that carries a .claude-plugin/plugin.json is a
 # plugin this repo ships (currently dfadler-agent-config and accessibility-skills)
@@ -513,6 +516,25 @@ mkdir -p "$HOME/.claude/skills"
 for i in "${!PLUGIN_SRCS[@]}"; do
   link "${PLUGIN_SRCS[$i]}" "${PLUGIN_LINKS[$i]}"
 done
+
+# Register plugin hooks in ~/.claude/settings.json.
+#
+# Claude Code does not auto-invoke hooks from a skills-dir plugin's hooks.json;
+# the PreToolUse hook that enforces worktree usage must be registered explicitly
+# in the global settings so it fires on every Edit/Write tool call.  The hook
+# script itself is off-by-default (reads worktree.enforce from the project's own
+# .claude/settings.json), so registering it globally is safe for projects that
+# haven't opted in — it simply exits 0 without doing anything in those repos.
+#
+# When worktree-core is excluded via --skip/--include, deregister the hook to
+# keep settings.json in sync with the installed plugin set.
+GLOBAL_SETTINGS="$HOME/.claude/settings.json"
+WORKTREE_HOOK_CMD="$HOME/.claude/skills/worktree-core/skills/git-worktree-usage/scripts/require-worktree-hook.sh"
+if ! is_skipped "worktree-core"; then
+  ensure_hook_registered "PreToolUse" "Edit|Write" "$WORKTREE_HOOK_CMD" "$GLOBAL_SETTINGS"
+else
+  ensure_hook_deregistered "PreToolUse" "$WORKTREE_HOOK_CMD" "$GLOBAL_SETTINGS"
+fi
 
 # Last, so the linking work is already done and reported when these speak up.
 # Advisory checks (git identity, pyte, companion plugins/tools, Aikido Safe
