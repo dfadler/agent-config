@@ -73,6 +73,27 @@ session-level overrides).
 WORKTREE_ENFORCE=block claude   # enforce worktree usage for this session only
 ```
 
+## `dfadler-agent-config` and `worktree-core`: identical hooks, mutually exclusive plugins
+
+`plugins/worktree-core/` is a minimal, standalone plugin that ships exactly the
+git-worktree-usage skill plus these same three hooks — no other skills or agents. Its
+`hooks/hooks.json` is byte-for-byte identical to `dfadler-agent-config`'s, using the
+same `${CLAUDE_PLUGIN_ROOT}` relative path to the same hook scripts (copied into each
+plugin's own tree).
+
+**These two plugins are meant to be mutually exclusive.** Install `worktree-core` when
+you want only the worktree skill and hooks without the rest of `dfadler-agent-config`'s
+PR/review surface. Install `dfadler-agent-config` when you want the full plugin, which
+bundles worktree hooks as a convenience. Do not enable both on the same machine.
+
+If both are enabled, all three hooks fire **twice** per event — once from
+`dfadler-agent-config`'s registration and once from `worktree-core`'s. For the two
+`SessionStart` hooks that is annoying (doubled advisory output) but not dangerous; for
+`require-worktree-hook.sh` (`PreToolUse`, blocking) it means two independent block
+decisions running in series, which is functionally equivalent to one but wasteful and
+confusing. Nothing in `setup.sh` currently enforces the exclusion — skipping one plugin
+is the user's responsibility via `--skip`.
+
 ## Guidance for authors of other plugins
 
 If your plugin ships hooks for `PreToolUse` (Edit/Write) or `SessionStart`,
