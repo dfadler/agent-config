@@ -26,7 +26,7 @@ Collect workflow run data from the GitHub API, find patterns that cost time or m
 > - `scripts/analyze_jobs.py` — critical path, billable minutes, top jobs, optional step breakdown
 > - `scripts/fetch_workflow_stats.sh` — counts + avg/p90 for multiple workflow IDs in one pass
 > - `scripts/find_p50_run.py` — print the run ID of the successful run closest to median duration (use before analyze_jobs.py)
-> - `scripts/check_failures.py` — detect chronic failure patterns; exits 1 if failure rate >40% or streak ≥5 (use in Step 6 pre-check)
+> - `scripts/check_failures.py` — detect chronic failure patterns; writes `failure_check.json` (`chronic`/`failure_rate`/`details`) via `--output` (use in Step 6 pre-check)
 > - `scripts/write_collect_summary.py` — write collect_summary.json from CLI args (use in collector Step 8; never build this JSON inline)
 > - `scripts/write_assertions.py` — populate assertions from evals.json into eval_metadata.json (use in orchestrator Step 2; never use a heredoc or inline Python for this)
 > - `scripts/compute_workflow_timing.py` — read workflow runs JSON from stdin, output avg and p90 duration in minutes (used internally by fetch_workflow_stats.sh)
@@ -136,14 +136,15 @@ Work through each pattern. Compute a rough magnitude estimate for each so you ca
 
 ### Pre-check: Persistent failure signal
 
-Run `check_failures.py` against the primary workflow's saved runs file — **do not count failures manually**:
+The collector already ran `check_failures.py` and wrote `outputs/failure_check.json` — **do not count failures manually, and do not re-run the script**. Read the JSON file:
 
-```bash
-python3 /path/to/scripts/check_failures.py outputs/runs.json
-# Exit code 1 = chronic failure detected; 0 = healthy
+```python
+import json
+signal = json.load(open("outputs/failure_check.json"))
+# {"chronic": bool, "failure_rate": float, "details": "..."}
 ```
 
-If it exits 1 (failure rate >40% OR streak ≥5), surface this as an `alert-banner` above the ranked opportunities in the report. The banner should state the workflow name, the failure rate or streak length, and the earliest failing run timestamp from the script output. This is separate from opportunity card #1 (which still appears in the ranked list) — the banner is a prominent heads-up that CI may be broken right now, not just expensive.
+If `chronic` is `true` (failure rate >40% OR streak ≥5), surface this as an `alert-banner` above the ranked opportunities in the report. The banner should state the workflow name, the failure rate or streak length, and the earliest failing run timestamp from the script output. This is separate from opportunity card #1 (which still appears in the ranked list) — the banner is a prominent heads-up that CI may be broken right now, not just expensive.
 
 Also check whether **multiple workflows show simultaneous failures** — the same timestamp window appearing across two or more workflows' recent failures. If so, note it in the caveats or as a finding: correlated multi-workflow failures often indicate an infrastructure event (runner quota, dependency outage, upstream service failure) rather than a code problem. Include the run IDs and timestamps as evidence.
 
