@@ -86,7 +86,11 @@ case "$script" in
     echo "99001 5.2 2024-01-01T10:00:00Z"
     ;;
   check_failures.py)
+    # $2=runs.json  $3=--output  $4=output path
     echo "no chronic failures"
+    if [[ "${3:-}" == "--output" ]]; then
+      printf '{"chronic": false, "failure_rate": 0.0, "details": "no chronic failures"}\n' > "${4:-/dev/null}"
+    fi
     ;;
   write_collect_summary.py)
     # Named flags now (e.g. --outputs-dir <dir> --repo <repo> ...); find the
@@ -148,7 +152,7 @@ collect() {
   [ -f "$OUTPUT_DIR/runs.json"             ]
   [ -f "$OUTPUT_DIR/p50_run.txt"           ]
   [ -f "$OUTPUT_DIR/jobs.json"             ]
-  [ -f "$OUTPUT_DIR/failure_check.txt"     ]
+  [ -f "$OUTPUT_DIR/failure_check.json"    ]
   [ -f "$OUTPUT_DIR/workflow_stats.txt"    ]
   [ -f "$OUTPUT_DIR/collect_summary.json"  ]
   [ -f "$OUTPUT_DIR/collect_timing.json"   ]
