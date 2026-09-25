@@ -38,9 +38,10 @@ for wf_id in "${WORKFLOW_IDS[@]}"; do
 
   # Timing stats from last 100 completed runs
   SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-  timing=$(gh api "repos/${REPO}/actions/workflows/${wf_id}/runs?per_page=100" \
-    --jq '[.workflow_runs[] | select(.conclusion != null) | {s: .run_started_at, e: .updated_at}]' \
-    2>/dev/null | python3 "${SCRIPT_DIR}/compute_workflow_timing.py"
+  timing=$(
+    gh api "repos/${REPO}/actions/workflows/${wf_id}/runs?per_page=100" \
+      --jq '[.workflow_runs[] | select(.conclusion != null) | {s: .run_started_at, e: .updated_at}]' \
+      2>/dev/null | python3 "${SCRIPT_DIR}/compute_workflow_timing.py"
   )
 
   avg_min=$(echo "$timing" | awk '{print $1}')

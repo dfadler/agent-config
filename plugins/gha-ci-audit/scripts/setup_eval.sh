@@ -25,7 +25,7 @@ PROMPT="$4"
 
 DIR="$ITERATION_DIR/$EVAL_NAME/with_skill"
 mkdir -p "$DIR/outputs"
-cat > "$DIR/eval_metadata.json" <<EOF
+cat >"$DIR/eval_metadata.json" <<EOF
 {
   "eval_id": $EVAL_ID,
   "eval_name": "$EVAL_NAME",

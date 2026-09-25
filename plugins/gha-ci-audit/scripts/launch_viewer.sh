@@ -30,10 +30,22 @@ PORT=3117
 
 while [[ $# -gt 0 ]]; do
   case "$1" in
-    --previous) PREVIOUS_DIR="$2"; shift 2 ;;
-    --port)     PORT="$2"; shift 2 ;;
-    --*)        echo "Unknown flag: $1" >&2; exit 1 ;;
-    *)          ITERATION_DIR="$1"; shift ;;
+    --previous)
+      PREVIOUS_DIR="$2"
+      shift 2
+      ;;
+    --port)
+      PORT="$2"
+      shift 2
+      ;;
+    --*)
+      echo "Unknown flag: $1" >&2
+      exit 1
+      ;;
+    *)
+      ITERATION_DIR="$1"
+      shift
+      ;;
   esac
 done
 
@@ -71,9 +83,9 @@ fi
 PID_FILE="$ITERATION_DIR/.viewer.pid"
 LOG_FILE="$ITERATION_DIR/.viewer.log"
 
-nohup "${VIEWER_CMD[@]}" > "$LOG_FILE" 2>&1 &
+nohup "${VIEWER_CMD[@]}" >"$LOG_FILE" 2>&1 &
 VIEWER_PID=$!
-echo "$VIEWER_PID" > "$PID_FILE"
+echo "$VIEWER_PID" >"$PID_FILE"
 
 # Wait briefly and verify it started
 sleep 1
