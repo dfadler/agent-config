@@ -335,8 +335,8 @@ in any consuming repo is not observable from here.
 ## Ranked optimization opportunities
 
 Ordered by (estimated effort to ship) vs. (plausible savings), highest
-leverage first. None of these are applied in this PR — see the task
-constraints; they're recommendations only.
+leverage first. Items marked **Done** were completed after the original audit;
+remaining items are open recommendations.
 
 1. ~~**Trim `claude/CLAUDE.md` toward the 200-line guideline; move the two
    TypeScript sections into a TS-specific skill.**~~ **Done.** `claude/CLAUDE.md`

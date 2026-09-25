@@ -9,8 +9,8 @@ producing collisions or conflicting behavior.
 Every hook in this plugin is **additive, not exclusive**. A hook does its
 specific job and exits; it never assumes it is the only hook registered for
 that event, and it never tries to suppress or shortcut hooks from other
-plugins. Claude Code runs all registered hooks for an event in series — that
-is the composition model, and each hook is responsible only for its own
+plugins. Claude Code runs all matching hooks for an event **in parallel** and merges
+their results after they finish. Each hook is responsible only for its own
 domain.
 
 ## Off by default: opt-in protocol
@@ -88,10 +88,12 @@ bundles worktree hooks as a convenience. Do not enable both on the same machine.
 
 If both are enabled, all three hooks fire **twice** per event — once from
 `dfadler-agent-config`'s registration and once from `worktree-core`'s. For the two
-`SessionStart` hooks that is annoying (doubled advisory output) but not dangerous; for
-`require-worktree-hook.sh` (`PreToolUse`, blocking) it means two independent block
-decisions running in series, which is functionally equivalent to one but wasteful and
-confusing. Nothing in `setup.sh` currently enforces the exclusion — skipping one plugin
+`SessionStart` hooks, when `worktree.autoPrune` is enabled, duplicate execution means
+each hook can attempt to remove merged worktrees and branches — that is state-changing,
+not just doubled advisory output. For `require-worktree-hook.sh` (`PreToolUse`,
+blocking) Claude Code runs both handlers in parallel and merges their results: a block
+from either takes precedence, so the effect is the same as one handler, but it's
+wasteful. Nothing in `setup.sh` currently enforces the exclusion — skipping one plugin
 is the user's responsibility via `--skip`.
 
 ## Guidance for authors of other plugins
