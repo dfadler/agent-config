@@ -143,6 +143,9 @@ copy of something is a deliberate fork rather than drift to reconcile.
   the `allowed-tools` decision, `make check`, and GitHub operations via `gh`.
 - [`docs/scope.md`](docs/scope.md) — what belongs in this repo vs. a project's own
   `.claude/`.
+- [`docs/steering-mechanisms.md`](docs/steering-mechanisms.md) — when to use a
+  convention, skill, hook, subagent, or path-scoped rule here, and why output
+  styles and `--append-system-prompt` aren't used.
 - [`docs/hook-composition.md`](docs/hook-composition.md) — how this plugin's hooks
   compose with hooks from other plugins.
 - [`docs/prompt-injection-defense.md`](docs/prompt-injection-defense.md) — the
