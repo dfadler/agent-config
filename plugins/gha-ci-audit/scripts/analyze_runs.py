@@ -19,14 +19,9 @@ import argparse
 import json
 import statistics
 import sys
-from datetime import datetime
 from typing import Any
 
-
-def parse_dt(s: str | None) -> datetime | None:
-    if not s:
-        return None
-    return datetime.fromisoformat(s.replace("Z", "+00:00"))
+from utils import duration_minutes, parse_dt
 
 
 def duration_min(r: dict[str, Any]) -> float | None:
@@ -35,7 +30,7 @@ def duration_min(r: dict[str, Any]) -> float | None:
     e = parse_dt(r.get("updated_at") or r.get("e"))
     if not s or not e:
         return None
-    d = (e - s).total_seconds() / 60
+    d = duration_minutes(s, e)
     return d if d >= 0 else None
 
 
