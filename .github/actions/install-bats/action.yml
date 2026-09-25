@@ -1,0 +1,28 @@
+name: Install bats
+description: >
+  Clones bats-core at a pinned commit and installs it to /usr/local.
+
+# sh-test-sh.yml and sh-coverage.yml both need bats (sh-test-sh.yml to run
+# the suite, sh-coverage.yml to re-run it under kcov) and both pinned it to
+# the same commit. That was a byte-for-byte duplicated block in two workflow
+# files (see #304), so it's factored out here: one version/commit pin
+# instead of two copies that can drift apart on the next bump.
+#
+# Pinned by commit rather than tag: a tag can be repointed at different code
+# without the workflow file changing at all.
+
+runs:
+  using: composite
+  steps:
+    - name: Install bats ${{ env.BATS_VERSION }}
+      shell: bash
+      env:
+        BATS_VERSION: v1.11.1
+        BATS_COMMIT: b640ec3cf2c7c9cfc9e6351479261186f76eeec8
+      run: |
+        git clone --filter=blob:none --no-checkout \
+          https://github.com/bats-core/bats-core.git /tmp/bats-core
+        git -C /tmp/bats-core checkout --detach "$BATS_COMMIT"
+        sudo /tmp/bats-core/install.sh /usr/local
+        rm -rf /tmp/bats-core
+        bats --version
