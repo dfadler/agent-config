@@ -14,8 +14,8 @@ env:
   SHFMT_SHA256: fb096c5d1ac6beabbdbaa2874d025badb03ee07929f0c9ff67563ce8c75398b1
 
 jobs:
-  shfmt:
-    name: shfmt
+  run:
+    name: run
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1

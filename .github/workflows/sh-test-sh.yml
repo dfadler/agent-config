@@ -12,8 +12,8 @@ env:
   BATS_COMMIT: b640ec3cf2c7c9cfc9e6351479261186f76eeec8
 
 jobs:
-  test-sh:
-    name: test-sh
+  run:
+    name: run
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
