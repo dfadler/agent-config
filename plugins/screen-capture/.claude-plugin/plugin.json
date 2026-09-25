@@ -1,0 +1,12 @@
+{
+  "$schema": "https://json.schemastore.org/claude-code-plugin-manifest.json",
+  "name": "screen-capture",
+  "version": "0.1.0",
+  "description": "Generic page-capture primitive: screenshot or walkthrough video of a URL via Playwright (primary) or Chrome+CDP (config-driven fallback), config-resolved from second-brain:config / settings.json / env.",
+  "author": {
+    "name": "Dustin Fadler",
+    "url": "https://github.com/dfadler"
+  },
+  "homepage": "https://github.com/dfadler/agent-config",
+  "repository": "https://github.com/dfadler/agent-config"
+}
