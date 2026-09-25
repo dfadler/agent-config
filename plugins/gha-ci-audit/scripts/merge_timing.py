@@ -19,9 +19,12 @@ Fields in timing.json:
     render_end_iso            str or null
 """
 
+from __future__ import annotations
+
 import json
 import sys
 from pathlib import Path
+from typing import Any
 
 
 def main() -> None:
@@ -43,8 +46,12 @@ def main() -> None:
         )
         sys.exit(1)
 
-    collect_timing = json.loads(collect_path.read_text()) if collect_path.exists() else None
-    render_timing = json.loads(render_path.read_text()) if render_path.exists() else None
+    collect_timing = (
+        json.loads(collect_path.read_text()) if collect_path.exists() else None
+    )
+    render_timing = (
+        json.loads(render_path.read_text()) if render_path.exists() else None
+    )
 
     collect_dur = collect_timing["duration_seconds"] if collect_timing else None
     render_dur = render_timing["duration_seconds"] if render_timing else None
@@ -58,11 +65,13 @@ def main() -> None:
     else:
         total_dur = None
 
-    timing: dict = {
+    timing: dict[str, Any] = {
         "collect_duration_seconds": collect_dur,
         "render_duration_seconds": render_dur,
         "total_duration_seconds": total_dur,
-        "collect_start_iso": collect_timing.get("start_iso") if collect_timing else None,
+        "collect_start_iso": collect_timing.get("start_iso")
+        if collect_timing
+        else None,
         "collect_end_iso": collect_timing.get("end_iso") if collect_timing else None,
         "render_start_iso": render_timing.get("start_iso") if render_timing else None,
         "render_end_iso": render_timing.get("end_iso") if render_timing else None,

@@ -38,10 +38,12 @@ def main() -> None:
     if mode == "--start":
         now = datetime.now(timezone.utc)
         marker.write_text(
-            json.dumps({
-                "epoch": int(now.timestamp()),
-                "iso": now.strftime("%Y-%m-%dT%H:%M:%SZ"),
-            })
+            json.dumps(
+                {
+                    "epoch": int(now.timestamp()),
+                    "iso": now.strftime("%Y-%m-%dT%H:%M:%SZ"),
+                }
+            )
         )
         print(f"Render timing started at {now.strftime('%Y-%m-%dT%H:%M:%SZ')}")
         return
