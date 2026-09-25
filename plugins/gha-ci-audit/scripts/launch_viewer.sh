@@ -14,9 +14,6 @@
 
 set -euo pipefail
 
-SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-PLUGIN_DIR="$(dirname "$SCRIPT_DIR")"
-
 # Find the skill-creator's eval-viewer script
 SKILL_CREATOR_DIR="${HOME}/Library/Application Support/Claude/local-agent-mode-sessions/skills-plugin"
 VIEWER_SCRIPT="$(find "$SKILL_CREATOR_DIR" -name "generate_review.py" -maxdepth 8 2>/dev/null | head -1)"
