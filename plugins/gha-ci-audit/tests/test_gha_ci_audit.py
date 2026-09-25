@@ -919,9 +919,7 @@ class TestWriteAssertions:
         iter_dir.mkdir()
 
         evals_json = tmp_path / "evals.json"
-        evals_json.write_text(
-            json.dumps({"evals": [{"id": 1, "assertions": []}]})
-        )
+        evals_json.write_text(json.dumps({"evals": [{"id": 1, "assertions": []}]}))
 
         with patch.object(
             sys, "argv", ["write_assertions.py", str(iter_dir), str(evals_json)]
