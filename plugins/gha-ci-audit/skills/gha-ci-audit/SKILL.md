@@ -10,7 +10,7 @@ Collect workflow run data from the GitHub API, find patterns that cost time or m
 
 > **For eval orchestrators**: The canonical eval workflow, grader/analyzer agent instructions, and reusable scripts live alongside this skill:
 > - `agents/orchestrator.md` — **run a full iteration in one agent call** (setup → collect → render → grade → aggregate → viewer → propose improvements). Start here.
-> - `references/eval-workflow.md` — step-by-step manual workflow (use if orchestrator is unavailable)
+> - `references/eval-workflow.md` — conceptual overview of the phases (use if orchestrator is unavailable)
 > - `agents/collector.md` — fetch raw GitHub API data for one eval (runs.json, jobs.json, workflow stats)
 > - `agents/renderer.md` — produce report.html from already-collected data files (no API calls)
 > - `agents/grader.md` — how to grade report.html outputs against assertions
