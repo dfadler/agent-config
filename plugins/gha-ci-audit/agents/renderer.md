@@ -1,3 +1,8 @@
+---
+name: renderer
+description: >-
+  Produces report.html from already-collected outputs/ data files with no GitHub API calls.
+---
 # Renderer Agent — gha-ci-audit
 
 Produce `report.html` from already-collected data files. Reads `outputs/` only — no GitHub API calls.

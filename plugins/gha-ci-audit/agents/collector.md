@@ -1,3 +1,8 @@
+---
+name: collector
+description: >-
+  Fetches raw GitHub Actions data for one eval run, writing data files to outputs/ only.
+---
 # Collector Agent — gha-ci-audit
 
 Fetch all raw GitHub Actions data for one eval. Produces data files in `outputs/` only — no report, no analysis prose.

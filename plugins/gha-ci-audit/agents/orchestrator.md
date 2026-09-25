@@ -1,3 +1,8 @@
+---
+name: orchestrator
+description: >-
+  Runs a complete gha-ci-audit eval iteration end-to-end: setup, eval agents, grade, aggregate, viewer.
+---
 # Orchestrator Agent — gha-ci-audit
 
 Run a complete eval iteration end-to-end: setup → eval agents → grade → aggregate → viewer.
