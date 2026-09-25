@@ -14,31 +14,49 @@ You review the report.html output and the agent's transcript, then determine whe
 
 ## Process
 
-### Step 1: Read the report
+### Step 1: Run the programmatic pre-grader
 
-Open `{outputs_dir}/report.html`. This is the primary output. Assess:
-- Was an HTML file actually produced (not just described in prose)?
-- Does it contain real GitHub Actions data or placeholder/fabricated content?
-- Which workflows, job names, durations, and counts are present?
+Before reading the report with AI, run:
 
-### Step 2: Check for a transcript
+```
+python3 scripts/grade.py --output-dir {outputs_dir} --grading-out {grading_path}
+```
+
+where `{grading_path}` is your intended output path (e.g. `{outputs_dir}/../grading.json`).
+
+This writes a `grading.json` with:
+- Assertions that can be checked mechanically: `passed` is `true` or `false`
+- Assertions that require language understanding: `passed` is `null`, `evidence` is `"requires_ai_grader"`
+
+Read the resulting `grading.json`. Only the assertions with `passed == null` need AI evaluation.
+
+### Step 2: Read the report (for AI-required assertions only)
+
+Open `{outputs_dir}/report.html`. Focus on what the null-passed assertions need:
+- Was the data real (not fabricated placeholders)?
+- Are job names and workflow names specific to the target repo?
+- Is there a named critical path job with a plausible duration estimate?
+- Does at least one opportunity include a quantified time or run-count estimate?
+
+### Step 3: Check for a transcript
 
 If `{outputs_dir}/../transcript.md` exists, read it. Note:
 - How the agent collected data (which `gh api` calls it made)
 - Whether it hit API errors or rate limits and how it recovered
 - Whether it fabricated data when the API returned nothing useful
 
-### Step 3: Evaluate each assertion
+### Step 4: Evaluate AI-required assertions
 
-For each assertion in the eval:
+For each assertion in `grading.json` where `passed == null`:
 
 1. Search for **concrete evidence** in the report content and transcript
 2. Verdict rules:
    - **PASS**: Clear evidence the assertion is satisfied AND the evidence reflects genuine task completion (e.g., a workflow name that appears in GH API responses, not just "CI" as a placeholder)
    - **FAIL**: No evidence, contradicting evidence, or the assertion is only superficially satisfied (correct filename but wrong/empty content)
 3. Cite the specific text or observation that supports your verdict
+4. Update that assertion entry: set `passed` to `true` or `false` and replace `evidence` with your citation
 
-### Step 4: Extract and verify implicit claims
+### Step 5: Extract and verify implicit claims
 
 Beyond the formal assertions, extract claims the report makes and spot-check them:
 - "29% failure rate" — is this plausible given the repo size?
@@ -47,46 +65,32 @@ Beyond the formal assertions, extract claims the report makes and spot-check the
 
 Flag any claims that appear fabricated or arithmetically inconsistent.
 
-### Step 5: Critique the assertions
+### Step 6: Critique the assertions
 
 After grading, note whether any assertion is too easy (would pass for a clearly wrong output) or whether an important outcome has no assertion. Only flag genuine gaps — the bar is "the eval author would say good catch."
 
 Common gaps to watch for in CI audit evals:
-- No assertion verifies the data is real (not fabricated) 
+- No assertion verifies the data is real (not fabricated)
 - No assertion checks whether the design system was followed (font, color tokens, layout)
 - Opportunity cards mention specific job names that match actual workflows
 
-### Step 6: Write grading.json
+### Step 7: Write the final grading.json
 
-Save to `{outputs_dir}/../grading.json`:
+Merge your AI verdicts into the `grading.json` the pre-grader wrote. Recalculate `overall_passed` as `true` only when every assertion has `passed == true`. Update `summary` to a human-readable sentence.
+
+Final structure (field names are fixed — the viewer depends on them):
 
 ```json
 {
-  "expectations": [
+  "assertions": [
     {
       "text": "At least 2 distinct workflows identified by name",
       "passed": true,
       "evidence": "Report lists 'CI' and 'Deploy Preview' workflows in the workflow table"
     }
   ],
-  "summary": {
-    "passed": 4,
-    "failed": 2,
-    "total": 6,
-    "pass_rate": 0.67
-  },
-  "claims": [
-    {
-      "claim": "29% failure rate",
-      "type": "factual",
-      "verified": true,
-      "evidence": "KPI tile shows 71% success rate, consistent with 29% failure"
-    }
-  ],
-  "eval_feedback": {
-    "suggestions": [],
-    "overall": "No suggestions, evals look solid"
-  }
+  "overall_passed": true,
+  "summary": "4 of 6 assertions passed. Critical path assertion failed: no job named with a duration."
 }
 ```
 
@@ -100,4 +104,4 @@ Save to `{outputs_dir}/../grading.json`:
 
 **Ranked opportunities**: At least two cards with severity labels AND estimated impact (time saved, cost reduction, or failure rate improvement) — not just a list of suggestions.
 
-**When uncertain**: The burden of proof to pass is on the expectation. If you cannot find clear evidence, FAIL.
+**When uncertain**: The burden of proof to pass is on the assertion. If you cannot find clear evidence, FAIL.
