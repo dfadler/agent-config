@@ -3,7 +3,7 @@
 Claude Code auto-loads any directory under `~/.claude/skills/` that carries a
 `.claude-plugin/plugin.json`, as `<name>@skills-dir` — no marketplace and no install
 step. It follows symlinks, so `setup.sh` links each directory under `plugins/` that
-contains a valid `plugin.json` into `~/.claude/skills/<name>`, and the plugin loads
+contains a `plugin.json` file into `~/.claude/skills/<name>`, and the plugin loads
 straight out of this working copy. Edits here are live in the next session; there's
 nothing to commit, push, or update first.
 

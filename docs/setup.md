@@ -14,7 +14,7 @@ git clone git@github.com:dfadler/agent-config.git ~/Development/agent-config
 `setup.sh` generates `~/.claude/CLAUDE.md`'s managed section (`@include`-ing
 `claude/CLAUDE.md` plus the default set from `claude/conventions/DEFAULT_ENABLED`),
 symlinks the contents of `claude/commands/`, and links each directory under `plugins/`
-that contains a valid `.claude-plugin/plugin.json` into `~/.claude/skills/<name>` in
+that contains a `.claude-plugin/plugin.json` file into `~/.claude/skills/<name>` in
 one pass. It's idempotent — re-run it any time after pulling to pick up new entries.
 It only takes over a target this repo already owns, or a symlink that's already broken;
 a real file, or a live symlink pointing anywhere else, is reported and left alone. That
