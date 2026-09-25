@@ -32,6 +32,7 @@ setup() {
     > "$FAKE_REPO/plugins/dfadler-agent-config/.claude-plugin/plugin.json"
   mkdir -p "$FAKE_REPO/scripts"
   cp "$REPO_ROOT/scripts/claude-md-lib.sh" "$FAKE_REPO/scripts/claude-md-lib.sh"
+  cp "$REPO_ROOT/scripts/settings-lib.sh" "$FAKE_REPO/scripts/settings-lib.sh"
   cp "$REPO_ROOT/scripts/offer-safe-chain-permission.sh" \
     "$FAKE_REPO/scripts/offer-safe-chain-permission.sh"
   chmod +x "$FAKE_REPO/scripts/offer-safe-chain-permission.sh"
@@ -470,4 +471,65 @@ run_setup_with() {
   run_setup
   assert_success
   [ "$(readlink "$HOME/.claude/skills/dfadler-agent-config")" = "$FAKE_REPO/plugins/dfadler-agent-config" ]
+}
+
+# ---------------------------------------------------------------------------
+# Hook registration in ~/.claude/settings.json
+# ---------------------------------------------------------------------------
+
+_add_worktree_core_fixture() {
+  mkdir -p "$FAKE_REPO/plugins/worktree-core/.claude-plugin"
+  printf '{"name":"worktree-core","version":"0.1.0","description":"fixture"}\n' \
+    >"$FAKE_REPO/plugins/worktree-core/.claude-plugin/plugin.json"
+  mkdir -p "$FAKE_REPO/plugins/worktree-core/skills/git-worktree-usage/scripts"
+  printf '#!/usr/bin/env bash\nexit 0\n' \
+    >"$FAKE_REPO/plugins/worktree-core/skills/git-worktree-usage/scripts/require-worktree-hook.sh"
+  chmod +x "$FAKE_REPO/plugins/worktree-core/skills/git-worktree-usage/scripts/require-worktree-hook.sh"
+}
+
+@test "hook registration: worktree-core installs PreToolUse hook in settings.json" {
+  _add_worktree_core_fixture
+  run_setup
+  assert_success
+  HOOK_CMD="$HOME/.claude/skills/worktree-core/skills/git-worktree-usage/scripts/require-worktree-hook.sh"
+  run python3 -c "
+import json, sys
+d = json.load(open('$HOME/.claude/settings.json'))
+cmds = [h['command'] for e in d.get('hooks', {}).get('PreToolUse', []) for h in e.get('hooks', [])]
+sys.exit(0 if '$HOOK_CMD' in cmds else 1)
+"
+  [ "$status" -eq 0 ]
+}
+
+@test "hook registration: idempotent on re-run (no duplicate entry)" {
+  _add_worktree_core_fixture
+  run_setup
+  assert_success
+  run_setup
+  assert_success
+  HOOK_CMD="$HOME/.claude/skills/worktree-core/skills/git-worktree-usage/scripts/require-worktree-hook.sh"
+  run python3 -c "
+import json
+d = json.load(open('$HOME/.claude/settings.json'))
+cmds = [h['command'] for e in d.get('hooks', {}).get('PreToolUse', []) for h in e.get('hooks', [])]
+count = cmds.count('$HOOK_CMD')
+assert count == 1, 'expected 1, got {}'.format(count)
+"
+  [ "$status" -eq 0 ]
+}
+
+@test "hook registration: --skip=worktree-core deregisters the hook" {
+  _add_worktree_core_fixture
+  run_setup
+  assert_success
+  run_setup_with --skip=worktree-core
+  assert_success
+  HOOK_CMD="$HOME/.claude/skills/worktree-core/skills/git-worktree-usage/scripts/require-worktree-hook.sh"
+  run python3 -c "
+import json
+d = json.load(open('$HOME/.claude/settings.json'))
+cmds = [h['command'] for e in d.get('hooks', {}).get('PreToolUse', []) for h in e.get('hooks', [])]
+assert '$HOOK_CMD' not in cmds, 'hook still present after skip'
+"
+  [ "$status" -eq 0 ]
 }
