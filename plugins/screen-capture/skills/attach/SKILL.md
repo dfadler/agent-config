@@ -65,7 +65,7 @@ or silently no-op.
 
    | Before | After |
    | --- | --- |
-   | ![before](<before-url>) | ![after](<after-url>) |
+   | `![before](<before-url>)` | `![after](<after-url>)` |
 
    <caption text>
 
