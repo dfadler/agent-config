@@ -1,5 +1,5 @@
 ---
-name: vite:dev-workflow
+name: dev-workflow
 description: |
   Dev workflow for working on a Vite plugin package: running tests, watch mode,
   coverage, type checking, and local linking. Use when setting up a development

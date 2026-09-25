@@ -1,5 +1,5 @@
 ---
-name: vite:test
+name: test
 description: |
   Generate a Vitest test file for a Vite plugin. Covers all three hook patterns:
   transform (call the hook directly), generateBundle (fake bundle object), and

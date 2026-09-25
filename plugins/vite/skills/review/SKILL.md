@@ -1,5 +1,5 @@
 ---
-name: vite:review
+name: review
 description: |
   Review a Vite plugin against conventions: checks for deprecated hooks,
   missing required fields, incorrect enforce/apply usage, peerDependency ranges,

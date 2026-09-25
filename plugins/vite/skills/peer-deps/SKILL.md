@@ -1,5 +1,5 @@
 ---
-name: vite:peer-deps
+name: peer-deps
 description: |
   Walk through updating a Vite plugin's peerDependencies when a new Vite major
   version ships. Use when a Vite major is released and users report peer-dependency
