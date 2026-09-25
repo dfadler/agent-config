@@ -33,7 +33,7 @@ REPO_ROOT = Path(__file__).resolve().parents[2]
 SCRIPT = (
     REPO_ROOT
     / "plugins"
-    / "dfadler-agent-config"
+    / "detached-terminal"
     / "skills"
     / "detached-terminal"
     / "scripts"

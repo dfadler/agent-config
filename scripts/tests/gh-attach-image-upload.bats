@@ -12,7 +12,7 @@
 
 load helpers
 
-UPLOAD_SCRIPT="$REPO_ROOT/plugins/dfadler-agent-config/skills/gh-attach-image/scripts/upload.sh"
+UPLOAD_SCRIPT="$REPO_ROOT/plugins/gh-attach-image/skills/gh-attach-image/scripts/upload.sh"
 
 # Replaces helpers.bash's network-blocking `gh` shim. Answers `gh auth token`
 # and `gh api repos/OWNER/NAME --jq .id` (needed in every mode), plus
