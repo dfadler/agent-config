@@ -1,5 +1,5 @@
 ---
-name: vite:scaffold
+name: scaffold
 description: |
   Scaffold a new Vite plugin: generates a correctly-structured TypeScript plugin
   file following the factory-function convention, with the right return type,
