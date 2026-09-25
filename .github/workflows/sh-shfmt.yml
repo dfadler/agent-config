@@ -1,0 +1,33 @@
+name: shfmt
+
+on:
+  workflow_call:
+
+permissions:
+  contents: read
+
+env:
+  SHFMT_VERSION: v3.13.1
+  # mvdan/sh publishes no checksums file; this SHA was recorded on first
+  # download and pins the artifact — see shell.yml's inline comment for the
+  # full provenance note.
+  SHFMT_SHA256: fb096c5d1ac6beabbdbaa2874d025badb03ee07929f0c9ff67563ce8c75398b1
+
+jobs:
+  run:
+    name: run
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - name: Install shfmt ${{ env.SHFMT_VERSION }}
+        run: |
+          curl -fsSL -o /tmp/shfmt \
+            "https://github.com/mvdan/sh/releases/download/${SHFMT_VERSION}/shfmt_${SHFMT_VERSION}_linux_amd64"
+          echo "${SHFMT_SHA256}  /tmp/shfmt" | sha256sum -c -
+          sudo install -m 0755 /tmp/shfmt /usr/local/bin/shfmt
+          rm -f /tmp/shfmt
+          shfmt --version
+      - name: Lint (shfmt)
+        run: make lint-shfmt
