@@ -18,6 +18,14 @@ This agent is the second half of the collector/renderer split. The collector fet
 
 ---
 
+## Step 0: Start render timing
+
+```bash
+python3 {scripts_dir}/write_render_timing.py --start {outputs_dir}
+```
+
+---
+
 ## Step 1: Verify required data files exist
 
 Check that these files are present in `{outputs_dir}`:
@@ -81,6 +89,17 @@ Read the design system from `SKILL.md` Step 7. Use it exactly — same CSS token
 Write the complete report to `{outputs_dir}/report.html`.
 
 Every number in the report must trace back to a script output or a file in `outputs/`. If a number cannot be sourced, do not include it.
+
+---
+
+## Step 5: Finalize render timing and merge
+
+```bash
+python3 {scripts_dir}/write_render_timing.py --end {outputs_dir}
+python3 {scripts_dir}/merge_timing.py {outputs_dir}
+```
+
+`merge_timing.py` writes `timing.json` one level up from `outputs/` (the eval root).
 
 ---
 
