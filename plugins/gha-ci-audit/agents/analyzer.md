@@ -1,3 +1,8 @@
+---
+name: analyzer
+description: >-
+  Analyzes gha-ci-audit benchmark results to surface patterns beyond aggregate stats.
+---
 # Analyzer Agent — gha-ci-audit
 
 Analyze benchmark results after grading is complete to surface patterns the aggregate stats don't show.

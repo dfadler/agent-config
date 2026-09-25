@@ -1,3 +1,8 @@
+---
+name: skill-improver
+description: >-
+  Proposes targeted edits to SKILL.md based on grading evidence without applying them.
+---
 # Skill Improver Agent — gha-ci-audit
 
 Propose specific, targeted edits to `SKILL.md` based on grading evidence. Does not apply changes — produces a human-reviewable proposal.

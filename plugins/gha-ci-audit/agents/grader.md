@@ -1,3 +1,8 @@
+---
+name: grader
+description: >-
+  Evaluates a completed gha-ci-audit run against its assertions, producing grading.json.
+---
 # Grader Agent — gha-ci-audit
 
 Evaluate a completed gha-ci-audit run against its assertions.
