@@ -14,7 +14,7 @@ Expects this directory layout (gha-ci-audit workspace structure):
     └── ...
 
 Usage:
-    python3 aggregate.py <iteration_dir> [--skill-name NAME]
+    python3 aggregate.py <iteration_dir> [--skill-name NAME] [--model MODEL]
 
 Output:
     <iteration_dir>/benchmark.json
@@ -143,7 +143,10 @@ def aggregate(runs: list[dict[str, Any]]) -> dict[str, Any]:
 
 
 def generate_benchmark(
-    runs: list[dict[str, Any]], skill_name: str, skill_path: str
+    runs: list[dict[str, Any]],
+    skill_name: str,
+    skill_path: str,
+    model: str = "claude-sonnet-4-6",
 ) -> dict[str, Any]:
     run_summary = aggregate(runs)
     eval_ids = sorted(set(r["eval_id"] for r in runs))
@@ -152,8 +155,8 @@ def generate_benchmark(
         "metadata": {
             "skill_name": skill_name,
             "skill_path": skill_path,
-            "executor_model": "claude-sonnet-4-6",
-            "analyzer_model": "claude-sonnet-4-6",
+            "executor_model": model,
+            "analyzer_model": model,
             "timestamp": datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ"),
             "evals_run": eval_ids,
             "runs_per_configuration": len(
@@ -240,6 +243,7 @@ def main() -> None:
     parser.add_argument("iteration_dir", type=Path)
     parser.add_argument("--skill-name", default="gha-ci-audit")
     parser.add_argument("--skill-path", default="skills/gha-ci-audit")
+    parser.add_argument("--model", default="claude-sonnet-4-6")
     parser.add_argument("--output", "-o", type=Path)
     args = parser.parse_args()
 
@@ -252,7 +256,7 @@ def main() -> None:
         print("No graded runs found.", file=sys.stderr)
         sys.exit(1)
 
-    benchmark = generate_benchmark(runs, args.skill_name, args.skill_path)
+    benchmark = generate_benchmark(runs, args.skill_name, args.skill_path, args.model)
 
     out_json = args.output or (args.iteration_dir / "benchmark.json")
     out_md = out_json.with_suffix(".md")
