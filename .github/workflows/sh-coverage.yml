@@ -1,0 +1,61 @@
+name: coverage
+
+on:
+  workflow_call:
+
+permissions:
+  contents: read
+
+env:
+  BATS_VERSION: v1.11.1
+  BATS_COMMIT: b640ec3cf2c7c9cfc9e6351479261186f76eeec8
+  # kcov is built from source; pinned by commit SHA for the same reason bats is.
+  # KCOV_VERSION is the human-readable name (tag v42) and keys the build cache.
+  KCOV_VERSION: 42
+  KCOV_COMMIT: 3a8c5464be2dd781988dca7ec30db679493ed9a8
+
+jobs:
+  run:
+    name: run
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - name: Install bats ${{ env.BATS_VERSION }}
+        run: |
+          git clone --filter=blob:none --no-checkout \
+            https://github.com/bats-core/bats-core.git /tmp/bats-core
+          git -C /tmp/bats-core checkout --detach "$BATS_COMMIT"
+          sudo /tmp/bats-core/install.sh /usr/local
+          bats --version
+      - name: Cache kcov ${{ env.KCOV_VERSION }} binary
+        id: kcov-cache
+        uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: ~/.cache/kcov-bin/kcov
+          key: kcov-bin-v1-${{ runner.os }}-${{ env.KCOV_VERSION }}-${{ env.KCOV_COMMIT }}
+      - name: Install kcov ${{ env.KCOV_VERSION }} build dependencies
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y -qq cmake g++ pkg-config python3 \
+            libcurl4-openssl-dev libssl-dev libelf-dev libdw-dev \
+            binutils-dev libiberty-dev
+      - name: Build kcov ${{ env.KCOV_VERSION }} from source
+        if: steps.kcov-cache.outputs.cache-hit != 'true'
+        run: |
+          git clone --filter=blob:none --no-checkout \
+            https://github.com/SimonKagstrom/kcov.git /tmp/kcov
+          git -C /tmp/kcov checkout --detach "$KCOV_COMMIT"
+          cmake -S /tmp/kcov -B /tmp/kcov/build
+          make -C /tmp/kcov/build
+          sudo make -C /tmp/kcov/build install
+          mkdir -p ~/.cache/kcov-bin
+          cp /usr/local/bin/kcov ~/.cache/kcov-bin/kcov
+      - name: Install cached kcov ${{ env.KCOV_VERSION }} binary
+        if: steps.kcov-cache.outputs.cache-hit == 'true'
+        run: sudo install -m 0755 ~/.cache/kcov-bin/kcov /usr/local/bin/kcov
+      - name: Verify kcov
+        run: kcov --version
+      - name: Coverage (kcov, 70% floor)
+        run: make coverage

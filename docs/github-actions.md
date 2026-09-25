@@ -15,7 +15,21 @@ a CI failure here.
   shows up identically in two or more files. A reusable workflow
   (`workflow_call`) factors out a shared *multi-job process* — worth it once
   several trigger paths need to invoke the same pipeline identically, not for
-  a few shared lines at the top of otherwise-unrelated jobs.
+  a few shared lines at the top of otherwise-unrelated jobs. It is also valid
+  for *file organisation*: when one workflow has grown to a size where splitting
+  each check into its own `sh-*.yml` file aids readability, `workflow_call`
+  lets a thin orchestrator (`shell.yml`) call them in parallel and still wire a
+  `needs:`-based sentinel — something cross-file triggers (`workflow_run`)
+  cannot do reliably on PRs. In that case, env vars and tool pins live in each
+  called file rather than in the orchestrator, since `env:` does not propagate
+  across `workflow_call` boundaries.
+  **Cache-backed installs remove the performance argument.** When an install
+  step is already protected by `actions/cache`, repeating it in a second job
+  is cheap — the cache restores in seconds. The remaining reason to extract a
+  composite action is **readability**: a long install sequence that buries a
+  job's actual work in YAML noise is worth extracting even with only one
+  consumer. Performance and readability are separate justifications; cache
+  changes which one applies, not whether the tool exists.
 - **Don't force either abstraction below its break-even point.** A 3–4 line
   `checkout` + `setup-python` prefix shared by jobs that otherwise share
   nothing (different runtimes, step counts, `env` blocks) isn't worth a
