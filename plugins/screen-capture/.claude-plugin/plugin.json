@@ -2,7 +2,7 @@
   "$schema": "https://json.schemastore.org/claude-code-plugin-manifest.json",
   "name": "screen-capture",
   "version": "0.1.0",
-  "description": "Composable screen-capture toolkit: capture, attach, compare, and lighthouse skills. Canonical replacement for pr-visual-capture, which becomes a wrapper shim onto this plugin.",
+  "description": "Canonical replacement for pr-visual-capture: screenshot, video, comparison, and Lighthouse capture skills for PR/issue visual verification. Scaffold only; skills land in follow-up issues.",
   "author": {
     "name": "Dustin Fadler",
     "url": "https://github.com/dfadler"

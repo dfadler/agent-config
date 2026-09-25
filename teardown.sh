@@ -5,7 +5,7 @@
 # Safe to re-run: only touches symlinks that point into this repo; skips
 # anything that has already been removed.
 #
-# Usage: ./teardown.sh
+# Usage: ./teardown.sh [--commands] [--plugins] [--claude-md]
 
 set -euo pipefail
 
@@ -14,14 +14,23 @@ EXIT_USAGE=2
 
 usage() {
   cat <<'USAGE'
-Usage: ./teardown.sh
+Usage: ./teardown.sh [--commands] [--plugins] [--claude-md]
 
 Removes this repo's symlinks from ~/.claude and restores ~/.claude/CLAUDE.md
-from ~/.claude/CLAUDE.personal.md (the inverse of setup.sh).
+from ~/.claude/CLAUDE.personal.md (the inverse of setup.sh). With no flags,
+does the full teardown. Pass one or more flags to remove only that part;
+flags are combinable.
 
-  -h, --help   Show this message and exit.
+  --commands    Only unlink ~/.claude/commands/* entries pointing into this repo.
+  --plugins     Only unlink ~/.claude/skills/* entries pointing into this repo's plugins/.
+  --claude-md   Only restore ~/.claude/CLAUDE.md / CLAUDE.personal.md.
+  -h, --help    Show this message and exit.
 USAGE
 }
+
+DO_COMMANDS=0
+DO_PLUGINS=0
+DO_CLAUDE_MD=0
 
 while [[ $# -gt 0 ]]; do
   case "$1" in
@@ -29,13 +38,30 @@ while [[ $# -gt 0 ]]; do
       usage
       exit "$EXIT_OK"
       ;;
+    --commands)
+      DO_COMMANDS=1
+      ;;
+    --plugins)
+      DO_PLUGINS=1
+      ;;
+    --claude-md)
+      DO_CLAUDE_MD=1
+      ;;
     *)
       echo "Unknown argument: $1" >&2
       usage >&2
       exit "$EXIT_USAGE"
       ;;
   esac
+  shift
 done
+
+# No flags given: full teardown (backwards compatible).
+if [[ "$DO_COMMANDS" -eq 0 && "$DO_PLUGINS" -eq 0 && "$DO_CLAUDE_MD" -eq 0 ]]; then
+  DO_COMMANDS=1
+  DO_PLUGINS=1
+  DO_CLAUDE_MD=1
+fi
 
 REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 
@@ -152,18 +178,22 @@ restore_claude_md() {
   # A user-owned empty CLAUDE.personal.md without a marker is left untouched.
 }
 
-restore_claude_md
+[[ "$DO_CLAUDE_MD" -eq 1 ]] && restore_claude_md
 
 # Commands — each file under claude/commands/ was linked individually.
-unlink_dir_contents "$HOME/.claude/commands" "$REPO_ROOT/claude/commands"
+if [[ "$DO_COMMANDS" -eq 1 ]]; then
+  unlink_dir_contents "$HOME/.claude/commands" "$REPO_ROOT/claude/commands"
+fi
 
-# Plugins — any symlink in ~/.claude/skills/ pointing into this repo's
-# plugins/ directory, including links to plugins no longer in the checkout.
-unlink_dir_contents "$HOME/.claude/skills" "$REPO_ROOT/plugins"
+if [[ "$DO_PLUGINS" -eq 1 ]]; then
+  # Plugins — any symlink in ~/.claude/skills/ pointing into this repo's
+  # plugins/ directory, including links to plugins no longer in the checkout.
+  unlink_dir_contents "$HOME/.claude/skills" "$REPO_ROOT/plugins"
 
-# Deregister plugin hooks from ~/.claude/settings.json that setup.sh wired in.
-GLOBAL_SETTINGS="$HOME/.claude/settings.json"
-WORKTREE_HOOK_CMD="$HOME/.claude/skills/worktree-core/skills/git-worktree-usage/scripts/require-worktree-hook.sh"
-ensure_hook_deregistered "PreToolUse" "$WORKTREE_HOOK_CMD" "$GLOBAL_SETTINGS"
+  # Deregister plugin hooks from ~/.claude/settings.json that setup.sh wired in.
+  GLOBAL_SETTINGS="$HOME/.claude/settings.json"
+  WORKTREE_HOOK_CMD="$HOME/.claude/skills/worktree-core/skills/git-worktree-usage/scripts/require-worktree-hook.sh"
+  ensure_hook_deregistered "PreToolUse" "$WORKTREE_HOOK_CMD" "$GLOBAL_SETTINGS"
+fi
 
 echo "Done."
