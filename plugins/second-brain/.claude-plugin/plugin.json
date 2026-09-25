@@ -1,0 +1,12 @@
+{
+  "$schema": "https://json.schemastore.org/claude-code-plugin-manifest.json",
+  "name": "second-brain",
+  "version": "0.1.0",
+  "description": "Vault-path-agnostic port of the personal second-brain skills (capture, query, config). Resolves the Obsidian-style vault path from SECOND_BRAIN_VAULT_PATH env var, then ~/.claude/settings.json's secondBrain.vaultPath; skills needing vault access error clearly if neither is set.",
+  "author": {
+    "name": "Dustin Fadler",
+    "url": "https://github.com/dfadler"
+  },
+  "homepage": "https://github.com/dfadler/agent-config",
+  "repository": "https://github.com/dfadler/agent-config"
+}
