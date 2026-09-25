@@ -72,7 +72,7 @@ nothing to confirm.
   workflow waiting for it to end — `ps`, a bounded `top -b -n 1`/single
   `htop` snapshot (not an interactive, unbounded session), `pgrep`. Route a
   genuinely interactive `top`/`htop`/`journalctl -f` session through
-  `dfadler-agent-config:detached-terminal` instead of treating it as Tier 1.
+  `detached-terminal:detached-terminal` instead of treating it as Tier 1.
 - **Package queries**: `apt list|search|show`, `apt-cache policy`,
   `apt update` (refreshes the package index only — installs/upgrades
   nothing), `dnf list|info|repoquery`, `dnf check-update`, `dpkg -l|-s`,
