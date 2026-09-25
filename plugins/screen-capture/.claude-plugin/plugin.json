@@ -2,7 +2,7 @@
   "$schema": "https://json.schemastore.org/claude-code-plugin-manifest.json",
   "name": "screen-capture",
   "version": "0.1.0",
-  "description": "Generic page-capture primitive: screenshot or walkthrough video of a URL via Playwright (primary) or Chrome+CDP (config-driven fallback), config-resolved from second-brain:config / settings.json / env.",
+  "description": "Canonical replacement for pr-visual-capture: screenshot, video, comparison, and Lighthouse capture skills for PR/issue visual verification. Scaffold only; skills land in follow-up issues.",
   "author": {
     "name": "Dustin Fadler",
     "url": "https://github.com/dfadler"
