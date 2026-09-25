@@ -19,13 +19,6 @@ from __future__ import annotations
 
 import json
 import sys
-from datetime import datetime
-
-
-def parse_dt(s: str | None) -> datetime | None:
-    if not s:
-        return None
-    return datetime.fromisoformat(s.replace("Z", "+00:00"))
 
 
 def main() -> None:
