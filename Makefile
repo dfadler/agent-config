@@ -28,7 +28,7 @@ SHELL := /usr/bin/env bash
 SH_FIND := find scripts plugins setup.sh -type f -name '*.sh' -print0
 
 # Python sources: the skill's implementation plus its tests.
-PY_SOURCES := plugins/dfadler-agent-config/skills/detached-terminal/scripts/agent_term.py \
+PY_SOURCES := plugins/detached-terminal/skills/detached-terminal/scripts/agent_term.py \
               scripts/tests/test_agent_term.py
 
 # The non-test entries of PY_SOURCES, reduced to their containing
