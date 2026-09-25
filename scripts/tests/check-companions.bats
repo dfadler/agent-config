@@ -312,6 +312,181 @@ EOF
 # interpreter and pins the probe's answer to independently observed truth.
 # Still hermetic: reading the local interpreter touches no network.
 
+# --- convention dependency check --------------------------------------------
+#
+# check_convention_deps reads CONVENTION_DEPS from FAKE_REPO and @-include
+# lines from $HOME/.claude/CLAUDE.md and CLAUDE.personal.md.  Helpers below
+# set up those fixtures without touching the real repo or the developer's
+# ~/.claude.
+
+# Write a minimal CONVENTION_DEPS file into FAKE_REPO.
+make_deps_file() {
+  mkdir -p "$FAKE_REPO/claude/conventions"
+  printf '%s\n' "$@" > "$FAKE_REPO/claude/conventions/CONVENTION_DEPS"
+}
+
+# Write CLAUDE.md (and an empty CLAUDE.personal.md) that @-include the given
+# convention filenames from FAKE_REPO.  Called with no arguments the files
+# exist but include nothing, which lets check_convention_deps run its early
+# "no included conventions" return path.
+set_active_conventions() {
+  mkdir -p "$HOME/.claude"
+  : > "$HOME/.claude/CLAUDE.md"
+  touch "$HOME/.claude/CLAUDE.personal.md"
+  local c
+  for c in "$@"; do
+    echo "@$FAKE_REPO/claude/conventions/$c" >> "$HOME/.claude/CLAUDE.md"
+  done
+}
+
+# Create a real (non-dangling) plugin directory and symlink it under
+# ~/.claude/skills/ so the check treats it as linked.
+link_plugin() {
+  local plugin="$1"
+  mkdir -p "$SANDBOX/fake-plugins/$plugin"
+  mkdir -p "$HOME/.claude/skills"
+  ln -s "$SANDBOX/fake-plugins/$plugin" "$HOME/.claude/skills/$plugin"
+}
+
+# Create a symlink that points nowhere, simulating a plugin whose directory
+# was removed after setup.sh ran.
+link_plugin_dangling() {
+  local plugin="$1"
+  mkdir -p "$HOME/.claude/skills"
+  ln -s "$SANDBOX/nonexistent-$plugin" "$HOME/.claude/skills/$plugin"
+}
+
+@test "no warning when convention dep is satisfied by a linked plugin" {
+  make_deps_file "my-convention.md:my-plugin"
+  set_active_conventions "my-convention.md"
+  link_plugin "my-plugin"
+  run_companions
+  assert_success
+  refute_output_contains "Convention my-convention.md"
+}
+
+@test "warns when convention dep plugin is not linked" {
+  make_deps_file "my-convention.md:my-plugin"
+  set_active_conventions "my-convention.md"
+  run_companions
+  assert_success
+  assert_output_contains "Convention my-convention.md is active but its required plugin is not linked"
+  assert_output_contains "./setup.sh --include=my-plugin"
+}
+
+@test "check exits 0 even when a convention dep is missing" {
+  make_deps_file "my-convention.md:my-plugin"
+  set_active_conventions "my-convention.md"
+  run_companions
+  assert_success
+}
+
+@test "no warning when convention has a dep entry but is not included" {
+  make_deps_file "other.md:some-plugin"
+  set_active_conventions  # nothing included
+  run_companions
+  assert_success
+  refute_output_contains "Convention other.md"
+}
+
+@test "no warning when CONVENTION_DEPS file does not exist" {
+  # No make_deps_file call: file is absent from FAKE_REPO.
+  set_active_conventions "any.md"
+  run_companions
+  assert_success
+  refute_output_contains "Convention"
+}
+
+@test "first of pipe-separated alternatives satisfies the dep" {
+  make_deps_file "my-convention.md:plugin-a|plugin-b"
+  set_active_conventions "my-convention.md"
+  link_plugin "plugin-a"
+  run_companions
+  assert_success
+  refute_output_contains "Convention my-convention.md"
+}
+
+@test "second of pipe-separated alternatives satisfies the dep" {
+  make_deps_file "my-convention.md:plugin-a|plugin-b"
+  set_active_conventions "my-convention.md"
+  link_plugin "plugin-b"
+  run_companions
+  assert_success
+  refute_output_contains "Convention my-convention.md"
+}
+
+@test "warns and lists both options when neither alternative is linked" {
+  make_deps_file "my-convention.md:plugin-a|plugin-b"
+  set_active_conventions "my-convention.md"
+  run_companions
+  assert_success
+  assert_output_contains "Convention my-convention.md is active but its required plugin is not linked"
+  assert_output_contains "plugin-a or plugin-b"
+  assert_output_contains "./setup.sh --include=plugin-a"
+  assert_output_contains "./setup.sh --include=plugin-b"
+}
+
+@test "a dangling plugin symlink does not satisfy the dep" {
+  make_deps_file "my-convention.md:my-plugin"
+  set_active_conventions "my-convention.md"
+  link_plugin_dangling "my-plugin"
+  run_companions
+  assert_success
+  assert_output_contains "Convention my-convention.md is active but its required plugin is not linked"
+}
+
+@test "convention included from a foreign repo does not trigger a warning" {
+  make_deps_file "my-convention.md:my-plugin"
+  # Path is under /some/other/repo, not FAKE_REPO.
+  mkdir -p "$HOME/.claude"
+  echo "@/some/other/repo/claude/conventions/my-convention.md" > "$HOME/.claude/CLAUDE.md"
+  touch "$HOME/.claude/CLAUDE.personal.md"
+  run_companions
+  assert_success
+  refute_output_contains "Convention my-convention.md"
+}
+
+@test "convention included via CLAUDE.personal.md is checked" {
+  make_deps_file "personal-convention.md:my-plugin"
+  mkdir -p "$HOME/.claude"
+  : > "$HOME/.claude/CLAUDE.md"
+  echo "@$FAKE_REPO/claude/conventions/personal-convention.md" \
+    > "$HOME/.claude/CLAUDE.personal.md"
+  run_companions
+  assert_success
+  assert_output_contains "Convention personal-convention.md is active but its required plugin is not linked"
+}
+
+@test "only this repo's convention match fires, not a same-named one from another repo" {
+  make_deps_file "shared-name.md:my-plugin"
+  mkdir -p "$HOME/.claude"
+  # One include from a foreign repo (should not match), one from FAKE_REPO (should match).
+  {
+    echo "@/other/repo/claude/conventions/shared-name.md"
+    echo "@$FAKE_REPO/claude/conventions/shared-name.md"
+  } > "$HOME/.claude/CLAUDE.md"
+  touch "$HOME/.claude/CLAUDE.personal.md"
+  run_companions
+  assert_success
+  # The FAKE_REPO include is unsatisfied — warning must fire exactly once.
+  assert_output_contains "Convention shared-name.md is active but its required plugin is not linked"
+}
+
+@test "satisfied dep for one convention does not suppress warning for another" {
+  make_deps_file \
+    "conv-a.md:plugin-a" \
+    "conv-b.md:plugin-b"
+  set_active_conventions "conv-a.md" "conv-b.md"
+  link_plugin "plugin-a"
+  # plugin-b is absent
+  run_companions
+  assert_success
+  refute_output_contains "Convention conv-a.md"
+  assert_output_contains "Convention conv-b.md is active but its required plugin is not linked"
+}
+
+# --- probe contract test (must stay last) -----------------------------------
+
 @test "the probe reports the real python3 correctly" {
   unshim_python3
   command -v python3 > /dev/null 2>&1 || skip "no python3 on PATH"
