@@ -16,6 +16,13 @@ a CI failure here.
   (`workflow_call`) factors out a shared *multi-job process* — worth it once
   several trigger paths need to invoke the same pipeline identically, not for
   a few shared lines at the top of otherwise-unrelated jobs.
+  **Cache-backed installs remove the performance argument.** When an install
+  step is already protected by `actions/cache`, repeating it in a second job
+  is cheap — the cache restores in seconds. The remaining reason to extract a
+  composite action is **readability**: a long install sequence that buries a
+  job's actual work in YAML noise is worth extracting even with only one
+  consumer. Performance and readability are separate justifications; cache
+  changes which one applies, not whether the tool exists.
 - **Don't force either abstraction below its break-even point.** A 3–4 line
   `checkout` + `setup-python` prefix shared by jobs that otherwise share
   nothing (different runtimes, step counts, `env` blocks) isn't worth a

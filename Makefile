@@ -178,7 +178,8 @@ COVERAGE_PY_JSON := $(COVERAGE_PY_DIR)/py-coverage.json
 # further takes a deliberate commit, the same as COVERAGE_MIN above.
 CLAUDE_MD_MAX_LINES := 350
 
-.PHONY: help check lint lint-sh lint-py lint-actions fmt fmt-py test test-sh test-py \
+.PHONY: help check lint lint-sh lint-shellcheck lint-shfmt lint-set-flags lint-claude-md \
+        lint-py lint-actions fmt fmt-py test test-sh test-py \
         structure typecheck venv coverage coverage-py check-links
 
 help: ## Show available targets
@@ -187,7 +188,8 @@ help: ## Show available targets
 # `check` must be the UNION of what every workflow runs, because that is the
 # promise the README makes. The split, so a new target lands in both places:
 #
-#   shell.yml      lint-sh, structure, test-sh, coverage
+#   shell.yml      lint-shellcheck, lint-shfmt, lint-set-flags, lint-claude-md,
+#                  structure, test-sh, coverage
 #   python.yml     lint-py, typecheck, test-py, coverage-py
 #   actionlint.yml lint-actions
 #
@@ -207,11 +209,19 @@ $(VENV_STAMP): requirements-dev.txt
 
 lint: lint-sh lint-py ## Lint shell and Python
 
-lint-sh: ## shellcheck + shfmt (check only) + set-flags convention + CLAUDE.md size
+lint-shellcheck: ## shellcheck
 	@$(SH_FIND) | xargs -0 shellcheck
+
+lint-shfmt: ## shfmt (check only)
 	@$(SH_FIND) | xargs -0 shfmt -i 2 -ci -d
+
+lint-set-flags: ## set-flags convention
 	@bash scripts/check-shell-set-flags.sh
+
+lint-claude-md: ## CLAUDE.md size
 	@bash scripts/check-claude-md-lines.sh claude/CLAUDE.md $(CLAUDE_MD_MAX_LINES)
+
+lint-sh: lint-shellcheck lint-shfmt lint-set-flags lint-claude-md ## shellcheck + shfmt + set-flags + CLAUDE.md size
 
 lint-py: venv ## ruff check + ruff format --check
 	@$(PY) -m ruff check $(PY_SOURCES)

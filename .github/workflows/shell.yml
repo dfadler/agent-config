@@ -44,7 +44,7 @@ concurrency:
   group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
   cancel-in-progress: true
 
-# Least privilege: the job only needs to read the repo.
+# Least privilege: all jobs only need to read the repo.
 permissions:
   contents: read
 
@@ -73,24 +73,25 @@ env:
   KCOV_COMMIT: 3a8c5464be2dd781988dca7ec30db679493ed9a8
 
 jobs:
-  shell:
-    name: shellcheck + shfmt + structure + bats
+  shellcheck:
+    name: shellcheck
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
-          # The job runs PR-controlled code and never needs authenticated git
-          # after checkout — don't leave the GITHUB_TOKEN in reach.
           persist-credentials: false
-
-      # Pinned binaries from upstream releases. Each lands in /usr/local/bin,
-      # which precedes /usr/bin on PATH, so it wins over any preinstalled copy.
-      # Each artifact is downloaded to a file and checksum-verified BEFORE it is
-      # extracted or made executable — piping curl straight into tar would run
-      # the unverified payload first and check it never.
       - name: Install shellcheck
         uses: ./.github/actions/install-shellcheck
+      - name: Lint (shellcheck)
+        run: make lint-shellcheck
 
+  shfmt:
+    name: shfmt
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
       - name: Install shfmt ${{ env.SHFMT_VERSION }}
         run: |
           curl -fsSL -o /tmp/shfmt \
@@ -99,9 +100,46 @@ jobs:
           sudo install -m 0755 /tmp/shfmt /usr/local/bin/shfmt
           rm -f /tmp/shfmt
           shfmt --version
+      - name: Lint (shfmt)
+        run: make lint-shfmt
 
-      # Cloned then checked out at a pinned COMMIT: --branch takes a tag, and a
-      # tag can be moved to point at different code under the same name.
+  set-flags:
+    name: set-flags
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - name: Lint (set-flags)
+        run: make lint-set-flags
+
+  claude-md-size:
+    name: claude-md-size
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - name: Lint (claude-md-size)
+        run: make lint-claude-md
+
+  structure:
+    name: structure
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - name: Structure (plugin manifests + frontmatter)
+        run: make structure
+
+  test-sh:
+    name: test-sh
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
       - name: Install bats ${{ env.BATS_VERSION }}
         run: |
           git clone --filter=blob:none --no-checkout \
@@ -109,39 +147,36 @@ jobs:
           git -C /tmp/bats-core checkout --detach "$BATS_COMMIT"
           sudo /tmp/bats-core/install.sh /usr/local
           bats --version
+      - name: Test (bats)
+        run: make test-sh
 
-      # The clone + cmake + make below is by far the slowest step in this job (a
-      # full C++ compile), so the resulting binary is cached on the pinned
-      # version and a hit skips straight to installing it.
-      #
-      # The cached path is under $HOME, NOT /usr/local/bin: actions/cache runs
-      # as the unprivileged runner user, and a root-owned path fails SILENTLY
-      # on restore ("Cannot open: Permission denied") and falls through to a
-      # full rebuild every run — the cache looks configured and does nothing.
-      # Restore into a user-writable dir, then `sudo install` it into place.
+  coverage:
+    name: coverage
+    runs-on: ubuntu-latest
+    needs: [test-sh]
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - name: Install bats ${{ env.BATS_VERSION }}
+        run: |
+          git clone --filter=blob:none --no-checkout \
+            https://github.com/bats-core/bats-core.git /tmp/bats-core
+          git -C /tmp/bats-core checkout --detach "$BATS_COMMIT"
+          sudo /tmp/bats-core/install.sh /usr/local
+          bats --version
       - name: Cache kcov ${{ env.KCOV_VERSION }} binary
         id: kcov-cache
         uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
         with:
           path: ~/.cache/kcov-bin/kcov
-          # "-v1" is this cache key's own generation, not a kcov version: bump
-          # it if the cached PATH ever changes, since a saved key is immutable
-          # and a stale entry for a moved path can never be corrected in place.
           key: kcov-bin-v1-${{ runner.os }}-${{ env.KCOV_VERSION }}-${{ env.KCOV_COMMIT }}
-
-      # Unconditional even on a cache hit: apt is fast here, and while most of
-      # this list only builds kcov, several packages transitively supply the
-      # runtime shared libraries (libcurl, libelf, libdw) the cached binary
-      # still needs to RUN. python3 is a BUILD-time dependency — kcov generates
-      # one of its sources with a Python script, and the build dies with a bare
-      # "env: 'python3': No such file or directory" without it.
       - name: Install kcov ${{ env.KCOV_VERSION }} build dependencies
         run: |
           sudo apt-get update -qq
           sudo apt-get install -y -qq cmake g++ pkg-config python3 \
             libcurl4-openssl-dev libssl-dev libelf-dev libdw-dev \
             binutils-dev libiberty-dev
-
       - name: Build kcov ${{ env.KCOV_VERSION }} from source
         if: steps.kcov-cache.outputs.cache-hit != 'true'
         run: |
@@ -153,27 +188,10 @@ jobs:
           sudo make -C /tmp/kcov/build install
           mkdir -p ~/.cache/kcov-bin
           cp /usr/local/bin/kcov ~/.cache/kcov-bin/kcov
-
       - name: Install cached kcov ${{ env.KCOV_VERSION }} binary
         if: steps.kcov-cache.outputs.cache-hit == 'true'
         run: sudo install -m 0755 ~/.cache/kcov-bin/kcov /usr/local/bin/kcov
-
       - name: Verify kcov
         run: kcov --version
-
-      - name: Lint (shellcheck + shfmt + set-flags)
-        run: make lint-sh
-
-      - name: Structure (plugin manifests + frontmatter)
-        run: make structure
-
-      - name: Test (bats)
-        run: make test-sh
-
-      # Re-runs the same suite under kcov and enforces the floor. Kept as its
-      # own step rather than folded into `make test-sh` so a plain test failure
-      # and a coverage regression are told apart at a glance in the run summary
-      # — and so an instrumentation problem can never be reported as a broken
-      # test suite.
       - name: Coverage (kcov, 70% floor)
         run: make coverage
