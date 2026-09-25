@@ -2,7 +2,7 @@
   "$schema": "https://json.schemastore.org/claude-code-plugin-manifest.json",
   "name": "screen-capture",
   "version": "0.1.0",
-  "description": "Routes captured screenshot/video artefacts to a target (--target=github in v1) and owns the target-specific formatting — e.g. the before/after PR comment table and video embed for GitHub. Requires gh-attach-image (standalone or via dfadler-agent-config) to perform the raw upload.",
+  "description": "Canonical replacement for pr-visual-capture: screenshot, video, comparison, and Lighthouse capture skills for PR/issue visual verification. Scaffold only; skills land in follow-up issues.",
   "author": {
     "name": "Dustin Fadler",
     "url": "https://github.com/dfadler"
