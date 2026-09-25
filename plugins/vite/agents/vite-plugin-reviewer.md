@@ -33,12 +33,14 @@ in context.
 
 ## What to look for
 
-### Deprecated APIs
-- `handleHotUpdate` → must be replaced with `hotUpdate` (deprecated since Vite 5).
-  The `hotUpdate` hook receives `HotUpdateOptions` with `type: 'create' | 'update' |
-  'delete'` and is called once per environment.
-- `transformWithEsbuild` → must be replaced with `transformWithOxc` (deprecated in
-  Vite 7). Report the import and every call site.
+### Migration opportunities
+- `handleHotUpdate` — flag as a migration candidate for Vite 6+ projects. `hotUpdate`
+  is the newer per-environment replacement; `handleHotUpdate` still works. Do not
+  report as a blocking defect — report as a recommended migration with the benefits:
+  per-environment invocation and `this.environment` access.
+- `transformWithEsbuild` in a project using rolldown-vite or Vite 8+ — flag for
+  migration to `transformWithOxc`. Do not flag this in standard Vite 7 projects;
+  `transformWithEsbuild` is documented and supported there.
 
 ### Structural violations
 - Plugin is not a factory function (missing the wrapping function — plain exported
@@ -48,17 +50,20 @@ in context.
   or the project's `VitePlugin` alias.
 
 ### `transform` hook
-- Returns `undefined` instead of `null` for unhandled files. Vite treats `undefined`
-  as "I handled it" in some versions; always return explicit `null`.
+- Returns `undefined` instead of `null` for unhandled files. Explicit `null` is
+  the convention in this codebase for "I did not handle this file" — flag missing
+  `null` returns as a convention violation.
 - Returns a bare `code` string instead of `{ code, map }` when the input had a
   sourcemap — this drops the original sourcemap from the chain.
 - No extension/path guard — accidentally processing `node_modules` or asset files.
 - Missing SSR guard when the transform injects client-only code.
 
 ### `generateBundle` hook
-- Returns a value (the return value is ignored; mutations must be in-place).
-- Directly assigns new keys to `bundle` with a non-`OutputChunk`/`OutputAsset`
-  shape — use `this.emitFile` instead.
+- Hook **only** returns a value without mutating `bundle` — the return is ignored
+  and the intended change never lands. A return expression alongside in-place
+  mutations is not a defect.
+- Directly assigns invalid output shapes to `bundle` keys — use `this.emitFile`
+  to add new files instead.
 
 ### `configureServer` / `configurePreviewServer`
 - Registers middleware with `server.middlewares.use(fn)` when it needs to run
@@ -72,7 +77,8 @@ in context.
 - Range does not include the current Vite major — users on that major get
   peer-conflict errors.
 - Range requires an API introduced later than the declared minimum (e.g., declares
-  `>=5.0.0` but uses `transformWithOxc` which requires `>=7.0.0`).
+  `>=6.0.0` but uses `transformWithOxc` which requires rolldown-vite or Vite 8+;
+  declares `>=5.0.0` but uses `hotUpdate` or Environment API which requires Vite 6+).
 
 ### `enforce` and `apply`
 - `enforce` is present with no explanation — challenge whether it's actually needed.

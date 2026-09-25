@@ -111,7 +111,7 @@ export function myPlugin(): Plugin {
       if (id === virtualId) return resolvedVirtualId
     },
     load(id) {
-      if (id === resolvedVirtualId) return `export const data = ${JSON.stringify(...)}`
+      if (id === resolvedVirtualId) return `export const data = ${JSON.stringify({ message: 'hello from virtual module' })}`
     },
   }
 }
