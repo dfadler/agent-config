@@ -18,8 +18,6 @@ import json
 import sys
 from pathlib import Path
 
-NAME_MAP = {1: "vite-audit", 2: "agent-config-context", 3: "facebook-react"}
-
 
 def main() -> None:
     if len(sys.argv) != 3:
@@ -32,9 +30,9 @@ def main() -> None:
     evals = json.loads(evals_json.read_text())
 
     for ev in evals["evals"]:
-        name = NAME_MAP.get(ev["id"])
+        name = ev.get("dir_name")
         if not name:
-            print(f"Unknown eval id {ev['id']}, skipping", file=sys.stderr)
+            print(f"Missing dir_name for eval id {ev['id']}, skipping", file=sys.stderr)
             continue
 
         meta_path = iter_dir / name / "with_skill" / "eval_metadata.json"
