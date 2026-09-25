@@ -163,13 +163,13 @@ fi
 echo "[collect] Step 8: writing collect_summary.json" >&2
 RUN_COUNT=$(cat "${OUTPUT_DIR}/run_count_primary.txt")
 python3 "${SCRIPT_DIR}/write_collect_summary.py" \
-  "${OUTPUT_DIR}" \
-  "${REPO}" \
-  "${WORKFLOW_ID}" \
-  "${PRIMARY_WF_NAME}" \
-  "${P50_RUN_ID}" \
-  "${P50_DURATION}" \
-  "${RUN_COUNT}"
+  --outputs-dir "${OUTPUT_DIR}" \
+  --repo "${REPO}" \
+  --workflow-id "${WORKFLOW_ID}" \
+  --workflow-name "${PRIMARY_WF_NAME}" \
+  --p50-run-id "${P50_RUN_ID}" \
+  --p50-duration-min "${P50_DURATION}" \
+  --run-count "${RUN_COUNT}"
 
 # ---------------------------------------------------------------------------
 # Timing — compute and write collect_timing.json

@@ -93,8 +93,18 @@ case "$script" in
     fi
     ;;
   write_collect_summary.py)
-    # $2 = OUTPUT_DIR
-    printf '{"summary":"ok"}\n' > "${2:-/dev/null}/collect_summary.json"
+    # Named flags now (e.g. --outputs-dir <dir> --repo <repo> ...); find the
+    # value that follows --outputs-dir rather than assuming a fixed position.
+    shift
+    out_dir=""
+    while [[ $# -gt 0 ]]; do
+      if [[ "$1" == "--outputs-dir" ]]; then
+        out_dir="${2:-}"
+        break
+      fi
+      shift
+    done
+    printf '{"summary":"ok"}\n' > "${out_dir:-/dev/null}/collect_summary.json"
     ;;
   write_collect_timing.py)
     # $2 = OUTPUT_DIR
