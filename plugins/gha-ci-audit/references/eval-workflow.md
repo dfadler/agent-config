@@ -44,6 +44,11 @@ To run an entire iteration with a single agent call, use the orchestrator:
 
 For each eval in `evals/evals.json`, call `setup_eval.sh` to create the directory structure and seed `eval_metadata.json`. Do this for all evals before spawning any agents.
 
+`evals/evals.json` is the single source of truth for eval identity: each entry's
+`dir_name` and `repo` fields are what `setup_eval.sh` and the collector agents need.
+Don't duplicate that id/dir_name/repo mapping elsewhere — adding an eval means
+adding an entry there.
+
 ```bash
 WORKSPACE=/Volumes/Development/agent-config/plugins/gha-ci-audit-workspace
 PLUGIN=/Volumes/Development/agent-config/plugins/gha-ci-audit

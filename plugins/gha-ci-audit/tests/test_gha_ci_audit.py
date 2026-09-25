@@ -894,7 +894,7 @@ class TestWriteAssertions:
             "evals": [
                 {
                     "id": 1,
-                    "name": "vite-audit",
+                    "dir_name": "vite-audit",
                     "assertions": [
                         {"id": "artifact_published", "text": "Report published"},
                     ],
@@ -911,6 +911,24 @@ class TestWriteAssertions:
         updated = json.loads((run_dir / "eval_metadata.json").read_text())
         assert len(updated["assertions"]) == 1
         assert updated["assertions"][0]["id"] == "artifact_published"
+
+    def test_skips_eval_missing_dir_name(
+        self, tmp_path: Path, capsys: pytest.CaptureFixture[str]
+    ) -> None:
+        iter_dir = tmp_path / "iteration-1"
+        iter_dir.mkdir()
+
+        evals_json = tmp_path / "evals.json"
+        evals_json.write_text(
+            json.dumps({"evals": [{"id": 1, "assertions": []}]})
+        )
+
+        with patch.object(
+            sys, "argv", ["write_assertions.py", str(iter_dir), str(evals_json)]
+        ):
+            self.mod.main()
+
+        assert "Missing dir_name" in capsys.readouterr().err
 
 
 # ---------------------------------------------------------------------------

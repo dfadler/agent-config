@@ -3,6 +3,8 @@
   "evals": [
     {
       "id": 1,
+      "dir_name": "vite-audit",
+      "repo": "vitejs/vite",
       "prompt": "Audit GitHub Actions for vitejs/vite. I want to understand where time and money are being spent in CI and what the biggest opportunities are for cost savings or performance improvements. Generate a dashboard artifact.",
       "expected_output": "A published HTML artifact with: KPI tiles showing run counts and success rates, ranked opportunity cards with quantified estimates, a critical path visualization, and a workflow summary table. Should identify the primary CI workflow, find what's on the critical path, and give at least 2 concrete actionable recommendations.",
       "files": [],
@@ -41,6 +43,8 @@
     },
     {
       "id": 2,
+      "dir_name": "agent-config-context",
+      "repo": "dfadler/agent-config",
       "prompt": "Our CI pipelines feel slow and expensive. Can you pull the GitHub Actions data for this repo and show me what's on the critical path and where we can cut time? I'm in the dfadler/agent-config repo.",
       "expected_output": "Should parse the repo from context (dfadler/agent-config), find workflows, identify the primary CI workflow, analyze durations and outcomes, find the critical path job(s), and surface improvement opportunities in a dashboard artifact.",
       "files": [],
@@ -69,6 +73,8 @@
     },
     {
       "id": 3,
+      "dir_name": "facebook-react",
+      "repo": "facebook/react",
       "prompt": "What does the GitHub Actions usage look like for facebook/react? I'm curious about the failure rate and what jobs are taking the longest.",
       "expected_output": "Should query the facebook/react repo's GHA data, find the primary CI workflow, report on failure rates and duration patterns, identify critical path jobs, and render a dashboard. Should work with a public repo.",
       "files": [],
