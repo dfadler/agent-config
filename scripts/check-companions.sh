@@ -492,6 +492,77 @@ check_ponytail() {
   esac
 }
 
+# Check that every convention the user has opted into (via DEFAULT_ENABLED or
+# CLAUDE.personal.md) has its required plugin(s) linked under ~/.claude/skills/.
+# The dep map lives in claude/conventions/CONVENTION_DEPS: one line per
+# convention, value is a pipe-separated list of alternatives (any one satisfies
+# the dep). Warnings match the ⚠ advisory style used throughout this script.
+check_convention_deps() {
+  local deps_file="$REPO_ROOT/claude/conventions/CONVENTION_DEPS"
+  [[ -f "$deps_file" ]] || return 0
+
+  # Collect every convention filename currently @-included in either CLAUDE.md
+  # file. Lines look like: @/path/to/agent-config/claude/conventions/foo.md
+  local included_conventions=()
+  local f line
+  for f in "$HOME/.claude/CLAUDE.md" "$HOME/.claude/CLAUDE.personal.md"; do
+    [[ -f "$f" ]] || continue
+    while IFS= read -r line || [[ -n "$line" ]]; do
+      # Match @...conventions/<name>.md, capture just the filename
+      if [[ "$line" =~ ^@.*/claude/conventions/([^/]+\.md)$ ]]; then
+        included_conventions+=("${BASH_REMATCH[1]}")
+      fi
+    done <"$f"
+  done
+
+  [[ ${#included_conventions[@]} -eq 0 ]] && return 0
+
+  # For each convention that has a dep entry, check whether at least one
+  # of the required plugins is linked under ~/.claude/skills/.
+  local convention dep_spec plugin satisfied
+  while IFS= read -r line || [[ -n "$line" ]]; do
+    line="${line%%#*}"
+    line="${line## }"
+    line="${line%% }"
+    [[ -n "$line" ]] || continue
+
+    convention="${line%%:*}"
+    dep_spec="${line#*:}"
+    [[ -n "$convention" && -n "$dep_spec" ]] || continue
+
+    # Is this convention currently included?
+    local is_included=0
+    for f in "${included_conventions[@]}"; do
+      [[ "$f" == "$convention" ]] && is_included=1 && break
+    done
+    [[ "$is_included" == 1 ]] || continue
+
+    # Is at least one of the required plugins linked?
+    satisfied=0
+    IFS='|' read -r -a plugins <<<"$dep_spec"
+    for plugin in "${plugins[@]}"; do
+      [[ -L "$HOME/.claude/skills/$plugin" ]] && satisfied=1 && break
+    done
+
+    if [[ "$satisfied" == 0 ]]; then
+      {
+        echo
+        echo "⚠ Convention $convention is active but its required plugin is not linked."
+        echo "  This convention directs Claude to load a skill from: ${dep_spec//|/ or }"
+        echo "  but none of those plugins are linked under ~/.claude/skills/."
+        echo "  Re-run setup.sh without --include/--skip restrictions, or add one of"
+        echo "  these plugins explicitly:"
+        IFS='|' read -r -a plugins <<<"$dep_spec"
+        for plugin in "${plugins[@]}"; do
+          echo "    ./setup.sh --include=$plugin"
+        done
+        echo
+      } >&2
+    fi
+  done <"$deps_file"
+}
+
+check_convention_deps
 check_git_identity
 check_python_deps
 check_mattpocock_skills

@@ -1,0 +1,17 @@
+# Maps each convention file to the plugin(s) its skill references require.
+# A convention is "satisfied" when at least one of the listed plugins is
+# linked under ~/.claude/skills/. Pipe-separate alternatives (any one is
+# enough); separate independent deps with additional lines for the same file
+# if it needs multiple plugins.
+#
+# Only conventions that actively direct Claude to load or use a specific skill
+# are listed here — conventions that merely mention a skill as optional reading
+# are omitted. Missing-plugin warnings in check-companions.sh use this file.
+#
+# Format: convention-filename:plugin-name-or-pipe-separated-alternatives
+
+fetch-execute-installs.md:dfadler-agent-config
+focus-stealing.md:dfadler-agent-config|detached-terminal
+vite-plugin.md:vite
+git-worktree-usage.md:dfadler-agent-config|worktree-core
+visual-verification.md:dfadler-agent-config|pr-visual-capture
