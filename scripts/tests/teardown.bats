@@ -29,7 +29,7 @@ teardown() {
 }
 
 run_teardown() {
-  run bash "$FAKE_REPO/teardown.sh"
+  run bash "$FAKE_REPO/teardown.sh" "$@"
 }
 
 # Lay out the state current setup.sh produces: a generated CLAUDE.md with the
@@ -229,6 +229,73 @@ install_legacy_links() {
   assert_status 2
   assert_output_contains "Unknown argument: --nope"
   [ ! -e "$HOME/.claude" ]
+}
+
+# ---------------------------------------------------------------------------
+# Selective flags: --commands / --plugins / --claude-md
+# ---------------------------------------------------------------------------
+
+@test "--commands only unlinks commands, leaving plugins and CLAUDE.md alone" {
+  install_links
+  echo "personal content" > "$HOME/.claude/CLAUDE.personal.md"
+
+  run_teardown --commands
+  assert_success
+
+  [ ! -e "$HOME/.claude/commands/demo.md" ]
+  [ -L "$HOME/.claude/skills/dfadler-agent-config" ]
+  grep -qF "agent-config managed" "$HOME/.claude/CLAUDE.md"
+  [ -f "$HOME/.claude/CLAUDE.personal.md" ]
+}
+
+@test "--plugins only unlinks plugins and deregisters the hook, leaving commands and CLAUDE.md alone" {
+  install_links
+  HOOK_CMD="$HOME/.claude/skills/worktree-core/skills/git-worktree-usage/scripts/require-worktree-hook.sh"
+  python3 -c "
+import json
+d = {'hooks': {'PreToolUse': [{'matcher': 'Edit|Write', 'hooks': [{'type': 'command', 'command': '$HOOK_CMD'}]}]}}
+open('$HOME/.claude/settings.json', 'w').write(json.dumps(d))
+"
+
+  run_teardown --plugins
+  assert_success
+
+  [ ! -e "$HOME/.claude/skills/dfadler-agent-config" ]
+  [ -L "$HOME/.claude/commands/demo.md" ]
+  grep -qF "agent-config managed" "$HOME/.claude/CLAUDE.md"
+  run python3 -c "
+import json
+d = json.load(open('$HOME/.claude/settings.json'))
+cmds = [h['command'] for e in d.get('hooks', {}).get('PreToolUse', []) for h in e.get('hooks', [])]
+assert '$HOOK_CMD' not in cmds, 'hook still present after teardown'
+"
+  [ "$status" -eq 0 ]
+}
+
+@test "--claude-md only restores CLAUDE.md, leaving commands and plugins symlinks alone" {
+  install_links
+  echo "personal content" > "$HOME/.claude/CLAUDE.personal.md"
+
+  run_teardown --claude-md
+  assert_success
+
+  [ ! -e "$HOME/.claude/CLAUDE.md" ] || ! grep -qF "agent-config managed" "$HOME/.claude/CLAUDE.md"
+  [ "$(cat "$HOME/.claude/CLAUDE.md")" = "personal content" ]
+  [ -L "$HOME/.claude/commands/demo.md" ]
+  [ -L "$HOME/.claude/skills/dfadler-agent-config" ]
+}
+
+@test "--commands --plugins together unlink both but leave CLAUDE.md alone" {
+  install_links
+  echo "personal content" > "$HOME/.claude/CLAUDE.personal.md"
+
+  run_teardown --commands --plugins
+  assert_success
+
+  [ ! -e "$HOME/.claude/commands/demo.md" ]
+  [ ! -e "$HOME/.claude/skills/dfadler-agent-config" ]
+  grep -qF "agent-config managed" "$HOME/.claude/CLAUDE.md"
+  [ -f "$HOME/.claude/CLAUDE.personal.md" ]
 }
 
 # ---------------------------------------------------------------------------
