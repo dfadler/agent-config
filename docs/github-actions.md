@@ -15,7 +15,21 @@ a CI failure here.
   shows up identically in two or more files. A reusable workflow
   (`workflow_call`) factors out a shared *multi-job process* — worth it once
   several trigger paths need to invoke the same pipeline identically, not for
-  a few shared lines at the top of otherwise-unrelated jobs.
+  a few shared lines at the top of otherwise-unrelated jobs. It is also valid
+  for *file organisation*: when one workflow has grown to a size where splitting
+  each check into its own `sh-*.yml` file aids readability, `workflow_call`
+  lets a thin orchestrator (`shell.yml`) call them in parallel and still wire a
+  `needs:`-based sentinel — something cross-file triggers (`workflow_run`)
+  cannot do reliably on PRs. In that case, env vars and tool pins live in each
+  called file rather than in the orchestrator, since `env:` does not propagate
+  across `workflow_call` boundaries.
+  **Cache-backed installs remove the performance argument.** When an install
+  step is already protected by `actions/cache`, repeating it in a second job
+  is cheap — the cache restores in seconds. The remaining reason to extract a
+  composite action is **readability**: a long install sequence that buries a
+  job's actual work in YAML noise is worth extracting even with only one
+  consumer. Performance and readability are separate justifications; cache
+  changes which one applies, not whether the tool exists.
 - **Don't force either abstraction below its break-even point.** A 3–4 line
   `checkout` + `setup-python` prefix shared by jobs that otherwise share
   nothing (different runtimes, step counts, `env` blocks) isn't worth a
@@ -24,6 +38,26 @@ a CI failure here.
   more than the duplication it would remove. Revisit once a third near-identical
   instance of something bigger appears, or once an actual shared multi-job
   pipeline exists (e.g. a release workflow several triggers need identically).
+- **`env:` blocks do not propagate across `workflow_call` boundaries.** An
+  `env:` key defined at the orchestrator level (or in the caller's job) is
+  invisible inside the called workflow — the called workflow's steps see only
+  what is defined inside *it*. Consequence: every called workflow that pins a
+  tool version must declare its own `env:` block. See `sh-shfmt.yml` — it
+  defines `SHFMT_VERSION` and `SHFMT_SHA256` inside the called file, not in
+  `shell.yml`, because a top-level `env:` in the orchestrator would be silently
+  ignored across the call boundary.
+- **Sentinel job for branch protection.** When a thin orchestrator dispatches
+  several reusable workflows in parallel, adding a dedicated `all-checks` job
+  (with `if: always()` and `needs:` listing every other job) gives branch
+  protection a single stable check name to target. Without it, every rename or
+  addition to the dispatched job list requires a branch-protection settings
+  update. The `if: always()` guard is load-bearing: a skipped dependency would
+  otherwise skip the sentinel too, letting a cancelled or never-run job
+  silently satisfy the required check.
+- **GitHub check names for reusable workflow callers** take the form
+  `<caller-job-id> / <called-job-name>`. Name the inner job `run` (or another
+  short neutral word) rather than repeating the check subject — that produces
+  clean names like `shellcheck / run` instead of `shellcheck / shellcheck`.
 - **Every CI check should call the same command a human runs locally**
   (a `make` target, a script) rather than reimplementing the check inline in
   YAML. That's what keeps "CI is green" and "the local check is green" from

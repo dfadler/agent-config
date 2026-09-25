@@ -1,6 +1,6 @@
 #!/usr/bin/env bats
 #
-# Tests for plugins/worktree-core/skills/git-worktree-usage/scripts/
+# Tests for plugins/dfadler-agent-config/skills/git-worktree-usage/scripts/
 # verify-worktree-symlinks.sh — detects (and with --fix, repairs) a
 # worktree's symlinked directory pointing somewhere other than the main
 # checkout. Covers the failure mode described in the script's own header: a
@@ -12,7 +12,7 @@
 
 load helpers
 
-SCRIPT_UNDER_TEST="$REPO_ROOT/plugins/worktree-core/skills/git-worktree-usage/scripts/verify-worktree-symlinks.sh"
+SCRIPT_UNDER_TEST="$REPO_ROOT/plugins/dfadler-agent-config/skills/git-worktree-usage/scripts/verify-worktree-symlinks.sh"
 
 setup() {
   make_git_sandbox

@@ -1,6 +1,6 @@
 #!/usr/bin/env bats
 #
-# Tests for plugins/worktree-core/skills/git-worktree-usage/scripts/
+# Tests for plugins/dfadler-agent-config/skills/git-worktree-usage/scripts/
 # prune-merged-worktrees.sh — the classification logic that decides which
 # Claude worktrees are safe to remove (merged + clean + pushed) and which to
 # keep (current / locked / unmerged / dirty / unpushed).

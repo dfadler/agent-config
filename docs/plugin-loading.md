@@ -1,11 +1,18 @@
-# How the plugin gets loaded
+# How plugins get loaded
 
 Claude Code auto-loads any directory under `~/.claude/skills/` that carries a
 `.claude-plugin/plugin.json`, as `<name>@skills-dir` — no marketplace and no install
-step. It follows symlinks, so `setup.sh` links the whole
-`plugins/dfadler-agent-config/` directory to `~/.claude/skills/dfadler-agent-config`,
-and the plugin loads straight out of this working copy. Edits here are live in the next
-session; there's nothing to commit, push, or update first.
+step. It follows symlinks, so `setup.sh` links each directory under `plugins/` that
+contains a `plugin.json` file into `~/.claude/skills/<name>`, and the plugin loads
+straight out of this working copy. Edits here are live in the next session; there's
+nothing to commit, push, or update first.
+
+This repo currently ships nine plugins under `plugins/`:
+`accessibility-skills`, `detached-terminal`, `dfadler-agent-config`, `gh-attach-image`,
+`gha-ci-audit`, `pr-visual-capture`, `typescript-gotchas`, `vite`, and `worktree-core`.
+Each gets its own `~/.claude/skills/<name>` link and loads under its own namespace.
+The sections below use `dfadler-agent-config` as the concrete example; the mechanics
+apply identically to every plugin in the list.
 
 Linking the plugin as a unit (rather than fanning its skills and agents out as
 individual symlinks, which is what `setup.sh` used to do) is what buys the plugin an
@@ -34,9 +41,6 @@ Sharing the plugin with another machine or person would need a
 `.claude-plugin/marketplace.json` at the repo root; that isn't here yet, and adding it
 later wouldn't change how this machine loads the plugin.
 
-A future tool gets its own sibling directory (e.g. `codex/`) with whatever layout that
-tool expects, symlinked into its own config location the same way.
-
-See [`docs/setup.md`](./setup.md) for how `setup.sh` creates that symlink and
+See [`docs/setup.md`](./setup.md) for how `setup.sh` creates these symlinks and
 [`docs/contributing.md`](./contributing.md) for adding a new skill, agent, or
 plugin to this layout.

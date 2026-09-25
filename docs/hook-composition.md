@@ -9,8 +9,8 @@ producing collisions or conflicting behavior.
 Every hook in this plugin is **additive, not exclusive**. A hook does its
 specific job and exits; it never assumes it is the only hook registered for
 that event, and it never tries to suppress or shortcut hooks from other
-plugins. Claude Code runs all registered hooks for an event in series — that
-is the composition model, and each hook is responsible only for its own
+plugins. Claude Code runs all matching hooks for an event **in parallel** and merges
+their results after they finish. Each hook is responsible only for its own
 domain.
 
 ## Off by default: opt-in protocol
@@ -72,6 +72,29 @@ session-level overrides).
 ```bash
 WORKTREE_ENFORCE=block claude   # enforce worktree usage for this session only
 ```
+
+## `dfadler-agent-config` and `worktree-core`: identical hooks, mutually exclusive plugins
+
+`plugins/worktree-core/` is a minimal, standalone plugin that ships exactly the
+git-worktree-usage skill plus these same three hooks — no other skills or agents. Its
+`hooks/hooks.json` is byte-for-byte identical to `dfadler-agent-config`'s, using the
+same `${CLAUDE_PLUGIN_ROOT}` relative path to the same hook scripts (copied into each
+plugin's own tree).
+
+**These two plugins are meant to be mutually exclusive.** Install `worktree-core` when
+you want only the worktree skill and hooks without the rest of `dfadler-agent-config`'s
+PR/review surface. Install `dfadler-agent-config` when you want the full plugin, which
+bundles worktree hooks as a convenience. Do not enable both on the same machine.
+
+If both are enabled, all three hooks fire **twice** per event — once from
+`dfadler-agent-config`'s registration and once from `worktree-core`'s. For the two
+`SessionStart` hooks, when `worktree.autoPrune` is enabled, duplicate execution means
+each hook can attempt to remove merged worktrees and branches — that is state-changing,
+not just doubled advisory output. For `require-worktree-hook.sh` (`PreToolUse`,
+blocking) Claude Code runs both handlers in parallel and merges their results: a block
+from either takes precedence, so the effect is the same as one handler, but it's
+wasteful. Nothing in `setup.sh` currently enforces the exclusion — skipping one plugin
+is the user's responsibility via `--skip`.
 
 ## Guidance for authors of other plugins
 
