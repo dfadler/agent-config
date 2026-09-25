@@ -508,8 +508,9 @@ check_convention_deps() {
   for f in "$HOME/.claude/CLAUDE.md" "$HOME/.claude/CLAUDE.personal.md"; do
     [[ -f "$f" ]] || continue
     while IFS= read -r line || [[ -n "$line" ]]; do
-      # Match @...conventions/<name>.md, capture just the filename
-      if [[ "$line" =~ ^@.*/claude/conventions/([^/]+\.md)$ ]]; then
+      # Match @<REPO_ROOT>/claude/conventions/<name>.md only — not a same-named
+      # convention from a different repository.
+      if [[ "$line" =~ ^@${REPO_ROOT}/claude/conventions/([^/]+\.md)$ ]]; then
         included_conventions+=("${BASH_REMATCH[1]}")
       fi
     done <"$f"
@@ -541,7 +542,8 @@ check_convention_deps() {
     satisfied=0
     IFS='|' read -r -a plugins <<<"$dep_spec"
     for plugin in "${plugins[@]}"; do
-      [[ -L "$HOME/.claude/skills/$plugin" ]] && satisfied=1 && break
+      # -L: is a symlink; -e: target exists (rules out dangling links)
+      [[ -L "$HOME/.claude/skills/$plugin" && -e "$HOME/.claude/skills/$plugin" ]] && satisfied=1 && break
     done
 
     if [[ "$satisfied" == 0 ]]; then
