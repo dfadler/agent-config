@@ -1,6 +1,6 @@
 #!/usr/bin/env bats
 #
-# Tests for plugins/worktree-core/skills/git-worktree-usage/scripts/
+# Tests for plugins/dfadler-agent-config/skills/git-worktree-usage/scripts/
 # require-worktree-hook.sh — the PreToolUse hook that blocks/warns/allows
 # Edit/Write in the main git checkout based on configured enforce mode.
 #
@@ -11,8 +11,8 @@
 
 bats_require_minimum_version 1.5.0 # for `run --separate-stderr`
 
-REAL_HOOK="$BATS_TEST_DIRNAME/../../plugins/worktree-core/skills/git-worktree-usage/scripts/require-worktree-hook.sh"
-HOOK_LIB="$BATS_TEST_DIRNAME/../../plugins/worktree-core/skills/git-worktree-usage/scripts/worktree-hook-lib.sh"
+REAL_HOOK="$BATS_TEST_DIRNAME/../../plugins/dfadler-agent-config/skills/git-worktree-usage/scripts/require-worktree-hook.sh"
+HOOK_LIB="$BATS_TEST_DIRNAME/../../plugins/dfadler-agent-config/skills/git-worktree-usage/scripts/worktree-hook-lib.sh"
 
 setup() {
   TMP="$(mktemp -d)"

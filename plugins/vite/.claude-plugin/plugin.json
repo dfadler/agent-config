@@ -1,0 +1,19 @@
+{
+  "$schema": "https://json.schemastore.org/claude-code-plugin-manifest.json",
+  "name": "vite",
+  "version": "0.1.0",
+  "description": "Skills and agents for authoring, reviewing, testing, and maintaining Vite plugins. Covers the plugin lifecycle, hook selection, deprecation guards, testing patterns, and peer-dependency maintenance.",
+  "author": {
+    "name": "Dustin Fadler",
+    "url": "https://github.com/dfadler"
+  },
+  "homepage": "https://github.com/dfadler/agent-config",
+  "repository": "https://github.com/dfadler/agent-config",
+  "keywords": [
+    "vite",
+    "vite-plugin",
+    "rolldown",
+    "bundler",
+    "frontend"
+  ]
+}

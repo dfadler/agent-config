@@ -41,6 +41,8 @@ REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 
 # shellcheck source=scripts/claude-md-lib.sh
 source "$REPO_ROOT/scripts/claude-md-lib.sh"
+# shellcheck source=scripts/settings-lib.sh
+source "$REPO_ROOT/scripts/settings-lib.sh"
 
 # Remove a symlink only if it points exactly to the expected target.
 unlink_if_owned() {
@@ -158,5 +160,10 @@ unlink_dir_contents "$HOME/.claude/commands" "$REPO_ROOT/claude/commands"
 # Plugins — any symlink in ~/.claude/skills/ pointing into this repo's
 # plugins/ directory, including links to plugins no longer in the checkout.
 unlink_dir_contents "$HOME/.claude/skills" "$REPO_ROOT/plugins"
+
+# Deregister plugin hooks from ~/.claude/settings.json that setup.sh wired in.
+GLOBAL_SETTINGS="$HOME/.claude/settings.json"
+WORKTREE_HOOK_CMD="$HOME/.claude/skills/worktree-core/skills/git-worktree-usage/scripts/require-worktree-hook.sh"
+ensure_hook_deregistered "PreToolUse" "$WORKTREE_HOOK_CMD" "$GLOBAL_SETTINGS"
 
 echo "Done."

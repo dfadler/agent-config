@@ -268,7 +268,7 @@ delete_origin_branch() {
 prune() {
   local cwd="$1"
   shift
-  local script="$REPO_ROOT/plugins/worktree-core/skills/git-worktree-usage/scripts/prune-merged-worktrees.sh"
+  local script="$REPO_ROOT/plugins/dfadler-agent-config/skills/git-worktree-usage/scripts/prune-merged-worktrees.sh"
   (cd "$cwd" && bash "$script" "$@")
 }
 

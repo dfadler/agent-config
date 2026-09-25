@@ -88,66 +88,41 @@ diffs, which this audit can't run.
 
 ### 2. Prompt caching: is CLAUDE.md a stable, cache-friendly prefix?
 
-**Confirmed, structurally.** `claude/CLAUDE.md` is written as topic-scoped
-`##` sections, each added as its own commit (see churn note below) rather
-than rewritten in place — that's a genuinely cache-friendly *shape*: new
-content appends, old content doesn't get reworded. Compare the section list:
-worktrees (`CLAUDE.md:8-61`), visual verification (`:63-93`), TypeScript
-assertions (`:95-109`), JS/TS comments (`:111-143`), focus-stealing (`:145-176`),
-answer-shape (`:178-193`), shell hygiene (`:195-229`), sabotage testing
-(`:231-242`), tooling-over-scanning (`:244-260`), dependency audits
-(`:261-275`), secrets handling (`:277-290`), citation discipline (`:292-299`),
-GitHub workflow habits (`:301-352`) — 13 largely independent topics, additive.
+**Finding from original audit (2026-08-29): stale — optimization already complete.**
 
-**But two things work against caching/context economy regardless of shape:**
+The original audit found `claude/CLAUDE.md` at 352 lines / 24,871 bytes (~6,200 tokens),
+with 13 monolithic topic sections and a noted TypeScript relevance mismatch (~48 lines /
+~13% of the file). Both the size-overage and the TS-section concerns were Confirmed
+findings at the time.
 
-- **Size.** `claude/CLAUDE.md` is 352 lines / 24,871 bytes (`wc -l`/`wc -c`),
-  ≈6,200 tokens at a rough 4 chars/token estimate. The docs: "Aim to keep
-  CLAUDE.md under 200 lines by including only essentials"
-  ([costs doc](https://code.claude.com/docs/en/costs), "Move instructions
-  from CLAUDE.md to skills"). This file is 76% over that guideline, and
-  because it's the *global* `~/.claude/CLAUDE.md`, it is loaded in full at
-  the start of **every** session in **every** project on this machine,
-  regardless of relevance.
-- **Relevance mismatch is real, not hypothetical.** Two full sections —
-  "TypeScript: avoid type assertions" (`CLAUDE.md:95-109`, 15 lines) and
-  "JS/TS: comment syntax" (`:111-143`, 33 lines), 48 lines / ~13% of the
-  file — are language-specific to TypeScript/JavaScript. This very repo
-  (agent-config) contains zero TypeScript/JavaScript; it's Bash and Python
-  (`Makefile:1-30`, `requirements-dev.txt`). Every session in *this* repo
-  pays for those 48 lines with no possible use for them this session. That's
-  the literal shape of the issue's "content always loaded into context but
-  rarely relevant" question — confirmed to exist, at a small but nonzero
-  scale (~13% of one always-on file, in this one repo).
+Since then, the refactoring the audit recommended has been completed:
 
-**Churn rate.** `git log --format=%ad --date=short -- claude/CLAUDE.md | sort |
-uniq -c` shows the file was created 2026-08-26 and has been touched on every
-day since: 3 commits (08-26), 5 (08-27), 22 (08-28), 18 (08-29) — 48 commits
-in 4 days. The 5-minute default / 1-hour extended TTL is an *inactivity*
-timeout, and every request that hits the cache resets it — so a session that
-stays active resets its own clock and can, in principle, stay warm across
-several days without ever going cold on that basis alone. Cross-day file
-changes to `CLAUDE.md` are not automatically harmless, then: whether they
-invalidate a long-lived cache depends on whether the changed content sits in
-the stable prefix a running session is still relying on, which this audit
-did not measure. What the commit count *does* establish, on its own: 48
-commits touching one file in 4 days is a lot of edit activity, and each edit
-is at minimum a write to that file. Whether each commit also required Claude
-to read or diff the *whole* file (rather than a targeted edit) isn't
-something `git log` can show — that would need session/tool telemetry this
-audit didn't have access to, so that stronger claim is marked Unmeasured
-rather than asserted.
+- `claude/CLAUDE.md` is now **20 lines** — a short header explaining the conventions
+  model and pointing at `claude/conventions/`. No topic sections live directly in this
+  file.
+- The actual behavioral guidance that used to be inline (worktrees, secrets, shell
+  hygiene, citation discipline, focus-stealing, etc.) is now split into individual
+  per-topic files under `claude/conventions/`. `setup.sh` generates `@include` lines
+  in `~/.claude/CLAUDE.md` only for the files listed in
+  `claude/conventions/DEFAULT_ENABLED` — a short, low-controversy default set.
+  Additional conventions are opt-in per machine, not globally forced.
+- The TypeScript sections (`CLAUDE.md:95-109`, `:111-143` in the original file) were
+  moved to the `dfadler-agent-config:typescript-conventions` skill, which only loads
+  on invocation, in TypeScript-containing repos.
+- A `CLAUDE_MD_MAX_LINES` ceiling (`Makefile:179`, currently 350) enforced by
+  `scripts/check-claude-md-lines.sh` as part of `make lint-sh` prevents the file
+  from growing back.
 
-Confidence: line/byte counts and churn commit counts are Confirmed
-(direct tool output). Whether cross-day cache effects are actually being lost
-to this churn, and whether each commit cost a full-file read/diff, are
-Unmeasured — flagged above rather than asserted. The claim that 352 lines
-meaningfully raises per-session cost vs. a 200-line file, and that the
-TypeScript sections are "waste" in *this* repo specifically, are Confirmed as
-facts about this
-repo's content but Speculative as a claim about aggregate cost impact across
-this user's *other* (TS-containing) repos, where the same content is fully
-relevant every session.
+The current architecture is cache-friendly by design: `claude/CLAUDE.md` itself is
+stable (rarely edited), and the always-loaded content is the small per-file includes
+from `claude/conventions/DEFAULT_ENABLED` rather than a single large file. Convention
+additions that would have previously grown `claude/CLAUDE.md` now go to opt-in
+per-machine includes or on-demand skills.
+
+Confidence: the refactoring is Confirmed (direct read of `claude/CLAUDE.md`,
+`wc -l`, `cat claude/conventions/DEFAULT_ENABLED`). The caching behavior of the
+new architecture — whether smaller, stable prefix files produce measurably better
+cache hit rates in practice — is Unmeasured, as before.
 
 ### 3. Subagent / workflow fan-out costs
 
@@ -284,15 +259,14 @@ skills" guidance. [`docs/contributing.md`'s "Why skills here don't declare
 shows this was a deliberate design choice (weighing whether to add
 `allowed-tools` per-skill vs. leaning on `settings.json`), not an accident.
 
-The one thing genuinely mismatched between "always loaded" and "often
-irrelevant" is `CLAUDE.md` itself, covered in depth in §2 — restated briefly
-here because it's the primary finding for this section: 352 lines / ~6,200
-tokens loaded into every session in every project, with a confirmed
-~13%-of-file segment (TypeScript rules) irrelevant to this specific
-Bash/Python repo on every one of those loads.
+The `CLAUDE.md` relevance-mismatch finding from the original audit (§2) has been
+resolved: `claude/CLAUDE.md` is now 20 lines pointing at per-topic convention files,
+and the TypeScript content moved to an on-demand skill. Session hygiene for the
+always-loaded content is now sound — the only relevant mismatch would be a convention
+file in `DEFAULT_ENABLED` that happens to be irrelevant to a given repo, which is a
+much smaller surface than the original monolithic file.
 
-Confidence: Confirmed for the skill/agent architecture; Confirmed (same
-evidence as §2) for the CLAUDE.md relevance-mismatch claim.
+Confidence: Confirmed for the skill/agent architecture; §2 finding confirmed resolved.
 
 ### 6. Effort / reasoning-level defaults
 
@@ -361,34 +335,18 @@ in any consuming repo is not observable from here.
 ## Ranked optimization opportunities
 
 Ordered by (estimated effort to ship) vs. (plausible savings), highest
-leverage first. None of these are applied in this PR — see the task
-constraints; they're recommendations only.
+leverage first. Items marked **Done** were completed after the original audit;
+remaining items are open recommendations.
 
-1. **Trim `claude/CLAUDE.md` toward the 200-line guideline; move the two
-   TypeScript sections into a TS-specific skill or a project-level snippet.**
-   Effort: low (it's two contiguous, self-contained sections —
-   `CLAUDE.md:95-109` and `:111-143` — with no cross-references from the
-   rest of the file). Savings: ~48 lines (~13%) off the file that's loaded
-   into literally every session on this machine, in every project,
-   TypeScript or not; compounds across every non-TS session (this repo
-   included) for as long as the content lives there. Confidence: Confirmed
-   the content is there and is TS-specific; Speculative on exact token
-   savings and how much it matters at ~800-1,000 tokens (small in absolute
-   terms, but it's pure waste on every non-TS session and the file is
-   already 76% over the docs' own size guideline, so trimming here is a
-   concrete first cut toward that target rather than a one-off).
+1. ~~**Trim `claude/CLAUDE.md` toward the 200-line guideline; move the two
+   TypeScript sections into a TS-specific skill.**~~ **Done.** `claude/CLAUDE.md`
+   is now 20 lines; all topic sections were moved to per-file convention includes
+   under `claude/conventions/`; the TypeScript sections became the
+   `dfadler-agent-config:typescript-conventions` skill (§2).
 
-2. **Treat `claude/CLAUDE.md`'s current length as a standing budget, not
-   just this one over-limit.** Effort: low to set up (a line-count check),
-   ongoing discipline cost thereafter. Right now the file has taken on 13
-   independent topic sections in under a week (48 commits since creation,
-   §2) with no size ceiling enforced anywhere — `make check` has no CLAUDE.md
-   line-count gate. Adding one (e.g., a `wc -l` assertion in the same spirit
-   as the shell/coverage checks already in `Makefile`) would catch future
-   growth before it re-crosses 200 lines, rather than requiring a periodic
-   manual trim. Confidence: Confirmed no such gate currently exists (read of
-   `Makefile`); the recommendation itself is a design suggestion, not a
-   measured claim.
+2. ~~**Add a `claude/CLAUDE.md` line-count gate to `make check`.**~~ **Done.**
+   `make lint-sh` now runs `scripts/check-claude-md-lines.sh` against a
+   `CLAUDE_MD_MAX_LINES` ceiling defined in `Makefile:179` (§2).
 
 3. **Document why each agent is pinned to its model tier — one comment per
    agent, three agents now, not one.** Effort: trivial (a one-line comment
@@ -435,9 +393,9 @@ constraints; they're recommendations only.
 | Area | Verdict | Confidence |
 |---|---|---|
 | Model tier selection | Three overrides (opus/sonnet/haiku, one per agent), each plausibly matched to its task's reasoning complexity, all undocumented | Overrides: Confirmed. Justification: Speculative |
-| Prompt caching / CLAUDE.md structure | Cache-friendly append shape; oversized (352 vs. 200-line guideline); ~13% TS-irrelevant-here content | Confirmed |
+| Prompt caching / CLAUDE.md structure | Original finding (352-line file, ~13% TS-irrelevant) resolved: file is now 20 lines, content moved to per-topic convention files and skills | Confirmed |
 | Subagent/workflow fan-out | No fan-out in this repo (3 agents now, still one per caller, no parallel launch); rubric skill is large (~10.4k tok) and built for external reuse | In-repo facts: Confirmed. External impact: Speculative |
 | Background task/polling | Clean — dynamic pacing already implemented, no fixed-interval polling found | Confirmed |
-| Session/context hygiene | Skill/agent split is sound; CLAUDE.md is the one always-on/rarely-relevant mismatch | Confirmed |
+| Session/context hygiene | Skill/agent split is sound; original CLAUDE.md relevance-mismatch finding resolved (§2) | Confirmed |
 | Effort/reasoning defaults | No knob set today; `effort:` frontmatter is a documented lever for mechanical subagents (#231) | Mechanism: Confirmed. Quality impact: Speculative |
 | Subscription vs. API tradeoffs | Repo's own CI never touches Claude; exported skills are designed for external CI reuse where API billing likely applies | Speculative |

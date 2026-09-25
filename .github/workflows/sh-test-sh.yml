@@ -1,0 +1,30 @@
+name: test-sh
+
+on:
+  workflow_call:
+
+permissions:
+  contents: read
+
+env:
+  BATS_VERSION: v1.11.1
+  # Pinned commit rather than tag: a tag can be repointed at different code.
+  BATS_COMMIT: b640ec3cf2c7c9cfc9e6351479261186f76eeec8
+
+jobs:
+  run:
+    name: run
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - name: Install bats ${{ env.BATS_VERSION }}
+        run: |
+          git clone --filter=blob:none --no-checkout \
+            https://github.com/bats-core/bats-core.git /tmp/bats-core
+          git -C /tmp/bats-core checkout --detach "$BATS_COMMIT"
+          sudo /tmp/bats-core/install.sh /usr/local
+          bats --version
+      - name: Test (bats)
+        run: make test-sh
