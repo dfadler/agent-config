@@ -1,4 +1,5 @@
 #!/usr/bin/env bash
+# sourced-only
 # Helpers for managing ~/.claude/settings.json hook entries.
 # Sourced by setup.sh and teardown.sh — do not run directly.
 #
