@@ -12,28 +12,29 @@ metadata:
 
 ## Running tests
 
-From the plugin package directory:
+Prefer the package's own scripts over invoking `vitest` directly. The scripts
+wire up the correct config, reporters, and any task-runner dependency ordering
+(e.g. Turbo requires upstream builds to run before tests).
+
+| Goal | Script |
+|------|--------|
+| Watch mode | `pnpm test` |
+| One-shot (no watch) | `pnpm test:nowatch` |
+| One-shot, CI mode | `pnpm test:ci` |
+| With coverage | `pnpm test:ci:coverage` |
+| Single file, watch | `pnpm test -- src/vite/__tests__/myPlugin.test.ts` |
+| Single file, no watch | `pnpm test:nowatch -- src/vite/__tests__/myPlugin.test.ts` |
+
+Script names vary across projects — check `package.json` before assuming they
+match the table above. Common aliases: `test:watch`, `vitest`, `unit`.
+
+**Standalone packages** (no monorepo, no task runner) can invoke Vitest directly:
 
 ```bash
-# Run all tests once
-npx vitest run
-
-# Run a specific test file
-npx vitest run src/vite/__tests__/myPlugin.test.ts
-
-# Watch mode (re-runs on save)
-npx vitest
-
-# With coverage
-npx vitest run --coverage
-```
-
-In a monorepo with a shared test config, the workspace root may have a script:
-
-```bash
-# Example: from workspace root
-pnpm --filter @my-org/vite-plugins test
-pnpm --filter @my-org/vite-plugins test:watch
+npx vitest                          # watch mode
+npx vitest --watch=false            # one-shot
+npx vitest --watch=false --coverage # with coverage
+npx vitest src/vite/__tests__/myPlugin.test.ts  # single file, watch
 ```
 
 ## Type checking
@@ -48,19 +49,34 @@ caught by the type checker.
 
 ## Testing against your app
 
-For a workspace-local plugin, no linking is needed — the app imports from
-the package path directly. For a standalone published plugin:
+**In a pnpm workspace** — use the workspace protocol in the consumer's
+`package.json`, then reinstall:
+
+```json
+"dependencies": {
+  "@my-org/vite-plugin-name": "workspace:*"
+}
+```
 
 ```bash
-# Link the plugin locally (from plugin dir)
+pnpm install
+```
+
+The consumer imports the plugin from the package path as normal. Changes to the
+plugin source are picked up on the next Vite dev server restart (or rebuild for
+build-mode plugins).
+
+**For a standalone published plugin** — use `npm link`:
+
+```bash
+# From the plugin package directory
 npm link
 
-# Use it in your app (from app dir)
+# From the consumer app directory
 npm link vite-plugin-my-plugin
 ```
 
-Then import in `vite.config.ts` as normal. Vite picks up changes after a
-dev server restart.
+Then import in `vite.config.ts` as normal.
 
 ## Debugging a plugin transform
 
@@ -95,6 +111,8 @@ enable `devtools.build.withApp: true`.
 2. Add the test adjacent to the plugin: `src/vite/__tests__/<plugin>.test.ts`.
 3. Run the test file in watch mode while developing:
    ```bash
+   pnpm test -- src/vite/__tests__/<plugin>.test.ts
+   # or for standalone packages:
    npx vitest src/vite/__tests__/<plugin>.test.ts
    ```
 
@@ -103,6 +121,6 @@ enable `devtools.build.withApp: true`.
 When upgrading the installed Vite version in the plugin package:
 
 1. Update `devDependencies` in `package.json`.
-2. Run tests: `npx vitest run`.
+2. Run tests via the package script: `pnpm test:ci`.
 3. Check for deprecated API usage: run `vite:review` on each plugin file.
 4. If this is a publishable plugin, update `peerDependencies` — run `vite:peer-deps`.
