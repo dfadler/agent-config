@@ -23,14 +23,16 @@ import sys
 from pathlib import Path
 
 
-def get_workflow_events(repo: str, workflow_id: int) -> set:
+def get_workflow_events(repo: str, workflow_id: int) -> set[str]:
     """Return the set of distinct event types seen in the last 10 runs."""
     try:
         result = subprocess.run(
             [
-                "gh", "api",
+                "gh",
+                "api",
                 f"repos/{repo}/actions/workflows/{workflow_id}/runs?per_page=10",
-                "--jq", "[.workflow_runs[].event] | unique",
+                "--jq",
+                "[.workflow_runs[].event] | unique",
             ],
             capture_output=True,
             text=True,

@@ -21,7 +21,7 @@ from pathlib import Path
 NAME_MAP = {1: "vite-audit", 2: "agent-config-context", 3: "facebook-react"}
 
 
-def main():
+def main() -> None:
     if len(sys.argv) != 3:
         print("Usage: write_assertions.py <iter_dir> <evals_json>", file=sys.stderr)
         sys.exit(1)
