@@ -21,7 +21,8 @@ automatically, with no per-project copy to keep in sync.
 - `plugins/` — one directory per plugin. Each plugin's directory name matches its
   manifest `name`, which is what makes skills resolve as `<plugin-name>:<skill>`.
   - `dfadler-agent-config/` — the main plugin: cross-project agents and skills
-    (PR shepherding, PR review rubric, adversarial code reviewer, worktree usage).
+    (PR shepherding, PR review rubric, adversarial code reviewer). Requires
+    `worktree-core` for git-worktree-usage.
   - `accessibility-skills/` — WCAG 2.2 code review for web markup and CSS, graded
     with an evidence-basis/severity system.
   - `detached-terminal/` — run and drive an interactive terminal (TUI, REPL,

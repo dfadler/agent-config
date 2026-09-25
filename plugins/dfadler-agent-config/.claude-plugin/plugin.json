@@ -14,5 +14,6 @@
     "pull-requests",
     "code-review",
     "ci"
-  ]
+  ],
+  "requires": ["worktree-core"]
 }
