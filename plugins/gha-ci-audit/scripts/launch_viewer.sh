@@ -11,11 +11,16 @@
 #
 # The viewer restarts on every HTTP request, so it always shows the latest outputs.
 # A PID file is written so you can kill it cleanly.
+#
+# Env:
+#   CLAUDE_SKILL_CREATOR_DIR  Override the skill-creator directory searched for
+#                             generate_review.py (default: the macOS
+#                             local-agent-mode-sessions path below).
 
 set -euo pipefail
 
 # Find the skill-creator's eval-viewer script
-SKILL_CREATOR_DIR="${HOME}/Library/Application Support/Claude/local-agent-mode-sessions/skills-plugin"
+SKILL_CREATOR_DIR="${CLAUDE_SKILL_CREATOR_DIR:-${HOME}/Library/Application Support/Claude/local-agent-mode-sessions/skills-plugin}"
 VIEWER_SCRIPT="$(find "$SKILL_CREATOR_DIR" -name "generate_review.py" -maxdepth 8 2>/dev/null | head -1)"
 
 if [[ -z "$VIEWER_SCRIPT" ]]; then

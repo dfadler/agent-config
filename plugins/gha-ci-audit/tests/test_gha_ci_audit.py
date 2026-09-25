@@ -200,6 +200,41 @@ class TestGenerateBenchmark:
         assert "Pass Rate" in md
         assert "vite-audit" in md
 
+    def test_model_defaults_when_omitted(self) -> None:
+        runs = [self._make_run()]
+        result = self.mod.generate_benchmark(
+            runs, "gha-ci-audit", "skills/gha-ci-audit"
+        )
+        assert result["metadata"]["executor_model"] == "claude-sonnet-4-6"
+        assert result["metadata"]["analyzer_model"] == "claude-sonnet-4-6"
+
+    def test_model_override_is_recorded(self) -> None:
+        runs = [self._make_run()]
+        result = self.mod.generate_benchmark(
+            runs, "gha-ci-audit", "skills/gha-ci-audit", model="claude-opus-5-5"
+        )
+        assert result["metadata"]["executor_model"] == "claude-opus-5-5"
+        assert result["metadata"]["analyzer_model"] == "claude-opus-5-5"
+
+    def test_cli_model_flag_threads_through(self, tmp_path: Path) -> None:
+        run_dir = tmp_path / "eval-1" / "with_skill"
+        run_dir.mkdir(parents=True)
+        grading = {"summary": {"pass_rate": 1.0, "passed": 2, "failed": 0, "total": 2}}
+        (run_dir / "grading.json").write_text(json.dumps(grading))
+
+        argv = [
+            "aggregate.py",
+            str(tmp_path),
+            "--model",
+            "claude-opus-5-5",
+        ]
+        with patch("sys.argv", argv):
+            self.mod.main()
+
+        data = json.loads((tmp_path / "benchmark.json").read_text())
+        assert data["metadata"]["executor_model"] == "claude-opus-5-5"
+        assert data["metadata"]["analyzer_model"] == "claude-opus-5-5"
+
 
 class TestAggregateEndToEnd:
     def setup_method(self) -> None:
