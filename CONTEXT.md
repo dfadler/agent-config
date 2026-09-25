@@ -51,9 +51,11 @@ without a full page reload. The server-side entry point for plugin authors is th
 
 A package listed in `peerDependencies` in a plugin's `package.json` that the
 consuming project must provide. For Vite plugins, `"vite"` is declared as a peer
-dependency with an explicit minimum version range (e.g., `">=7.0.0"`). When a
-new Vite major ships, the range must be updated before users can install without
-conflicts.
+dependency with an explicit minimum version range (e.g., `">=7.0.0"`). A
+lower-bounded range such as `>=7.0.0` already satisfies later Vite majors, so a
+new major does not automatically require a range update — only update when the
+new major is excluded by the existing range, or when the plugin adopts APIs
+introduced in that major.
 
 ## Plugin Layer
 

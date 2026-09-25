@@ -64,8 +64,12 @@ dev server restart.
 
 ## Debugging a plugin transform
 
-Use `vite-plugin-inspect` (requires Vite 8+) to see intermediate transform
-states between plugins:
+Use `vite-plugin-inspect` (requires Vite 8+ and `@vitejs/devtools`) to see
+intermediate transform states between plugins:
+
+```bash
+pnpm add -D vite-plugin-inspect @vitejs/devtools
+```
 
 ```ts
 // vite.config.ts
@@ -73,15 +77,16 @@ import Inspect from 'vite-plugin-inspect'
 
 export default {
   plugins: [
-    Inspect(),          // dev inspection (default)
-    // Inspect({ build: true }),  // also inspect builds
+    Inspect(),
     myPlugin(),
   ],
+  devtools: true,  // required to enable the inspection UI
 }
 ```
 
 Then open `/__inspect` in the browser to step through what each plugin
-does to each module.
+does to each module. For build inspection, pass `Inspect({ build: true })` and
+enable `devtools.build.withApp: true`.
 
 ## Adding a test for a new hook
 

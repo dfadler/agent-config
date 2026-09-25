@@ -39,7 +39,7 @@ This plugin does not enable any hooks by default. To get a nudge to run
         "hooks": [
           {
             "type": "command",
-            "command": "bash -c 'case \"$CLAUDE_TOOL_INPUT_FILE_PATH\" in */vite/plugins/*.ts|*/vite/*.config.ts) echo \"💡 Vite plugin edited — consider running /vite:review to check for deprecated APIs\" ;; esac'"
+            "command": "bash -c 'FILE_PATH=$(python3 -c \"import sys,json; d=json.load(sys.stdin); print(d.get(\\\"tool_input\\\",{}).get(\\\"file_path\\\",\\\"\\\"))\" 2>/dev/null || echo \"\"); case \"$FILE_PATH\" in */vite/plugins/*.ts|*/vite/*.config.ts) echo \"💡 Vite plugin edited — consider running /vite:review to check for deprecated APIs\" ;; esac'"
           }
         ]
       }

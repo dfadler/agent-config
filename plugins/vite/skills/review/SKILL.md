@@ -14,14 +14,17 @@ metadata:
 Work through each checklist item. Report every finding with the file path and
 line number. Skip items that don't apply to the plugin under review.
 
-## 1. Deprecated APIs
+## 1. Migration opportunities
 
-- [ ] `handleHotUpdate` present → replace with `hotUpdate`. The new hook receives
-  `HotUpdateOptions` (with `type: 'create' | 'update' | 'delete'`) and is called
-  once per environment with `this.environment` available.
-- [ ] `transformWithEsbuild` imported or called → replace with `transformWithOxc`
-  from `vite`. The API is a drop-in replacement; `transformWithEsbuild` is
-  deprecated in Vite 7.
+- [ ] `handleHotUpdate` present — flag as a migration candidate. `hotUpdate` is the
+  newer per-environment hook (available in Vite 6+) that receives `HotUpdateOptions`
+  (with `type: 'create' | 'update' | 'delete'`) and exposes `this.environment`.
+  `handleHotUpdate` still works; migration is recommended for Vite 6+ projects but
+  not required.
+- [ ] `transformWithEsbuild` imported or called in a project using rolldown-vite or
+  Vite 8+ — flag for migration to `transformWithOxc`. Standard Vite 7 still documents
+  `transformWithEsbuild`; the Oxc path requires Rolldown-powered Vite (rolldown-vite
+  package or Vite 8+).
 
 ## 2. Required fields
 
@@ -76,10 +79,11 @@ line number. Skip items that don't apply to the plugin under review.
 
 ## 9. `generateBundle` hook
 
-- [ ] Mutates the `bundle` argument in place rather than returning a new value
-  (the Rolldown hook ignores return values from `generateBundle`).
-- [ ] Uses `this.emitFile` to add new files rather than directly mutating
-  `bundle` keys with non-existing entries.
+- [ ] The hook mutates `bundle` in place. Flag a hook that **only** returns a value
+  without mutating `bundle` — the return value is ignored and the intended change
+  never lands. A return expression alongside in-place mutations is fine.
+- [ ] Uses `this.emitFile` to add new files rather than directly assigning invalid
+  output shapes to `bundle` keys.
 
 ## 10. `peerDependencies` (for publishable plugins)
 
@@ -87,15 +91,19 @@ line number. Skip items that don't apply to the plugin under review.
   (e.g., `">=7.0.0"`) rather than `"*"`.
 - [ ] The declared range matches what the plugin actually requires. If the plugin
   uses Environment API hooks (`configEnvironment`, `hotUpdate`, `this.environment`),
-  the minimum is Vite 6. If it uses `transformWithOxc`, the minimum is Vite 7.
-- [ ] When a new Vite major ships, the range must be updated before users can
-  install without peer-dependency conflicts. Run `vite:peer-deps` to walk through
-  the update.
+  the minimum is Vite 6. If it uses `transformWithOxc`, the minimum is Vite 8
+  (rolldown-vite or Vite 8+).
+- [ ] When a new Vite major ships, check whether the existing range already includes
+  it (e.g., `>=7.0.0` already satisfies Vite 8). Run `vite:peer-deps` only when the
+  range excludes the new major or the plugin adopts APIs from that major.
 
-## 11. HMR hook (`hotUpdate`)
+## 11. HMR hook
 
-- [ ] Uses `hotUpdate` not `handleHotUpdate`.
-- [ ] If the hook filters modules, it returns the filtered array (or an empty
-  array to suppress HMR), not `undefined`.
-- [ ] Accesses `this.environment` (available in Vite 6+) rather than inspecting
-  a global server reference.
+- [ ] If the project targets Vite 6+ and is open to migration, `hotUpdate` is
+  preferred over `handleHotUpdate` — it is per-environment, exposes
+  `this.environment`, and receives `type: 'create' | 'update' | 'delete'`.
+  `handleHotUpdate` still works; flag for migration, not as a blocking defect.
+- [ ] If the hook uses `hotUpdate`: when filtering modules, returns the filtered
+  array (or empty array to suppress HMR), not `undefined`.
+- [ ] If the hook uses `hotUpdate`: accesses `this.environment` rather than a
+  global server reference.

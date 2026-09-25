@@ -32,8 +32,10 @@ describe('myPlugin', () => {
 
   it('transforms matching files', () => {
     const plugin = myPlugin()
-    const transform = plugin.transform as Function
-    const result = transform('const x = 1', '/path/to/file.ts', {})
+    // Vite supports both callable hooks and object hooks with a `handler` property
+    const rawTransform = plugin.transform
+    const transform = typeof rawTransform === 'function' ? rawTransform : rawTransform?.handler
+    const result = transform?.('const x = 1', '/path/to/file.ts', {})
 
     expect(result).not.toBeNull()
     expect(result.code).toContain('/* transformed */')
@@ -41,16 +43,18 @@ describe('myPlugin', () => {
 
   it('returns null for non-matching files', () => {
     const plugin = myPlugin()
-    const transform = plugin.transform as Function
-    const result = transform('body {}', '/path/to/style.css', {})
+    const rawTransform = plugin.transform
+    const transform = typeof rawTransform === 'function' ? rawTransform : rawTransform?.handler
+    const result = transform?.('body {}', '/path/to/style.css', {})
 
     expect(result).toBeNull()
   })
 
   it('skips SSR builds', () => {
     const plugin = myPlugin()
-    const transform = plugin.transform as Function
-    const result = transform('const x = 1', '/path/to/file.ts', { ssr: true })
+    const rawTransform = plugin.transform
+    const transform = typeof rawTransform === 'function' ? rawTransform : rawTransform?.handler
+    const result = transform?.('const x = 1', '/path/to/file.ts', { ssr: true })
 
     expect(result).toBeNull()
   })
@@ -63,8 +67,9 @@ Build a minimal fake `bundle` object with the entries you need to assert on.
 `generateBundle` mutates `bundle` in place; assert on its state after the call.
 
 ```ts
-import { describe, it, expect } from 'vitest'
-import type { OutputBundle, OutputChunk } from 'rolldown'
+import { describe, it, expect, vi } from 'vitest'
+// Vite 7 bundles on top of Rollup — import types from 'rollup', not 'rolldown'
+import type { OutputBundle, OutputChunk } from 'rollup'
 import { myPlugin } from './myPlugin'
 
 function makeChunk(overrides: Partial<OutputChunk> = {}): OutputChunk {
@@ -92,6 +97,11 @@ function makeChunk(overrides: Partial<OutputChunk> = {}): OutputChunk {
   }
 }
 
+// Minimal fake plugin context — add vi.fn() stubs for methods the plugin actually calls
+function makeFakeContext() {
+  return { emitFile: vi.fn() }
+}
+
 describe('myPlugin generateBundle', () => {
   it('rewrites import paths in output chunks', () => {
     const plugin = myPlugin()
@@ -103,7 +113,7 @@ describe('myPlugin generateBundle', () => {
       }),
     }
 
-    generateBundle({}, bundle)
+    generateBundle.call(makeFakeContext(), {}, bundle)
 
     expect((bundle['output.js'] as OutputChunk).code).toContain("import './dep'")
   })
@@ -152,13 +162,23 @@ function makeFakeResponse(): Partial<ServerResponse> & { writeHead: ReturnType<t
   }
 }
 
+// Extract the middleware handler from a middlewares.use() call.
+// Handles both use(handler) and use(path, handler) call signatures.
+function extractHandler(useMock: ReturnType<typeof vi.fn>) {
+  const args = useMock.mock.calls[0]
+  return typeof args[0] === 'function' ? args[0] : args[1]
+}
+
 describe('myPlugin configureServer', () => {
   it('registers middleware on the dev server', async () => {
     const plugin = myPlugin()
     const fakeServer = makeFakeServer()
 
     const configureServer = plugin.configureServer as Function
-    await configureServer(fakeServer)
+    // configureServer may return a post-hook function (runs after Vite's internal
+    // middleware). Invoke it if present before asserting.
+    const postHook = await configureServer(fakeServer)
+    if (typeof postHook === 'function') await postHook()
 
     expect(fakeServer.middlewares.use).toHaveBeenCalledOnce()
   })
@@ -168,9 +188,10 @@ describe('myPlugin configureServer', () => {
     const fakeServer = makeFakeServer()
 
     const configureServer = plugin.configureServer as Function
-    await configureServer(fakeServer)
+    const postHook = await configureServer(fakeServer)
+    if (typeof postHook === 'function') await postHook()
 
-    const [, handler] = (fakeServer.middlewares.use as ReturnType<typeof vi.fn>).mock.calls[0]
+    const handler = extractHandler(fakeServer.middlewares.use as ReturnType<typeof vi.fn>)
     const req = makeFakeRequest({ url: '/my-route' })
     const res = makeFakeResponse()
     const next = vi.fn()
@@ -186,9 +207,10 @@ describe('myPlugin configureServer', () => {
     const fakeServer = makeFakeServer()
 
     const configureServer = plugin.configureServer as Function
-    await configureServer(fakeServer)
+    const postHook = await configureServer(fakeServer)
+    if (typeof postHook === 'function') await postHook()
 
-    const [, handler] = (fakeServer.middlewares.use as ReturnType<typeof vi.fn>).mock.calls[0]
+    const handler = extractHandler(fakeServer.middlewares.use as ReturnType<typeof vi.fn>)
     const req = makeFakeRequest({ url: '/unrelated' })
     const res = makeFakeResponse()
     const next = vi.fn()

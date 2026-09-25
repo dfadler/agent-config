@@ -10,14 +10,17 @@ metadata:
 
 # Maintaining Vite Plugin peerDependencies
 
-When a new Vite major ships (e.g., Vite 7 → Vite 8), plugins that declare
-`"vite"` as a peer dependency must update their range before users can install
-without conflicts.
+When a new Vite major ships (e.g., Vite 7 → Vite 8), check whether each plugin's
+declared `"vite"` peer range already includes the new major. A range like
+`>=7.0.0` already satisfies Vite 8 and later — no range update is needed unless
+the range excludes the new major (e.g., `^7.0.0`) or the plugin adopts APIs
+introduced in that major.
 
 ## Step 1: Find the current peer dependency declaration
 
 ```bash
-grep -r '"vite"' package.json
+# Search all package manifests in the repo (monorepo-safe)
+grep -r '"vite"' --include='package.json' .
 ```
 
 Expect to find something like:
@@ -36,10 +39,10 @@ Ask: **does this plugin use any API that was introduced after the old minimum?**
 
 | API used | Minimum Vite version |
 |----------|---------------------|
-| `hotUpdate` hook | 5.0 |
+| `hotUpdate` hook | 6.0 |
 | Environment API (`configEnvironment`, `this.environment`) | 6.0 |
-| `transformWithOxc` | 7.0 |
-| `RolldownOutput` from `build()` return type | 6.0 |
+| `transformWithOxc` | 8.0 (rolldown-vite/Vite 8+) |
+| `RolldownOutput` from `build()` return type | 8.0 |
 | `scss.silenceDeprecations` config option | 5.0 |
 
 If the plugin uses none of these, the minimum can stay at whatever the oldest
@@ -86,7 +89,7 @@ it's a non-breaking change — a patch or minor bump is sufficient.
 |--------|--------------------|
 | Add new Vite major to range (keep old min) | patch |
 | Raise minimum to new Vite major (drop old) | major |
-| Replace `"*"` with explicit minimum | patch (clarification only) |
+| Replace `"*"` with explicit minimum that narrows the range | major (drops formerly-supported versions) |
 
 ## Step 6: Update the changelog and release
 
