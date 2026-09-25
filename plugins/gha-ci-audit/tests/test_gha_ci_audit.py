@@ -779,6 +779,66 @@ class TestCheckFailures:
         assert exc.value.code == 0
         assert "no_data" in capsys.readouterr().out
 
+    def test_output_writes_json_when_chronic(self, tmp_path: Path) -> None:
+        runs = self._make_runs(["failure"] * 5)
+        runs_file = tmp_path / "runs.json"
+        runs_file.write_text(json.dumps(runs))
+        out_file = tmp_path / "failure_check.json"
+        with (
+            patch.object(
+                sys,
+                "argv",
+                ["check_failures.py", str(runs_file), "--output", str(out_file)],
+            ),
+            pytest.raises(SystemExit) as exc,
+        ):
+            self.mod.main()
+        assert exc.value.code == 1
+        data = json.loads(out_file.read_text())
+        assert data["chronic"] is True
+        assert data["failure_rate"] == 1.0
+        assert "details" in data
+
+    def test_output_writes_json_when_not_chronic(self, tmp_path: Path) -> None:
+        runs = self._make_runs(["success", "success", "failure", "success"])
+        runs_file = tmp_path / "runs.json"
+        runs_file.write_text(json.dumps(runs))
+        out_file = tmp_path / "failure_check.json"
+        with (
+            patch.object(
+                sys,
+                "argv",
+                ["check_failures.py", str(runs_file), "--output", str(out_file)],
+            ),
+            pytest.raises(SystemExit) as exc,
+        ):
+            self.mod.main()
+        assert exc.value.code == 0
+        data = json.loads(out_file.read_text())
+        assert data == {
+            "chronic": False,
+            "failure_rate": 0.25,
+            "details": data["details"],
+        }
+        assert isinstance(data["details"], str) and data["details"]
+
+    def test_output_writes_json_when_no_data(self, tmp_path: Path) -> None:
+        runs_file = tmp_path / "runs.json"
+        runs_file.write_text(json.dumps([]))
+        out_file = tmp_path / "failure_check.json"
+        with (
+            patch.object(
+                sys,
+                "argv",
+                ["check_failures.py", str(runs_file), "--output", str(out_file)],
+            ),
+            pytest.raises(SystemExit) as exc,
+        ):
+            self.mod.main()
+        assert exc.value.code == 0
+        data = json.loads(out_file.read_text())
+        assert data == {"chronic": False, "failure_rate": 0.0, "details": "no_data"}
+
 
 # ---------------------------------------------------------------------------
 # write_collect_summary.py

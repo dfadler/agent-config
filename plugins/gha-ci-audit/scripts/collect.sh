@@ -138,10 +138,8 @@ gh api "repos/${REPO}/actions/runs/${P50_RUN_ID}/jobs?per_page=100" \
 # Step 6: Check for chronic failures
 # ---------------------------------------------------------------------------
 echo "[collect] Step 6: checking for chronic failures" >&2
-FAILURE_EXIT=0
 python3 "${SCRIPT_DIR}/check_failures.py" "${OUTPUT_DIR}/runs.json" \
-  >"${OUTPUT_DIR}/failure_check.txt" 2>&1 || FAILURE_EXIT=$?
-echo "exit_code=${FAILURE_EXIT}" >>"${OUTPUT_DIR}/failure_check.txt"
+  --output "${OUTPUT_DIR}/failure_check.json" >&2 || true
 
 # ---------------------------------------------------------------------------
 # Step 7: Fetch secondary workflow stats
