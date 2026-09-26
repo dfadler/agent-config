@@ -9,6 +9,10 @@ coverage-py/
 .coverage
 node_modules/
 
+# `claude plugin eval` run output (report.html, aggregate-result.json, traces)
+# — local-only, regenerated on every run.
+evals/results/
+
 # Host-local Claude Code state. Excluding this in the repo's own .gitignore
 # (rather than relying on a personal global gitignore) matters here more than
 # in most repos: this repo is what a fresh machine bootstraps its Claude Code
