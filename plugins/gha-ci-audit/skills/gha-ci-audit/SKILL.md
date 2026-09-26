@@ -30,6 +30,8 @@ Collect workflow run data from the GitHub API, find patterns that cost time or m
 > - `scripts/write_collect_summary.py` — write collect_summary.json from CLI args (use in collector Step 8; never build this JSON inline)
 > - `scripts/write_assertions.py` — populate assertions from evals.json into eval_metadata.json (use in orchestrator Step 2; never use a heredoc or inline Python for this)
 > - `scripts/compute_workflow_timing.py` — read workflow runs JSON from stdin, output avg and p90 duration in minutes (used internally by fetch_workflow_stats.sh)
+> - `scripts/utils.py` — shared `parse_dt`/`duration_minutes`/`thirty_days_ago` helpers imported by the scripts above (not run directly)
+> - `scripts/common.sh` — shared `thirty_days_ago_iso` shell helper; sourced by `collect.sh` and `fetch_workflow_stats.sh` (not run directly)
 
 ## Step 1: Identify the repository
 
@@ -64,11 +66,12 @@ If there are multiple candidates, pick the one with the most runs (see Step 3). 
 For the primary CI workflow:
 
 ```bash
-gh api "repos/{owner}/{repo}/actions/workflows/{id}/runs?per_page=1&created=>$(date -v-30d +%Y-%m-%dT%H:%M:%SZ 2>/dev/null || date -d '30 days ago' --iso-8601=seconds)" \
+source /path/to/scripts/common.sh
+gh api "repos/{owner}/{repo}/actions/workflows/{id}/runs?per_page=1&created=>$(thirty_days_ago_iso)" \
   --jq '.total_count'
 ```
 
-> The `created>` filter uses ISO 8601. On macOS use `date -v-30d`; on Linux use `date -d '30 days ago'`. If the date flag errors, fall back to omitting the filter and noting the caveat.
+> `thirty_days_ago_iso` (in `scripts/common.sh`) uses `date -v-30d` on macOS or `date -d '30 days ago'` on Linux, and prints an empty string if neither works — treat an empty result as "omit the filter" and note the caveat.
 
 For each other workflow, get counts the same way. This gives you the true volume — don't rely on paginating through runs (you'd hit the 500-run API cap before seeing 30 days for busy workflows).
 
