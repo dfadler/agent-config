@@ -12,11 +12,8 @@ from __future__ import annotations
 import json
 import statistics
 import sys
-from datetime import datetime
 
-
-def parse_dt(s: str) -> datetime:
-    return datetime.fromisoformat(s.replace("Z", "+00:00"))
+from utils import duration_minutes, parse_dt
 
 
 def main() -> None:
@@ -29,7 +26,11 @@ def main() -> None:
     durs = []
     for r in runs:
         try:
-            d = (parse_dt(r["e"]) - parse_dt(r["s"])).total_seconds() / 60
+            s = parse_dt(r["s"])
+            e = parse_dt(r["e"])
+            if s is None or e is None:
+                continue
+            d = duration_minutes(s, e)
             if d >= 0:
                 durs.append(d)
         except Exception:
