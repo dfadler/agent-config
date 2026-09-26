@@ -105,6 +105,33 @@ assert 'SessionStart' in d['hooks'], 'SessionStart key lost'
   [ "$status" -eq 0 ]
 }
 
+@test "registered: empty matcher omits the matcher key entirely" {
+  printf '{}' >"$SETTINGS"
+  ensure_hook_registered "Stop" "" "/path/to/stop-hook.sh" "$SETTINGS"
+  run python3 -c "
+import json
+d = json.load(open('$SETTINGS'))
+entries = d['hooks']['Stop']
+assert len(entries) == 1, entries
+assert 'matcher' not in entries[0], entries[0]
+assert entries[0]['hooks'][0]['command'] == '/path/to/stop-hook.sh'
+"
+  [ "$status" -eq 0 ]
+}
+
+@test "registered: empty matcher is still idempotent — no duplicate on re-run" {
+  printf '{}' >"$SETTINGS"
+  ensure_hook_registered "SessionStart" "" "/path/to/session-hook.sh" "$SETTINGS"
+  ensure_hook_registered "SessionStart" "" "/path/to/session-hook.sh" "$SETTINGS"
+  run python3 -c "
+import json
+d = json.load(open('$SETTINGS'))
+entries = d['hooks']['SessionStart']
+assert len(entries) == 1, entries
+"
+  [ "$status" -eq 0 ]
+}
+
 @test "registered: no-op with warning when python3 absent" {
   # The absent-python3 code path uses only bash builtins (printf, return), so
   # we can use PATH=$fake_bin (empty dir, no python3) without breaking anything.

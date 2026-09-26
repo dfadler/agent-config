@@ -328,3 +328,46 @@ assert '$HOOK_CMD' not in cmds, 'hook still present after teardown'
   run_teardown
   assert_success
 }
+
+@test "hook deregistration: removes worktree-core SessionStart hooks from settings.json" {
+  SYMLINK_CMD="$HOME/.claude/skills/worktree-core/skills/git-worktree-usage/scripts/check-worktree-symlinks-hook.sh"
+  PRUNE_CMD="$HOME/.claude/skills/worktree-core/skills/git-worktree-usage/scripts/prune-merged-worktrees-hook.sh"
+  mkdir -p "$HOME/.claude"
+  python3 -c "
+import json
+d = {'hooks': {'SessionStart': [{'hooks': [
+  {'type': 'command', 'command': '$SYMLINK_CMD'},
+  {'type': 'command', 'command': '$PRUNE_CMD'},
+]}]}}
+open('$HOME/.claude/settings.json', 'w').write(json.dumps(d))
+"
+  run_teardown
+  assert_success
+  run python3 -c "
+import json
+d = json.load(open('$HOME/.claude/settings.json'))
+cmds = [h['command'] for e in d.get('hooks', {}).get('SessionStart', []) for h in e.get('hooks', [])]
+assert '$SYMLINK_CMD' not in cmds, 'symlink-check hook still present after teardown'
+assert '$PRUNE_CMD' not in cmds, 'auto-prune hook still present after teardown'
+"
+  [ "$status" -eq 0 ]
+}
+
+@test "hook deregistration: removes the memory-hygiene Stop hook from settings.json" {
+  HOOK_CMD="$HOME/.claude/skills/dfadler-agent-config/hooks/scripts/memory-hygiene-stop-hook.sh"
+  mkdir -p "$HOME/.claude"
+  python3 -c "
+import json
+d = {'hooks': {'Stop': [{'hooks': [{'type': 'command', 'command': '$HOOK_CMD'}]}]}}
+open('$HOME/.claude/settings.json', 'w').write(json.dumps(d))
+"
+  run_teardown
+  assert_success
+  run python3 -c "
+import json
+d = json.load(open('$HOME/.claude/settings.json'))
+cmds = [h['command'] for e in d.get('hooks', {}).get('Stop', []) for h in e.get('hooks', [])]
+assert '$HOOK_CMD' not in cmds, 'hook still present after teardown'
+"
+  [ "$status" -eq 0 ]
+}
