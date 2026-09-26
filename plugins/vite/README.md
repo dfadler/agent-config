@@ -51,8 +51,8 @@ This plugin does not enable any hooks by default. To get a nudge to run
 This fires only when editing files under `vite/plugins/` or `vite/*.config.ts`
 and prints an advisory message. It does not block or modify anything.
 
-## Hudl-specific layer
+## Organization-specific layer
 
-Hudl-frontends conventions (file placement in `core/packages/apps-core/src/vite/`,
-return type `VitePlugin`, Vitest shared config) will live in a separate
-`hudl-vite` plugin in the `hudl-agent-config` repository.
+Conventions specific to one organization's monorepo (file placement, a
+project-specific return type, a shared Vitest config) belong in a separate,
+private plugin that layers on top of this one — not in this repo.
