@@ -49,10 +49,15 @@ skill uses `curl` rather than `WebFetch`).
 Prefer [trafilatura](https://trafilatura.readthedocs.io/en/latest/)
 (Apache-2.0, Python) for extraction — it does readability-style main-text
 extraction and reports beating other open-source extractors on its own
-benchmark. Check whether it's already installed before doing anything else:
+benchmark. Check whether it's installed **and its CLI is actually
+reachable** — `pip install --user` can put the module on Python's import
+path while its console script lands in a `bin` directory that isn't on
+`PATH` ([trafilatura's own install docs](https://trafilatura.readthedocs.io/en/latest/installation.html)
+call this out), so the import succeeding alone isn't enough:
 
 ```sh
-python3 -c "import trafilatura" 2>/dev/null && echo present || echo missing
+python3 -c "import trafilatura" 2>/dev/null && command -v trafilatura >/dev/null 2>&1 \
+  && echo present || echo missing
 ```
 
 **If missing, this is a fetch-and-execute-style install** (a one-off tool
@@ -60,13 +65,19 @@ acquisition, not a project's own lockfile) — follow this repo's
 `fetch-execute-guide` skill: show the user the exact command
 (`pip3 install --user trafilatura`) and what it installs, and wait for
 explicit, request-scoped permission before running it. Don't install it
-silently just because the broader task was approved.
+silently just because the broader task was approved. If it's still not on
+`PATH` after installing, don't chase it — fall back to `textutil` below
+rather than trying to fix the user's `PATH`.
 
-Once available, extract from the **already-downloaded local file** (not
-`trafilatura -u`, which would fetch the URL itself again):
+Once available, feed it the **already-downloaded local file's contents on
+stdin** — not `trafilatura -i file`, which [treats the file as a
+newline-delimited list of URLs to fetch](https://trafilatura.readthedocs.io/en/latest/usage-cli.html)
+(bulk-download mode), not as HTML to parse, and would silently produce no
+output here; and not `trafilatura -u`, which would fetch the URL itself
+again:
 
 ```sh
-trafilatura -i "$WORKDIR/page.html" > "$WORKDIR/article.txt"
+trafilatura < "$WORKDIR/page.html" > "$WORKDIR/article.txt"
 ```
 
 **If the user declines the install, or it's unavailable,** fall back to the
@@ -137,35 +148,64 @@ python3 "$CLAUDE_PLUGIN_ROOT/skills/url-to-audio/scripts/chunk_text.py" \
 ```
 
 This prints one chunk file path per line. For each one, call the API and
-save the audio, then concatenate:
+save the audio, then assemble the final file once every chunk has
+succeeded:
 
 ```sh
+chunk_files=("$WORKDIR"/chunks/chunk_*.txt)
+total="${#chunk_files[@]}"
+
 i=0
+failed=0
 : > "$WORKDIR/concat.txt"
-for chunk in "$WORKDIR"/chunks/chunk_*.txt; do
+for chunk in "${chunk_files[@]}"; do
   i=$((i + 1))
   out="$WORKDIR/part_$(printf '%04d' "$i").mp3"
-  curl -sf https://api.openai.com/v1/audio/speech \
-    -H "Authorization: Bearer $OPENAI_API_KEY" \
-    -H "Content-Type: application/json" \
-    -d "$(python3 -c 'import json,sys; print(json.dumps({"model":"tts-1","voice":sys.argv[1],"speed":float(sys.argv[2]),"input":open(sys.argv[3]).read()}))' \
-      "${TTS_VOICE:-alloy}" "${TTS_SPEED:-1.0}" "$chunk")" \
-    --output "$out" || { echo "OpenAI TTS call failed for chunk $i (bad key, rate limit, or network) — stopping rather than shipping partial audio" >&2; break; }
+  body="$WORKDIR/chunks/body_$(printf '%04d' "$i").json"
+  python3 -c 'import json,sys; print(json.dumps({"model":"tts-1","voice":sys.argv[1],"speed":float(sys.argv[2]),"input":open(sys.argv[3]).read()}))' \
+    "${TTS_VOICE:-alloy}" "${TTS_SPEED:-1.0}" "$chunk" > "$body"
+  if ! curl -sf https://api.openai.com/v1/audio/speech \
+    -K - -d "@$body" --output "$out" <<CURLCFG
+header = "Authorization: Bearer ${OPENAI_API_KEY}"
+header = "Content-Type: application/json"
+CURLCFG
+  then
+    echo "OpenAI TTS call failed for chunk $i (bad key, rate limit, or network) — stopping rather than shipping partial audio" >&2
+    failed=1
+    break
+  fi
   printf "file '%s'\n" "$out" >> "$WORKDIR/concat.txt"
 done
-ffmpeg -y -f concat -safe 0 -i "$WORKDIR/concat.txt" -c copy "$WORKDIR/article.mp3"
+
+if [ "$failed" -eq 1 ]; then
+  echo "Aborting: not every chunk synthesized — refusing to ship a truncated file" >&2
+elif [ "$total" -eq 1 ]; then
+  cp "$WORKDIR/part_0001.mp3" "$WORKDIR/article.mp3"
+elif ! command -v ffmpeg >/dev/null 2>&1; then
+  echo "ffmpeg not found and there is more than one chunk — stopping rather than shipping only the first chunk's audio" >&2
+else
+  ffmpeg -y -f concat -safe 0 -i "$WORKDIR/concat.txt" -c copy "$WORKDIR/article.mp3"
+fi
 ```
 
 `-f` makes `curl` fail (non-zero exit, no output file written) on an HTTP
-error response instead of saving the JSON error body as if it were audio —
-stop the loop rather than silently building a truncated or garbled file.
+error response instead of saving the JSON error body as if it were audio.
+The API key goes through `-K -` (a config file read from stdin) rather than
+a `-H` argument, so it never becomes a process argument another same-user
+process could read via `ps`
+([curl's config-file docs](https://curl.se/docs/manpage.html)); the JSON
+body goes through `-d @file` for the same reason, since a chunk is
+untrusted extracted content that could otherwise blow past `ARG_MAX`.
+`failed` gates assembly so a break mid-loop stops the whole thing rather
+than quietly concatenating only the chunks that finished. A single chunk
+skips `ffmpeg` entirely — copying it directly means a one-chunk request
+still works on a machine without `ffmpeg` installed, matching the table
+below (`ffmpeg` is only ever required for >1 chunk).
 
 (The JSON body is built with `python3 -c` rather than hand-quoted, so the
 article text's own quotes/newlines can't break the request — a chunk is
 untrusted extracted content, same as the raw HTML in Step 1.)
 
-If `ffmpeg` isn't on `PATH` and there's more than one chunk, say so and stop
-— degrade cleanly rather than shipping only the first chunk's audio.
 [`man ffmpeg`](https://ffmpeg.org/ffmpeg-all.html#concat) documents this
 concat-demuxer approach for joining same-codec files without re-encoding.
 
