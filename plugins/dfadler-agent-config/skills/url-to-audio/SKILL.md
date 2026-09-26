@@ -177,15 +177,8 @@ CURLCFG
   printf "file '%s'\n" "$out" >> "$WORKDIR/concat.txt"
 done
 
-if [ "$failed" -eq 1 ]; then
-  echo "Aborting: not every chunk synthesized — refusing to ship a truncated file" >&2
-elif [ "$total" -eq 1 ]; then
-  cp "$WORKDIR/part_0001.mp3" "$WORKDIR/article.mp3"
-elif ! command -v ffmpeg >/dev/null 2>&1; then
-  echo "ffmpeg not found and there is more than one chunk — stopping rather than shipping only the first chunk's audio" >&2
-else
-  ffmpeg -y -f concat -safe 0 -i "$WORKDIR/concat.txt" -c copy "$WORKDIR/article.mp3"
-fi
+"$CLAUDE_PLUGIN_ROOT/skills/url-to-audio/scripts/assemble_audio.sh" \
+  "$WORKDIR" "$total" "$failed"
 ```
 
 `-f` makes `curl` fail (non-zero exit, no output file written) on an HTTP
@@ -196,11 +189,15 @@ process could read via `ps`
 ([curl's config-file docs](https://curl.se/docs/manpage.html)); the JSON
 body goes through `-d @file` for the same reason, since a chunk is
 untrusted extracted content that could otherwise blow past `ARG_MAX`.
-`failed` gates assembly so a break mid-loop stops the whole thing rather
-than quietly concatenating only the chunks that finished. A single chunk
-skips `ffmpeg` entirely — copying it directly means a one-chunk request
-still works on a machine without `ffmpeg` installed, matching the table
-below (`ffmpeg` is only ever required for >1 chunk).
+
+`assemble_audio.sh` (stdlib-only, no install needed, has its own bats
+coverage) is where the actual assembly decision lives: it refuses to ship
+anything if `failed` is set (a mid-loop break no longer means quietly
+concatenating only the chunks that finished), copies the single chunk
+directly to `article.mp3` without touching `ffmpeg` when `total` is 1 (so a
+one-chunk request still works on a machine without `ffmpeg` installed,
+matching the table below), and otherwise concatenates via `ffmpeg`,
+degrading cleanly if it's missing.
 
 (The JSON body is built with `python3 -c` rather than hand-quoted, so the
 article text's own quotes/newlines can't break the request — a chunk is

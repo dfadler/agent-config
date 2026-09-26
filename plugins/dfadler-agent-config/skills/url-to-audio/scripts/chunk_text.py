@@ -61,7 +61,7 @@ def _split_oversized(unit: str, max_chars: int) -> list[str]:
     character split as the last resort."""
     sentences = [s for s in _SENTENCE_SPLIT.split(unit) if s.strip()]
     if len(sentences) > 1:
-        pieces = []
+        pieces: list[str] = []
         for s in sentences:
             pieces.extend([s] if len(s) <= max_chars else _hard_split(s, max_chars))
         return _pack(pieces, max_chars, " ")
