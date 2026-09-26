@@ -19,19 +19,18 @@
      cleanly (exit 0, no output) whenever its precondition doesn't hold (wrong
      project type, feature not configured, required CLI missing), and never let
      the hook's own failure block a session start. The `git-worktree-usage`
-     skill's hooks (shared identically by `dfadler-agent-config` and `worktree-core`)
-     are the reference example; see `docs/hook-composition.md` for the
-     `dfadler-agent-config`/`worktree-core` mutual-exclusion note.
+     skill's hooks, owned solely by `worktree-core`, are the reference example;
+     see `docs/hook-composition.md` for the enable/disable protocol they follow.
    - A whole new **plugin** (a set of skills/agents that belong together) → a new
      directory under `plugins/`, with its own `.claude-plugin/plugin.json`, `agents/`,
      and `skills/`. Keep the directory name and the manifest `name` identical.
      `setup.sh` auto-discovers any directory under `plugins/` that carries a
      `plugin.json`, so no manual changes to `setup.sh` are needed.
-     **If the plugin ships hooks** that overlap with another plugin's hooks (e.g. the
-     git-worktree hooks that `dfadler-agent-config` and `worktree-core` share), document
-     that the two plugins are intended to be mutually exclusive — install one or the
-     other, not both — and note this in the new plugin's README and in
-     `docs/hook-composition.md`.
+     **If the plugin depends on another plugin's skill or hooks** (e.g.
+     `dfadler-agent-config` requiring `worktree-core` for `git-worktree-usage`),
+     declare it in `requires` in the manifest — note that Claude Code does not
+     enforce this field at load time — and document the dependency in the
+     plugin's README and, if hooks are involved, in `docs/hook-composition.md`.
 2. Name skills and agents plainly — `pr-babysit`, not `dfadler-agent-config-pr-babysit`
    — in both the directory/filename and the frontmatter `name:`. The plugin namespace
    already prevents collisions with a project's own skills, so a prefix here would just

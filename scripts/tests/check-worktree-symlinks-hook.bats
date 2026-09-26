@@ -1,6 +1,6 @@
 #!/usr/bin/env bats
 #
-# Tests for plugins/dfadler-agent-config/skills/git-worktree-usage/scripts/
+# Tests for plugins/worktree-core/skills/git-worktree-usage/scripts/
 # check-worktree-symlinks-hook.sh — the SessionStart hook that runs
 # verify-worktree-symlinks.sh --fix and echoes its combined output (prefixed
 # with a 🔗 marker) only when non-empty, never failing the session regardless
@@ -12,8 +12,8 @@
 # $(dirname "$0"), so copying both into one directory is enough to substitute
 # the fake without touching any real symlink, git repo, or `jq` dependency.
 
-REAL_HOOK="$BATS_TEST_DIRNAME/../../plugins/dfadler-agent-config/skills/git-worktree-usage/scripts/check-worktree-symlinks-hook.sh"
-HOOK_LIB="$BATS_TEST_DIRNAME/../../plugins/dfadler-agent-config/skills/git-worktree-usage/scripts/worktree-hook-lib.sh"
+REAL_HOOK="$BATS_TEST_DIRNAME/../../plugins/worktree-core/skills/git-worktree-usage/scripts/check-worktree-symlinks-hook.sh"
+HOOK_LIB="$BATS_TEST_DIRNAME/../../plugins/worktree-core/skills/git-worktree-usage/scripts/worktree-hook-lib.sh"
 
 setup() {
   TMP="$(mktemp -d)"

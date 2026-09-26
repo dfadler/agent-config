@@ -44,6 +44,7 @@ PY_SOURCES := plugins/detached-terminal/skills/detached-terminal/scripts/agent_t
               plugins/gha-ci-audit/scripts/write_collect_summary.py \
               plugins/gha-ci-audit/scripts/write_collect_timing.py \
               plugins/gha-ci-audit/scripts/write_render_timing.py \
+              plugins/gha-ci-audit/scripts/utils.py \
               plugins/gha-ci-audit/tests/test_gha_ci_audit.py
 
 # The non-test entries of PY_SOURCES, reduced to their containing

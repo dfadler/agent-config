@@ -38,7 +38,7 @@ session_id="$(printf '%s' "$input" | jq -r '.session_id // empty' 2>/dev/null | 
 
 case "${MEMORY_HYGIENE_REMINDER:-}" in
   1 | true | yes | on) : ;; # explicit opt-in, fall through
-  *) exit 0 ;; # unset, or any other value (0/false/no/off) -> off
+  *) exit 0 ;;              # unset, or any other value (0/false/no/off) -> off
 esac
 
 # At most one reminder per session.
