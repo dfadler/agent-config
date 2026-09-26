@@ -26,6 +26,14 @@ import pytest
 
 SCRIPTS_DIR = Path(__file__).resolve().parents[1] / "scripts"
 
+# Several scripts do `from utils import ...` at module scope, expecting the
+# same directory-relative resolution `python3 <script>.py` gets for free (the
+# script's own directory is auto-added to sys.path[0]). Loading via
+# importlib.util.spec_from_file_location below skips that, so it's done here
+# once for the whole test module.
+if str(SCRIPTS_DIR) not in sys.path:
+    sys.path.insert(0, str(SCRIPTS_DIR))
+
 
 def _load(name: str) -> types.ModuleType:
     path = SCRIPTS_DIR / f"{name}.py"
@@ -34,6 +42,87 @@ def _load(name: str) -> types.ModuleType:
     module = importlib.util.module_from_spec(spec)
     spec.loader.exec_module(module)
     return module
+
+
+# ---------------------------------------------------------------------------
+# utils.py
+# ---------------------------------------------------------------------------
+
+
+class TestParseDt:
+    def setup_method(self) -> None:
+        self.mod = _load("utils")
+
+    def test_none_returns_none(self) -> None:
+        assert self.mod.parse_dt(None) is None
+
+    def test_empty_string_returns_none(self) -> None:
+        assert self.mod.parse_dt("") is None
+
+    def test_utc_z_suffix(self) -> None:
+        dt = self.mod.parse_dt("2025-01-01T10:00:00Z")
+        assert dt is not None
+        assert dt.year == 2025 and dt.hour == 10
+        assert dt.utcoffset() is not None and dt.utcoffset().total_seconds() == 0
+
+    def test_offset_suffix(self) -> None:
+        dt = self.mod.parse_dt("2025-01-01T10:00:00+02:00")
+        assert dt is not None
+        assert dt.utcoffset() is not None and dt.utcoffset().total_seconds() == 7200
+
+
+class TestDurationMinutes:
+    def setup_method(self) -> None:
+        self.mod = _load("utils")
+
+    def test_timezone_aware_arithmetic(self) -> None:
+        start = self.mod.parse_dt("2025-01-01T10:00:00Z")
+        end = self.mod.parse_dt("2025-01-01T10:06:00Z")
+        assert self.mod.duration_minutes(start, end) == pytest.approx(6.0)
+
+    def test_cross_offset_arithmetic(self) -> None:
+        # Same instant expressed in two offsets, plus 30 real minutes.
+        start = self.mod.parse_dt("2025-01-01T10:00:00+02:00")
+        end = self.mod.parse_dt("2025-01-01T08:30:00Z")
+        assert self.mod.duration_minutes(start, end) == pytest.approx(30.0)
+
+    def test_negative_when_reversed(self) -> None:
+        start = self.mod.parse_dt("2025-01-01T10:06:00Z")
+        end = self.mod.parse_dt("2025-01-01T10:00:00Z")
+        assert self.mod.duration_minutes(start, end) == pytest.approx(-6.0)
+
+
+class TestThirtyDaysAgo:
+    def setup_method(self) -> None:
+        self.mod = _load("utils")
+
+    def test_format_is_parseable_and_in_the_past(self) -> None:
+        result = self.mod.thirty_days_ago()
+        parsed = self.mod.parse_dt(result)
+        assert parsed is not None
+        assert result.endswith("Z")
+        assert parsed < self.mod.datetime.now(parsed.tzinfo)
+
+
+class TestNullGuardUnified:
+    """Regression coverage for the divergence #305 fixes: every caller now
+    shares `parse_dt`'s guard, including `compute_workflow_timing.py`, which
+    previously used a stripped local copy with no guard at all."""
+
+    def test_compute_workflow_timing_skips_null_timestamp(
+        self, capsys: pytest.CaptureFixture[str]
+    ) -> None:
+        import io
+
+        mod = _load("compute_workflow_timing")
+        runs = [
+            {"s": None, "e": "2025-01-01T10:06:00Z"},  # missing start, skipped
+            {"s": "2025-01-01T10:00:00Z", "e": "2025-01-01T10:04:00Z"},  # 4 min
+        ]
+        with patch.object(sys, "stdin", io.StringIO(json.dumps(runs))):
+            mod.main()
+        out = capsys.readouterr().out.strip()
+        assert out == "4.0  4.0"
 
 
 # ---------------------------------------------------------------------------
