@@ -40,7 +40,7 @@ Check that these files are present in `{outputs_dir}`:
 | `collect_summary.json` | Yes |
 | `runs.json` | Yes |
 | `jobs.json` | Yes |
-| `failure_check.txt` | Yes |
+| `failure_check.json` | Yes |
 | `workflow_stats.txt` | Yes |
 | `workflows.json` | Yes |
 
@@ -64,7 +64,7 @@ python3 {scripts_dir}/analyze_jobs.py {outputs_dir}/jobs.json --steps
 
 Read `{outputs_dir}/collect_summary.json` for repo name, primary workflow name, p50 run ID, and 30-day run count.
 
-Read `{outputs_dir}/failure_check.txt` to determine whether to show an alert-banner (look for `chronic=YES`).
+Read `{outputs_dir}/failure_check.json` with `json.load` to determine whether to show an alert-banner (the `chronic` field).
 
 Read `{outputs_dir}/workflow_stats.txt` for secondary workflow summary table.
 
@@ -74,7 +74,7 @@ Read `{outputs_dir}/workflow_stats.txt` for secondary workflow summary table.
 
 Using the data from Step 2, work through the patterns defined in the skill (Steps 6 in `SKILL.md`):
 
-- **Pre-check**: `failure_check.txt` says `chronic=YES` → include alert-banner
+- **Pre-check**: `failure_check.json` has `"chronic": true` → include alert-banner
 - **Pattern A**: Long-tail critical path bottleneck
 - **Pattern B**: Failures cost as much as successes
 - **Pattern C**: Expensive cancellations

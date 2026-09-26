@@ -1,8 +1,8 @@
 {
   "$schema": "https://json.schemastore.org/claude-code-plugin-manifest.json",
   "name": "pr-visual-capture",
-  "version": "1.2.0",
-  "description": "Standalone pr-visual-capture skill: produce screenshot (PNG) and walkthrough video (MP4) files for PR/issue visual verification using headless Chrome and CDP, with responsive/Lighthouse pass. Requires gh-attach-image (standalone or via dfadler-agent-config) to upload the resulting files.",
+  "version": "2.0.0",
+  "description": "Deprecated: working wrapper shim that sequences the screen-capture plugin's capture/compare/attach skills for PR/issue visual verification. See plugins/screen-capture.",
   "author": {
     "name": "Dustin Fadler",
     "url": "https://github.com/dfadler"

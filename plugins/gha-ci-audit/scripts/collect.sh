@@ -52,6 +52,8 @@ done
 }
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+# shellcheck source=plugins/gha-ci-audit/scripts/common.sh
+source "${SCRIPT_DIR}/common.sh"
 mkdir -p "$OUTPUT_DIR"
 
 # ---------------------------------------------------------------------------
@@ -100,9 +102,7 @@ echo "[collect] Primary workflow: ${PRIMARY_WF_NAME} (id=${WORKFLOW_ID})" >&2
 # Step 2: Fetch run count (last 30 days)
 # ---------------------------------------------------------------------------
 echo "[collect] Step 2: fetching 30-day run count" >&2
-SINCE=$(date -v-30d +%Y-%m-%dT%H:%M:%SZ 2>/dev/null ||
-  date -d '30 days ago' --iso-8601=seconds 2>/dev/null ||
-  echo "")
+SINCE=$(thirty_days_ago_iso)
 
 COUNT_QUERY="repos/${REPO}/actions/workflows/${WORKFLOW_ID}/runs?per_page=1"
 if [[ -n "$SINCE" ]]; then
@@ -138,10 +138,8 @@ gh api "repos/${REPO}/actions/runs/${P50_RUN_ID}/jobs?per_page=100" \
 # Step 6: Check for chronic failures
 # ---------------------------------------------------------------------------
 echo "[collect] Step 6: checking for chronic failures" >&2
-FAILURE_EXIT=0
 python3 "${SCRIPT_DIR}/check_failures.py" "${OUTPUT_DIR}/runs.json" \
-  >"${OUTPUT_DIR}/failure_check.txt" 2>&1 || FAILURE_EXIT=$?
-echo "exit_code=${FAILURE_EXIT}" >>"${OUTPUT_DIR}/failure_check.txt"
+  --output "${OUTPUT_DIR}/failure_check.json" >&2 || true
 
 # ---------------------------------------------------------------------------
 # Step 7: Fetch secondary workflow stats
@@ -165,13 +163,13 @@ fi
 echo "[collect] Step 8: writing collect_summary.json" >&2
 RUN_COUNT=$(cat "${OUTPUT_DIR}/run_count_primary.txt")
 python3 "${SCRIPT_DIR}/write_collect_summary.py" \
-  "${OUTPUT_DIR}" \
-  "${REPO}" \
-  "${WORKFLOW_ID}" \
-  "${PRIMARY_WF_NAME}" \
-  "${P50_RUN_ID}" \
-  "${P50_DURATION}" \
-  "${RUN_COUNT}"
+  --outputs-dir "${OUTPUT_DIR}" \
+  --repo "${REPO}" \
+  --workflow-id "${WORKFLOW_ID}" \
+  --workflow-name "${PRIMARY_WF_NAME}" \
+  --p50-run-id "${P50_RUN_ID}" \
+  --p50-duration-min "${P50_DURATION}" \
+  --run-count "${RUN_COUNT}"
 
 # ---------------------------------------------------------------------------
 # Timing — compute and write collect_timing.json

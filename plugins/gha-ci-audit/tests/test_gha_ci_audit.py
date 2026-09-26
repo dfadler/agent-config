@@ -26,6 +26,14 @@ import pytest
 
 SCRIPTS_DIR = Path(__file__).resolve().parents[1] / "scripts"
 
+# Several scripts do `from utils import ...` at module scope, expecting the
+# same directory-relative resolution `python3 <script>.py` gets for free (the
+# script's own directory is auto-added to sys.path[0]). Loading via
+# importlib.util.spec_from_file_location below skips that, so it's done here
+# once for the whole test module.
+if str(SCRIPTS_DIR) not in sys.path:
+    sys.path.insert(0, str(SCRIPTS_DIR))
+
 
 def _load(name: str) -> types.ModuleType:
     path = SCRIPTS_DIR / f"{name}.py"
@@ -34,6 +42,87 @@ def _load(name: str) -> types.ModuleType:
     module = importlib.util.module_from_spec(spec)
     spec.loader.exec_module(module)
     return module
+
+
+# ---------------------------------------------------------------------------
+# utils.py
+# ---------------------------------------------------------------------------
+
+
+class TestParseDt:
+    def setup_method(self) -> None:
+        self.mod = _load("utils")
+
+    def test_none_returns_none(self) -> None:
+        assert self.mod.parse_dt(None) is None
+
+    def test_empty_string_returns_none(self) -> None:
+        assert self.mod.parse_dt("") is None
+
+    def test_utc_z_suffix(self) -> None:
+        dt = self.mod.parse_dt("2025-01-01T10:00:00Z")
+        assert dt is not None
+        assert dt.year == 2025 and dt.hour == 10
+        assert dt.utcoffset() is not None and dt.utcoffset().total_seconds() == 0
+
+    def test_offset_suffix(self) -> None:
+        dt = self.mod.parse_dt("2025-01-01T10:00:00+02:00")
+        assert dt is not None
+        assert dt.utcoffset() is not None and dt.utcoffset().total_seconds() == 7200
+
+
+class TestDurationMinutes:
+    def setup_method(self) -> None:
+        self.mod = _load("utils")
+
+    def test_timezone_aware_arithmetic(self) -> None:
+        start = self.mod.parse_dt("2025-01-01T10:00:00Z")
+        end = self.mod.parse_dt("2025-01-01T10:06:00Z")
+        assert self.mod.duration_minutes(start, end) == pytest.approx(6.0)
+
+    def test_cross_offset_arithmetic(self) -> None:
+        # Same instant expressed in two offsets, plus 30 real minutes.
+        start = self.mod.parse_dt("2025-01-01T10:00:00+02:00")
+        end = self.mod.parse_dt("2025-01-01T08:30:00Z")
+        assert self.mod.duration_minutes(start, end) == pytest.approx(30.0)
+
+    def test_negative_when_reversed(self) -> None:
+        start = self.mod.parse_dt("2025-01-01T10:06:00Z")
+        end = self.mod.parse_dt("2025-01-01T10:00:00Z")
+        assert self.mod.duration_minutes(start, end) == pytest.approx(-6.0)
+
+
+class TestThirtyDaysAgo:
+    def setup_method(self) -> None:
+        self.mod = _load("utils")
+
+    def test_format_is_parseable_and_in_the_past(self) -> None:
+        result = self.mod.thirty_days_ago()
+        parsed = self.mod.parse_dt(result)
+        assert parsed is not None
+        assert result.endswith("Z")
+        assert parsed < self.mod.datetime.now(parsed.tzinfo)
+
+
+class TestNullGuardUnified:
+    """Regression coverage for the divergence #305 fixes: every caller now
+    shares `parse_dt`'s guard, including `compute_workflow_timing.py`, which
+    previously used a stripped local copy with no guard at all."""
+
+    def test_compute_workflow_timing_skips_null_timestamp(
+        self, capsys: pytest.CaptureFixture[str]
+    ) -> None:
+        import io
+
+        mod = _load("compute_workflow_timing")
+        runs = [
+            {"s": None, "e": "2025-01-01T10:06:00Z"},  # missing start, skipped
+            {"s": "2025-01-01T10:00:00Z", "e": "2025-01-01T10:04:00Z"},  # 4 min
+        ]
+        with patch.object(sys, "stdin", io.StringIO(json.dumps(runs))):
+            mod.main()
+        out = capsys.readouterr().out.strip()
+        assert out == "4.0  4.0"
 
 
 # ---------------------------------------------------------------------------
@@ -199,6 +288,41 @@ class TestGenerateBenchmark:
         assert "# Benchmark" in md
         assert "Pass Rate" in md
         assert "vite-audit" in md
+
+    def test_model_defaults_when_omitted(self) -> None:
+        runs = [self._make_run()]
+        result = self.mod.generate_benchmark(
+            runs, "gha-ci-audit", "skills/gha-ci-audit"
+        )
+        assert result["metadata"]["executor_model"] == "claude-sonnet-4-6"
+        assert result["metadata"]["analyzer_model"] == "claude-sonnet-4-6"
+
+    def test_model_override_is_recorded(self) -> None:
+        runs = [self._make_run()]
+        result = self.mod.generate_benchmark(
+            runs, "gha-ci-audit", "skills/gha-ci-audit", model="claude-opus-5-5"
+        )
+        assert result["metadata"]["executor_model"] == "claude-opus-5-5"
+        assert result["metadata"]["analyzer_model"] == "claude-opus-5-5"
+
+    def test_cli_model_flag_threads_through(self, tmp_path: Path) -> None:
+        run_dir = tmp_path / "eval-1" / "with_skill"
+        run_dir.mkdir(parents=True)
+        grading = {"summary": {"pass_rate": 1.0, "passed": 2, "failed": 0, "total": 2}}
+        (run_dir / "grading.json").write_text(json.dumps(grading))
+
+        argv = [
+            "aggregate.py",
+            str(tmp_path),
+            "--model",
+            "claude-opus-5-5",
+        ]
+        with patch("sys.argv", argv):
+            self.mod.main()
+
+        data = json.loads((tmp_path / "benchmark.json").read_text())
+        assert data["metadata"]["executor_model"] == "claude-opus-5-5"
+        assert data["metadata"]["analyzer_model"] == "claude-opus-5-5"
 
 
 class TestAggregateEndToEnd:
@@ -744,6 +868,66 @@ class TestCheckFailures:
         assert exc.value.code == 0
         assert "no_data" in capsys.readouterr().out
 
+    def test_output_writes_json_when_chronic(self, tmp_path: Path) -> None:
+        runs = self._make_runs(["failure"] * 5)
+        runs_file = tmp_path / "runs.json"
+        runs_file.write_text(json.dumps(runs))
+        out_file = tmp_path / "failure_check.json"
+        with (
+            patch.object(
+                sys,
+                "argv",
+                ["check_failures.py", str(runs_file), "--output", str(out_file)],
+            ),
+            pytest.raises(SystemExit) as exc,
+        ):
+            self.mod.main()
+        assert exc.value.code == 1
+        data = json.loads(out_file.read_text())
+        assert data["chronic"] is True
+        assert data["failure_rate"] == 1.0
+        assert "details" in data
+
+    def test_output_writes_json_when_not_chronic(self, tmp_path: Path) -> None:
+        runs = self._make_runs(["success", "success", "failure", "success"])
+        runs_file = tmp_path / "runs.json"
+        runs_file.write_text(json.dumps(runs))
+        out_file = tmp_path / "failure_check.json"
+        with (
+            patch.object(
+                sys,
+                "argv",
+                ["check_failures.py", str(runs_file), "--output", str(out_file)],
+            ),
+            pytest.raises(SystemExit) as exc,
+        ):
+            self.mod.main()
+        assert exc.value.code == 0
+        data = json.loads(out_file.read_text())
+        assert data == {
+            "chronic": False,
+            "failure_rate": 0.25,
+            "details": data["details"],
+        }
+        assert isinstance(data["details"], str) and data["details"]
+
+    def test_output_writes_json_when_no_data(self, tmp_path: Path) -> None:
+        runs_file = tmp_path / "runs.json"
+        runs_file.write_text(json.dumps([]))
+        out_file = tmp_path / "failure_check.json"
+        with (
+            patch.object(
+                sys,
+                "argv",
+                ["check_failures.py", str(runs_file), "--output", str(out_file)],
+            ),
+            pytest.raises(SystemExit) as exc,
+        ):
+            self.mod.main()
+        assert exc.value.code == 0
+        data = json.loads(out_file.read_text())
+        assert data == {"chronic": False, "failure_rate": 0.0, "details": "no_data"}
+
 
 # ---------------------------------------------------------------------------
 # write_collect_summary.py
@@ -762,12 +946,19 @@ class TestWriteCollectSummary:
             "argv",
             [
                 "write_collect_summary.py",
+                "--outputs-dir",
                 str(outputs_dir),
+                "--repo",
                 "vitejs/vite",
+                "--workflow-id",
                 "12345",
+                "--workflow-name",
                 "CI",
+                "--p50-run-id",
                 "99999",
+                "--p50-duration-min",
                 "4.5",
+                "--run-count",
                 "100",
             ],
         ):
@@ -894,7 +1085,7 @@ class TestWriteAssertions:
             "evals": [
                 {
                     "id": 1,
-                    "name": "vite-audit",
+                    "dir_name": "vite-audit",
                     "assertions": [
                         {"id": "artifact_published", "text": "Report published"},
                     ],
@@ -911,6 +1102,22 @@ class TestWriteAssertions:
         updated = json.loads((run_dir / "eval_metadata.json").read_text())
         assert len(updated["assertions"]) == 1
         assert updated["assertions"][0]["id"] == "artifact_published"
+
+    def test_skips_eval_missing_dir_name(
+        self, tmp_path: Path, capsys: pytest.CaptureFixture[str]
+    ) -> None:
+        iter_dir = tmp_path / "iteration-1"
+        iter_dir.mkdir()
+
+        evals_json = tmp_path / "evals.json"
+        evals_json.write_text(json.dumps({"evals": [{"id": 1, "assertions": []}]}))
+
+        with patch.object(
+            sys, "argv", ["write_assertions.py", str(iter_dir), str(evals_json)]
+        ):
+            self.mod.main()
+
+        assert "Missing dir_name" in capsys.readouterr().err
 
 
 # ---------------------------------------------------------------------------
