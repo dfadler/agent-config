@@ -24,5 +24,8 @@
     "enforce": "block",
     "autoPrune": true,
     "symlinkCheck": "on"
+  },
+  "env": {
+    "MEMORY_HYGIENE_REMINDER": "on"
   }
 }

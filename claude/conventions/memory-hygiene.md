@@ -47,11 +47,15 @@ hook, not `SessionEnd`: `SessionEnd` fires after the session has already termina
 can't block anything, and its output is shown to the user only, never added to
 Claude's context, so Claude has no way to act on it. `Stop` fires while Claude can
 still act — it can block (exit code 2 or `decision: "block"`) to keep the
-conversation going, and its `additionalContext` output does reach Claude. A project
-or user `Stop` hook that reminds "write a memory update if anything durable happened
-this turn, before it's lost" would close this gap without adopting engram. Not
-implemented yet — evaluate as a follow-up if the manual habit of writing memories
-mid-session (rather than at close) turns out to be lossy in practice.
+conversation going, and its `additionalContext` output does reach Claude.
+
+Implemented as `memory-hygiene-stop-hook.sh` in `dfadler-agent-config`'s
+`hooks/hooks.json` (see [`docs/hook-composition.md`](../../docs/hook-composition.md)
+for the enable signals). `Stop` fires once per turn, not once per session, so a
+blanket "always remind" hook would nag constantly; this one throttles to at most
+one reminder per session and only fires when `git status` shows uncommitted
+changes — opt in per session (or per project, via settings.json's `env` key) with
+`MEMORY_HYGIENE_REMINDER=on`, off by default.
 
 Until then, make it a manual habit: before wrapping up a session that produced
 anything durable, do one pass modeled on engram's session summary — what was the
