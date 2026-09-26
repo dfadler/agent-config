@@ -7,6 +7,10 @@
 
 # ensure_hook_registered EVENT MATCHER COMMAND SETTINGS_FILE
 #   Idempotently adds a command hook entry under hooks.<EVENT> in SETTINGS_FILE.
+#   MATCHER may be "" for an event that has no matcher concept (SessionStart,
+#   Stop, etc.) — the entry is then written without a "matcher" key at all,
+#   matching the shape a plugin's own hooks.json uses for those events,
+#   rather than a literal empty string.
 #   No-op (silent) if a hook with the same command already exists anywhere
 #   under hooks.<EVENT>. Creates SETTINGS_FILE as {} if it does not exist.
 #   Prints a single status line on add; nothing if already present.
@@ -44,16 +48,17 @@ for entry in event_hooks:
     if any(h.get("command") == cmd for h in entry.get("hooks", [])):
         sys.exit(0)  # already registered
 
-event_hooks.append({
-    "matcher": matcher,
-    "hooks":   [{"type": "command", "command": cmd}],
-})
+new_entry = {"hooks": [{"type": "command", "command": cmd}]}
+if matcher:
+    new_entry["matcher"] = matcher
+event_hooks.append(new_entry)
 
 with open(settings_path, "w") as f:
     json.dump(data, f, indent=4)
     f.write("\n")
 
-print("Registered {}/{} hook in {}".format(event, matcher, settings_path))
+label = "{}/{}".format(event, matcher) if matcher else event
+print("Registered {} hook in {}".format(label, settings_path))
 PYEOF
 }
 

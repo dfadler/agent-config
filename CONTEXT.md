@@ -60,6 +60,6 @@ introduced in that major.
 ## Plugin Layer
 
 A scoping concept for this plugin system. The general `vite` plugin (this repo,
-`agent-config`) holds patterns valid for any Vite project. A Hudl-specific layer
-(`hudl-agent-config`, a separate future repo) extends it with conventions specific
-to `hudl-frontends`.
+`agent-config`) holds patterns valid for any Vite project. An organization-specific
+layer (a separate, private repo) can extend it with conventions specific to that
+organization's own monorepo.

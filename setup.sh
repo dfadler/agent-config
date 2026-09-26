@@ -526,14 +526,34 @@ done
 # .claude/settings.json), so registering it globally is safe for projects that
 # haven't opted in — it simply exits 0 without doing anything in those repos.
 #
-# When worktree-core is excluded via --skip/--include, deregister the hook to
+# Same story for worktree-core's two SessionStart hooks (self-healing
+# symlink check, merged-worktree prune) and dfadler-agent-config's Stop hook
+# (memory-hygiene reminder) — all three are off-by-default (env var or the
+# project's own .claude/settings.json key) and documented in
+# docs/hook-composition.md, but were never actually wired into
+# ~/.claude/settings.json, so they never fired regardless of configuration.
+#
+# When a plugin is excluded via --skip/--include, deregister its hooks to
 # keep settings.json in sync with the installed plugin set.
 GLOBAL_SETTINGS="$HOME/.claude/settings.json"
 WORKTREE_HOOK_CMD="$HOME/.claude/skills/worktree-core/skills/git-worktree-usage/scripts/require-worktree-hook.sh"
+WORKTREE_SYMLINK_CHECK_CMD="$HOME/.claude/skills/worktree-core/skills/git-worktree-usage/scripts/check-worktree-symlinks-hook.sh"
+WORKTREE_AUTOPRUNE_CMD="$HOME/.claude/skills/worktree-core/skills/git-worktree-usage/scripts/prune-merged-worktrees-hook.sh"
 if ! is_skipped "worktree-core"; then
   ensure_hook_registered "PreToolUse" "Edit|Write" "$WORKTREE_HOOK_CMD" "$GLOBAL_SETTINGS"
+  ensure_hook_registered "SessionStart" "" "$WORKTREE_SYMLINK_CHECK_CMD" "$GLOBAL_SETTINGS"
+  ensure_hook_registered "SessionStart" "" "$WORKTREE_AUTOPRUNE_CMD" "$GLOBAL_SETTINGS"
 else
   ensure_hook_deregistered "PreToolUse" "$WORKTREE_HOOK_CMD" "$GLOBAL_SETTINGS"
+  ensure_hook_deregistered "SessionStart" "$WORKTREE_SYMLINK_CHECK_CMD" "$GLOBAL_SETTINGS"
+  ensure_hook_deregistered "SessionStart" "$WORKTREE_AUTOPRUNE_CMD" "$GLOBAL_SETTINGS"
+fi
+
+MEMORY_HYGIENE_HOOK_CMD="$HOME/.claude/skills/dfadler-agent-config/hooks/scripts/memory-hygiene-stop-hook.sh"
+if ! is_skipped "dfadler-agent-config"; then
+  ensure_hook_registered "Stop" "" "$MEMORY_HYGIENE_HOOK_CMD" "$GLOBAL_SETTINGS"
+else
+  ensure_hook_deregistered "Stop" "$MEMORY_HYGIENE_HOOK_CMD" "$GLOBAL_SETTINGS"
 fi
 
 # Last, so the linking work is already done and reported when these speak up.
