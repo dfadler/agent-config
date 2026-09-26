@@ -21,7 +21,8 @@ automatically, with no per-project copy to keep in sync.
 - `plugins/` — one directory per plugin. Each plugin's directory name matches its
   manifest `name`, which is what makes skills resolve as `<plugin-name>:<skill>`.
   - `dfadler-agent-config/` — the main plugin: cross-project agents and skills
-    (PR shepherding, PR review rubric, adversarial code reviewer, worktree usage).
+    (PR shepherding, PR review rubric, adversarial code reviewer). Requires
+    `worktree-core` for git-worktree-usage.
   - `accessibility-skills/` — WCAG 2.2 code review for web markup and CSS, graded
     with an evidence-basis/severity system.
   - `detached-terminal/` — run and drive an interactive terminal (TUI, REPL,
@@ -143,6 +144,9 @@ copy of something is a deliberate fork rather than drift to reconcile.
   the `allowed-tools` decision, `make check`, and GitHub operations via `gh`.
 - [`docs/scope.md`](docs/scope.md) — what belongs in this repo vs. a project's own
   `.claude/`.
+- [`docs/steering-mechanisms.md`](docs/steering-mechanisms.md) — when to use a
+  convention, skill, hook, subagent, or path-scoped rule here, and why output
+  styles and `--append-system-prompt` aren't used.
 - [`docs/hook-composition.md`](docs/hook-composition.md) — how this plugin's hooks
   compose with hooks from other plugins.
 - [`docs/prompt-injection-defense.md`](docs/prompt-injection-defense.md) — the

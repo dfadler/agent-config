@@ -10,7 +10,7 @@ Collect workflow run data from the GitHub API, find patterns that cost time or m
 
 > **For eval orchestrators**: The canonical eval workflow, grader/analyzer agent instructions, and reusable scripts live alongside this skill:
 > - `agents/orchestrator.md` — **run a full iteration in one agent call** (setup → collect → render → grade → aggregate → viewer → propose improvements). Start here.
-> - `references/eval-workflow.md` — step-by-step manual workflow (use if orchestrator is unavailable)
+> - `references/eval-workflow.md` — conceptual overview of the phases (use if orchestrator is unavailable)
 > - `agents/collector.md` — fetch raw GitHub API data for one eval (runs.json, jobs.json, workflow stats)
 > - `agents/renderer.md` — produce report.html from already-collected data files (no API calls)
 > - `agents/grader.md` — how to grade report.html outputs against assertions
@@ -26,10 +26,12 @@ Collect workflow run data from the GitHub API, find patterns that cost time or m
 > - `scripts/analyze_jobs.py` — critical path, billable minutes, top jobs, optional step breakdown
 > - `scripts/fetch_workflow_stats.sh` — counts + avg/p90 for multiple workflow IDs in one pass
 > - `scripts/find_p50_run.py` — print the run ID of the successful run closest to median duration (use before analyze_jobs.py)
-> - `scripts/check_failures.py` — detect chronic failure patterns; exits 1 if failure rate >40% or streak ≥5 (use in Step 6 pre-check)
+> - `scripts/check_failures.py` — detect chronic failure patterns; writes `failure_check.json` (`chronic`/`failure_rate`/`details`) via `--output` (use in Step 6 pre-check)
 > - `scripts/write_collect_summary.py` — write collect_summary.json from CLI args (use in collector Step 8; never build this JSON inline)
 > - `scripts/write_assertions.py` — populate assertions from evals.json into eval_metadata.json (use in orchestrator Step 2; never use a heredoc or inline Python for this)
 > - `scripts/compute_workflow_timing.py` — read workflow runs JSON from stdin, output avg and p90 duration in minutes (used internally by fetch_workflow_stats.sh)
+> - `scripts/utils.py` — shared `parse_dt`/`duration_minutes`/`thirty_days_ago` helpers imported by the scripts above (not run directly)
+> - `scripts/common.sh` — shared `thirty_days_ago_iso` shell helper; sourced by `collect.sh` and `fetch_workflow_stats.sh` (not run directly)
 
 ## Step 1: Identify the repository
 
@@ -64,11 +66,12 @@ If there are multiple candidates, pick the one with the most runs (see Step 3). 
 For the primary CI workflow:
 
 ```bash
-gh api "repos/{owner}/{repo}/actions/workflows/{id}/runs?per_page=1&created=>$(date -v-30d +%Y-%m-%dT%H:%M:%SZ 2>/dev/null || date -d '30 days ago' --iso-8601=seconds)" \
+source /path/to/scripts/common.sh
+gh api "repos/{owner}/{repo}/actions/workflows/{id}/runs?per_page=1&created=>$(thirty_days_ago_iso)" \
   --jq '.total_count'
 ```
 
-> The `created>` filter uses ISO 8601. On macOS use `date -v-30d`; on Linux use `date -d '30 days ago'`. If the date flag errors, fall back to omitting the filter and noting the caveat.
+> `thirty_days_ago_iso` (in `scripts/common.sh`) uses `date -v-30d` on macOS or `date -d '30 days ago'` on Linux, and prints an empty string if neither works — treat an empty result as "omit the filter" and note the caveat.
 
 For each other workflow, get counts the same way. This gives you the true volume — don't rely on paginating through runs (you'd hit the 500-run API cap before seeing 30 days for busy workflows).
 
@@ -136,14 +139,15 @@ Work through each pattern. Compute a rough magnitude estimate for each so you ca
 
 ### Pre-check: Persistent failure signal
 
-Run `check_failures.py` against the primary workflow's saved runs file — **do not count failures manually**:
+The collector already ran `check_failures.py` and wrote `outputs/failure_check.json` — **do not count failures manually, and do not re-run the script**. Read the JSON file:
 
-```bash
-python3 /path/to/scripts/check_failures.py outputs/runs.json
-# Exit code 1 = chronic failure detected; 0 = healthy
+```python
+import json
+signal = json.load(open("outputs/failure_check.json"))
+# {"chronic": bool, "failure_rate": float, "details": "..."}
 ```
 
-If it exits 1 (failure rate >40% OR streak ≥5), surface this as an `alert-banner` above the ranked opportunities in the report. The banner should state the workflow name, the failure rate or streak length, and the earliest failing run timestamp from the script output. This is separate from opportunity card #1 (which still appears in the ranked list) — the banner is a prominent heads-up that CI may be broken right now, not just expensive.
+If `chronic` is `true` (failure rate >40% OR streak ≥5), surface this as an `alert-banner` above the ranked opportunities in the report. The banner should state the workflow name, the failure rate or streak length, and the earliest failing run timestamp from the script output. This is separate from opportunity card #1 (which still appears in the ranked list) — the banner is a prominent heads-up that CI may be broken right now, not just expensive.
 
 Also check whether **multiple workflows show simultaneous failures** — the same timestamp window appearing across two or more workflows' recent failures. If so, note it in the caveats or as a finding: correlated multi-workflow failures often indicate an infrastructure event (runner quota, dependency outage, upstream service failure) rather than a code problem. Include the run IDs and timestamps as evidence.
 

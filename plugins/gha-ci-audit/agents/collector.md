@@ -69,7 +69,7 @@ After a successful run, confirm these files exist in `{outputs_dir}`:
 | `workflows.json` | All active workflows |
 | `runs.json` | Last 100 runs for the primary workflow |
 | `jobs.json` | Jobs for the p50 representative run |
-| `failure_check.txt` | Chronic-failure signal |
+| `failure_check.json` | Chronic-failure signal (structured) |
 | `workflow_stats.txt` | Secondary workflow timing summary |
 | `run_count_primary.txt` | 30-day run count |
 | `p50_run.txt` | p50 run ID and duration |

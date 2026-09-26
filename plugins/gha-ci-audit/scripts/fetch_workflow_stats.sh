@@ -12,6 +12,10 @@
 # Requires: gh, jq, python3
 set -euo pipefail
 
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+# shellcheck source=plugins/gha-ci-audit/scripts/common.sh
+source "${SCRIPT_DIR}/common.sh"
+
 REPO="${1:?Usage: $0 <owner/repo> <wf_id> [wf_id ...]}"
 shift
 WORKFLOW_IDS=("$@")
@@ -20,7 +24,7 @@ if [[ ${#WORKFLOW_IDS[@]} -eq 0 ]]; then
   exit 1
 fi
 
-SINCE=$(date -v-30d +%Y-%m-%dT%H:%M:%SZ 2>/dev/null || date -d '30 days ago' --iso-8601=seconds 2>/dev/null || echo "")
+SINCE=$(thirty_days_ago_iso)
 
 printf '%-12s  %-40s  %8s  %8s  %8s\n' 'WF_ID' 'NAME' 'RUNS_30D' 'AVG_MIN' 'P90_MIN'
 printf '%s\n' '--------------------------------------------------------------------------------------------'
@@ -37,7 +41,6 @@ for wf_id in "${WORKFLOW_IDS[@]}"; do
   count=$(gh api "${count_args}" --jq '.total_count' 2>/dev/null || echo "?")
 
   # Timing stats from last 100 completed runs
-  SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
   timing=$(
     gh api "repos/${REPO}/actions/workflows/${wf_id}/runs?per_page=100" \
       --jq '[.workflow_runs[] | select(.conclusion != null) | {s: .run_started_at, e: .updated_at}]' \

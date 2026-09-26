@@ -41,13 +41,9 @@ Never overwrite an existing `report.html` or `grading.json`.
 
 ## Step 2: Set up iteration directory
 
-Read `$EVALS` to get the eval list. The name mapping is:
-
-| id | dir name              |
-|----|----------------------|
-| 1  | vite-audit           |
-| 2  | agent-config-context |
-| 3  | facebook-react       |
+Read `$EVALS` to get the eval list. Each entry's `dir_name` and `repo` fields are the
+single source of truth for eval identity — `evals.json` is the registry; don't
+duplicate its id/dir_name/repo mapping elsewhere. To add an eval, add an entry there.
 
 For each eval, run setup then copy in assertions:
 
@@ -79,10 +75,7 @@ Collect data for this eval:
 - scripts_dir: /Volumes/Development/agent-config/plugins/gha-ci-audit/scripts/
 ```
 
-The repo for each eval:
-- vite-audit → `vitejs/vite`
-- agent-config-context → `dfadler/agent-config`
-- facebook-react → `facebook/react`
+The repo for each eval comes from that eval's `repo` field in `evals.json`.
 
 ---
 
@@ -169,8 +162,10 @@ After all graders complete, run `check_status.py` again and confirm all three sh
 ## Step 8: Aggregate
 
 ```bash
-python3 $SCRIPTS/aggregate.py $ITER --skill-name gha-ci-audit
+python3 $SCRIPTS/aggregate.py $ITER --skill-name gha-ci-audit --model "<the model you are running as, e.g. claude-sonnet-4-6>"
 ```
+
+Pass `--model` explicitly so the benchmark metadata records the model actually used for this run, not a stale default.
 
 This produces `$ITER/benchmark.json` and `$ITER/benchmark.md`. Print the pass rate line from the output.
 

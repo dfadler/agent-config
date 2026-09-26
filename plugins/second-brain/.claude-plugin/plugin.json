@@ -2,7 +2,7 @@
   "$schema": "https://json.schemastore.org/claude-code-plugin-manifest.json",
   "name": "second-brain",
   "version": "0.1.0",
-  "description": "Vault-path-agnostic utilities that read from an Obsidian vault via mcp__obsidian__* tools. Ships the config primitive: resolves global and per-project YAML frontmatter for other agent-config skills (e.g. screen-capture), degrading gracefully when the Obsidian MCP is disconnected.",
+  "description": "Vault-path-agnostic Obsidian second-brain skills (capture, query, config). Vault path resolves from SECOND_BRAIN_VAULT_PATH env var or secondBrain.vaultPath in ~/.claude/settings.json. The config primitive reads and merges YAML frontmatter from vault config files for other skills, degrading gracefully when Obsidian MCP is disconnected.",
   "author": {
     "name": "Dustin Fadler",
     "url": "https://github.com/dfadler"
@@ -12,7 +12,9 @@
   "keywords": [
     "obsidian",
     "vault",
-    "config",
-    "second-brain"
+    "second-brain",
+    "pkm",
+    "notes",
+    "config"
   ]
 }
