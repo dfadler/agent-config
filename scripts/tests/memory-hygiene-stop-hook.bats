@@ -30,6 +30,10 @@ setup() {
   REPO="$TMP/repo"
   mkdir -p "$REPO"
   git -C "$REPO" init -q
+  # A global status.showUntrackedFiles=no would make `git status --porcelain`
+  # report clean even with untracked files present, silently defeating every
+  # dirty-repo test below regardless of the machine running this suite.
+  git -C "$REPO" config status.showUntrackedFiles normal
   git -C "$REPO" config user.email "test@example.com"
   git -C "$REPO" config user.name "Test"
 
