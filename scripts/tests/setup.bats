@@ -482,9 +482,18 @@ _add_worktree_core_fixture() {
   printf '{"name":"worktree-core","version":"0.1.0","description":"fixture"}\n' \
     >"$FAKE_REPO/plugins/worktree-core/.claude-plugin/plugin.json"
   mkdir -p "$FAKE_REPO/plugins/worktree-core/skills/git-worktree-usage/scripts"
+  for script in require-worktree-hook.sh check-worktree-symlinks-hook.sh prune-merged-worktrees-hook.sh; do
+    printf '#!/usr/bin/env bash\nexit 0\n' \
+      >"$FAKE_REPO/plugins/worktree-core/skills/git-worktree-usage/scripts/$script"
+    chmod +x "$FAKE_REPO/plugins/worktree-core/skills/git-worktree-usage/scripts/$script"
+  done
+}
+
+_add_memory_hygiene_hook_fixture() {
+  mkdir -p "$FAKE_REPO/plugins/dfadler-agent-config/hooks/scripts"
   printf '#!/usr/bin/env bash\nexit 0\n' \
-    >"$FAKE_REPO/plugins/worktree-core/skills/git-worktree-usage/scripts/require-worktree-hook.sh"
-  chmod +x "$FAKE_REPO/plugins/worktree-core/skills/git-worktree-usage/scripts/require-worktree-hook.sh"
+    >"$FAKE_REPO/plugins/dfadler-agent-config/hooks/scripts/memory-hygiene-stop-hook.sh"
+  chmod +x "$FAKE_REPO/plugins/dfadler-agent-config/hooks/scripts/memory-hygiene-stop-hook.sh"
 }
 
 @test "hook registration: worktree-core installs PreToolUse hook in settings.json" {
@@ -529,6 +538,74 @@ assert count == 1, 'expected 1, got {}'.format(count)
 import json
 d = json.load(open('$HOME/.claude/settings.json'))
 cmds = [h['command'] for e in d.get('hooks', {}).get('PreToolUse', []) for h in e.get('hooks', [])]
+assert '$HOOK_CMD' not in cmds, 'hook still present after skip'
+"
+  [ "$status" -eq 0 ]
+}
+
+@test "hook registration: worktree-core installs both SessionStart hooks, without a matcher key" {
+  _add_worktree_core_fixture
+  run_setup
+  assert_success
+  SYMLINK_CMD="$HOME/.claude/skills/worktree-core/skills/git-worktree-usage/scripts/check-worktree-symlinks-hook.sh"
+  PRUNE_CMD="$HOME/.claude/skills/worktree-core/skills/git-worktree-usage/scripts/prune-merged-worktrees-hook.sh"
+  run python3 -c "
+import json, sys
+d = json.load(open('$HOME/.claude/settings.json'))
+entries = d.get('hooks', {}).get('SessionStart', [])
+cmds = [h['command'] for e in entries for h in e.get('hooks', [])]
+assert '$SYMLINK_CMD' in cmds, 'symlink-check hook missing'
+assert '$PRUNE_CMD' in cmds, 'auto-prune hook missing'
+assert all('matcher' not in e for e in entries), 'SessionStart entry should have no matcher key'
+"
+  [ "$status" -eq 0 ]
+}
+
+@test "hook registration: --skip=worktree-core deregisters both SessionStart hooks" {
+  _add_worktree_core_fixture
+  run_setup
+  assert_success
+  run_setup_with --skip=worktree-core
+  assert_success
+  SYMLINK_CMD="$HOME/.claude/skills/worktree-core/skills/git-worktree-usage/scripts/check-worktree-symlinks-hook.sh"
+  PRUNE_CMD="$HOME/.claude/skills/worktree-core/skills/git-worktree-usage/scripts/prune-merged-worktrees-hook.sh"
+  run python3 -c "
+import json
+d = json.load(open('$HOME/.claude/settings.json'))
+cmds = [h['command'] for e in d.get('hooks', {}).get('SessionStart', []) for h in e.get('hooks', [])]
+assert '$SYMLINK_CMD' not in cmds, 'symlink-check hook still present after skip'
+assert '$PRUNE_CMD' not in cmds, 'auto-prune hook still present after skip'
+"
+  [ "$status" -eq 0 ]
+}
+
+@test "hook registration: dfadler-agent-config installs the memory-hygiene Stop hook, without a matcher key" {
+  _add_memory_hygiene_hook_fixture
+  run_setup
+  assert_success
+  HOOK_CMD="$HOME/.claude/skills/dfadler-agent-config/hooks/scripts/memory-hygiene-stop-hook.sh"
+  run python3 -c "
+import json, sys
+d = json.load(open('$HOME/.claude/settings.json'))
+entries = d.get('hooks', {}).get('Stop', [])
+cmds = [h['command'] for e in entries for h in e.get('hooks', [])]
+assert '$HOOK_CMD' in cmds, 'memory-hygiene hook missing'
+assert all('matcher' not in e for e in entries), 'Stop entry should have no matcher key'
+"
+  [ "$status" -eq 0 ]
+}
+
+@test "hook registration: --skip=dfadler-agent-config deregisters the memory-hygiene Stop hook" {
+  _add_memory_hygiene_hook_fixture
+  run_setup
+  assert_success
+  run_setup_with --skip=dfadler-agent-config
+  assert_success
+  HOOK_CMD="$HOME/.claude/skills/dfadler-agent-config/hooks/scripts/memory-hygiene-stop-hook.sh"
+  run python3 -c "
+import json
+d = json.load(open('$HOME/.claude/settings.json'))
+cmds = [h['command'] for e in d.get('hooks', {}).get('Stop', []) for h in e.get('hooks', [])]
 assert '$HOOK_CMD' not in cmds, 'hook still present after skip'
 "
   [ "$status" -eq 0 ]

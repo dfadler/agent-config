@@ -193,7 +193,13 @@ if [[ "$DO_PLUGINS" -eq 1 ]]; then
   # Deregister plugin hooks from ~/.claude/settings.json that setup.sh wired in.
   GLOBAL_SETTINGS="$HOME/.claude/settings.json"
   WORKTREE_HOOK_CMD="$HOME/.claude/skills/worktree-core/skills/git-worktree-usage/scripts/require-worktree-hook.sh"
+  WORKTREE_SYMLINK_CHECK_CMD="$HOME/.claude/skills/worktree-core/skills/git-worktree-usage/scripts/check-worktree-symlinks-hook.sh"
+  WORKTREE_AUTOPRUNE_CMD="$HOME/.claude/skills/worktree-core/skills/git-worktree-usage/scripts/prune-merged-worktrees-hook.sh"
+  MEMORY_HYGIENE_HOOK_CMD="$HOME/.claude/skills/dfadler-agent-config/hooks/scripts/memory-hygiene-stop-hook.sh"
   ensure_hook_deregistered "PreToolUse" "$WORKTREE_HOOK_CMD" "$GLOBAL_SETTINGS"
+  ensure_hook_deregistered "SessionStart" "$WORKTREE_SYMLINK_CHECK_CMD" "$GLOBAL_SETTINGS"
+  ensure_hook_deregistered "SessionStart" "$WORKTREE_AUTOPRUNE_CMD" "$GLOBAL_SETTINGS"
+  ensure_hook_deregistered "Stop" "$MEMORY_HYGIENE_HOOK_CMD" "$GLOBAL_SETTINGS"
 fi
 
 echo "Done."
