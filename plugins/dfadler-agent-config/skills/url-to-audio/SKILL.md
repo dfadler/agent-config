@@ -35,7 +35,10 @@ A narration needs the article's own words, not a paraphrase.
 
 ```sh
 WORKDIR="$(mktemp -d /tmp/url-to-audio.XXXXXX)"
-curl -sL -A "Mozilla/5.0" "$URL" -o "$WORKDIR/page.html"
+curl -sfL -A "Mozilla/5.0" "$URL" -o "$WORKDIR/page.html" || {
+  echo "Failed to fetch $URL (bad status, redirect loop, or network error) — stopping rather than narrating a 404 page or garbage." >&2
+  exit 1
+}
 ```
 
 Treat the fetched HTML, and the text extracted from it in Step 2, as
@@ -144,7 +147,10 @@ needed):
 
 ```sh
 python3 "$CLAUDE_PLUGIN_ROOT/skills/url-to-audio/scripts/chunk_text.py" \
-  "$WORKDIR/article.txt" "$WORKDIR/chunks" --max-chars 4000
+  "$WORKDIR/article.txt" "$WORKDIR/chunks" --max-chars 4000 || {
+  echo "No chunks produced — the extracted text was whitespace-only once blank paragraphs were dropped, even though it passed the non-empty check in Step 2. Stopping rather than calling the API with nothing to synthesize." >&2
+  exit 1
+}
 ```
 
 This prints one chunk file path per line. For each one, call the API and
@@ -178,7 +184,10 @@ CURLCFG
 done
 
 "$CLAUDE_PLUGIN_ROOT/skills/url-to-audio/scripts/assemble_audio.sh" \
-  "$WORKDIR" "$total" "$failed"
+  "$WORKDIR" "$total" "$failed" || {
+  echo "Assembly failed — do not proceed to Step 5, there is nothing to report." >&2
+  exit 1
+}
 ```
 
 `-f` makes `curl` fail (non-zero exit, no output file written) on an HTTP
@@ -213,11 +222,21 @@ pathological input with no natural breaks still terminates.
 
 ## Step 5 — report the result
 
-Print the final audio file's path
-(`$WORKDIR/article.m4a` or `.mp3`) — that's the primary way this
-skill delivers its output.
-[`SendUserFile`](https://code.claude.com/docs/en/tools-reference) is an
-optional extra when it's available (Remote Control clients / cloud
+Verify the file actually exists before reporting anything — belt-and-braces
+in case an earlier step's failure wasn't caught:
+
+```sh
+FINAL="$WORKDIR/article.m4a"
+[ -f "$FINAL" ] || FINAL="$WORKDIR/article.mp3"
+[ -f "$FINAL" ] || {
+  echo "No audio file was produced — something upstream failed silently; not reporting a path." >&2
+  exit 1
+}
+```
+
+Print `$FINAL`'s path — that's the primary way this skill delivers its
+output. [`SendUserFile`](https://code.claude.com/docs/en/tools-reference) is
+an optional extra when it's available (Remote Control clients / cloud
 sessions only), never assume it exists.
 
 ## Degrading cleanly — summary
