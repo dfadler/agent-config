@@ -27,11 +27,12 @@ Collect workflow run data from the GitHub API, find patterns that cost time or m
 > - `scripts/fetch_workflow_stats.sh` — counts + avg/p90 for multiple workflow IDs in one pass
 > - `scripts/find_p50_run.py` — print the run ID of the successful run closest to median duration (use before analyze_jobs.py)
 > - `scripts/check_failures.py` — detect chronic failure patterns; writes `failure_check.json` (`chronic`/`failure_rate`/`details`) via `--output` (use in Step 6 pre-check)
-> - `scripts/write_collect_summary.py` — write collect_summary.json from CLI args (use in collector Step 8; never build this JSON inline)
 > - `scripts/write_assertions.py` — populate assertions from evals.json into eval_metadata.json (use in orchestrator Step 2; never use a heredoc or inline Python for this)
 > - `scripts/compute_workflow_timing.py` — read workflow runs JSON from stdin, output avg and p90 duration in minutes (used internally by fetch_workflow_stats.sh)
+> - `scripts/collect_pipeline.py` — the collect phase's implementation (workflow detection, p50 selection, chronic-failure check, collect_summary.json); `collect.sh` calls it once in-process rather than shelling out to it step by step. `find_p50_run.py`/`check_failures.py` above are thin CLI wrappers over this module's functions, kept as separate files because they're also called directly, outside `collect.sh`, by this skill's Steps 5/6. Not run directly otherwise.
+> - `scripts/timing.py` — shared `start()`/`end()` timing helpers used by both the collect phase (in-process) and the render phase (`--start`/`--end <outputs_dir>` CLI, see `agents/renderer.md`)
 > - `scripts/utils.py` — shared `parse_dt`/`duration_minutes`/`thirty_days_ago` helpers imported by the scripts above (not run directly)
-> - `scripts/common.sh` — shared `thirty_days_ago_iso` shell helper; sourced by `collect.sh` and `fetch_workflow_stats.sh` (not run directly)
+> - `scripts/common.sh` — shared `thirty_days_ago_iso` shell helper; sourced by `fetch_workflow_stats.sh` (not run directly)
 
 ## Step 1: Identify the repository
 

@@ -17,6 +17,10 @@ pipeline that redirects stdout to a file (`cmd > file`) discards the exit
 code unless it's captured separately. The exit code (0 = healthy, 1 =
 chronic failure) is kept only as a convenience for direct/interactive CLI
 use, e.g. `check_failures.py runs.json || echo alert`.
+
+This is a thin CLI wrapper — the actual logic lives in `collect_pipeline.py`
+(`check_failures`), shared with the in-process collect pipeline `collect.sh`
+now calls.
 """
 
 from __future__ import annotations
@@ -25,15 +29,7 @@ import argparse
 import json
 import sys
 
-
-def _write_json(path: str, *, chronic: bool, failure_rate: float, details: str) -> None:
-    with open(path, "w") as f:
-        json.dump(
-            {"chronic": chronic, "failure_rate": failure_rate, "details": details},
-            f,
-            indent=2,
-        )
-        f.write("\n")
+from collect_pipeline import check_failures, format_failure_report
 
 
 def main() -> None:
@@ -46,52 +42,17 @@ def main() -> None:
 
     src = open(args.runs_file) if args.runs_file else sys.stdin
     raw = json.load(src)
-    runs = raw.get("workflow_runs", raw) if isinstance(raw, dict) else raw
 
-    completed = [
-        r for r in runs if r.get("conclusion") and r["conclusion"] != "skipped"
-    ]
-    if not completed:
-        print("no_data")
-        if args.output:
-            _write_json(args.output, chronic=False, failure_rate=0.0, details="no_data")
-        sys.exit(0)
-
-    # Failure rate across all completed runs
-    failures = [r for r in completed if r["conclusion"] == "failure"]
-    rate = len(failures) / len(completed)
-
-    # Consecutive failures at the head of the list (most recent first)
-    streak = 0
-    for r in completed:
-        if r["conclusion"] == "failure":
-            streak += 1
-        else:
-            break
-
-    # Earliest failure timestamp in the streak
-    streak_runs = completed[:streak] if streak else []
-    earliest_streak_ts = ""
-    if streak_runs:
-        ts_list = [r.get("created_at", "") for r in streak_runs if r.get("created_at")]
-        earliest_streak_ts = min(ts_list) if ts_list else ""
-
-    chronic = rate > 0.40 or streak >= 5
-
-    print(f"failure_rate={rate:.2f}  failures={len(failures)}/{len(completed)}")
-    print(f"consecutive_streak={streak}  earliest_in_streak={earliest_streak_ts}")
-    print(f"chronic={'YES' if chronic else 'no'}")
+    result = check_failures(raw)
+    for line in format_failure_report(result):
+        print(line)
 
     if args.output:
-        details = (
-            f"failure_rate={rate:.2f} failures={len(failures)}/{len(completed)} "
-            f"consecutive_streak={streak} earliest_in_streak={earliest_streak_ts or 'n/a'}"
-        )
-        _write_json(
-            args.output, chronic=chronic, failure_rate=round(rate, 2), details=details
-        )
+        with open(args.output, "w") as f:
+            json.dump(result.to_dict(), f, indent=2)
+            f.write("\n")
 
-    sys.exit(1 if chronic else 0)
+    sys.exit(1 if result.chronic else 0)
 
 
 if __name__ == "__main__":
