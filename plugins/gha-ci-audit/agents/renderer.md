@@ -26,7 +26,7 @@ This agent is the second half of the collector/renderer split. The collector fet
 ## Step 0: Start render timing
 
 ```bash
-python3 {scripts_dir}/write_render_timing.py --start {outputs_dir}
+python3 {scripts_dir}/timing.py --start {outputs_dir}
 ```
 
 ---
@@ -100,7 +100,7 @@ Every number in the report must trace back to a script output or a file in `outp
 ## Step 5: Finalize render timing and merge
 
 ```bash
-python3 {scripts_dir}/write_render_timing.py --end {outputs_dir}
+python3 {scripts_dir}/timing.py --end {outputs_dir}
 python3 {scripts_dir}/merge_timing.py {outputs_dir}
 ```
 

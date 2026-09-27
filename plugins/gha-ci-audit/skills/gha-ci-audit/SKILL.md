@@ -27,11 +27,12 @@ Collect workflow run data from the GitHub API, find patterns that cost time or m
 > - `scripts/fetch_workflow_stats.sh` — counts + avg/p90 for multiple workflow IDs in one pass
 > - `scripts/find_p50_run.py` — print the run ID of the successful run closest to median duration (use before analyze_jobs.py)
 > - `scripts/check_failures.py` — detect chronic failure patterns; writes `failure_check.json` (`chronic`/`failure_rate`/`details`) via `--output` (use in Step 6 pre-check)
-> - `scripts/write_collect_summary.py` — write collect_summary.json from CLI args (use in collector Step 8; never build this JSON inline)
+> - `scripts/gha_ci_audit_collect.py` — the collector's full pipeline (workflow detection, run counts, p50 run, jobs, failure check, secondary stats, `collect_summary.json`) as one importable module; `collect.sh` is a thin wrapper around it (not run directly — see `collect.sh`)
 > - `scripts/write_assertions.py` — populate assertions from evals.json into eval_metadata.json (use in orchestrator Step 2; never use a heredoc or inline Python for this)
 > - `scripts/compute_workflow_timing.py` — read workflow runs JSON from stdin, output avg and p90 duration in minutes (used internally by fetch_workflow_stats.sh)
+> - `scripts/timing.py` — shared collect/render timing capture; `start()`/`end()` used in-process by `gha_ci_audit_collect.py`, `--start`/`--end` CLI used by the renderer agent across separate tool calls
 > - `scripts/utils.py` — shared `parse_dt`/`duration_minutes`/`thirty_days_ago` helpers imported by the scripts above (not run directly)
-> - `scripts/common.sh` — shared `thirty_days_ago_iso` shell helper; sourced by `collect.sh` and `fetch_workflow_stats.sh` (not run directly)
+> - `scripts/common.sh` — shared `thirty_days_ago_iso` shell helper; sourced by `fetch_workflow_stats.sh` (not run directly)
 
 ## Step 1: Identify the repository
 

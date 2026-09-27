@@ -14,6 +14,7 @@ import importlib.util
 import json
 import sys
 import types
+from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
 from unittest.mock import MagicMock, patch
@@ -40,6 +41,14 @@ def _load(name: str) -> types.ModuleType:
     spec = importlib.util.spec_from_file_location(name, path)
     assert spec and spec.loader
     module = importlib.util.module_from_spec(spec)
+    # Register in sys.modules under its own name before exec, same as the
+    # normal import machinery does — a module that uses `@dataclass` under
+    # `from __future__ import annotations` needs `sys.modules[cls.__module__]`
+    # to exist while its class body executes (dataclasses resolves each
+    # field's string annotation against that module's globals). Skipped
+    # before gha_ci_audit_collect.py (issue #368) because no earlier script
+    # this suite loaded this way used a dataclass.
+    sys.modules[name] = module
     spec.loader.exec_module(module)
     return module
 
@@ -592,111 +601,75 @@ class TestMergeTiming:
 
 
 # ---------------------------------------------------------------------------
-# detect_primary_workflow.py
+# gha_ci_audit_collect.py — detect_primary_workflow()
+#
+# (formerly detect_primary_workflow.py, concentrated into gha_ci_audit_collect
+# per issue #368; detect_primary_workflow() is now a pure function with no
+# file I/O or sys.exit, so these tests call it directly and assert on its
+# returned DetectionResult instead of on files/exit codes.)
 # ---------------------------------------------------------------------------
 
 
 class TestDetectPrimaryWorkflow:
     def setup_method(self) -> None:
-        self.mod = _load("detect_primary_workflow")
+        self.mod = _load("gha_ci_audit_collect")
 
-    def _write_workflows(self, tmp_path: Path, workflows: list[dict[str, Any]]) -> Path:
-        p = tmp_path / "workflows.json"
-        p.write_text(json.dumps(workflows))
-        return p
-
-    def test_single_primary_detected(self, tmp_path: Path) -> None:
+    def test_single_primary_detected(self) -> None:
         workflows = [
             {"id": 1, "name": "CI"},
             {"id": 2, "name": "Deploy"},
         ]
-        wf_path = self._write_workflows(tmp_path, workflows)
-        candidates_path = tmp_path / "candidates.json"
 
-        # get_workflow_events: CI has push, Deploy has schedule only
+        # CI has push, Deploy has schedule only
         def fake_events(repo: str, wf_id: int) -> set[str]:
             return {"push"} if wf_id == 1 else {"schedule"}
 
-        with (
-            patch.object(self.mod, "get_workflow_events", side_effect=fake_events),
-            patch.object(
-                sys,
-                "argv",
-                ["detect.py", str(wf_path), "owner/repo", str(candidates_path)],
-            ),
-            pytest.raises(SystemExit) as exc,
-        ):
-            self.mod.main()
+        result = self.mod.detect_primary_workflow(
+            workflows, "owner/repo", get_events=fake_events
+        )
 
-        assert exc.value.code == 0
-        id_file = tmp_path / "primary_workflow_id.txt"
-        assert id_file.exists()
-        assert id_file.read_text().strip() == "1"
+        assert result.status == "single"
+        assert result.workflow == {"id": 1, "name": "CI"}
+        assert result.candidates == []
 
-    def test_ambiguous_exits_2(self, tmp_path: Path) -> None:
+    def test_ambiguous(self) -> None:
         workflows = [{"id": 1, "name": "CI"}, {"id": 2, "name": "Build"}]
-        wf_path = self._write_workflows(tmp_path, workflows)
-        candidates_path = tmp_path / "candidates.json"
 
         def fake_events(repo: str, wf_id: int) -> set[str]:
             return {"push"}
 
-        with (
-            patch.object(self.mod, "get_workflow_events", side_effect=fake_events),
-            patch.object(
-                sys,
-                "argv",
-                ["detect.py", str(wf_path), "owner/repo", str(candidates_path)],
-            ),
-            pytest.raises(SystemExit) as exc,
-        ):
-            self.mod.main()
+        result = self.mod.detect_primary_workflow(
+            workflows, "owner/repo", get_events=fake_events
+        )
 
-        assert exc.value.code == 2
-        assert candidates_path.exists()
-        assert json.loads(candidates_path.read_text()) == workflows
+        assert result.status == "ambiguous"
+        assert result.workflow is None
+        assert result.candidates == workflows
 
-    def test_no_match_defaults_to_first(self, tmp_path: Path) -> None:
+    def test_no_match_defaults_to_first(self) -> None:
         workflows = [{"id": 99, "name": "OnlySchedule"}]
-        wf_path = self._write_workflows(tmp_path, workflows)
-        candidates_path = tmp_path / "candidates.json"
 
         def fake_events(repo: str, wf_id: int) -> set[str]:
             return {"schedule"}
 
-        with (
-            patch.object(self.mod, "get_workflow_events", side_effect=fake_events),
-            patch.object(
-                sys,
-                "argv",
-                ["detect.py", str(wf_path), "owner/repo", str(candidates_path)],
-            ),
-            pytest.raises(SystemExit) as exc,
-        ):
-            self.mod.main()
+        result = self.mod.detect_primary_workflow(
+            workflows, "owner/repo", get_events=fake_events
+        )
 
-        assert exc.value.code == 0
-        assert (tmp_path / "primary_workflow_id.txt").read_text().strip() == "99"
+        assert result.status == "default"
+        assert result.workflow == {"id": 99, "name": "OnlySchedule"}
 
-    def test_empty_workflows_exits_1(self, tmp_path: Path) -> None:
-        wf_path = self._write_workflows(tmp_path, [])
-        candidates_path = tmp_path / "candidates.json"
-
+    def test_empty_workflows(self) -> None:
         def fake_events(repo: str, wf_id: int) -> set[str]:
             return set()
 
-        with (
-            patch.object(self.mod, "get_workflow_events", side_effect=fake_events),
-            patch.object(
-                sys,
-                "argv",
-                ["detect.py", str(wf_path), "owner/repo", str(candidates_path)],
-            ),
-            pytest.raises(SystemExit) as exc,
-        ):
-            self.mod.main()
+        result = self.mod.detect_primary_workflow(
+            [], "owner/repo", get_events=fake_events
+        )
 
-        assert exc.value.code == 1
+        assert result.status == "empty"
+        assert result.workflow is None
+        assert result.candidates == []
 
     def test_get_workflow_events_mocks_subprocess(self) -> None:
         mock_result = MagicMock()
@@ -705,6 +678,11 @@ class TestDetectPrimaryWorkflow:
             events = self.mod.get_workflow_events("owner/repo", 123)
         assert "push" in events
         assert "pull_request" in events
+
+    def test_get_workflow_events_swallows_errors(self) -> None:
+        with patch("subprocess.run", side_effect=RuntimeError("boom")):
+            events = self.mod.get_workflow_events("owner/repo", 123)
+        assert events == set()
 
 
 # ---------------------------------------------------------------------------
@@ -930,94 +908,77 @@ class TestCheckFailures:
 
 
 # ---------------------------------------------------------------------------
-# write_collect_summary.py
+# gha_ci_audit_collect.py — build_collect_summary()
+#
+# (formerly write_collect_summary.py, concentrated into gha_ci_audit_collect
+# per issue #368; build_collect_summary() is a pure function — collect()
+# itself writes collect_summary.json.)
 # ---------------------------------------------------------------------------
 
 
-class TestWriteCollectSummary:
+class TestBuildCollectSummary:
     def setup_method(self) -> None:
-        self.mod = _load("write_collect_summary")
+        self.mod = _load("gha_ci_audit_collect")
 
-    def test_writes_file(self, tmp_path: Path) -> None:
-        outputs_dir = tmp_path / "outputs"
-        outputs_dir.mkdir()
-        with patch.object(
-            sys,
-            "argv",
-            [
-                "write_collect_summary.py",
-                "--outputs-dir",
-                str(outputs_dir),
-                "--repo",
-                "vitejs/vite",
-                "--workflow-id",
-                "12345",
-                "--workflow-name",
-                "CI",
-                "--p50-run-id",
-                "99999",
-                "--p50-duration-min",
-                "4.5",
-                "--run-count",
-                "100",
-            ],
-        ):
-            self.mod.main()
-
-        data = json.loads((outputs_dir / "collect_summary.json").read_text())
+    def test_builds_summary(self) -> None:
+        data = self.mod.build_collect_summary(
+            repo="vitejs/vite",
+            workflow_id=12345,
+            workflow_name="CI",
+            p50_run_id=99999,
+            p50_duration_min=4.5,
+            run_count=100,
+        )
         assert data["repo"] == "vitejs/vite"
         assert data["primary_workflow_id"] == 12345
+        assert data["primary_workflow_name"] == "CI"
         assert data["p50_run_id"] == 99999
         assert data["p50_duration_min"] == pytest.approx(4.5)
+        assert data["run_count_30d"] == 100
         assert "collected_at" in data
 
 
 # ---------------------------------------------------------------------------
-# write_collect_timing.py
+# timing.py
+#
+# (collapses the formerly-duplicate write_collect_timing.py and
+# write_render_timing.py per issue #368: start()/end()/write() are the
+# shared implementation, used in-process by gha_ci_audit_collect.py and via
+# the --start/--end marker-file CLI by the renderer agent.)
 # ---------------------------------------------------------------------------
 
 
-class TestWriteCollectTiming:
+class TestTiming:
     def setup_method(self) -> None:
-        self.mod = _load("write_collect_timing")
+        self.mod = _load("timing")
 
-    def test_writes_file(self, tmp_path: Path) -> None:
+    def test_start_returns_epoch_and_iso(self) -> None:
+        data = self.mod.start()
+        assert isinstance(data["epoch"], int)
+        assert data["iso"].endswith("Z")
+
+    def test_end_computes_duration_from_start(self) -> None:
+        start_data = {"epoch": 1000, "iso": "2025-01-01T10:00:00Z"}
+        with patch.object(self.mod, "datetime") as mock_dt:
+            mock_dt.now.return_value = datetime.fromtimestamp(1120, tz=timezone.utc)
+            end_data = self.mod.end(start_data)
+        assert end_data["duration_seconds"] == 120
+        assert end_data["start_iso"] == "2025-01-01T10:00:00Z"
+        assert end_data["end_iso"] == "1970-01-01T00:18:40Z"
+
+    def test_write_writes_json_and_prints(
+        self, tmp_path: Path, capsys: pytest.CaptureFixture[str]
+    ) -> None:
+        path = tmp_path / "collect_timing.json"
+        data = {"duration_seconds": 120, "start_iso": "a", "end_iso": "b"}
+        self.mod.write(path, data)
+        assert json.loads(path.read_text()) == data
+        assert json.loads(capsys.readouterr().out) == data
+
+    def test_cli_start_creates_marker(self, tmp_path: Path) -> None:
         outputs_dir = tmp_path / "outputs"
         outputs_dir.mkdir()
-        with patch.object(
-            sys,
-            "argv",
-            [
-                "write_collect_timing.py",
-                str(outputs_dir),
-                "120",
-                "2025-01-01T10:00:00Z",
-                "2025-01-01T10:02:00Z",
-            ],
-        ):
-            self.mod.main()
-
-        data = json.loads((outputs_dir / "collect_timing.json").read_text())
-        assert data["duration_seconds"] == 120
-        assert data["start_iso"] == "2025-01-01T10:00:00Z"
-        assert data["end_iso"] == "2025-01-01T10:02:00Z"
-
-
-# ---------------------------------------------------------------------------
-# write_render_timing.py
-# ---------------------------------------------------------------------------
-
-
-class TestWriteRenderTiming:
-    def setup_method(self) -> None:
-        self.mod = _load("write_render_timing")
-
-    def test_start_creates_marker(self, tmp_path: Path) -> None:
-        outputs_dir = tmp_path / "outputs"
-        outputs_dir.mkdir()
-        with patch.object(
-            sys, "argv", ["write_render_timing.py", "--start", str(outputs_dir)]
-        ):
+        with patch.object(sys, "argv", ["timing.py", "--start", str(outputs_dir)]):
             self.mod.main()
         marker = outputs_dir / ".render_start"
         assert marker.exists()
@@ -1025,7 +986,7 @@ class TestWriteRenderTiming:
         assert "epoch" in data
         assert "iso" in data
 
-    def test_end_writes_timing(self, tmp_path: Path) -> None:
+    def test_cli_end_writes_timing(self, tmp_path: Path) -> None:
         outputs_dir = tmp_path / "outputs"
         outputs_dir.mkdir()
         # Write a marker first
@@ -1038,28 +999,237 @@ class TestWriteRenderTiming:
         }
         (outputs_dir / ".render_start").write_text(json.dumps(marker_data))
 
-        with patch.object(
-            sys, "argv", ["write_render_timing.py", "--end", str(outputs_dir)]
-        ):
+        with patch.object(sys, "argv", ["timing.py", "--end", str(outputs_dir)]):
             self.mod.main()
 
-        timing = json.loads((outputs_dir / "render_timing.json").read_text())
-        assert timing["duration_seconds"] >= 10
-        assert timing["start_iso"] == "2025-01-01T10:00:00Z"
+        render_timing = json.loads((outputs_dir / "render_timing.json").read_text())
+        assert render_timing["duration_seconds"] >= 10
+        assert render_timing["start_iso"] == "2025-01-01T10:00:00Z"
         # marker should be removed
         assert not (outputs_dir / ".render_start").exists()
 
-    def test_end_without_start_exits_0(self, tmp_path: Path) -> None:
+    def test_cli_end_without_start_exits_0(self, tmp_path: Path) -> None:
         outputs_dir = tmp_path / "outputs"
         outputs_dir.mkdir()
         with (
-            patch.object(
-                sys, "argv", ["write_render_timing.py", "--end", str(outputs_dir)]
-            ),
+            patch.object(sys, "argv", ["timing.py", "--end", str(outputs_dir)]),
             pytest.raises(SystemExit) as exc,
         ):
             self.mod.main()
         assert exc.value.code == 0
+
+    def test_cli_bad_args_exits_1(self) -> None:
+        with (
+            patch.object(sys, "argv", ["timing.py", "--bogus", "/tmp/x"]),
+            pytest.raises(SystemExit) as exc,
+        ):
+            self.mod.main()
+        assert exc.value.code == 1
+
+
+# ---------------------------------------------------------------------------
+# gha_ci_audit_collect.py — collect()
+#
+# End-to-end tests of the orchestration function that replaced collect.sh's
+# 8-step, file-relay pipeline (issue #368). `_gh_api` is patched at the
+# module level so no real `gh` process runs; `subprocess.run` is patched
+# separately for the one remaining subprocess call (fetch_workflow_stats.sh)
+# and for get_workflow_events' own `gh api` call in the auto-detect path.
+# ---------------------------------------------------------------------------
+
+
+class TestCollect:
+    def setup_method(self) -> None:
+        self.mod = _load("gha_ci_audit_collect")
+
+    def _gh_api_stub(
+        self,
+        workflows: list[dict[str, Any]],
+        runs_payload: dict[str, Any],
+        jobs_payload: dict[str, Any],
+        run_count: int = 42,
+    ) -> Any:
+        def fake(path: str, *, jq: str | None = None) -> str:
+            if "/actions/workflows" in path and "/runs" not in path:
+                return json.dumps(workflows)
+            if "&created=>=" in path or path.endswith("/runs?per_page=1"):
+                return f"{run_count}\n"
+            if "/actions/workflows/" in path and "runs?per_page=100" in path:
+                return json.dumps(runs_payload)
+            if "/jobs?per_page=100" in path:
+                return json.dumps(jobs_payload)
+            raise AssertionError(f"unexpected gh api call: path={path!r} jq={jq!r}")
+
+        return fake
+
+    def _one_successful_run(self, run_id: int = 100) -> dict[str, Any]:
+        return {
+            "workflow_runs": [
+                {
+                    "id": run_id,
+                    "conclusion": "success",
+                    "run_started_at": "2025-01-01T10:00:00Z",
+                    "updated_at": "2025-01-01T10:05:00Z",
+                    "created_at": "2025-01-01T10:00:00Z",
+                }
+            ]
+        }
+
+    def test_success_writes_all_outputs(self, tmp_path: Path) -> None:
+        workflows = [{"id": 1, "name": "CI", "path": ".github/workflows/ci.yml"}]
+        runs = self._one_successful_run()
+        jobs: dict[str, Any] = {"jobs": []}
+        output_dir = tmp_path / "outputs"
+
+        with patch.object(
+            self.mod, "_gh_api", side_effect=self._gh_api_stub(workflows, runs, jobs)
+        ):
+            exit_code = self.mod.collect("owner/repo", output_dir, workflow_id=1)
+
+        assert exit_code == 0
+        assert json.loads((output_dir / "workflows.json").read_text()) == workflows
+        assert (output_dir / "run_count_primary.txt").read_text().strip() == "42"
+        assert json.loads((output_dir / "runs.json").read_text()) == runs
+        assert (output_dir / "p50_run.txt").read_text().startswith("100  5.0m")
+        assert json.loads((output_dir / "jobs.json").read_text()) == jobs
+        failure = json.loads((output_dir / "failure_check.json").read_text())
+        assert failure["chronic"] is False
+        assert failure["failure_rate"] == 0.0
+        assert (
+            output_dir / "workflow_stats.txt"
+        ).read_text() == "no secondary workflows\n"
+
+        summary = json.loads((output_dir / "collect_summary.json").read_text())
+        assert summary["repo"] == "owner/repo"
+        assert summary["primary_workflow_id"] == 1
+        assert summary["primary_workflow_name"] == "CI"
+        assert summary["p50_run_id"] == 100
+        assert summary["run_count_30d"] == 42
+
+        timing_data = json.loads((output_dir / "collect_timing.json").read_text())
+        assert "duration_seconds" in timing_data
+        assert "start_iso" in timing_data and "end_iso" in timing_data
+
+    def test_writes_secondary_workflow_stats_when_present(self, tmp_path: Path) -> None:
+        workflows = [{"id": 1, "name": "CI"}, {"id": 2, "name": "Deploy"}]
+        runs = self._one_successful_run()
+        jobs: dict[str, Any] = {"jobs": []}
+        output_dir = tmp_path / "outputs"
+
+        fake_stats_result = MagicMock()
+        fake_stats_result.stdout = "WF_ID  NAME    RUNS_30D\n2      Deploy  5\n"
+
+        with (
+            patch.object(
+                self.mod,
+                "_gh_api",
+                side_effect=self._gh_api_stub(workflows, runs, jobs),
+            ),
+            patch("subprocess.run", return_value=fake_stats_result) as mock_run,
+        ):
+            exit_code = self.mod.collect("owner/repo", output_dir, workflow_id=1)
+
+        assert exit_code == 0
+        assert (
+            output_dir / "workflow_stats.txt"
+        ).read_text() == fake_stats_result.stdout
+        called_args = mock_run.call_args.args[0]
+        assert called_args[0] == "bash"
+        assert called_args[1].endswith("fetch_workflow_stats.sh")
+        assert called_args[2] == "owner/repo"
+        assert "2" in called_args[3:]
+
+    def test_no_successful_runs_returns_1(self, tmp_path: Path) -> None:
+        workflows = [{"id": 1, "name": "CI"}]
+        runs = {"workflow_runs": [{"id": 1, "conclusion": "failure"}]}
+        output_dir = tmp_path / "outputs"
+
+        with patch.object(
+            self.mod, "_gh_api", side_effect=self._gh_api_stub(workflows, runs, {})
+        ):
+            exit_code = self.mod.collect("owner/repo", output_dir, workflow_id=1)
+
+        assert exit_code == 1
+        assert not (output_dir / "collect_summary.json").exists()
+
+    def test_empty_workflows_returns_1(self, tmp_path: Path) -> None:
+        output_dir = tmp_path / "outputs"
+
+        with patch.object(
+            self.mod, "_gh_api", side_effect=self._gh_api_stub([], {}, {})
+        ):
+            exit_code = self.mod.collect("owner/repo", output_dir, workflow_id=None)
+
+        assert exit_code == 1
+
+    def test_ambiguous_returns_2_and_writes_candidates(self, tmp_path: Path) -> None:
+        workflows = [{"id": 1, "name": "CI"}, {"id": 2, "name": "Build"}]
+        output_dir = tmp_path / "outputs"
+
+        fake_events_result = MagicMock()
+        fake_events_result.stdout = '["push"]'
+
+        with (
+            patch.object(
+                self.mod, "_gh_api", side_effect=self._gh_api_stub(workflows, {}, {})
+            ),
+            patch("subprocess.run", return_value=fake_events_result),
+        ):
+            exit_code = self.mod.collect("owner/repo", output_dir, workflow_id=None)
+
+        assert exit_code == 2
+        assert (
+            json.loads((output_dir / "workflow_candidates.json").read_text())
+            == workflows
+        )
+
+    def test_single_detected_flows_through(self, tmp_path: Path) -> None:
+        workflows = [{"id": 1, "name": "CI"}, {"id": 2, "name": "Deploy"}]
+        runs = self._one_successful_run()
+        output_dir = tmp_path / "outputs"
+
+        def fake_events_run(args: list[str], **kwargs: Any) -> MagicMock:
+            api_path = args[2]
+            result = MagicMock()
+            result.stdout = (
+                '["push"]' if "/workflows/1/" in api_path else '["schedule"]'
+            )
+            return result
+
+        with (
+            patch.object(
+                self.mod,
+                "_gh_api",
+                side_effect=self._gh_api_stub(workflows, runs, {"jobs": []}),
+            ),
+            patch("subprocess.run", side_effect=fake_events_run),
+        ):
+            exit_code = self.mod.collect("owner/repo", output_dir, workflow_id=None)
+
+        assert exit_code == 0
+        summary = json.loads((output_dir / "collect_summary.json").read_text())
+        assert summary["primary_workflow_id"] == 1
+        assert summary["primary_workflow_name"] == "CI"
+
+    def test_explicit_workflow_id_skips_detection(self, tmp_path: Path) -> None:
+        # Only one workflow is passed but get_workflow_events would blow up if
+        # called — since workflow_id is given explicitly, detection (and the
+        # subprocess call it makes) must never run.
+        workflows = [{"id": 1, "name": "CI"}]
+        runs = self._one_successful_run()
+        output_dir = tmp_path / "outputs"
+
+        with (
+            patch.object(
+                self.mod,
+                "_gh_api",
+                side_effect=self._gh_api_stub(workflows, runs, {"jobs": []}),
+            ),
+            patch("subprocess.run", side_effect=AssertionError("should not be called")),
+        ):
+            exit_code = self.mod.collect("owner/repo", output_dir, workflow_id=1)
+
+        assert exit_code == 0
 
 
 # ---------------------------------------------------------------------------
