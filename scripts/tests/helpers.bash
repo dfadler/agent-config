@@ -354,7 +354,9 @@ unshim_python3() {
 #
 # Usage: shim_claude <mode>
 # Modes: enabled | disabled | other-plugin-only | disabled-with-enabled-neighbor
-#        | enabled-field-before-id | ponytail-enabled | ponytail-disabled | broken
+#        | enabled-field-before-id | frontend-design-enabled | frontend-design-disabled
+#        | aws-core-enabled | aws-core-disabled | ponytail-enabled | ponytail-disabled
+#        | broken
 shim_claude() {
   CLAUDE_SHIM_BIN="$SANDBOX/claude-shim"
   mkdir -p "$CLAUDE_SHIM_BIN"
@@ -407,6 +409,26 @@ shim_claude() {
   {
     "enabled": true,
     "id": "mattpocock-skills@mattpocock"
+  }
+]'
+      ;;
+    frontend-design-enabled | frontend-design-disabled)
+      local on=true
+      [ "$mode" = "frontend-design-disabled" ] && on=false
+      body='[
+  {
+    "id": "example-skills@anthropic-agent-skills",
+    "enabled": '"$on"'
+  }
+]'
+      ;;
+    aws-core-enabled | aws-core-disabled)
+      local on=true
+      [ "$mode" = "aws-core-disabled" ] && on=false
+      body='[
+  {
+    "id": "aws-core@claude-plugins-official",
+    "enabled": '"$on"'
   }
 ]'
       ;;
