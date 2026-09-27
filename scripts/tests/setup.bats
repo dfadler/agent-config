@@ -33,6 +33,8 @@ setup() {
   mkdir -p "$FAKE_REPO/scripts"
   cp "$REPO_ROOT/scripts/claude-md-lib.sh" "$FAKE_REPO/scripts/claude-md-lib.sh"
   cp "$REPO_ROOT/scripts/settings-lib.sh" "$FAKE_REPO/scripts/settings-lib.sh"
+  cp "$REPO_ROOT/scripts/plugin-hooks.sh" "$FAKE_REPO/scripts/plugin-hooks.sh"
+  cp "$REPO_ROOT/scripts/symlink-lib.sh" "$FAKE_REPO/scripts/symlink-lib.sh"
   cp "$REPO_ROOT/scripts/offer-safe-chain-permission.sh" \
     "$FAKE_REPO/scripts/offer-safe-chain-permission.sh"
   chmod +x "$FAKE_REPO/scripts/offer-safe-chain-permission.sh"
@@ -247,7 +249,7 @@ run_setup_with() {
   mkdir -p "$HOME/.claude/skills"
   # $HOME is $SANDBOX/home and the repo is $SANDBOX/repo, so this is the real
   # relative path from the link's directory into the repo's plugins/.
-  # resolve_target cds into the target's PARENT, so that directory has to exist.
+  # resolve_symlink_target cds into the target's PARENT, so that directory has to exist.
   mkdir -p "$FAKE_REPO/plugins/dfadler-agent-config/skills"
   ln -s "../../../repo/plugins/dfadler-agent-config/skills/old-skill" \
     "$HOME/.claude/skills/old-skill"

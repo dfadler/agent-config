@@ -69,6 +69,13 @@ REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 source "$REPO_ROOT/scripts/claude-md-lib.sh"
 # shellcheck source=scripts/settings-lib.sh
 source "$REPO_ROOT/scripts/settings-lib.sh"
+# The hook (event, matcher, feature, command) table both setup.sh and
+# teardown.sh iterate — single source of truth for the command paths.
+# shellcheck source=scripts/plugin-hooks.sh
+source "$REPO_ROOT/scripts/plugin-hooks.sh"
+# Shared relative-symlink-to-absolute-path resolution.
+# shellcheck source=scripts/symlink-lib.sh
+source "$REPO_ROOT/scripts/symlink-lib.sh"
 
 # Remove a symlink only if it points exactly to the expected target.
 unlink_if_owned() {
@@ -83,7 +90,7 @@ unlink_if_owned() {
   if [[ "$target" != /* ]]; then
     local link_dir
     link_dir="$(dirname "$dest")"
-    target="$(cd "$link_dir" 2>/dev/null && cd "$(dirname "$target")" 2>/dev/null && pwd)/$(basename "$target")" || return 0
+    target="$(resolve_symlink_target "$target" "$link_dir")" || return 0
   fi
   if [[ "$target" != "$src" ]]; then
     return 0
@@ -103,7 +110,7 @@ unlink_dir_contents() {
     if [[ "$target" != /* ]]; then
       local link_dir
       link_dir="$(dirname "$entry")"
-      target="$(cd "$link_dir" 2>/dev/null && cd "$(dirname "$target")" 2>/dev/null && pwd)/$(basename "$target")" 2>/dev/null || continue
+      target="$(resolve_symlink_target "$target" "$link_dir")" || continue
     fi
     if [[ "$target" == "$src_dir/"* ]]; then
       rm "$entry"
@@ -190,16 +197,13 @@ if [[ "$DO_PLUGINS" -eq 1 ]]; then
   # plugins/ directory, including links to plugins no longer in the checkout.
   unlink_dir_contents "$HOME/.claude/skills" "$REPO_ROOT/plugins"
 
-  # Deregister plugin hooks from ~/.claude/settings.json that setup.sh wired in.
+  # Deregister plugin hooks from ~/.claude/settings.json that setup.sh wired
+  # in. The rows themselves live in scripts/plugin-hooks.sh — sourced above —
+  # shared with setup.sh so the two can't drift apart.
   GLOBAL_SETTINGS="$HOME/.claude/settings.json"
-  WORKTREE_HOOK_CMD="$HOME/.claude/skills/worktree-core/skills/git-worktree-usage/scripts/require-worktree-hook.sh"
-  WORKTREE_SYMLINK_CHECK_CMD="$HOME/.claude/skills/worktree-core/skills/git-worktree-usage/scripts/check-worktree-symlinks-hook.sh"
-  WORKTREE_AUTOPRUNE_CMD="$HOME/.claude/skills/worktree-core/skills/git-worktree-usage/scripts/prune-merged-worktrees-hook.sh"
-  MEMORY_HYGIENE_HOOK_CMD="$HOME/.claude/skills/dfadler-agent-config/hooks/scripts/memory-hygiene-stop-hook.sh"
-  ensure_hook_deregistered "PreToolUse" "$WORKTREE_HOOK_CMD" "$GLOBAL_SETTINGS"
-  ensure_hook_deregistered "SessionStart" "$WORKTREE_SYMLINK_CHECK_CMD" "$GLOBAL_SETTINGS"
-  ensure_hook_deregistered "SessionStart" "$WORKTREE_AUTOPRUNE_CMD" "$GLOBAL_SETTINGS"
-  ensure_hook_deregistered "Stop" "$MEMORY_HYGIENE_HOOK_CMD" "$GLOBAL_SETTINGS"
+  for i in "${!PLUGIN_HOOK_EVENTS[@]}"; do
+    ensure_hook_deregistered "${PLUGIN_HOOK_EVENTS[$i]}" "${PLUGIN_HOOK_CMDS[$i]}" "$GLOBAL_SETTINGS"
+  done
 fi
 
 echo "Done."

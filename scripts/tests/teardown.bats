@@ -16,6 +16,8 @@ setup() {
   mkdir -p "$FAKE_REPO/scripts"
   cp "$REPO_ROOT/scripts/claude-md-lib.sh" "$FAKE_REPO/scripts/claude-md-lib.sh"
   cp "$REPO_ROOT/scripts/settings-lib.sh" "$FAKE_REPO/scripts/settings-lib.sh"
+  cp "$REPO_ROOT/scripts/plugin-hooks.sh" "$FAKE_REPO/scripts/plugin-hooks.sh"
+  cp "$REPO_ROOT/scripts/symlink-lib.sh" "$FAKE_REPO/scripts/symlink-lib.sh"
   mkdir -p "$FAKE_REPO/claude/commands"
   echo "# global instructions" > "$FAKE_REPO/claude/CLAUDE.md"
   echo "# a command" > "$FAKE_REPO/claude/commands/demo.md"
