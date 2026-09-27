@@ -1,17 +1,21 @@
 #!/usr/bin/env bats
 # Unit tests for plugins/gha-ci-audit/scripts/collect.sh
 #
-# collect.sh orchestrates 8 gh api calls and 5 python3 invocations to produce
-# the raw data for one eval run. These tests cover the four key behaviours:
+# collect.sh is a thin entrypoint: argument handling plus one `exec` into
+# collect_pipeline.py, which does the actual collection (workflows, run
+# counts, runs, p50 run, jobs, failure check, secondary stats, summary,
+# timing) in a single process. These tests cover the four key behaviours:
 #
 #   1. Happy path with --workflow-id: exits 0, creates all expected output files
 #   2. Ambiguous detection (no --workflow-id): exits 2 and writes candidates JSON
-#   3. gh api failure: exits non-zero (set -euo pipefail propagates the error)
+#   3. gh api failure: exits non-zero
 #   4. --output-dir creation: the directory is created if it does not yet exist
 #
-# gh and python3 are faked (overriding helpers.bash's hard-blocking shim for gh)
-# so no real network call or file-system write outside the sandbox ever happens.
-# jq is left as the real system binary — it runs only on fixture data.
+# Only `gh` is faked (overriding helpers.bash's hard-blocking shim for it) so
+# no real network call ever happens. `python3` runs for real — collect_pipeline
+# is a plain, importable module now, not a one-off CLI worth re-mocking piece
+# by piece, so these tests exercise its actual logic end-to-end against the
+# faked `gh` responses. `jq` is also left as the real system binary.
 
 load helpers
 
@@ -20,14 +24,20 @@ COLLECT_SCRIPT="$REPO_ROOT/plugins/gha-ci-audit/scripts/collect.sh"
 # ---------------------------------------------------------------------------
 # gh shim
 # ---------------------------------------------------------------------------
-# Handles every gh api call collect.sh makes.  URL matching is by glob:
-#   */actions/workflows (exact suffix)          → active workflow list (pre-jq)
-#   */actions/workflows/*/runs* + --jq present  → run count (pre-jq integer)
-#   */actions/workflows/*/runs* (no --jq)       → raw workflow_runs JSON
-#   */actions/runs/*/jobs*                      → raw jobs JSON
+# Handles every gh api call collect_pipeline.py makes. URL matching is by
+# glob/substring, ordered most-specific-first since "per_page=1" is itself a
+# substring of "per_page=10" and "per_page=100":
+#   */actions/workflows (exact suffix) + --jq   → active workflow list
+#   */actions/runs/*/jobs*                      → jobs for the p50 run
+#   *per_page=100*                              → recent 100 runs (raw JSON)
+#   *per_page=10*                               → get_workflow_events (primary
+#                                                  workflow detection)
+#   *per_page=1*                                → run count (pre-jq integer)
 #
-# Set GH_COLLECT_FAIL=1 before calling shim_gh_collect (or export it) to make
-# every gh call return exit 1 instead.
+# GH_WORKFLOWS_JSON / GH_EVENTS_JSON override the default single-workflow,
+# single-event fixtures (used by the ambiguous-detection test, which needs
+# two workflows that both look like a match). Set GH_COLLECT_FAIL=1 to make
+# every gh call fail instead.
 shim_gh_collect() {
   cat > "$SHIM_BIN/gh" <<'EOF'
 #!/usr/bin/env bash
@@ -39,17 +49,33 @@ fi
 # $1=api, $2=URL, rest=optional flags
 url="${2:-}"
 if [[ "$url" == */actions/workflows && "$*" == *"--jq"* ]]; then
-  # Step 1: active workflow list — output the jq-filtered result directly
-  echo '[{"id":12345,"name":"CI","path":".github/workflows/ci.yml"}]'
-elif [[ "$url" == */actions/workflows/*/runs* && "$*" == *"--jq"* ]]; then
-  # Step 2: run count — output the jq '.total_count' result directly
-  echo "42"
-elif [[ "$url" == */actions/workflows/*/runs* ]]; then
-  # Step 3: recent 100 runs — raw JSON (no --jq on this call)
-  echo '{"workflow_runs":[{"id":99001,"run_started_at":"2024-01-01T10:00:00Z","updated_at":"2024-01-01T10:10:00Z","conclusion":"success"}]}'
+  # Step 1: active workflow list — output the jq-filtered result directly.
+  # (Not `${GH_WORKFLOWS_JSON:-default-with-braces}`: bash's brace matching
+  # for `${VAR:-word}` gets confused by literal `{`/`}` JSON characters in
+  # the default word, silently reordering them — an explicit if/else sidesteps
+  # that entirely.)
+  if [[ -n "${GH_WORKFLOWS_JSON:-}" ]]; then
+    echo "$GH_WORKFLOWS_JSON"
+  else
+    echo '[{"id":12345,"name":"CI","path":".github/workflows/ci.yml"}]'
+  fi
 elif [[ "$url" == */actions/runs/*/jobs* ]]; then
   # Step 5: jobs for the p50 run
   echo '{"jobs":[]}'
+elif [[ "$url" == *"per_page=100"* ]]; then
+  # Step 3: recent 100 runs — raw JSON (no --jq on this call)
+  echo '{"workflow_runs":[{"id":99001,"run_started_at":"2024-01-01T10:00:00Z","updated_at":"2024-01-01T10:10:00Z","conclusion":"success","created_at":"2024-01-01T10:00:00Z"}]}'
+elif [[ "$url" == *"per_page=10"* ]]; then
+  # get_workflow_events: last-10-runs event check used for primary workflow
+  # detection (only called when --workflow-id is omitted)
+  if [[ -n "${GH_EVENTS_JSON:-}" ]]; then
+    echo "$GH_EVENTS_JSON"
+  else
+    echo '["push"]'
+  fi
+elif [[ "$url" == *"per_page=1"* ]]; then
+  # Step 2: run count — output the jq '.total_count' result directly
+  echo "42"
 else
   echo "fake gh: unexpected URL: $url  args: $*" >&2
   exit 3
@@ -59,77 +85,15 @@ EOF
 }
 
 # ---------------------------------------------------------------------------
-# python3 shim
-# ---------------------------------------------------------------------------
-# Intercepts every python3 script call by basename of $1.  The DETECT_EXIT
-# env var (default 0) controls whether detect_primary_workflow.py reports
-# success (writes primary_workflow_id.txt) or ambiguity (writes candidates
-# file, exits 2).  All other scripts write their expected output files or
-# print the right value to stdout.
-shim_python3_collect() {
-  cat > "$SHIM_BIN/python3" <<'EOF'
-#!/usr/bin/env bash
-set -uo pipefail
-script="$(basename "${1:-}")"
-case "$script" in
-  detect_primary_workflow.py)
-    # $2=workflows.json  $3=repo  $4=candidates.json  (all from collect.sh)
-    if [[ "${DETECT_EXIT:-0}" == "2" ]]; then
-      printf '[{"id":12345,"name":"CI"},{"id":67890,"name":"Build"}]\n' > "${4:-/dev/null}"
-      exit 2
-    fi
-    # Happy path: write the primary_workflow_id.txt next to workflows.json
-    printf '12345\n' > "$(dirname "${2:-/dev/null}")/primary_workflow_id.txt"
-    ;;
-  find_p50_run.py)
-    # Outputs: run_id  duration_minutes  created_at
-    echo "99001 5.2 2024-01-01T10:00:00Z"
-    ;;
-  check_failures.py)
-    # $2=runs.json  $3=--output  $4=output path
-    echo "no chronic failures"
-    if [[ "${3:-}" == "--output" ]]; then
-      printf '{"chronic": false, "failure_rate": 0.0, "details": "no chronic failures"}\n' > "${4:-/dev/null}"
-    fi
-    ;;
-  write_collect_summary.py)
-    # Named flags now (e.g. --outputs-dir <dir> --repo <repo> ...); find the
-    # value that follows --outputs-dir rather than assuming a fixed position.
-    shift
-    out_dir=""
-    while [[ $# -gt 0 ]]; do
-      if [[ "$1" == "--outputs-dir" ]]; then
-        out_dir="${2:-}"
-        break
-      fi
-      shift
-    done
-    printf '{"summary":"ok"}\n' > "${out_dir:-/dev/null}/collect_summary.json"
-    ;;
-  write_collect_timing.py)
-    # $2 = OUTPUT_DIR
-    printf '{"duration":0}\n' > "${2:-/dev/null}/collect_timing.json"
-    ;;
-  *)
-    echo "fake python3: unexpected script: $script  args: $*" >&2
-    exit 3
-    ;;
-esac
-EOF
-  chmod +x "$SHIM_BIN/python3"
-}
-
-# ---------------------------------------------------------------------------
 # per-test setup / teardown
 # ---------------------------------------------------------------------------
 
 setup() {
   make_sandbox
   shim_gh_collect
-  shim_python3_collect
   OUTPUT_DIR="$SANDBOX/outputs"
   # Reset control vars so earlier tests don't bleed into later ones
-  unset GH_COLLECT_FAIL DETECT_EXIT
+  unset GH_COLLECT_FAIL GH_WORKFLOWS_JSON GH_EVENTS_JSON
 }
 
 teardown() {
@@ -159,10 +123,11 @@ collect() {
   assert_output_contains "COLLECT OK"
 }
 
-@test "exits 2 and writes workflow_candidates.json when detect_primary_workflow.py reports ambiguity" {
-  export DETECT_EXIT=2
-  shim_python3_collect
-  # No --workflow-id so detect_primary_workflow.py is invoked
+@test "exits 2 and writes workflow_candidates.json when multiple workflows look primary" {
+  export GH_WORKFLOWS_JSON='[{"id":12345,"name":"CI"},{"id":67890,"name":"Build"}]'
+  export GH_EVENTS_JSON='["push"]'
+  # No --workflow-id, so detect_primary_workflow runs and both workflows'
+  # event checks report "push" — an ambiguous match.
   collect --repo test/repo --output-dir "$OUTPUT_DIR"
   assert_status 2
   [ -f "$OUTPUT_DIR/workflow_candidates.json" ]
@@ -170,7 +135,6 @@ collect() {
 
 @test "exits non-zero when gh api fails" {
   export GH_COLLECT_FAIL=1
-  shim_gh_collect
   collect --repo test/repo --output-dir "$OUTPUT_DIR" --workflow-id 12345
   assert_failure
 }

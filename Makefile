@@ -37,15 +37,13 @@ PY_SOURCES := plugins/detached-terminal/skills/detached-terminal/scripts/agent_t
               plugins/gha-ci-audit/scripts/analyze_runs.py \
               plugins/gha-ci-audit/scripts/check_failures.py \
               plugins/gha-ci-audit/scripts/check_status.py \
+              plugins/gha-ci-audit/scripts/collect_pipeline.py \
               plugins/gha-ci-audit/scripts/compute_workflow_timing.py \
-              plugins/gha-ci-audit/scripts/detect_primary_workflow.py \
               plugins/gha-ci-audit/scripts/find_p50_run.py \
               plugins/gha-ci-audit/scripts/grade.py \
               plugins/gha-ci-audit/scripts/merge_timing.py \
+              plugins/gha-ci-audit/scripts/timing.py \
               plugins/gha-ci-audit/scripts/write_assertions.py \
-              plugins/gha-ci-audit/scripts/write_collect_summary.py \
-              plugins/gha-ci-audit/scripts/write_collect_timing.py \
-              plugins/gha-ci-audit/scripts/write_render_timing.py \
               plugins/gha-ci-audit/scripts/utils.py \
               plugins/gha-ci-audit/tests/test_gha_ci_audit.py
 
