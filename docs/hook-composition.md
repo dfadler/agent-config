@@ -34,6 +34,14 @@ work, and exits 0 immediately (no output, no side effect) unless a signal
 explicitly turns it on. Exit 0 with nothing configured means "no opinion" —
 the hook did not run at all.
 
+The three `worktree-core` hooks below share one mechanism for this: each
+calls `resolve_enable_mode <env_var> <settings_key> <default> <valid_values...>`
+in `worktree-hook-lib.sh`, which resolves env var override → settings.json
+value → default, validating against the hook's own `valid_values`. See that
+function's own header comment in `worktree-hook-lib.sh` for the exact
+precedence and validation rules — this table documents only the values each
+hook passes in, not the mechanism itself.
+
 ### Enable/disable signals by hook
 
 | Hook | Event | Env var | settings.json key | Default |
@@ -43,25 +51,28 @@ the hook did not run at all.
 | `check-worktree-symlinks-hook.sh` | `SessionStart` | `WORKTREE_SYMLINK_CHECK=on\|off` | `worktree.symlinkCheck: "on"\|"off"` | off (skipped entirely) |
 | `memory-hygiene-stop-hook.sh` | `Stop` | `MEMORY_HYGIENE_REMINDER=on\|off` | `env.MEMORY_HYGIENE_REMINDER: "on"` (settings.json's built-in `env` key — no bespoke key; see below) | off (skipped entirely) |
 
-`Stop` fires once per turn, not once per session
-([hooks docs](https://code.claude.com/docs/en/hooks#stop)), so
-`memory-hygiene-stop-hook.sh` throttles itself to at most one reminder per
-session (a marker file keyed on `session_id`) and only fires when `git
-status` shows uncommitted changes — see the script's own header for the
-full reasoning and known gaps. It has no project-settings key of its own
-because the CLI's own settings validation rejects unrecognized top-level
-keys (confirmed while building this hook — a `memoryHygiene.reminder` key
-was refused as "Unrecognized field"); project-level opt-in instead sets the
-env var through settings.json's own `env` field.
+`memory-hygiene-stop-hook.sh` belongs to a different plugin (`dfadler-agent-config`,
+not `worktree-core`) and does not call `resolve_enable_mode` — it hand-rolls its
+own on/off check. `Stop` fires once per turn, not once per session
+([hooks docs](https://code.claude.com/docs/en/hooks#stop)), so the hook
+throttles itself to at most one reminder per session (a marker file keyed on
+`session_id`) and only fires when `git status` shows uncommitted changes —
+see the script's own header for the full reasoning and known gaps. It has no
+project-settings key of its own because the CLI's own settings validation
+rejects unrecognized top-level keys (confirmed while building this hook — a
+`memoryHygiene.reminder` key was refused as "Unrecognized field");
+project-level opt-in instead sets the env var through settings.json's own
+`env` field.
 
 For `require-worktree-hook.sh`, `warn` is a middle ground: it prints an
 advisory instead of blocking (see the hook script's own header for the full
 mode table). For the other two, `off` isn't a distinct third state from the
 default — an explicit `off`/`false` still means "don't run", same as leaving
-it unconfigured; the two hooks that also support a lighter "nudge, don't act"
-mode (`prune-merged-worktrees-hook.sh`'s `--hook` mode) reach it via the
-env var's `0`/`false`/`no`/`off` values specifically, distinct from leaving
-the signal unset.
+it unconfigured; `prune-merged-worktrees-hook.sh`'s lighter "nudge, don't
+act" mode (its `--hook` flag) is reached via the env var's or settings'
+`0`/`false`/`no`/`off` values specifically, distinct from leaving the signal
+unset entirely (which skips the prune script altogether — see that hook's
+own header for why "unconfigured" and "off" are different outcomes there).
 
 ### Turning a hook on per project via settings.json
 
