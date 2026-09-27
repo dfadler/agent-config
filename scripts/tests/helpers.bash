@@ -354,7 +354,7 @@ unshim_python3() {
 #
 # Usage: shim_claude <mode>
 # Modes: enabled | disabled | other-plugin-only | disabled-with-enabled-neighbor
-#        | enabled-field-before-id | ponytail-enabled | ponytail-disabled | broken
+#        | enabled-field-before-id | broken
 shim_claude() {
   CLAUDE_SHIM_BIN="$SANDBOX/claude-shim"
   mkdir -p "$CLAUDE_SHIM_BIN"
@@ -410,16 +410,6 @@ shim_claude() {
   }
 ]'
       ;;
-    ponytail-enabled | ponytail-disabled)
-      local on=true
-      [ "$mode" = "ponytail-disabled" ] && on=false
-      body='[
-  {
-    "id": "ponytail@ponytail",
-    "enabled": '"$on"'
-  }
-]'
-      ;;
     broken) body="" ;;
     *)
       echo "shim_claude: unknown mode $mode" >&2
@@ -443,6 +433,48 @@ echo "fake claude: unexpected args: \$*" >&2
 exit 1
 EOF
   fi
+  chmod +x "$CLAUDE_SHIM_BIN/claude"
+  case ":$PATH:" in
+    *":$CLAUDE_SHIM_BIN:"*) ;;
+    *) export PATH="$CLAUDE_SHIM_BIN:$PATH" ;;
+  esac
+}
+
+# A fake `claude` CLI listing an arbitrary set of plugins, for the
+# table-driven companion-plugin tests in check-companions.bats that need
+# several companions' ids present (or absent) at once — something the fixed
+# per-plugin modes in shim_claude above can't do, since each of those bakes
+# in one hardcoded body. Distinct from shim_claude, which stays reserved for
+# the fixed regression fixtures (field order, a neighboring enabled plugin, a
+# broken CLI) that check-companions.sh's JSON parsing has to survive.
+#
+# Usage: shim_claude_plugins "mattpocock-skills@mattpocock:true" "ponytail@ponytail:false"
+# Each argument is "<id>:<true|false>"; an id never passed is absent. Called
+# with no arguments, the plugin list is empty.
+shim_claude_plugins() {
+  CLAUDE_SHIM_BIN="$SANDBOX/claude-shim"
+  mkdir -p "$CLAUDE_SHIM_BIN"
+  local pair id enabled body="[" first=1
+  for pair in "$@"; do
+    id="${pair%%:*}"
+    enabled="${pair#*:}"
+    if [ "$first" -eq 1 ]; then
+      first=0
+    else
+      body+=","
+    fi
+    body+="{\"id\":\"$id\",\"enabled\":$enabled}"
+  done
+  body+="]"
+  cat > "$CLAUDE_SHIM_BIN/claude" <<EOF
+#!/usr/bin/env bash
+if [ "\$1" = "plugin" ] && [ "\$2" = "list" ]; then
+  echo '$body'
+  exit 0
+fi
+echo "fake claude: unexpected args: \$*" >&2
+exit 1
+EOF
   chmod +x "$CLAUDE_SHIM_BIN/claude"
   case ":$PATH:" in
     *":$CLAUDE_SHIM_BIN:"*) ;;

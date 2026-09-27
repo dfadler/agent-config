@@ -108,8 +108,9 @@ claude plugin install example-skills
 Unlike `mattpocock-skills`, this one is **not** in the official marketplace (checked
 directly against `anthropics/claude-plugins-official`'s manifest — absent), so it needs
 the `marketplace add` step first; updates after that arrive automatically the same way.
-`setup.sh` runs an advisory-only check (`check_frontend_design`) and prints the install
-command above if it's missing — it doesn't install it.
+`setup.sh` runs an advisory-only check (`check_companion_plugin` against the
+`example-skills@` id) and prints the install command above if it's missing — it doesn't
+install it.
 
 ## Linux administration skill: first-party, not vendored
 
@@ -197,7 +198,7 @@ Credential and permission handling for those live calls is the toolkit's own con
 not something this repo wraps — the tradeoff of reference-don't-vendor, same as the
 other companions in this section. `setup.sh` doesn't install this — same reasoning as
 `mattpocock-skills` (#132, option A over B) — but does run an advisory check
-(`check_aws_core`).
+(`check_companion_plugin` against the `aws-core@` id).
 
 For the third area #213 asked about, security auditing, the same toolkit ships
 `aws-agents-for-devsecops` (vulnerability scanning and an AWS Security Agent for
@@ -234,9 +235,9 @@ Third-party marketplaces default to auto-update *disabled* (confirmed against
 pick up updates with `claude plugin marketplace update ponytail`, or enable
 auto-update for it via `/plugin` → Marketplaces. `setup.sh` doesn't install this —
 same reasoning as `mattpocock-skills` (#132, option A over B) — but does run an
-advisory check (`check_ponytail`) against the `ponytail@ponytail` id, which is
-what the repo's own `.claude-plugin/marketplace.json` defines (marketplace and
-plugin both named `ponytail`).
+advisory check (`check_companion_plugin` against the `ponytail@` id), matching
+`ponytail@ponytail`, which is what the repo's own `.claude-plugin/marketplace.json`
+defines (marketplace and plugin both named `ponytail`).
 
 ## rtk-ai/rtk (token compression)
 

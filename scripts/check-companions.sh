@@ -253,74 +253,59 @@ sys.exit(1)
   esac
 }
 
-# Purely informational: nothing in this repo depends on mattpocock-skills
-# being installed (see README's "Recommended companion" section, and #132's
-# decision to document rather than auto-install it) - unlike pyte or git
-# identity, there's no --install-deps for this, and there never should be.
-# The id can be "mattpocock-skills@mattpocock" (self-hosted fallback) or
-# "@claude-plugins-official" - either satisfies the check, so the marketplace
-# suffix is deliberately not matched.
-check_mattpocock_skills() {
-  case "$(claude_plugin_state "mattpocock-skills@")" in
-    enabled)
-      echo "✓ mattpocock-skills is installed"
-      ;;
-    disabled)
-      {
-        echo
-        echo "⚠ mattpocock-skills is installed but disabled."
-        echo "  Re-enable it with: claude plugin enable mattpocock-skills"
-        echo
-      } >&2
-      ;;
-    absent)
-      {
-        echo
-        echo "ℹ mattpocock-skills is not installed — a recommended companion plugin,"
-        echo "  not required by anything here. See README's \"Recommended companion\""
-        echo "  section. Install it with:"
-        echo "    claude plugin install mattpocock-skills"
-        echo
-      } >&2
-      ;;
-  esac
-}
+# One shape serves every `claude plugin list`-based companion check below:
+# print a message keyed off claude_plugin_state's enabled|disabled|absent
+# result. Purely informational, same posture each individual check used to
+# state on its own — nothing in this repo depends on any of these companion
+# plugins, unlike pyte or git identity, so none of them gets an
+# --install-deps equivalent. check_rtk and check_react_skills stay separate:
+# they check a bare CLI/skills listing on PATH, not `claude plugin list`, and
+# are genuinely a different shape.
+#
+# Args:
+#   id_prefix     plugin id prefix passed to claude_plugin_state, e.g.
+#                 "mattpocock-skills@" (matches any marketplace suffix)
+#   display_name  human-readable name used in all three messages
+#   install_cmd   one or more `claude plugin ...` lines to run, as a single
+#                 newline-separated string
+#
+# The "claude plugin enable <id>" hint always uses id_prefix with its
+# trailing "@" removed: every companion checked this way is enabled by its
+# plain id, with the "@<marketplace>" suffix only ever appearing in
+# `claude plugin list`'s own output, never typed by a user.
+check_companion_plugin() {
+  local id_prefix="$1" display_name="$2" install_cmd="$3"
+  local enable_id="${id_prefix%@}"
 
-# Same posture as check_mattpocock_skills above: purely informational, nothing
-# here depends on it, no --install-deps. anthropics/skills isn't in the
-# official marketplace the way mattpocock-skills is (checked directly against
-# anthropics/claude-plugins-official's own manifest - absent), so unlike that
-# one, getting it requires adding its marketplace first; the install id is
-# therefore always "example-skills@anthropic-agent-skills", never a
-# "@claude-plugins-official" variant.
-check_frontend_design() {
-  case "$(claude_plugin_state "example-skills@")" in
+  case "$(claude_plugin_state "$id_prefix")" in
     enabled)
-      echo "✓ anthropics/skills (frontend-design) is installed"
+      echo "✓ $display_name is installed"
       ;;
     disabled)
       {
         echo
-        echo "⚠ anthropics/skills is installed but disabled."
-        echo "  Re-enable it with: claude plugin enable example-skills"
+        echo "⚠ $display_name is installed but disabled."
+        echo "  Re-enable it with: claude plugin enable $enable_id"
         echo
       } >&2
       ;;
     absent)
       {
         echo
-        echo "ℹ anthropics/skills (frontend-design) is not installed — a recommended"
-        echo "  companion plugin, not required by anything here. See README's"
+        echo "ℹ $display_name is not installed — a recommended companion"
+        echo "  plugin, not required by anything here. See README's"
         echo "  \"Recommended companion\" section. Install it with:"
-        echo "    claude plugin marketplace add anthropics/skills"
-        echo "    claude plugin install example-skills"
+        local line
+        while IFS= read -r line; do
+          echo "    $line"
+        done <<<"$install_cmd"
         echo
       } >&2
       ;;
   esac
 }
 
-# Same posture as check_mattpocock_skills above: purely informational, nothing
+# Same posture as check_companion_plugin above: purely informational, nothing
 # here depends on it, no --install-deps. Unlike mattpocock-skills/frontend-design,
 # vercel-labs/agent-skills isn't a `claude plugin` at all - it distributes
 # through a separate `skills` CLI (see README's "Recommended companion"
@@ -391,45 +376,7 @@ sys.exit(0)
   esac
 }
 
-# Same posture as check_mattpocock_skills above: purely informational, nothing
-# here depends on it, no --install-deps. aws-core is Amazon Web Services' own
-# plugin (part of aws/agent-toolkit-for-aws, GA) and - like mattpocock-skills -
-# ships directly in Claude Code's official marketplace, confirmed against
-# anthropics/claude-plugins-official's own manifest, so its install id is
-# always "aws-core@claude-plugins-official" with no marketplace-add step
-# first. Matched by id prefix only (not the marketplace suffix), same
-# reasoning as check_mattpocock_skills. aws-agents-for-devsecops (the
-# security-auditing companion documented alongside aws-core in the README)
-# deliberately has no check here: it needs a plugin-specific
-# /aws-agents-for-devsecops:setup step before use, so installed/not-installed
-# alone would misstate whether it's actually ready.
-check_aws_core() {
-  case "$(claude_plugin_state "aws-core@")" in
-    enabled)
-      echo "✓ aws-core is installed"
-      ;;
-    disabled)
-      {
-        echo
-        echo "⚠ aws-core is installed but disabled."
-        echo "  Re-enable it with: claude plugin enable aws-core"
-        echo
-      } >&2
-      ;;
-    absent)
-      {
-        echo
-        echo "ℹ aws-core is not installed — a recommended companion plugin, not"
-        echo "  required by anything here. See README's \"Recommended companion\""
-        echo "  section. Install it with:"
-        echo "    claude plugin install aws-core@claude-plugins-official"
-        echo
-      } >&2
-      ;;
-  esac
-}
-
-# Same posture as check_mattpocock_skills above: purely informational, nothing
+# Same posture as check_companion_plugin above: purely informational, nothing
 # here depends on it, no --install-deps. Unlike the plugin-based checks above,
 # rtk-ai/rtk (see README's "Recommended companion" section) is a bare CLI, not
 # a `claude plugin` or a `skills` CLI entry, so this only checks whether the
@@ -458,38 +405,6 @@ check_rtk() {
     echo "  this script won't run it for you."
     echo
   } >&2
-}
-
-# Same posture as check_mattpocock_skills above: purely informational, nothing
-# here depends on it, no --install-deps. DietrichGebert/ponytail isn't in the
-# official marketplace; its own .claude-plugin/marketplace.json names both the
-# marketplace and the plugin "ponytail", so the install id is
-# "ponytail@ponytail". Matched by id prefix only, same as the checks above.
-check_ponytail() {
-  case "$(claude_plugin_state "ponytail@")" in
-    enabled)
-      echo "✓ ponytail is installed"
-      ;;
-    disabled)
-      {
-        echo
-        echo "⚠ ponytail is installed but disabled."
-        echo "  Re-enable it with: claude plugin enable ponytail"
-        echo
-      } >&2
-      ;;
-    absent)
-      {
-        echo
-        echo "ℹ ponytail is not installed — a recommended companion plugin, not"
-        echo "  required by anything here. See README's \"Recommended companion\""
-        echo "  section. Install it with:"
-        echo "    claude plugin marketplace add DietrichGebert/ponytail"
-        echo "    claude plugin install ponytail"
-        echo
-      } >&2
-      ;;
-  esac
 }
 
 # Check that every convention the user has opted into (via DEFAULT_ENABLED or
@@ -567,12 +482,51 @@ check_convention_deps() {
 check_convention_deps
 check_git_identity
 check_python_deps
-check_mattpocock_skills
-check_frontend_design
+
+# mattpocock-skills: no --install-deps equivalent, see README's "Recommended
+# companion" section (#132's decision to document rather than auto-install
+# it). The id can be "mattpocock-skills@mattpocock" (self-hosted fallback) or
+# "@claude-plugins-official" — either satisfies the check, so the
+# marketplace suffix is deliberately not matched.
+check_companion_plugin "mattpocock-skills@" "mattpocock-skills" \
+  "claude plugin install mattpocock-skills"
+
+# anthropics/skills (frontend-design): not in the official marketplace the
+# way mattpocock-skills is (checked directly against
+# anthropics/claude-plugins-official's own manifest — absent), so unlike
+# that one, getting it requires adding its marketplace first; the install id
+# is therefore always "example-skills@anthropic-agent-skills", never a
+# "@claude-plugins-official" variant.
+check_companion_plugin "example-skills@" "anthropics/skills (frontend-design)" \
+  "$(printf '%s\n%s' \
+    'claude plugin marketplace add anthropics/skills' \
+    'claude plugin install example-skills')"
+
 check_react_skills
-check_aws_core
+
+# aws-core: Amazon Web Services' own plugin (part of aws/agent-toolkit-for-aws,
+# GA) and — like mattpocock-skills — ships directly in Claude Code's official
+# marketplace, confirmed against anthropics/claude-plugins-official's own
+# manifest, so its install id is always "aws-core@claude-plugins-official"
+# with no marketplace-add step first. Matched by id prefix only (not the
+# marketplace suffix), same reasoning as mattpocock-skills above.
+# aws-agents-for-devsecops (the security-auditing companion documented
+# alongside aws-core in the README) deliberately has no check here: it needs
+# a plugin-specific /aws-agents-for-devsecops:setup step before use, so
+# installed/not-installed alone would misstate whether it's actually ready.
+check_companion_plugin "aws-core@" "aws-core" \
+  "claude plugin install aws-core@claude-plugins-official"
+
 check_rtk
-check_ponytail
+
+# ponytail: DietrichGebert/ponytail isn't in the official marketplace; its
+# own .claude-plugin/marketplace.json names both the marketplace and the
+# plugin "ponytail", so the install id is "ponytail@ponytail". Matched by id
+# prefix only, same as the checks above.
+check_companion_plugin "ponytail@" "ponytail" \
+  "$(printf '%s\n%s' \
+    'claude plugin marketplace add DietrichGebert/ponytail' \
+    'claude plugin install ponytail')"
 
 # Also last: offers (opt-in, y/n) to pre-approve Aikido Safe Chain's pinned
 # installer command in Claude Code's permission settings. See

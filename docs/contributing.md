@@ -53,10 +53,14 @@ places, and nothing enforces that they stay in sync:
 - [ ] [`docs/companion-plugins.md`](./companion-plugins.md) has its own section: what
       it is, license, provenance checked against the actual repo/GitHub API rather
       than marketing copy, install commands, and what `setup.sh` does about it.
-- [ ] `scripts/check-companions.sh` has an advisory `check_<name>` function (plus a
-      bats case in `scripts/tests/check-companions.bats`), **or** the
-      companion-plugins.md section documents why it's excluded. Take the install id
-      from the upstream's own `.claude-plugin/marketplace.json`, not a guess.
+- [ ] `scripts/check-companions.sh` has an advisory check for it, **or** the
+      companion-plugins.md section documents why it's excluded. For a plugin checked
+      via `claude plugin list` (the common case), this is one `check_companion_plugin`
+      call site, not a new function — see the existing call sites for the shape. Take
+      the install id from the upstream's own `.claude-plugin/marketplace.json`, not a
+      guess. Add its enabled/disabled/absent cases to the `COMPANION_TABLE` in
+      `scripts/tests/check-companions.bats` rather than writing a new per-companion
+      bats block.
 - [ ] Every platform-capability claim (official-vs-third-party marketplace,
       auto-update defaults, install ids) is checked against current official docs
       and cited, per
