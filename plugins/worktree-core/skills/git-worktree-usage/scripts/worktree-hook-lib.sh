@@ -32,9 +32,19 @@ read_worktree_setting() {
 # <mode-spec> arguments (see resolve_enable_mode's header for the spec
 # format), echoing the first canonical value that matches. Echoes nothing
 # (and returns 0) when <raw> is empty or matches no spec.
+#
+# <aliasing> controls whether the conventional boolean synonyms
+# (0/false/no/off, 1/true/yes/on) are recognized:
+#   alias    <raw> came from the env var — a session-level override, where
+#            the synonyms are part of the documented contract.
+#   literal  <raw> came from settings.json — matched only against each
+#            spec's own group token, with no synonym translation. A hook
+#            whose settings value needs translating (e.g. a JSON boolean)
+#            normalizes it to the literal group token in its own jq
+#            expression instead (see prune-merged-worktrees-hook.sh).
 _worktree_match_mode_spec() {
-  local raw="$1"
-  shift
+  local aliasing="$1" raw="$2"
+  shift 2
   [ -n "$raw" ] || return 0
 
   local spec group canonical
@@ -45,30 +55,37 @@ _worktree_match_mode_spec() {
     else
       canonical="${spec#*=}"
     fi
-    case "$group" in
-      off)
-        case "$raw" in
-          0 | false | no | off)
+    if [ "$aliasing" = "alias" ]; then
+      case "$group" in
+        off)
+          case "$raw" in
+            0 | false | no | off)
+              printf '%s' "$canonical"
+              return 0
+              ;;
+          esac
+          ;;
+        on)
+          case "$raw" in
+            1 | true | yes | on)
+              printf '%s' "$canonical"
+              return 0
+              ;;
+          esac
+          ;;
+        *)
+          if [ "$raw" = "$group" ]; then
             printf '%s' "$canonical"
             return 0
-            ;;
-        esac
-        ;;
-      on)
-        case "$raw" in
-          1 | true | yes | on)
-            printf '%s' "$canonical"
-            return 0
-            ;;
-        esac
-        ;;
-      *)
-        if [ "$raw" = "$group" ]; then
-          printf '%s' "$canonical"
-          return 0
-        fi
-        ;;
-    esac
+          fi
+          ;;
+      esac
+    else
+      if [ "$raw" = "$group" ]; then
+        printf '%s' "$canonical"
+        return 0
+      fi
+    fi
   done
 }
 
@@ -80,13 +97,23 @@ _worktree_match_mode_spec() {
 #
 # Each hook defines its own vocabulary of modes and passes each one as a
 # <mode-spec>:
-#   <token>           matches only the literal string <token> (from either
-#                     the env var or the settings value) and resolves to
-#                     <token> itself, e.g. "warn" or "block".
-#   off[=<canonical>] matches the conventional "off" aliases 0/false/no/off
-#                     and resolves to <canonical> (or "off" when omitted).
-#   on[=<canonical>]  matches the conventional "on" aliases 1/true/yes/on
-#                     and resolves to <canonical> (or "on" when omitted).
+#   <token>           matches only the literal string <token> and resolves
+#                     to <token> itself, e.g. "warn" or "block".
+#   off[=<canonical>] from the env var, matches the conventional "off"
+#                     aliases 0/false/no/off; from settings.json, matches
+#                     only the literal string "off". Resolves to <canonical>
+#                     (or "off" when omitted) either way.
+#   on[=<canonical>]  from the env var, matches the conventional "on"
+#                     aliases 1/true/yes/on; from settings.json, matches
+#                     only the literal string "on". Resolves to <canonical>
+#                     (or "on" when omitted) either way.
+#
+# The boolean synonyms apply only to the env var: it's a session-level
+# override where "yes"/"1"/etc. are part of the documented contract. A
+# settings.json value is matched literally against each spec's own group
+# token, with no synonym translation — a hook whose settings value needs
+# translating (e.g. a JSON boolean) embeds that in its own jq expression
+# (an `if/elif/else` works well) rather than relying on this function.
 #
 # Usage:
 #   resolve_enable_mode <env-var-name> <settings-jq-expr> \
@@ -111,7 +138,7 @@ resolve_enable_mode() {
 
   local env_raw resolved
   env_raw="${!env_var_name:-}"
-  resolved="$(_worktree_match_mode_spec "$env_raw" "$@")"
+  resolved="$(_worktree_match_mode_spec alias "$env_raw" "$@")"
   if [ -n "$resolved" ]; then
     printf '%s\n' "$resolved"
     return 0
@@ -119,7 +146,7 @@ resolve_enable_mode() {
 
   local settings_raw
   settings_raw="$(read_worktree_setting "$jq_expr" "$settings_read_default")"
-  resolved="$(_worktree_match_mode_spec "$settings_raw" "$@")"
+  resolved="$(_worktree_match_mode_spec literal "$settings_raw" "$@")"
   if [ -n "$resolved" ]; then
     printf '%s\n' "$resolved"
     return 0

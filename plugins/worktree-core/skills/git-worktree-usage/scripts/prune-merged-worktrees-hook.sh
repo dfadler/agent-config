@@ -29,10 +29,14 @@ source "$script_dir/worktree-hook-lib.sh"
 # set to a recognized value, else worktree.autoPrune in settings.json, else
 # empty ("not configured" — skip; there is no third default mode here).
 #
-# No `// empty` in the jq expr: jq's `//` treats a literal `false` as falsy,
-# which would swallow an explicit autoPrune:false the same as a missing key.
-# The "null" settings-read default lets us distinguish null from false.
-mode="$(resolve_enable_mode WORKTREE_AUTO_PRUNE '.worktree.autoPrune' "null" "" off=--hook on=--auto)"
+# resolve_enable_mode matches a settings.json value literally, with no
+# boolean-synonym translation, so the jq expression itself normalizes the
+# JSON boolean to the literal "on"/"off" tokens; any other value (including
+# a missing key, explicit null, or a non-boolean like "yes") falls through
+# to `null`, which matches neither and defers to the final default below.
+mode="$(resolve_enable_mode WORKTREE_AUTO_PRUNE \
+  '.worktree.autoPrune | if . == true then "on" elif . == false then "off" else null end' \
+  "null" "" off=--hook on=--auto)"
 
 if [ -z "$mode" ]; then
   exit 0
