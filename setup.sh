@@ -313,7 +313,7 @@ prune_skipped_dir_links() {
   for entry in "$dest_dir"/*; do
     [[ -L "$entry" ]] || continue
     target="$(readlink "$entry")"
-    resolved="$(resolve_target "$target" "$dest_dir")" || continue
+    resolved="$(resolve_symlink_target "$target" "$dest_dir")" || continue
     [[ "$resolved" == "$src_dir/"* ]] || continue
     name="$(basename "$entry")"
     feature="${name%.md}"
@@ -336,21 +336,10 @@ prune_skipped_dir_links() {
 # made absolute before it can be compared against $REPO_ROOT - otherwise a
 # relative link into plugins/ reads as pointing elsewhere and survives, and the
 # "isn't the current plugin link" test above can't recognize the current link
-# either. Resolving the target's parent directory and re-appending the basename
-# normalizes any leading ../ and works on a target that no longer exists, which
-# realpath cannot do portably (macOS has no realpath -m). A target whose parent
-# is also missing can't be placed, so it is left alone.
-resolve_target() {
-  local target="$1" link_dir="$2" parent
-  if [[ "$target" == /* ]]; then
-    printf '%s\n' "$target"
-    return 0
-  fi
-  parent="$(cd "$link_dir" 2>/dev/null && cd "$(dirname "$target")" 2>/dev/null && pwd)" || parent=""
-  [[ -n "$parent" ]] || return 1
-  printf '%s/%s\n' "$parent" "$(basename "$target")"
-}
-
+# either. resolve_symlink_target (scripts/settings-lib.sh) normalizes any
+# leading ../ and works on a target that no longer exists, which realpath
+# cannot do portably (macOS has no realpath -m). A target whose parent is also
+# missing can't be placed, so it is left alone.
 prune_stale_plugin_links() {
   local dest_dir="$1"
   [[ -d "$dest_dir" ]] || return 0
@@ -358,7 +347,7 @@ prune_stale_plugin_links() {
   for entry in "$dest_dir"/*; do
     [[ -L "$entry" ]] || continue
     target="$(readlink "$entry")"
-    resolved="$(resolve_target "$target" "$dest_dir")" || continue
+    resolved="$(resolve_symlink_target "$target" "$dest_dir")" || continue
     if [[ "$resolved" != "$REPO_ROOT/plugins/"* ]]; then
       continue
     fi
@@ -534,27 +523,19 @@ done
 # ~/.claude/settings.json, so they never fired regardless of configuration.
 #
 # When a plugin is excluded via --skip/--include, deregister its hooks to
-# keep settings.json in sync with the installed plugin set.
+# keep settings.json in sync with the installed plugin set. HOOK_TABLE_*
+# (scripts/settings-lib.sh) is the single source of truth for which hooks
+# exist and which plugin gates each one — adding a hook is one row there,
+# not a new if/else block here.
 GLOBAL_SETTINGS="$HOME/.claude/settings.json"
-WORKTREE_HOOK_CMD="$HOME/.claude/skills/worktree-core/skills/git-worktree-usage/scripts/require-worktree-hook.sh"
-WORKTREE_SYMLINK_CHECK_CMD="$HOME/.claude/skills/worktree-core/skills/git-worktree-usage/scripts/check-worktree-symlinks-hook.sh"
-WORKTREE_AUTOPRUNE_CMD="$HOME/.claude/skills/worktree-core/skills/git-worktree-usage/scripts/prune-merged-worktrees-hook.sh"
-if ! is_skipped "worktree-core"; then
-  ensure_hook_registered "PreToolUse" "Edit|Write" "$WORKTREE_HOOK_CMD" "$GLOBAL_SETTINGS"
-  ensure_hook_registered "SessionStart" "" "$WORKTREE_SYMLINK_CHECK_CMD" "$GLOBAL_SETTINGS"
-  ensure_hook_registered "SessionStart" "" "$WORKTREE_AUTOPRUNE_CMD" "$GLOBAL_SETTINGS"
-else
-  ensure_hook_deregistered "PreToolUse" "$WORKTREE_HOOK_CMD" "$GLOBAL_SETTINGS"
-  ensure_hook_deregistered "SessionStart" "$WORKTREE_SYMLINK_CHECK_CMD" "$GLOBAL_SETTINGS"
-  ensure_hook_deregistered "SessionStart" "$WORKTREE_AUTOPRUNE_CMD" "$GLOBAL_SETTINGS"
-fi
-
-MEMORY_HYGIENE_HOOK_CMD="$HOME/.claude/skills/dfadler-agent-config/hooks/scripts/memory-hygiene-stop-hook.sh"
-if ! is_skipped "dfadler-agent-config"; then
-  ensure_hook_registered "Stop" "" "$MEMORY_HYGIENE_HOOK_CMD" "$GLOBAL_SETTINGS"
-else
-  ensure_hook_deregistered "Stop" "$MEMORY_HYGIENE_HOOK_CMD" "$GLOBAL_SETTINGS"
-fi
+for i in "${!HOOK_TABLE_PLUGIN[@]}"; do
+  hook_cmd="$(hook_command_path "$i")"
+  if ! is_skipped "${HOOK_TABLE_PLUGIN[$i]}"; then
+    ensure_hook_registered "${HOOK_TABLE_EVENT[$i]}" "${HOOK_TABLE_MATCHER[$i]}" "$hook_cmd" "$GLOBAL_SETTINGS"
+  else
+    ensure_hook_deregistered "${HOOK_TABLE_EVENT[$i]}" "$hook_cmd" "$GLOBAL_SETTINGS"
+  fi
+done
 
 # Last, so the linking work is already done and reported when these speak up.
 # Advisory checks (git identity, pyte, companion plugins/tools, Aikido Safe
