@@ -25,31 +25,24 @@ script_dir="$(cd "$(dirname "$0")" && pwd)"
 # shellcheck source=/dev/null
 source "$script_dir/worktree-hook-lib.sh"
 
-# Resolve env-var level (session override).
-env_mode=""
-case "${WORKTREE_AUTO_PRUNE:-}" in
-  0 | false | no | off) env_mode="--hook" ;;
-  1 | true | yes | on) env_mode="--auto" ;;
-esac
-
-# Resolve final mode. Empty means "not configured" — stays empty (skip) unless
-# settings.json explicitly opts in one way or the other.
+# Resolve final mode (env var override → settings.json → default ""); see
+# resolve_enable_mode's own header. Default "" (rather than "off") means "not
+# configured at all" — distinct from an explicit opt-out, which still runs
+# the prune script in nudge-only (--hook) mode.
 #
-# No `// empty` in the jq expr: jq's `//` treats a literal `false` as falsy,
-# which would swallow an explicit autoPrune:false the same as a missing key.
-# read_worktree_setting defaults to "null" so we can distinguish null from false.
-mode="$env_mode"
-if [ -z "$mode" ]; then
-  val="$(read_worktree_setting '.worktree.autoPrune' "null")"
-  case "$val" in
-    true) mode="--auto" ;;
-    false) mode="--hook" ;;
-  esac
-fi
+# The jq expression translates the JSON boolean itself to "on"/"off" so that
+# resolve_enable_mode's settings-side matching — literal, no synonym
+# translation — sees exactly the vocabulary in our valid_values list; a
+# missing key or explicit null falls through as "unset" (matches neither).
+canonical_mode="$(resolve_enable_mode WORKTREE_AUTO_PRUNE \
+  '.worktree.autoPrune | if . == true then "on" elif . == false then "off" else "unset" end' \
+  "" on off)"
 
-if [ -z "$mode" ]; then
-  exit 0
-fi
+case "$canonical_mode" in
+  on) mode="--auto" ;;
+  off) mode="--hook" ;;
+  *) exit 0 ;;
+esac
 
 script_dir="$(cd "$(dirname "$0")" && pwd)"
 script="$script_dir/prune-merged-worktrees.sh"
