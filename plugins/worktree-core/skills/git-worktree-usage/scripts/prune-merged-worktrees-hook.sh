@@ -25,33 +25,19 @@ script_dir="$(cd "$(dirname "$0")" && pwd)"
 # shellcheck source=/dev/null
 source "$script_dir/worktree-hook-lib.sh"
 
-# Resolve env-var level (session override).
-env_mode=""
-case "${WORKTREE_AUTO_PRUNE:-}" in
-  0 | false | no | off) env_mode="--hook" ;;
-  1 | true | yes | on) env_mode="--auto" ;;
-esac
-
-# Resolve final mode. Empty means "not configured" — stays empty (skip) unless
-# settings.json explicitly opts in one way or the other.
+# Resolve final mode: WORKTREE_AUTO_PRUNE env var (session override) wins if
+# set to a recognized value, else worktree.autoPrune in settings.json, else
+# empty ("not configured" — skip; there is no third default mode here).
 #
 # No `// empty` in the jq expr: jq's `//` treats a literal `false` as falsy,
 # which would swallow an explicit autoPrune:false the same as a missing key.
-# read_worktree_setting defaults to "null" so we can distinguish null from false.
-mode="$env_mode"
-if [ -z "$mode" ]; then
-  val="$(read_worktree_setting '.worktree.autoPrune' "null")"
-  case "$val" in
-    true) mode="--auto" ;;
-    false) mode="--hook" ;;
-  esac
-fi
+# The "null" settings-read default lets us distinguish null from false.
+mode="$(resolve_enable_mode WORKTREE_AUTO_PRUNE '.worktree.autoPrune' "null" "" off=--hook on=--auto)"
 
 if [ -z "$mode" ]; then
   exit 0
 fi
 
-script_dir="$(cd "$(dirname "$0")" && pwd)"
 script="$script_dir/prune-merged-worktrees.sh"
 
 if [ -f "$script" ]; then

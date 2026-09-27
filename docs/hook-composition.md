@@ -34,6 +34,15 @@ work, and exits 0 immediately (no output, no side effect) unless a signal
 explicitly turns it on. Exit 0 with nothing configured means "no opinion" —
 the hook did not run at all.
 
+The three `worktree-core` hooks share the precedence logic itself, not just
+the settings.json read: `worktree-hook-lib.sh`'s `resolve_enable_mode`
+resolves "env var (if valid) wins, else settings.json value (if valid), else
+default" once, and each hook calls it with its own env var name, settings
+key, default, and vocabulary (`off`/`warn`/`block` for
+`require-worktree-hook.sh`, `off`/`on` for the other two). What still varies
+per hook — the exact env var, settings key, and default — is genuine
+per-hook variation, not duplication, and is what the table below documents.
+
 ### Enable/disable signals by hook
 
 | Hook | Event | Env var | settings.json key | Default |

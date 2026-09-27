@@ -23,17 +23,12 @@ script_dir="$(cd "$(dirname "$0")" && pwd)"
 # shellcheck source=/dev/null
 source "$script_dir/worktree-hook-lib.sh"
 
-# Resolve enable signal (env var → settings.json → off).
-case "${WORKTREE_SYMLINK_CHECK:-}" in
-  0 | false | no | off) exit 0 ;;
-  1 | true | yes | on) : ;; # explicit opt-in, fall through to run the check
-  *)
-    val="$(read_worktree_setting '.worktree.symlinkCheck // "off"' "off")"
-    [ "$val" = "on" ] || exit 0
-    ;;
-esac
+# Resolve enable signal: WORKTREE_SYMLINK_CHECK env var (session override)
+# wins if set to a recognized value, else worktree.symlinkCheck in
+# settings.json, else "off".
+mode="$(resolve_enable_mode WORKTREE_SYMLINK_CHECK '.worktree.symlinkCheck // "off"' "off" "off" off on)"
+[ "$mode" = "on" ] || exit 0
 
-script_dir="$(cd "$(dirname "$0")" && pwd)"
 script="$script_dir/verify-worktree-symlinks.sh"
 
 if [ -f "$script" ]; then

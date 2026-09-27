@@ -29,14 +29,6 @@ if [ "${CLAUDE_CODE_REMOTE:-}" = "true" ]; then
   exit $EXIT_OK
 fi
 
-# Resolve env-var level (session override).
-env_mode=""
-case "${WORKTREE_ENFORCE:-}" in
-  0 | false | no | off) env_mode="off" ;;
-  warn) env_mode="warn" ;;
-  block) env_mode="block" ;;
-esac
-
 # Must be inside a git repo to apply.
 git_dir=$(git rev-parse --git-dir 2>/dev/null) || exit $EXIT_OK
 
@@ -45,15 +37,10 @@ case "$git_dir" in
   *".git/worktrees/"*) exit $EXIT_OK ;;
 esac
 
-# We're in the main checkout. Resolve final enforce mode.
-enforce_mode="$env_mode"
-if [ -z "$enforce_mode" ]; then
-  val="$(read_worktree_setting '.worktree.enforce // "off"' "off")"
-  case "$val" in
-    off | warn | block) enforce_mode="$val" ;;
-    *) enforce_mode="off" ;;
-  esac
-fi
+# We're in the main checkout. Resolve final enforce mode: WORKTREE_ENFORCE
+# env var (session override) wins if set to a recognized value, else
+# worktree.enforce in settings.json, else "off".
+enforce_mode="$(resolve_enable_mode WORKTREE_ENFORCE '.worktree.enforce // "off"' "off" "off" off warn block)"
 
 case "$enforce_mode" in
   off)
