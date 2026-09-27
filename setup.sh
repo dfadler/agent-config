@@ -227,6 +227,13 @@ source "$REPO_ROOT/scripts/claude-md-lib.sh"
 # Helpers for adding/removing hook entries in ~/.claude/settings.json.
 # shellcheck source=scripts/settings-lib.sh
 source "$REPO_ROOT/scripts/settings-lib.sh"
+# The hook (event, matcher, feature, command) table both setup.sh and
+# teardown.sh iterate — single source of truth for the command paths.
+# shellcheck source=scripts/plugin-hooks.sh
+source "$REPO_ROOT/scripts/plugin-hooks.sh"
+# Shared relative-symlink-to-absolute-path resolution.
+# shellcheck source=scripts/symlink-lib.sh
+source "$REPO_ROOT/scripts/symlink-lib.sh"
 
 # Every directory under plugins/ that carries a .claude-plugin/plugin.json is a
 # plugin this repo ships (currently dfadler-agent-config and accessibility-skills)
@@ -313,7 +320,7 @@ prune_skipped_dir_links() {
   for entry in "$dest_dir"/*; do
     [[ -L "$entry" ]] || continue
     target="$(readlink "$entry")"
-    resolved="$(resolve_target "$target" "$dest_dir")" || continue
+    resolved="$(resolve_symlink_target "$target" "$dest_dir")" || continue
     [[ "$resolved" == "$src_dir/"* ]] || continue
     name="$(basename "$entry")"
     feature="${name%.md}"
@@ -336,21 +343,9 @@ prune_skipped_dir_links() {
 # made absolute before it can be compared against $REPO_ROOT - otherwise a
 # relative link into plugins/ reads as pointing elsewhere and survives, and the
 # "isn't the current plugin link" test above can't recognize the current link
-# either. Resolving the target's parent directory and re-appending the basename
-# normalizes any leading ../ and works on a target that no longer exists, which
-# realpath cannot do portably (macOS has no realpath -m). A target whose parent
-# is also missing can't be placed, so it is left alone.
-resolve_target() {
-  local target="$1" link_dir="$2" parent
-  if [[ "$target" == /* ]]; then
-    printf '%s\n' "$target"
-    return 0
-  fi
-  parent="$(cd "$link_dir" 2>/dev/null && cd "$(dirname "$target")" 2>/dev/null && pwd)" || parent=""
-  [[ -n "$parent" ]] || return 1
-  printf '%s/%s\n' "$parent" "$(basename "$target")"
-}
-
+# either. resolve_symlink_target (scripts/symlink-lib.sh) does that
+# resolution — shared with teardown.sh, which needs the identical logic to
+# decide whether a symlink is one this repo owns.
 prune_stale_plugin_links() {
   local dest_dir="$1"
   [[ -d "$dest_dir" ]] || return 0
@@ -358,7 +353,7 @@ prune_stale_plugin_links() {
   for entry in "$dest_dir"/*; do
     [[ -L "$entry" ]] || continue
     target="$(readlink "$entry")"
-    resolved="$(resolve_target "$target" "$dest_dir")" || continue
+    resolved="$(resolve_symlink_target "$target" "$dest_dir")" || continue
     if [[ "$resolved" != "$REPO_ROOT/plugins/"* ]]; then
       continue
     fi
@@ -535,26 +530,19 @@ done
 #
 # When a plugin is excluded via --skip/--include, deregister its hooks to
 # keep settings.json in sync with the installed plugin set.
+#
+# The (event, matcher, owning feature, command) rows themselves live in
+# scripts/plugin-hooks.sh — sourced above — so a new hook is one row there
+# instead of a matching pair of edits in setup.sh and teardown.sh.
 GLOBAL_SETTINGS="$HOME/.claude/settings.json"
-WORKTREE_HOOK_CMD="$HOME/.claude/skills/worktree-core/skills/git-worktree-usage/scripts/require-worktree-hook.sh"
-WORKTREE_SYMLINK_CHECK_CMD="$HOME/.claude/skills/worktree-core/skills/git-worktree-usage/scripts/check-worktree-symlinks-hook.sh"
-WORKTREE_AUTOPRUNE_CMD="$HOME/.claude/skills/worktree-core/skills/git-worktree-usage/scripts/prune-merged-worktrees-hook.sh"
-if ! is_skipped "worktree-core"; then
-  ensure_hook_registered "PreToolUse" "Edit|Write" "$WORKTREE_HOOK_CMD" "$GLOBAL_SETTINGS"
-  ensure_hook_registered "SessionStart" "" "$WORKTREE_SYMLINK_CHECK_CMD" "$GLOBAL_SETTINGS"
-  ensure_hook_registered "SessionStart" "" "$WORKTREE_AUTOPRUNE_CMD" "$GLOBAL_SETTINGS"
-else
-  ensure_hook_deregistered "PreToolUse" "$WORKTREE_HOOK_CMD" "$GLOBAL_SETTINGS"
-  ensure_hook_deregistered "SessionStart" "$WORKTREE_SYMLINK_CHECK_CMD" "$GLOBAL_SETTINGS"
-  ensure_hook_deregistered "SessionStart" "$WORKTREE_AUTOPRUNE_CMD" "$GLOBAL_SETTINGS"
-fi
-
-MEMORY_HYGIENE_HOOK_CMD="$HOME/.claude/skills/dfadler-agent-config/hooks/scripts/memory-hygiene-stop-hook.sh"
-if ! is_skipped "dfadler-agent-config"; then
-  ensure_hook_registered "Stop" "" "$MEMORY_HYGIENE_HOOK_CMD" "$GLOBAL_SETTINGS"
-else
-  ensure_hook_deregistered "Stop" "$MEMORY_HYGIENE_HOOK_CMD" "$GLOBAL_SETTINGS"
-fi
+for i in "${!PLUGIN_HOOK_EVENTS[@]}"; do
+  if ! is_skipped "${PLUGIN_HOOK_FEATURES[$i]}"; then
+    ensure_hook_registered "${PLUGIN_HOOK_EVENTS[$i]}" "${PLUGIN_HOOK_MATCHERS[$i]}" \
+      "${PLUGIN_HOOK_CMDS[$i]}" "$GLOBAL_SETTINGS"
+  else
+    ensure_hook_deregistered "${PLUGIN_HOOK_EVENTS[$i]}" "${PLUGIN_HOOK_CMDS[$i]}" "$GLOBAL_SETTINGS"
+  fi
+done
 
 # Last, so the linking work is already done and reported when these speak up.
 # Advisory checks (git identity, pyte, companion plugins/tools, Aikido Safe
