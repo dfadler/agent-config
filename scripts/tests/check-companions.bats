@@ -173,30 +173,86 @@ run_companions() {
   assert_output_contains "Could not run python3"
 }
 
-# --- companion plugin check (#134) ------------------------------------------
+# --- companion plugin check (#134, unified via check_companion_plugin — #369) -
 #
-# Purely advisory — nothing here depends on mattpocock-skills, unlike pyte,
-# so every case below asserts the script still exits 0 and there's no
+# check-companions.sh drives every claude-plugin-based companion (currently
+# mattpocock-skills, anthropics/skills, aws-core, ponytail — see
+# check_react_skills/check_rtk above for the two that aren't) through one
+# shared check_companion_plugin function, so its confirms/warns/notes/silent
+# message shapes only need proving once. The four helpers below are that
+# proof; each companion below just supplies its own state and text, which is
+# the "thin per-companion test" #369 asks for instead of a copy-pasted block.
+# Purely advisory — nothing here depends on any of these plugins, unlike
+# pyte, so every case asserts the script still exits 0 and there's no
 # --install-deps equivalent to test.
 
-@test "confirms mattpocock-skills when installed and enabled" {
-  shim_claude enabled
+# Confirms the ✓-installed line for a companion already enabled.
+assert_confirms_companion() {
+  local mode="$1" long_name="$2"
+  shim_claude "$mode"
   run_companions
   assert_success
-  assert_output_contains "✓ mattpocock-skills is installed"
+  assert_output_contains "✓ $long_name is installed"
 }
 
-@test "warns when mattpocock-skills is installed but disabled" {
-  shim_claude disabled
+# Warns with the ⚠-disabled line and its exact re-enable command. short_name,
+# when given, pins the disabled line to that exact name — the one place
+# short_name and long_name diverge is anthropics/skills, whose long form adds
+# "(frontend-design)" that must NOT leak into the disabled line.
+assert_warns_disabled_companion() {
+  local mode="$1" plugin_id="$2" short_name="${3:-}"
+  shim_claude "$mode"
   run_companions
   assert_success
   assert_output_contains "installed but disabled"
-  assert_output_contains "claude plugin enable mattpocock-skills"
+  assert_output_contains "claude plugin enable $plugin_id"
+  if [ -n "$short_name" ]; then
+    assert_output_contains "⚠ $short_name is installed but disabled."
+  fi
+}
+
+# Notes the ℹ-not-installed line and every line of its install command, using
+# a plugin id prefix that matches none of the companions (so every companion
+# reports "absent" against it, the same fixture each existing per-companion
+# "notes" test already used).
+assert_notes_absent_companion() {
+  local long_name="$1"
+  shift
+  shim_claude other-plugin-only
+  run_companions
+  assert_success
+  assert_output_contains "$long_name is not installed"
+  local install_line
+  for install_line in "$@"; do
+    assert_output_contains "$install_line"
+  done
+}
+
+# A `claude` CLI that errors must leave a companion entirely unmentioned —
+# claude_plugin_state reports "error", which check_companion_plugin's case
+# statement has no branch for, so it prints nothing at all.
+assert_silent_on_broken_claude() {
+  local needle="$1"
+  shim_claude broken
+  run_companions
+  assert_success
+  refute_output_contains "$needle"
+}
+
+@test "confirms mattpocock-skills when installed and enabled" {
+  assert_confirms_companion enabled "mattpocock-skills"
+}
+
+@test "warns when mattpocock-skills is installed but disabled" {
+  assert_warns_disabled_companion disabled "mattpocock-skills" "mattpocock-skills"
 }
 
 # Regression (review on #134): the original implementation grepped a fixed
 # line window after the id line for "enabled": true, which could pick up a
-# NEIGHBORING plugin's field instead of the matched one's.
+# NEIGHBORING plugin's field instead of the matched one's. Pinned to
+# mattpocock-skills only — this exercises claude_plugin_state's shared JSON
+# parsing, not per-companion wiring, so it doesn't need repeating per
+# companion.
 @test "a disabled target isn't misread as enabled via a neighboring plugin" {
   shim_claude disabled-with-enabled-neighbor
   run_companions
@@ -206,7 +262,8 @@ run_companions() {
 }
 
 # Regression (review on #134): field order within the JSON object shouldn't
-# matter to a real parser, unlike a positional/window-based read.
+# matter to a real parser, unlike a positional/window-based read. Same
+# shared-parsing reasoning as above — pinned once, not per companion.
 @test "field order within the plugin object doesn't confuse detection" {
   shim_claude enabled-field-before-id
   run_companions
@@ -215,18 +272,59 @@ run_companions() {
 }
 
 @test "notes when mattpocock-skills is not installed" {
-  shim_claude other-plugin-only
-  run_companions
-  assert_success
-  assert_output_contains "mattpocock-skills is not installed"
-  assert_output_contains "claude plugin install mattpocock-skills"
+  assert_notes_absent_companion "mattpocock-skills" \
+    "claude plugin install mattpocock-skills"
 }
 
 @test "stays silent about mattpocock-skills when the claude CLI errors" {
-  shim_claude broken
-  run_companions
-  assert_success
-  refute_output_contains "mattpocock-skills"
+  assert_silent_on_broken_claude "mattpocock-skills"
+}
+
+# --- anthropics/skills (frontend-design) companion check --------------------
+#
+# Same advisory posture as mattpocock-skills above; pins the "example-skills@"
+# id prefix, the "anthropics/skills (frontend-design)" long form used when
+# confirmed/absent, and the shorter "anthropics/skills" used when disabled.
+
+@test "confirms anthropics/skills (frontend-design) when installed and enabled" {
+  assert_confirms_companion frontend-design-enabled "anthropics/skills (frontend-design)"
+}
+
+@test "warns when anthropics/skills is installed but disabled" {
+  assert_warns_disabled_companion frontend-design-disabled "example-skills" "anthropics/skills"
+}
+
+@test "notes when anthropics/skills (frontend-design) is not installed" {
+  assert_notes_absent_companion "anthropics/skills (frontend-design)" \
+    "claude plugin marketplace add anthropics/skills" \
+    "claude plugin install example-skills"
+}
+
+@test "stays silent about anthropics/skills when the claude CLI errors" {
+  assert_silent_on_broken_claude "anthropics/skills"
+}
+
+# --- aws-core companion check -------------------------------------------------
+#
+# Same advisory posture as mattpocock-skills above; pins the "aws-core@" id
+# prefix and the marketplace-qualified install command (no marketplace-add
+# step, since aws-core ships in the official marketplace).
+
+@test "confirms aws-core when installed and enabled" {
+  assert_confirms_companion aws-core-enabled "aws-core"
+}
+
+@test "warns when aws-core is installed but disabled" {
+  assert_warns_disabled_companion aws-core-disabled "aws-core" "aws-core"
+}
+
+@test "notes when aws-core is not installed" {
+  assert_notes_absent_companion "aws-core" \
+    "claude plugin install aws-core@claude-plugins-official"
+}
+
+@test "stays silent about aws-core when the claude CLI errors" {
+  assert_silent_on_broken_claude "aws-core"
 }
 
 # --- ponytail companion check (#275) ----------------------------------------
@@ -235,32 +333,21 @@ run_companions() {
 # "ponytail@ponytail" id prefix and the marketplace-add install hint.
 
 @test "confirms ponytail when installed and enabled" {
-  shim_claude ponytail-enabled
-  run_companions
-  assert_success
-  assert_output_contains "✓ ponytail is installed"
+  assert_confirms_companion ponytail-enabled "ponytail"
 }
 
 @test "warns when ponytail is installed but disabled" {
-  shim_claude ponytail-disabled
-  run_companions
-  assert_success
-  assert_output_contains "claude plugin enable ponytail"
+  assert_warns_disabled_companion ponytail-disabled "ponytail" "ponytail"
 }
 
 @test "notes when ponytail is not installed" {
-  shim_claude other-plugin-only
-  run_companions
-  assert_success
-  assert_output_contains "ponytail is not installed"
-  assert_output_contains "claude plugin marketplace add DietrichGebert/ponytail"
+  assert_notes_absent_companion "ponytail" \
+    "claude plugin marketplace add DietrichGebert/ponytail" \
+    "claude plugin install ponytail"
 }
 
 @test "stays silent about ponytail when the claude CLI errors" {
-  shim_claude broken
-  run_companions
-  assert_success
-  refute_output_contains "ponytail"
+  assert_silent_on_broken_claude "ponytail"
 }
 
 # --- Aikido Safe Chain permission offer (advisory) --------------------------
