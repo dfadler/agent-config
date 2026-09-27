@@ -1,8 +1,7 @@
 # second-brain plugin for Claude Code
 
-Vault-path-agnostic port of the personal `claude-skills` second-brain skills. This
-is the foundational scaffold (agent-config#327, part of epic #321); config,
-capture, and query skills land in follow-up issues (#328, #329).
+Vault-path-agnostic port of the personal `claude-skills` second-brain skills
+(agent-config#321).
 
 ## Vault path resolution
 
@@ -18,6 +17,13 @@ no-oping.
 
 ## Skills
 
-None yet — this issue only adds the plugin manifest and vault path resolution
-contract. See #328 (config skill), #329 (capture/query port), #330 (config
-schema docs), and #331 (env var docs).
+- **`capture`** — save notes, decisions, links, and other information to the vault.
+- **`query`** — answer questions by searching and reading the vault.
+- **`sync`** — sync vault notes with their Slack canvas sources and fill in
+  missing documentation summaries.
+- **`config`** — internal primitive that reads and merges YAML frontmatter
+  from vault config files (`config/global/<skill>.md`, optionally overlaid by
+  `config/projects/<project>/<skill>.md`); other skills call it to load their
+  own settings. Not a user-facing entry point, and unrelated to the vault path
+  resolution above — it configures individual skills' *behavior* once the
+  vault is already found.
