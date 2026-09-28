@@ -283,6 +283,7 @@ run_setup_with() {
   run_setup_with --help
   assert_success
   assert_output_contains "--install-deps"
+  assert_output_contains "--fix"
   [ ! -e "$HOME/.claude" ]
 }
 

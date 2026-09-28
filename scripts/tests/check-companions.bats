@@ -572,6 +572,95 @@ link_plugin_dangling() {
   assert_output_contains "Convention conv-b.md is active but its required plugin is not linked"
 }
 
+# --- rtk: git-exclusion check and --fix -------------------------------------
+#
+# check_rtk_git_exclusion (and its --fix counterpart, fix_rtk_git_exclusion)
+# only run once check_rtk's own `command -v rtk` gate passes, so every test
+# here shims rtk in first. See docs/companion-plugins.md's rtk section for
+# the conflict this is guarding against.
+
+write_rtk_config() {
+  # Writes the [hooks] section body verbatim (e.g. 'exclude_commands = []'),
+  # wrapped in a minimal config.toml at $FAKE_RTK_CONFIG.
+  cat > "$FAKE_RTK_CONFIG" <<EOF
+[tracking]
+enabled = true
+
+[hooks]
+$1
+transparent_prefixes = []
+EOF
+}
+
+@test "warns when rtk's exclude_commands is missing git" {
+  shim_rtk
+  write_rtk_config 'exclude_commands = []'
+  run_companions
+  assert_success
+  assert_output_contains "rtk rewrites 'git ...' Bash commands"
+  assert_output_contains "$FAKE_RTK_CONFIG"
+  assert_output_contains "Or re-run this script with --fix to apply it automatically."
+}
+
+@test "stays silent about rtk when git is already excluded" {
+  shim_rtk
+  write_rtk_config 'exclude_commands = ["git"]'
+  run_companions
+  assert_success
+  refute_output_contains "rtk rewrites"
+}
+
+@test "warns when there is no [hooks] section at all (no exclusion exists yet)" {
+  shim_rtk
+  cat > "$FAKE_RTK_CONFIG" <<'EOF'
+[tracking]
+enabled = true
+EOF
+  run_companions
+  assert_success
+  assert_output_contains "rtk rewrites"
+}
+
+@test "--fix adds git to an empty exclude_commands" {
+  shim_rtk
+  write_rtk_config 'exclude_commands = []'
+  run_companions --fix
+  assert_success
+  assert_output_contains "Added \"git\" to rtk's exclude_commands"
+  grep -q 'exclude_commands = \["git"\]' "$FAKE_RTK_CONFIG"
+}
+
+@test "--fix appends git to a non-empty exclude_commands rather than clobbering it" {
+  shim_rtk
+  write_rtk_config 'exclude_commands = ["npm"]'
+  run_companions --fix
+  assert_success
+  grep -q 'exclude_commands = \["npm", "git"\]' "$FAKE_RTK_CONFIG"
+}
+
+@test "--fix is a silent no-op when git is already excluded" {
+  shim_rtk
+  write_rtk_config 'exclude_commands = ["git"]'
+  run_companions --fix
+  assert_success
+  refute_output_contains "Added \"git\""
+  grep -q 'exclude_commands = \["git"\]' "$FAKE_RTK_CONFIG"
+}
+
+@test "--fix fails loudly when it can't find exclude_commands to edit" {
+  shim_rtk
+  cat > "$FAKE_RTK_CONFIG" <<'EOF'
+[tracking]
+enabled = true
+
+[hooks]
+transparent_prefixes = []
+EOF
+  run_companions --fix
+  [ "$status" -ne 0 ]
+  assert_output_contains "Could not automatically edit"
+}
+
 # --- probe contract test (must stay last) -----------------------------------
 
 @test "the probe reports the real python3 correctly" {
