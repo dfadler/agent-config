@@ -2,7 +2,9 @@
 
 This document describes how `worktree-core`'s hooks are designed to
 compose with hooks from other plugins without
-producing collisions or conflicting behavior.
+producing collisions or conflicting behavior, and how `setup.sh`/`teardown.sh`
+edit the shared config files those hooks are registered in without clobbering
+configuration other tools own.
 
 ## The contract: hooks are additive
 
@@ -95,6 +97,33 @@ session-level overrides).
 ```bash
 WORKTREE_ENFORCE=block claude   # enforce worktree usage for this session only
 ```
+
+## `setup.sh`/`teardown.sh`: never clobber configuration they don't own
+
+The hooks above get registered into `~/.claude/settings.json`, a file other
+tools also write to directly — for example `rtk init -g` (the `rtk-ai` CLI)
+adds its own `PreToolUse`/`Bash` hook there. `setup.sh` and `teardown.sh`
+never rewrite that file, `~/.claude/CLAUDE.md`, or the symlink directories
+wholesale; each editor only touches the slice of a shared file it can prove
+it owns, identified by an explicit marker:
+
+| Shared location | Ownership marker | Where |
+|---|---|---|
+| `~/.claude/settings.json` (`hooks.<EVENT>`) | Exact `command` string match against this repo's own hook table (`scripts/plugin-hooks.sh`) | `ensure_hook_registered`/`ensure_hook_deregistered` in `scripts/settings-lib.sh` |
+| `~/.claude/CLAUDE.md` | `MANAGED_BEGIN`/`MANAGED_END` marker pair | `ensure_claude_md_includes()` (`setup.sh`), `restore_claude_md()` (`teardown.sh`) |
+| `~/.claude/CLAUDE.personal.md` (empty placeholder) | `.setup-managed` sidecar file | `migrate_personal_claude_md()` (`setup.sh`), checked in `restore_claude_md()` (`teardown.sh`) |
+| `~/.claude/{commands,skills,agents}/*` | Resolved symlink target falls under this repo's root | `link()`/`prune_stale_plugin_links()` (`setup.sh`), `unlink_if_owned`/`unlink_dir_contents` (`teardown.sh`) |
+
+Concretely for `settings.json`: `ensure_hook_registered` only appends a new
+entry under `hooks.<EVENT>`, and `ensure_hook_deregistered` only removes
+entries whose `command` exactly matches one of this repo's own hook commands.
+Neither function ever inspects or touches an entry it doesn't recognize —
+so a hook added by `rtk`, another skills-dir plugin, or hand-edited settings
+survives `./setup.sh`/`./teardown.sh` runs untouched. The same rule applies
+to `CLAUDE.md`: content outside the managed markers (a user's own notes, or
+another tool's own append) is preserved verbatim on every re-run, and to the
+symlink directories: a real file or a symlink pointing outside this repo is
+left alone with a warning rather than replaced.
 
 ## `dfadler-agent-config` and `worktree-core`: a required dependency, not a duplicate
 

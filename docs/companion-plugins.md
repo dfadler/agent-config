@@ -288,3 +288,36 @@ binary is on `PATH` and prints the install command above if it's missing — sam
 posture as `check_react_skills`: it never runs the installer or `rtk init --global`
 itself, since both are exactly the kind of side effect that needs asking first rather
 than happening automatically on every `setup.sh` run.
+
+### Known conflict: rtk's git rewrite breaks git inside a worktree session
+
+Confirmed empirically (2026-09-27, via `rtk hook check`'s dry-run and reproduced
+against a real `EnterWorktree` session): once `rtk init --global` is active, every
+`git ...` Bash command is rewritten to `rtk git ...` before it runs — that's the whole
+point of the hook (see above). But Claude Code's own worktree-isolation safety net
+inspects a Bash command's literal text to confirm a worktree-isolated session's git
+operations target that worktree; once `rtk` substitutes itself as the launcher, that
+check can no longer recognize the command as `git` and refuses to run it at all. This
+only happens **inside** an `EnterWorktree` session — the main checkout is unaffected,
+which is what makes it easy to miss until someone hits it mid-task.
+
+rtk's own config (path printed by `rtk config`, under `[hooks]`) has an
+`exclude_commands` list built for exactly this:
+
+```toml
+[hooks]
+exclude_commands = ["git"]
+```
+
+That stops rtk rewriting `git` specifically; every other command it wraps (tests,
+lint, `gh`, etc.) is unaffected. Verify the fix without guessing:
+
+```bash
+echo '{"tool_name":"Bash","tool_input":{"command":"git status"}}' | rtk hook claude
+```
+
+Empty output means `git` is no longer being rewritten; any JSON output means it still
+is. `check_rtk` (`scripts/check-companions.sh`) now warns when `git` is missing from
+`exclude_commands` — same advisory-only posture as the rest of this file: it reports
+the problem and the exact fix, never edits rtk's config on its own, since that's a
+companion tool's own persistent configuration, not this repo's.
