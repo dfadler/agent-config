@@ -63,7 +63,7 @@ if [[ "$DO_COMMANDS" -eq 0 && "$DO_PLUGINS" -eq 0 && "$DO_CLAUDE_MD" -eq 0 ]]; t
   DO_CLAUDE_MD=1
 fi
 
-REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+REPO_ROOT="$(cd -P "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 
 # shellcheck source=scripts/claude-md-lib.sh
 source "$REPO_ROOT/scripts/claude-md-lib.sh"

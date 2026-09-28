@@ -62,7 +62,7 @@ while [[ $# -gt 0 ]]; do
   shift
 done
 
-REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+REPO_ROOT="$(cd -P "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 
 # --------------------------------------------------------------------------
 # Runtime dependencies
