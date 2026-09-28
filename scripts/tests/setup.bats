@@ -90,6 +90,26 @@ run_setup_with() {
   refute_output_contains "Prepended"
 }
 
+# Regression: on macOS a volume can be reached via multiple paths (e.g.
+# ~/Development and /Volumes/Development). Without cd -P, REPO_ROOT is the
+# string of the path used to invoke the script, so symlinks created from one
+# path alias look foreign when setup runs from another — producing false-alarm
+# "Skipping — doesn't own" messages even though the symlinks are correct.
+@test "recognises its own symlinks when invoked via a different path alias to the same dir" {
+  run_setup
+  assert_success
+  # Create an alias: a symlink that resolves to the same physical directory.
+  FAKE_REPO_ALIAS="$SANDBOX/repo-alias"
+  ln -s "$FAKE_REPO" "$FAKE_REPO_ALIAS"
+  # Re-run from the alias — BASH_SOURCE[0] will differ but cd -P must
+  # resolve it to the same canonical path, so the existing skill symlink
+  # (pointing to $FAKE_REPO/...) is recognised as this repo's own.
+  run bash "$FAKE_REPO_ALIAS/setup.sh" --no-companions
+  assert_success
+  refute_output_contains "doesn't own"
+  refute_output_contains "Skipping"
+}
+
 @test "generates one @include per DEFAULT_ENABLED entry, skipping comments/blanks" {
   run_setup
   assert_success
