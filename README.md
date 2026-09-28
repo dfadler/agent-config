@@ -111,6 +111,19 @@ aren't vendored into it. See
 [`docs/companion-plugins.md`](docs/companion-plugins.md) for what each one does and
 how to install it.
 
+### Doctor: detect and fix companion issues
+
+```bash
+./doctor.sh          # report only — same checks setup.sh runs at the end
+./doctor.sh --fix    # also apply known fixes (currently: rtk's exclude_commands)
+```
+
+`doctor.sh` is a thin wrapper around `scripts/check-companions.sh`; both names run
+the same checks. Nothing is changed unless `--fix` (or `--install-deps` for the
+`pyte` dependency) is passed explicitly — see
+[`docs/companion-plugins.md`](docs/companion-plugins.md#known-conflict-rtks-git-rewrite-breaks-git-inside-a-worktree-session)
+for the rtk conflict `--fix` currently resolves.
+
 ## Adding something new
 
 Skills, agents, and slash commands each have a specific place to go, a naming

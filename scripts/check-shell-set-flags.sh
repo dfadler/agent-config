@@ -35,7 +35,7 @@ usage() {
   cat <<'USAGE'
 Usage: check-shell-set-flags.sh [-h|--help] [DIR...]
 
-Verify every shell script under DIR (default: scripts plugins setup.sh teardown.sh)
+Verify every shell script under DIR (default: scripts plugins setup.sh teardown.sh doctor.sh)
 declares `set -uo pipefail` (or `set -euo pipefail`) as its first real
 statement, unless it carries explicit sourced-only evidence: a literal
 `# sourced-only` comment line in its header (before the first real
@@ -68,7 +68,7 @@ while [[ $# -gt 0 ]]; do
 done
 
 dirs=("$@")
-[ "${#dirs[@]}" -eq 0 ] && dirs=(scripts plugins setup.sh teardown.sh)
+[ "${#dirs[@]}" -eq 0 ] && dirs=(scripts plugins setup.sh teardown.sh doctor.sh)
 
 missing=()
 non_executable=()
