@@ -3,11 +3,12 @@
 # claude/ -> ~/.claude/). Safe to re-run: fixes symlinks that already point
 # here, and reports (without touching) anything else already at the target.
 #
-# Usage: ./setup.sh [--install-deps] [--skip=<feature,...>] [--include=<feature,...>] [--list-features] [--no-companions]
+# Usage: ./setup.sh [--install-deps] [--fix] [--skip=<feature,...>] [--include=<feature,...>] [--list-features] [--no-companions]
 
 set -euo pipefail
 
 INSTALL_DEPS=0
+FIX=0
 NO_COMPANIONS=0
 SKIP_LIST=""
 INCLUDE_LIST=""
@@ -31,6 +32,11 @@ run is rejected rather than guessing which one wins.
 
   --install-deps     Also install a missing dependency (python3 -m pip
                      install --user pyte), when the interpreter allows it.
+  --fix              Also apply other known fixes the companion checks
+                     detect, instead of only reporting them (currently: rtk's
+                     exclude_commands config — see docs/companion-plugins.md).
+                     Forwarded to scripts/check-companions.sh; never runs as
+                     a side effect of a bare invocation.
   --skip=<list>      Comma-separated feature names to leave unlinked (and
                      to unlink if a previous run linked them). A feature is
                      either a slash command's basename (e.g. "adversarial-
@@ -60,6 +66,7 @@ USAGE
 while [[ $# -gt 0 ]]; do
   case "$1" in
     --install-deps) INSTALL_DEPS=1 ;;
+    --fix) FIX=1 ;;
     --no-companions) NO_COMPANIONS=1 ;;
     --skip=*) SKIP_LIST="${1#--skip=}" ;;
     --include=*)
@@ -549,11 +556,11 @@ done
 # Chain permission offer) are extracted into scripts/check-companions.sh.
 # Skipped when --no-companions is passed (useful for tests that only exercise
 # linking behavior and shouldn't depend on the companion-check shim setup).
-# An explicitly requested --install-deps that doesn't install is still a failure.
+# --install-deps and --fix both forward through unchanged; either one failing
+# to apply what it was explicitly asked for is still a failure.
 if [[ "$NO_COMPANIONS" != "1" ]]; then
-  if [[ "$INSTALL_DEPS" == "1" ]]; then
-    "$REPO_ROOT/scripts/check-companions.sh" --install-deps
-  else
-    "$REPO_ROOT/scripts/check-companions.sh"
-  fi
+  COMPANION_ARGS=()
+  [[ "$INSTALL_DEPS" == "1" ]] && COMPANION_ARGS+=(--install-deps)
+  [[ "$FIX" == "1" ]] && COMPANION_ARGS+=(--fix)
+  "$REPO_ROOT/scripts/check-companions.sh" ${COMPANION_ARGS[@]+"${COMPANION_ARGS[@]}"}
 fi

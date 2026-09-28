@@ -10,28 +10,37 @@
 # for exclusion (currently bulletproof-react-skills and
 # aws-agents-for-devsecops).
 #
-# All checks are informational — they never affect the symlinks setup.sh
-# created, and `./setup.sh && something-else` shouldn't break over any of
-# them. An explicitly requested --install-deps that can't install pyte is still
-# a failure.
+# All checks are informational by default — they never affect the symlinks
+# setup.sh created, and `./setup.sh && something-else` shouldn't break over
+# any of them. --install-deps and --fix are the two explicit opt-ins that
+# apply a known fix instead of just reporting it; neither ever runs as a side
+# effect of a bare invocation. An explicitly requested --install-deps that
+# can't install pyte, or a --fix that can't apply, is still a failure.
 #
-# Usage: check-companions.sh [--install-deps]
+# Usage: check-companions.sh [--install-deps] [--fix]
 
 set -euo pipefail
 
 INSTALL_DEPS=0
+FIX=0
 
 usage() {
   cat <<'USAGE'
-Usage: check-companions.sh [--install-deps]
+Usage: check-companions.sh [--install-deps] [--fix]
 
 Advisory checks for companion tools and plugins required or recommended by the
-skills this repo ships. All checks are informational; none affect the symlinks
-setup.sh has already created. Run by setup.sh automatically; you can also run
-it directly.
+skills this repo ships. All checks are informational by default; none affect
+the symlinks setup.sh has already created. Run by setup.sh automatically; you
+can also run it directly (also reachable as ./doctor.sh from the repo root).
 
   --install-deps   Also install a missing pyte dependency (python3 -m pip
                    install --user pyte), when the interpreter allows it.
+  --fix            Also apply other known fixes for a problem this script
+                   detects, instead of only reporting it (currently: adding
+                   "git" to rtk's own exclude_commands config when rtk's
+                   PreToolUse hook would otherwise break git commands inside
+                   a worktree-isolated session — see docs/companion-plugins.md).
+                   Never runs as a side effect of a bare invocation.
   -h, --help       Show this message and exit.
 USAGE
 }
@@ -39,6 +48,7 @@ USAGE
 while [[ $# -gt 0 ]]; do
   case "$1" in
     --install-deps) INSTALL_DEPS=1 ;;
+    --fix) FIX=1 ;;
     -h | --help)
       usage
       exit 0
@@ -412,20 +422,90 @@ check_rtk() {
   } >&2
 }
 
+# Applies the fix check_rtk_git_exclusion (below) reports: adds "git" to
+# rtk's own [hooks].exclude_commands in its config.toml. Only reached behind
+# an explicit --fix — this is the one place in this script that edits a
+# companion tool's own persistent config rather than this repo's, gated the
+# same way install_pyte is gated behind --install-deps: never as a side
+# effect of a bare invocation.
+#
+# Locates and rewrites only the exclude_commands array inside the [hooks]
+# section (same section-tracking logic check_rtk_git_exclusion uses) rather
+# than a blind string replace across the whole file, and appends "git" to
+# whatever entries are already there instead of assuming the array is empty
+# — so an existing exclusion (e.g. a test command) survives the edit.
+fix_rtk_git_exclusion() {
+  local cfg="$1"
+  # Passed via `-c` (like claude_plugin_state's own python3 call above) rather
+  # than piped to stdin: a test's fake python3 (shim_python3 in
+  # scripts/tests/helpers.bash) only recognizes -c/-m and forwards to the
+  # real interpreter, so a bare heredoc-to-stdin call would be swallowed by
+  # that shim during check-companions.bats's rtk tests.
+  local py_src
+  py_src=$(
+    cat <<'PYEOF'
+import os, re
+
+path = os.environ["RTK_CONFIG_PATH"]
+with open(path) as f:
+    lines = f.readlines()
+
+in_hooks = False
+fixed = False
+for i, line in enumerate(lines):
+    stripped = line.strip()
+    if stripped.startswith("[") and stripped != "[hooks]":
+        in_hooks = False
+    if stripped == "[hooks]":
+        in_hooks = True
+        continue
+    if in_hooks:
+        m = re.match(r'^(\s*exclude_commands\s*=\s*)\[(.*)\]\s*$', line.rstrip("\n"))
+        if m:
+            prefix, inner = m.group(1), m.group(2)
+            entries = [e.strip() for e in inner.split(",") if e.strip()]
+            if any(e.strip("\"'") == "git" for e in entries):
+                fixed = True  # already present — nothing to do
+                break
+            entries.append('"git"')
+            lines[i] = prefix + "[" + ", ".join(entries) + "]\n"
+            fixed = True
+            break
+
+if not fixed:
+    raise SystemExit(1)
+
+with open(path, "w") as f:
+    f.writelines(lines)
+PYEOF
+  )
+  if ! RTK_CONFIG_PATH="$cfg" python3 -c "$py_src"; then
+    echo "Could not automatically edit $cfg — no exclude_commands line found" >&2
+    echo "  under [hooks]. Add \"git\" to it yourself; see" >&2
+    echo "  docs/companion-plugins.md's rtk section." >&2
+    return 1
+  fi
+
+  echo "✓ Added \"git\" to rtk's exclude_commands in $cfg"
+  echo "  Verify with:"
+  echo "    echo '{\"tool_name\":\"Bash\",\"tool_input\":{\"command\":\"git status\"}}' | rtk hook claude"
+  echo "  (empty output means git is no longer being rewritten)"
+}
+
 # Confirmed conflict (docs/companion-plugins.md's rtk section has the full story):
 # once rtk's PreToolUse hook is active, it rewrites every `git ...` Bash command
 # into `rtk git ...`. Claude Code's own worktree-isolation safety net can no
 # longer recognize the rewritten command as git and refuses to run ANY git
 # command inside an EnterWorktree session (the main checkout is unaffected).
 # rtk's own [hooks].exclude_commands config is the supported way to stop it
-# rewriting a given command. This only warns when "git" is missing from that
-# list — same posture as the rest of this file: never edit a companion tool's
-# own config as a side effect of setup.sh, only report the problem and the
-# exact fix. `rtk config` always prints "Config: <path>" as its first line, so
-# the path is read from there rather than guessed per-platform (macOS vs. XDG).
-# The exclude_commands check itself is a plain substring grep, not a TOML
-# parser — good enough for an advisory check, and consistent with this repo
-# not carrying a TOML-parsing dependency anywhere else.
+# rewriting a given command. Without --fix this only warns when "git" is
+# missing from that list — same posture as the rest of this file: never edit
+# a companion tool's own config as a side effect of setup.sh unless asked.
+# `rtk config` always prints "Config: <path>" as its first line, so the path
+# is read from there rather than guessed per-platform (macOS vs. XDG). The
+# exclude_commands check itself is a plain substring grep, not a TOML parser
+# — good enough for an advisory check, and consistent with this repo not
+# carrying a TOML-parsing dependency anywhere else.
 check_rtk_git_exclusion() {
   local cfg
   cfg="$(rtk config 2>/dev/null | sed -n 's/^Config: //p')"
@@ -433,6 +513,11 @@ check_rtk_git_exclusion() {
 
   if awk '/^\[hooks\]/{f=1;next} /^\[/{f=0} f' "$cfg" | grep -q 'exclude_commands.*"git"'; then
     return 0
+  fi
+
+  if [[ "$FIX" == "1" ]]; then
+    fix_rtk_git_exclusion "$cfg"
+    return
   fi
 
   {
@@ -447,6 +532,7 @@ check_rtk_git_exclusion() {
     echo "  Then verify with:"
     echo "    echo '{\"tool_name\":\"Bash\",\"tool_input\":{\"command\":\"git status\"}}' | rtk hook claude"
     echo "  (empty output means git is no longer being rewritten)"
+    echo "  Or re-run this script with --fix to apply it automatically."
     echo
   } >&2
 }

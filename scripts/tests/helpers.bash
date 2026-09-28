@@ -472,6 +472,37 @@ EOF
   esac
 }
 
+# A fake `rtk` CLI placed ahead of PATH so check-companions.sh's rtk checks
+# never depend on whether the real rtk-ai/rtk binary happens to be installed
+# on the machine running the tests (it prepends, so it shadows a real one
+# further down PATH). Only implements what check-companions.sh actually
+# calls: `rtk config`, printing "Config: $FAKE_RTK_CONFIG" as its first line
+# — the only line check_rtk_git_exclusion reads. The config file itself is
+# the calling test's responsibility to write before running check-companions.sh.
+#
+# Usage: shim_rtk   (always "installed"; there is no "absent" mode here —
+# check_rtk's own `command -v rtk` gate was already untested before this, and
+# reliably hiding a real system rtk from PATH is out of scope for this change)
+shim_rtk() {
+  RTK_SHIM_BIN="$SANDBOX/rtk-shim"
+  mkdir -p "$RTK_SHIM_BIN"
+  export FAKE_RTK_CONFIG="$SANDBOX/rtk-config.toml"
+  cat > "$RTK_SHIM_BIN/rtk" <<EOF
+#!/usr/bin/env bash
+if [ "\$1" = "config" ]; then
+  echo "Config: $FAKE_RTK_CONFIG"
+  exit 0
+fi
+echo "fake rtk: unexpected args: \$*" >&2
+exit 1
+EOF
+  chmod +x "$RTK_SHIM_BIN/rtk"
+  case ":$PATH:" in
+    *":$RTK_SHIM_BIN:"*) ;;
+    *) export PATH="$RTK_SHIM_BIN:$PATH" ;;
+  esac
+}
+
 # --- assertions (dependency-free; no bats-assert needed) --------------------
 assert_success() {
   if [ "$status" -ne 0 ]; then
