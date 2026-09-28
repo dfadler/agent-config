@@ -93,7 +93,7 @@ if [[ -n "$SKIP_LIST" && "$INCLUDE_SET" == 1 ]]; then
   exit 2
 fi
 
-REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+REPO_ROOT="$(cd -P "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 
 # --skip's and --include's values, each split on commas into an array.
 # Declared even when empty so `set -u` never trips on ${arr[@]} below —
