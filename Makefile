@@ -25,7 +25,7 @@ SHELL := /usr/bin/env bash
 
 # Every shell script in the repo, NUL-safe. Kept as a `find` rather than a
 # hand-maintained list so a new script is covered the moment it lands.
-SH_FIND := find scripts plugins setup.sh -type f -name '*.sh' -print0
+SH_FIND := find scripts plugins setup.sh teardown.sh -type f -name '*.sh' -print0
 
 # Python sources: the skill's implementation plus its tests.
 PY_SOURCES := plugins/detached-terminal/skills/detached-terminal/scripts/agent_term.py \

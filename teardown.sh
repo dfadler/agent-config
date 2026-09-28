@@ -150,8 +150,8 @@ restore_claude_md() {
         continue
       fi
       [[ "$in_section" == 1 ]] && continue
-      printf '%s\n' "$rawline" >> "$tmp"
-    done < "$link"
+      printf '%s\n' "$rawline" >>"$tmp"
+    done <"$link"
     # Drop leading blank lines left after removing the managed section.
     local trimmed
     trimmed="$(sed '/./,$!d' "$tmp")"
@@ -160,7 +160,7 @@ restore_claude_md() {
       rm "$link"
       echo "Removed empty $link"
     else
-      printf '%s\n' "$trimmed" > "$link"
+      printf '%s\n' "$trimmed" >"$link"
       echo "Removed managed section from $link"
     fi
   fi
