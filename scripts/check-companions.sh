@@ -395,6 +395,7 @@ sys.exit(0)
 check_rtk() {
   if command -v rtk >/dev/null 2>&1; then
     echo "✓ rtk is installed (run 'rtk init --show' to check whether its token-compression hook is active)"
+    check_rtk_git_exclusion
     return 0
   fi
 
@@ -407,6 +408,45 @@ check_rtk() {
     echo "  then review and run 'rtk init --global' yourself to activate the hook -"
     echo "  it edits Claude Code's own hook settings and your shell rc files, so"
     echo "  this script won't run it for you."
+    echo
+  } >&2
+}
+
+# Confirmed conflict (docs/companion-plugins.md's rtk section has the full story):
+# once rtk's PreToolUse hook is active, it rewrites every `git ...` Bash command
+# into `rtk git ...`. Claude Code's own worktree-isolation safety net can no
+# longer recognize the rewritten command as git and refuses to run ANY git
+# command inside an EnterWorktree session (the main checkout is unaffected).
+# rtk's own [hooks].exclude_commands config is the supported way to stop it
+# rewriting a given command. This only warns when "git" is missing from that
+# list — same posture as the rest of this file: never edit a companion tool's
+# own config as a side effect of setup.sh, only report the problem and the
+# exact fix. `rtk config` always prints "Config: <path>" as its first line, so
+# the path is read from there rather than guessed per-platform (macOS vs. XDG).
+# The exclude_commands check itself is a plain substring grep, not a TOML
+# parser — good enough for an advisory check, and consistent with this repo
+# not carrying a TOML-parsing dependency anywhere else.
+check_rtk_git_exclusion() {
+  local cfg
+  cfg="$(rtk config 2>/dev/null | sed -n 's/^Config: //p')"
+  [[ -n "$cfg" && -f "$cfg" ]] || return 0
+
+  if awk '/^\[hooks\]/{f=1;next} /^\[/{f=0} f' "$cfg" | grep -q 'exclude_commands.*"git"'; then
+    return 0
+  fi
+
+  {
+    echo
+    echo "⚠ rtk rewrites 'git ...' Bash commands into 'rtk git ...', and Claude"
+    echo "  Code's own worktree-isolation check can't recognize the rewritten"
+    echo "  command as git — this blocks ALL git commands inside any"
+    echo "  EnterWorktree session (works fine in the main checkout). See"
+    echo "  docs/companion-plugins.md's rtk section for the full story. Fix: add"
+    echo "  \"git\" to exclude_commands under [hooks] in:"
+    echo "    $cfg"
+    echo "  Then verify with:"
+    echo "    echo '{\"tool_name\":\"Bash\",\"tool_input\":{\"command\":\"git status\"}}' | rtk hook claude"
+    echo "  (empty output means git is no longer being rewritten)"
     echo
   } >&2
 }
