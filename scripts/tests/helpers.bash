@@ -140,6 +140,26 @@ make_worktree_sandbox() {
   make_git_sandbox
   mkdir -p "$REPO/.claude/worktrees"
   _install_gh_pr_shim
+  # A tracked file for the marker-revert fixtures (see the merged-marker-*
+  # add_worktree states below) — matches the real shape (a project's own
+  # tracked file some tool regenerates a block into), not a modeling
+  # shortcut. Harmless for every other test, which never references it.
+  echo "static content" >"$REPO/regenerated.md"
+  git -C "$REPO" add regenerated.md
+  git -C "$REPO" commit -q -m "add regenerated.md"
+  git -C "$REPO" push -q origin main
+}
+
+# configure_cruft_marker <path> <marker> — writes $REPO/.claude/settings.json
+# with a single-entry worktree.autoPruneCruftMarkers config. The script reads
+# this from the MAIN checkout ($REPO here), regardless of which worktree
+# under it is being classified — see read_cruft_markers's own header.
+configure_cruft_marker() {
+  local path="$1" marker="$2"
+  mkdir -p "$REPO/.claude"
+  jq -n --arg path "$path" --arg marker "$marker" \
+    '{worktree: {autoPruneCruftMarkers: [{path: $path, beginMarker: $marker}]}}' \
+    >"$REPO/.claude/settings.json"
 }
 
 _install_gh_pr_shim() {
@@ -193,7 +213,26 @@ _mark_merged() {
 # `claude/competent-fermi-33e7a1`).
 #   merged-clean     pushed (upstream, 0 unpushed) + clean + in merged list  -> REMOVE
 #   merged-dirty     merged + pushed but has an uncommitted change           -> keep
-#   merged-unpushed  merged + clean but no upstream (unpushed)               -> keep
+#   merged-unpushed  merged + clean but no upstream, HEAD has a commit not on
+#                    main (unpushed, unique content)                        -> keep
+#   merged-no-upstream-clean  merged, no upstream, but HEAD IS main's tip (no
+#                    unique content) — the ancestor-of-main fallback         -> REMOVE
+#   merged-marker-block  merged + pushed, the configured marker file's only
+#                    diff is the exact marker-delimited block               -> REMOVE
+#                    (after the block is reverted; requires
+#                    configure_cruft_marker to have been called first)
+#   merged-marker-block-real-edit  merged + pushed, the marker file has a
+#                    real edit mixed in alongside the block                 -> keep
+#                    (left alone entirely, never reverted)
+#   merged-marker-block-and-dirty  the exact block, but ALSO an unrelated
+#                    dirty file                                             -> keep
+#                    (the marker file must be left alone too — reverting it
+#                    while the worktree is still kept would silently
+#                    discard part of its dirty state)
+#   merged-marker-block-no-upstream  the exact block, but no upstream AND a
+#                    real unique commit                                     -> keep
+#                    (same invariant: not being removed, so the marker file
+#                    must not be touched either)
 #   unmerged         clean + pushed but NOT in the merged list               -> keep
 #   locked           merged + clean + pushed but git-locked                  -> keep
 #   current          merged + clean + pushed (run the script from here)      -> keep
@@ -222,6 +261,49 @@ add_worktree() {
       ;;
     merged-unpushed)
       # Never pushed: no @{u}, so the script's upstream check reports unpushed.
+      git -C "$path" commit -q --allow-empty -m "local only"
+      _mark_merged "$branch" "$(git -C "$path" rev-parse HEAD)"
+      ;;
+    merged-no-upstream-clean)
+      # Never pushed either, but no commit was ever added — HEAD is exactly
+      # main's tip, so the is-ancestor-of-main fallback must clear it.
+      _mark_merged "$branch" "$(git -C "$path" rev-parse HEAD)"
+      ;;
+    merged-marker-block)
+      git -C "$path" push -q -u origin "$branch"
+      {
+        echo ""
+        echo "<!-- BEGIN:test-marker -->"
+        echo "some regenerated text"
+      } >>"$path/regenerated.md"
+      _mark_merged "$branch" "$(git -C "$path" rev-parse HEAD)"
+      ;;
+    merged-marker-block-real-edit)
+      git -C "$path" push -q -u origin "$branch"
+      {
+        echo "a real edit, not just the regenerated block"
+        echo ""
+        echo "<!-- BEGIN:test-marker -->"
+        echo "some regenerated text"
+      } >>"$path/regenerated.md"
+      _mark_merged "$branch" "$(git -C "$path" rev-parse HEAD)"
+      ;;
+    merged-marker-block-and-dirty)
+      git -C "$path" push -q -u origin "$branch"
+      {
+        echo ""
+        echo "<!-- BEGIN:test-marker -->"
+        echo "some regenerated text"
+      } >>"$path/regenerated.md"
+      echo "uncommitted" >"$path/scratch.txt"
+      _mark_merged "$branch" "$(git -C "$path" rev-parse HEAD)"
+      ;;
+    merged-marker-block-no-upstream)
+      {
+        echo ""
+        echo "<!-- BEGIN:test-marker -->"
+        echo "some regenerated text"
+      } >>"$path/regenerated.md"
       git -C "$path" commit -q --allow-empty -m "local only"
       _mark_merged "$branch" "$(git -C "$path" rev-parse HEAD)"
       ;;
@@ -262,6 +344,20 @@ add_out_of_scope_worktree() {
 delete_origin_branch() {
   local name="$1" branch="${2:-worktree-$name}"
   git -C "$ORIGIN" update-ref -d "refs/heads/$branch"
+}
+
+# add_orphaned_dir <name> [populate] — creates .claude/worktrees/<name> as a
+# plain directory that git's own worktree list knows nothing about, simulating
+# a worktree-creation call that made the directory but never completed
+# `git worktree add` (real-world wreckage, not a modeling shortcut). Pass
+# populate=1 to also drop a real file inside it, which the sweep must leave
+# alone. Prints the directory path.
+add_orphaned_dir() {
+  local name="$1" populate="${2:-}"
+  local d="$REPO/.claude/worktrees/$name"
+  mkdir -p "$d/.claude"
+  [ -n "$populate" ] && echo "real content" >"$d/some-file.txt"
+  printf '%s' "$d"
 }
 
 # prune <cwd> [args...] — run the real prune-merged-worktrees.sh from <cwd>.

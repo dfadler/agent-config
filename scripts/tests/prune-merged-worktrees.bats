@@ -540,6 +540,210 @@ teardown() {
   assert_output_contains "No Claude worktrees found"
 }
 
+# --- no-upstream-but-already-on-main fallback --------------------------------
+# A worktree branch is often never individually pushed — the branch a PR
+# actually merged from can be a different name entirely. `is_merged` already
+# confirmed via `gh` that SOME branch under this name merged at this exact
+# commit; if this branch's HEAD is also already an ancestor of main, it has
+# no unique content either way, upstream or not.
+
+@test "reports REMOVE for a merged worktree with no upstream whose HEAD is already on main (dry run)" {
+  add_worktree done merged-no-upstream-clean >/dev/null
+
+  run prune "$REPO"
+
+  assert_success
+  assert_output_contains "REMOVE"
+  refute_output_contains "unpushed commits"
+}
+
+@test "--yes removes a merged worktree with no upstream whose HEAD is already on main" {
+  local wt="$REPO/.claude/worktrees/done"
+  add_worktree done merged-no-upstream-clean >/dev/null
+
+  run prune "$REPO" --yes
+
+  assert_success
+  assert_output_contains "Removing"
+  [ ! -d "$wt" ]
+}
+
+@test "keeps a merged worktree with no upstream and a real unpushed commit" {
+  local wt="$REPO/.claude/worktrees/done"
+  add_worktree done merged-unpushed >/dev/null
+
+  run prune "$REPO" --yes
+
+  assert_success
+  refute_output_contains "Removing $wt"
+  [ -d "$wt" ]
+}
+
+# --- config-driven cruft-marker revert ---------------------------------------
+# A project may declare, in its own .claude/settings.json, a tracked file
+# whose diff is safe to revert before the clean check IFF the entire diff is
+# exactly an appended marker-delimited block (see the script's own header).
+# The revert only ever fires once every OTHER REMOVE condition already holds —
+# reverting first and classifying after would mutate a worktree the script
+# ends up keeping for an unrelated reason.
+
+@test "with no marker configured, a marker-shaped diff is just an ordinary dirty file" {
+  add_worktree done merged-marker-block >/dev/null
+
+  run prune "$REPO"
+
+  assert_success
+  assert_output_contains "uncommitted changes"
+  refute_output_contains "REMOVE"
+}
+
+@test "a dry run reports the marker block as uncommitted and never reverts it" {
+  configure_cruft_marker regenerated.md "<!-- BEGIN:test-marker -->"
+  local wt="$REPO/.claude/worktrees/done"
+  add_worktree done merged-marker-block >/dev/null
+
+  run prune "$REPO"
+
+  assert_success
+  assert_output_contains "uncommitted changes"
+  refute_output_contains "REMOVE"
+  grep -q "BEGIN:test-marker" "$wt/regenerated.md"
+}
+
+@test "--yes reverts an exact marker block and removes the worktree" {
+  configure_cruft_marker regenerated.md "<!-- BEGIN:test-marker -->"
+  local wt="$REPO/.claude/worktrees/done"
+  add_worktree done merged-marker-block >/dev/null
+
+  run prune "$REPO" --yes
+
+  assert_success
+  assert_output_contains "Removing"
+  [ ! -d "$wt" ]
+}
+
+@test "--auto reverts an exact marker block and removes the worktree" {
+  configure_cruft_marker regenerated.md "<!-- BEGIN:test-marker -->"
+  local wt="$REPO/.claude/worktrees/done"
+  add_worktree done merged-marker-block >/dev/null
+
+  run prune "$REPO" --auto
+
+  assert_success
+  assert_output_contains "Removed 1 merged worktree(s)"
+  [ ! -d "$wt" ]
+}
+
+@test "--yes leaves a real edit in the marker file alone and keeps the worktree" {
+  configure_cruft_marker regenerated.md "<!-- BEGIN:test-marker -->"
+  local wt="$REPO/.claude/worktrees/done"
+  add_worktree done merged-marker-block-real-edit >/dev/null
+
+  run prune "$REPO" --yes
+
+  assert_success
+  refute_output_contains "Removing $wt"
+  [ -d "$wt" ]
+  grep -q "a real edit, not just the regenerated block" "$wt/regenerated.md"
+}
+
+@test "--yes never reverts the marker file when another file is also dirty, and keeps the worktree" {
+  configure_cruft_marker regenerated.md "<!-- BEGIN:test-marker -->"
+  local wt="$REPO/.claude/worktrees/done"
+  add_worktree done merged-marker-block-and-dirty >/dev/null
+
+  run prune "$REPO" --yes
+
+  assert_success
+  refute_output_contains "Removing $wt"
+  [ -d "$wt" ]
+  grep -q "BEGIN:test-marker" "$wt/regenerated.md"
+}
+
+@test "--auto never reverts the marker file when another file is also dirty, and keeps the worktree" {
+  configure_cruft_marker regenerated.md "<!-- BEGIN:test-marker -->"
+  local wt="$REPO/.claude/worktrees/done"
+  add_worktree done merged-marker-block-and-dirty >/dev/null
+
+  run prune "$REPO" --auto
+
+  assert_success
+  refute_output_contains "Removed"
+  [ -d "$wt" ]
+  grep -q "BEGIN:test-marker" "$wt/regenerated.md"
+}
+
+@test "--yes never reverts the marker file when the branch has an unpushed commit, and keeps the worktree" {
+  configure_cruft_marker regenerated.md "<!-- BEGIN:test-marker -->"
+  local wt="$REPO/.claude/worktrees/done"
+  add_worktree done merged-marker-block-no-upstream >/dev/null
+
+  run prune "$REPO" --yes
+
+  assert_success
+  refute_output_contains "Removing $wt"
+  [ -d "$wt" ]
+  grep -q "BEGIN:test-marker" "$wt/regenerated.md"
+}
+
+# --- orphaned-directory sweep ------------------------------------------------
+# A directory under .claude/worktrees/ that git's own worktree list doesn't
+# know about at all — e.g. a worktree-creation call that mkdir'd it but never
+# finished `git worktree add`. Distinct failure mode from a merged-but-kept
+# worktree; swept only when empty, and only under --yes/--auto.
+
+@test "a dry run reports an orphaned empty directory but never removes it" {
+  local d
+  d="$(add_orphaned_dir stray)"
+
+  run prune "$REPO"
+
+  assert_success
+  [ -d "$d" ]
+}
+
+@test "--yes removes an empty orphaned directory git doesn't know about" {
+  local d
+  d="$(add_orphaned_dir stray)"
+
+  run prune "$REPO" --yes
+
+  assert_success
+  assert_output_contains "not a registered worktree"
+  [ ! -d "$d" ]
+}
+
+@test "--auto removes an empty orphaned directory git doesn't know about" {
+  local d
+  d="$(add_orphaned_dir stray)"
+
+  run prune "$REPO" --auto
+
+  assert_success
+  assert_output_contains "orphaned worktree director"
+  [ ! -d "$d" ]
+}
+
+@test "--yes leaves a non-empty orphaned directory alone" {
+  local d
+  d="$(add_orphaned_dir stray populate)"
+
+  run prune "$REPO" --yes
+
+  assert_success
+  [ -d "$d" ]
+  [ -f "$d/some-file.txt" ]
+}
+
+@test "--yes never sweeps a directory that IS a real (kept) worktree" {
+  add_worktree wip unmerged >/dev/null
+
+  run prune "$REPO" --yes
+
+  assert_success
+  [ -d "$REPO/.claude/worktrees/wip" ]
+}
+
 # --- hermeticity guard ------------------------------------------------------
 
 @test "the sandbox blocks real network tools" {

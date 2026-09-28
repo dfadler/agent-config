@@ -41,6 +41,30 @@ set -uo pipefail
 # Remote branches are intentionally NOT deleted here - turn on GitHub's
 # "Automatically delete head branches" for that. This is local-only cleanup.
 #
+# A worktree branch that was never individually pushed (no @{u} at all — an
+# EnterWorktree/desktop-app branch name is often not the branch a PR actually
+# opened from) falls back to checking whether its HEAD is already an ancestor
+# of the project's main branch: if so it carries no unique content either, and
+# is just as removable as one that's pushed with 0 commits ahead.
+#
+# A directory under .claude/worktrees/ that git's own `worktree list` doesn't
+# know about at all — wreckage from a worktree-creation call that made the
+# directory but never completed `git worktree add` — is swept separately,
+# removed only when it holds zero files anywhere in its tree.
+#
+# A project may declare, in its own .claude/settings.json, tracked files whose
+# diff is safe to revert before the clean check IF AND ONLY IF the entire diff
+# is exactly an appended marker-delimited block (some tooling — e.g. `next
+# dev` — regenerates such a block on every run):
+#   { "worktree": { "autoPruneCruftMarkers": [
+#     { "path": "CLAUDE.md", "beginMarker": "<!-- BEGIN:some-marker -->" }
+#   ] } }
+# The revert only ever fires once every OTHER condition for REMOVE already
+# holds (everything else clean, the branch carries no unique content) — never
+# on a worktree that's being kept for an unrelated reason. Any other
+# difference anywhere in a configured file (a real edit mixed in) leaves it
+# untouched, so genuine work is never mistaken for regenerated cruft.
+#
 # Usage:
 #   prune-merged-worktrees.sh              # dry run: report only, remove nothing
 #   prune-merged-worktrees.sh --yes         # actually remove the merged worktrees
@@ -145,6 +169,105 @@ is_merged() {
 # remove anything. A stale ref (upstream tip behind HEAD) only ever errs toward
 # keeping, which is the safe direction, so leaving it un-pruned costs nothing.
 
+# Ref to fall back on when a worktree's branch has no upstream at all (see
+# _pushed_or_already_on_main below). Prefers a local `main`, falls back to
+# `origin/main`. Left empty (fallback skipped, erring toward keep) if neither
+# resolves — e.g. a repo whose default branch isn't named "main" at all.
+main_ref=""
+if git rev-parse --verify --quiet main >/dev/null; then
+  main_ref="main"
+elif git rev-parse --verify --quiet origin/main >/dev/null; then
+  main_ref="origin/main"
+fi
+
+# True if a worktree's HEAD carries nothing beyond what's already pushed. A
+# resolvable @{u} with 0 commits ahead is the normal case. A branch that was
+# never individually pushed (no @{u} at all) falls back to asking whether
+# HEAD is already an ancestor of $main_ref: if so it has no unique content
+# either, regardless of never having had an upstream. Errs toward false
+# (keep) when neither check resolves.
+_pushed_or_already_on_main() {
+  local path="$1" ahead
+  if git -C "$path" rev-parse --verify --quiet '@{u}' >/dev/null 2>&1; then
+    ahead="$(git -C "$path" rev-list --count '@{u}..HEAD' 2>/dev/null || echo -1)"
+    [ "$ahead" = "0" ]
+    return
+  fi
+  [ -n "$main_ref" ] || return 1
+  git -C "$path" merge-base --is-ancestor HEAD "$main_ref" 2>/dev/null
+}
+
+# Reads a project's opt-in worktree.autoPruneCruftMarkers config (see the
+# script header) from the MAIN checkout's .claude/settings.json — not
+# whichever worktree the script happens to be invoked from, and not the
+# CANDIDATE worktree being classified, either of which could be sitting on an
+# old branch that predates the config, or simply differ from the policy the
+# project currently wants applied uniformly. Emits "path<TAB>beginMarker"
+# lines; empty (no markers) when jq is missing, the file is absent, or the
+# key is unset — this whole mechanism is a no-op for every project that
+# hasn't opted in.
+read_cruft_markers() {
+  local settings="$repo_root/.claude/settings.json"
+  command -v jq >/dev/null 2>&1 || return 0
+  [ -f "$settings" ] || return 0
+  jq -r '.worktree.autoPruneCruftMarkers // [] | .[] | [.path, .beginMarker] | @tsv' \
+    "$settings" 2>/dev/null
+}
+cruft_markers="$(read_cruft_markers)"
+
+# True (no mutation) when a configured tracked file has no diff from HEAD at
+# all, or its ENTIRE diff is exactly the appended marker-delimited block —
+# the marker line, plus the one blank line it's always appended after. False
+# for any other difference anywhere in the file (a real edit mixed in), so
+# genuine work is never mistaken for cruft. A pure predicate — callers decide
+# whether reverting is actually safe (see flush()) BEFORE calling
+# revert_cruft_markers.
+file_diff_is_only_marker_block() {
+  local path="$1" rel_file="$2" marker="$3" marker_line stripped head_version
+  [ -f "$path/$rel_file" ] || return 0
+  git -C "$path" diff --quiet -- "$rel_file" 2>/dev/null && return 0
+  marker_line="$(grep -Fn -- "$marker" "$path/$rel_file" | head -1 | cut -d: -f1)"
+  [ -n "$marker_line" ] || return 1
+  head_version="$(git -C "$path" show "HEAD:$rel_file" 2>/dev/null)" || return 1
+  stripped="$(head -n "$((marker_line - 2))" "$path/$rel_file")"
+  [ "$stripped" = "$head_version" ]
+}
+
+# True only when EVERY configured marker file independently passes
+# file_diff_is_only_marker_block. Vacuously true when no markers are
+# configured — the mechanism is then simply inert.
+all_cruft_markers_safe() {
+  local path="$1" rel_file marker
+  while IFS=$'\t' read -r rel_file marker; do
+    [ -n "$rel_file" ] || continue
+    file_diff_is_only_marker_block "$path" "$rel_file" "$marker" || return 1
+  done <<<"$cruft_markers"
+  return 0
+}
+
+# Reverts every configured marker file to HEAD's version. Callers must only
+# invoke this once all_cruft_markers_safe AND every other REMOVE condition
+# already hold (see flush()) — it re-checks cheaply per file too, so calling
+# it when a file has nothing to revert is a no-op, but it does NOT know
+# whether the worktree as a whole is otherwise clean.
+revert_cruft_markers() {
+  local path="$1" rel_file marker
+  while IFS=$'\t' read -r rel_file marker; do
+    [ -n "$rel_file" ] || continue
+    [ -f "$path/$rel_file" ] || continue
+    git -C "$path" diff --quiet -- "$rel_file" 2>/dev/null && continue
+    git -C "$path" checkout -- "$rel_file"
+  done <<<"$cruft_markers"
+}
+
+# The pathspec that excludes every configured marker file from a "does
+# anything ELSE need to stay dirty" status check — built once since
+# cruft_markers doesn't change during a run.
+cruft_marker_exclude_pathspecs=()
+while IFS=$'\t' read -r _cm_path _cm_marker; do
+  [ -n "$_cm_path" ] && cruft_marker_exclude_pathspecs+=(":!$_cm_path")
+done <<<"$cruft_markers"
+
 removable_paths=()
 removable_branches=()
 report_lines=()
@@ -181,9 +304,21 @@ flush() {
     report_lines+=("keep    $name — locked (another session is using it)")
   elif ! is_merged "$branch" "$(git -C "$path" rev-parse HEAD 2>/dev/null)"; then
     report_lines+=("keep    $name — no merged PR for $branch")
+  elif $apply &&
+    [ -z "$(git -C "$path" status --porcelain -- . "${cruft_marker_exclude_pathspecs[@]}" 2>/dev/null)" ] &&
+    all_cruft_markers_safe "$path" &&
+    _pushed_or_already_on_main "$path"; then
+    # Every other condition for REMOVE already holds with the configured
+    # marker files set aside — mutating them here can only ever complete a
+    # removal that was already going to happen, never touch a worktree
+    # we're about to keep.
+    revert_cruft_markers "$path"
+    removable_paths+=("$path")
+    removable_branches+=("$branch")
+    report_lines+=("REMOVE  $name — $branch merged")
   elif [ -n "$(git -C "$path" status --porcelain 2>/dev/null)" ]; then
     report_lines+=("keep    $name — uncommitted changes")
-  elif [ "$(git -C "$path" rev-list --count '@{u}..HEAD' 2>/dev/null || echo -1)" != "0" ]; then
+  elif ! _pushed_or_already_on_main "$path"; then
     report_lines+=("keep    $name — unpushed commits (or no upstream)")
   else
     removable_paths+=("$path")
@@ -207,6 +342,11 @@ done < <(
   printf '\n'
 )
 flush
+
+# Every path git still considers a worktree, in or out of scope — used by
+# sweep_orphaned_dirs below to tell "a real worktree flush() chose to skip"
+# from "wreckage git doesn't even know about anymore".
+all_worktree_paths="$(git worktree list --porcelain | sed -n 's/^worktree //p')"
 
 # Remove every worktree the classification above marked removable, and delete
 # its local branch. This acts ONLY on removable_paths — the safety envelope
@@ -232,6 +372,28 @@ remove_removable() {
   git worktree prune 2>/dev/null || true
 }
 
+# Sweep .claude/worktrees/ for directories git no longer even considers a
+# worktree — e.g. a worktree-creation call that made the directory but never
+# completed `git worktree add`, leaving inert wreckage indistinguishable by
+# name alone from a real worktree. Removed ONLY when the directory holds zero
+# files anywhere in its tree (an empty scaffold); anything with real content
+# is left for a human to look at. `known` is $all_worktree_paths — anything
+# git still lists, in or out of flush()'s scope, is never touched here.
+removed_orphans=()
+sweep_orphaned_dirs() {
+  local known="$1" verbose="$2" d
+  [ -d "$wt_prefix" ] || return 0
+  for d in "$wt_prefix"*/; do
+    d="${d%/}"
+    [ -d "$d" ] || continue
+    printf '%s\n' "$known" | grep -Fxq -- "$d" && continue
+    [ -n "$(find "$d" -type f -print -quit 2>/dev/null)" ] && continue
+    rm -rf -- "$d"
+    removed_orphans+=("${d#"$repo_root"/}")
+    $verbose && echo "==> Removing $d (empty, not a registered worktree)"
+  done
+}
+
 # --- SessionStart auto-remove (quiet, non-fatal, always exits 0) -------------
 if $auto_mode; then
   if [ "${#removable_paths[@]}" -gt 0 ]; then
@@ -244,6 +406,13 @@ if $auto_mode; then
     fi
   else
     git worktree prune 2>/dev/null || true
+  fi
+  sweep_orphaned_dirs "$all_worktree_paths" false
+  if [ "${#removed_orphans[@]}" -gt 0 ]; then
+    echo "🧹 Removed ${#removed_orphans[@]} orphaned worktree director(ies):"
+    for d in "${removed_orphans[@]}"; do
+      echo "   • $d"
+    done
   fi
   exit 0
 fi
@@ -261,6 +430,11 @@ if $hook_mode; then
 fi
 
 # --- human run (dry-run report, or --yes removal) ----------------------------
+# Orphaned-directory sweep runs here (once, regardless of which exit path
+# below fires) rather than inline in each branch — same $apply guard as
+# everywhere else: only --yes mutates, a plain dry run reports and stops.
+$apply && sweep_orphaned_dirs "$all_worktree_paths" true
+
 if [ "${#report_lines[@]}" -eq 0 ]; then
   echo "No Claude worktrees found under .claude/worktrees/."
   git worktree prune
