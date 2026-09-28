@@ -661,6 +661,48 @@ EOF
   assert_output_contains "Could not automatically edit"
 }
 
+@test "a commented-out exclude_commands line still warns (git isn't really excluded)" {
+  shim_rtk
+  write_rtk_config '# exclude_commands = ["git"]'
+  run_companions
+  assert_success
+  assert_output_contains "rtk rewrites"
+}
+
+@test "a multi-line exclude_commands array containing git is recognized" {
+  shim_rtk
+  write_rtk_config $'exclude_commands = [\n  "npm",\n  "git",\n]'
+  run_companions
+  assert_success
+  refute_output_contains "rtk rewrites"
+}
+
+@test "--fix appends to a multi-line exclude_commands array without git" {
+  shim_rtk
+  write_rtk_config $'exclude_commands = [\n  "npm",\n]'
+  run_companions --fix
+  assert_success
+  assert_output_contains "Added \"git\""
+  grep -q 'exclude_commands = \["npm", "git"\]' "$FAKE_RTK_CONFIG"
+}
+
+@test "warns when rtk's config path is reported but the file doesn't exist yet" {
+  shim_rtk
+  rm -f "$FAKE_RTK_CONFIG"
+  run_companions
+  assert_success
+  assert_output_contains "rtk hasn't created its config file yet"
+  assert_output_contains "rtk config --create"
+}
+
+@test "--fix on a not-yet-created config file fails loudly with the right guidance" {
+  shim_rtk
+  rm -f "$FAKE_RTK_CONFIG"
+  run_companions --fix
+  [ "$status" -ne 0 ]
+  assert_output_contains "Run 'rtk config --create' first"
+}
+
 # --- probe contract test (must stay last) -----------------------------------
 
 @test "the probe reports the real python3 correctly" {

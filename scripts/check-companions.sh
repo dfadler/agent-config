@@ -422,69 +422,148 @@ check_rtk() {
   } >&2
 }
 
-# Applies the fix check_rtk_git_exclusion (below) reports: adds "git" to
-# rtk's own [hooks].exclude_commands in its config.toml. Only reached behind
-# an explicit --fix — this is the one place in this script that edits a
-# companion tool's own persistent config rather than this repo's, gated the
-# same way install_pyte is gated behind --install-deps: never as a side
-# effect of a bare invocation.
+# Shared parser for rtk's own config.toml, used by both the read-only check
+# and the fix below — one implementation so they can't silently disagree
+# with each other (an earlier version used a separate awk/grep heuristic for
+# the check and a separate single-line regex for the fix; a reviewer
+# correctly pointed out the check side false-"excluded" on a commented-out
+# `# exclude_commands = [...]` line, and neither side handled a value that
+# wraps onto more than one line).
 #
-# Locates and rewrites only the exclude_commands array inside the [hooks]
-# section (same section-tracking logic check_rtk_git_exclusion uses) rather
-# than a blind string replace across the whole file, and appends "git" to
-# whatever entries are already there instead of assuming the array is empty
-# — so an existing exclusion (e.g. a test command) survives the edit.
-fix_rtk_git_exclusion() {
-  local cfg="$1"
-  # Passed via `-c` (like claude_plugin_state's own python3 call above) rather
-  # than piped to stdin: a test's fake python3 (shim_python3 in
-  # scripts/tests/helpers.bash) only recognizes -c/-m and forwards to the
-  # real interpreter, so a bare heredoc-to-stdin call would be swallowed by
-  # that shim during check-companions.bats's rtk tests.
-  local py_src
-  py_src=$(
-    cat <<'PYEOF'
-import os, re
+# Scans line-by-line tracking the current top-level [section] (a fully
+# commented-out line, including a commented section header, is skipped
+# rather than parsed), and once inside [hooks], locates the exclude_commands
+# key and accumulates its value across as many lines as it takes to reach
+# the closing "]" — so a multi-line array is read correctly, not just a
+# single-line one. Still not a real TOML parser (no escaped brackets inside
+# a quoted entry, no inline "# comment" after a value on the same line), but
+# closes the two concrete false-negatives above; good enough for an advisory
+# check, consistent with this repo not carrying a TOML-parsing dependency
+# anywhere else.
+#
+# Reads RTK_CONFIG_PATH and RTK_PARSE_MODE from the environment:
+#   RTK_PARSE_MODE=check  Prints "yes" if "git" is already in the array,
+#                          "no" otherwise (including when exclude_commands
+#                          isn't present under [hooks] at all). Always
+#                          exits 0; the file is never modified.
+#   RTK_PARSE_MODE=fix     Appends "git" to the array in place and prints
+#                          "fixed", or prints "noop" if it was already
+#                          there. Exits 1 (no output) if exclude_commands
+#                          isn't present under [hooks] to append to.
+# Passed via `-c` (like claude_plugin_state's own python3 call above) rather
+# than piped to stdin: a test's fake python3 (shim_python3 in
+# scripts/tests/helpers.bash) only recognizes -c/-m and forwards to the real
+# interpreter, so a bare heredoc-to-stdin call would be swallowed by that
+# shim during check-companions.bats's rtk tests.
+RTK_HOOKS_PARSER=$(
+  cat <<'PYEOF'
+import os, re, sys
 
 path = os.environ["RTK_CONFIG_PATH"]
+mode = os.environ["RTK_PARSE_MODE"]
+
 with open(path) as f:
     lines = f.readlines()
 
 in_hooks = False
-fixed = False
-for i, line in enumerate(lines):
+start = end = None
+raw = ""
+i = 0
+while i < len(lines):
+    line = lines[i]
     stripped = line.strip()
-    if stripped.startswith("[") and stripped != "[hooks]":
-        in_hooks = False
-    if stripped == "[hooks]":
-        in_hooks = True
+    if stripped.startswith("#"):
+        i += 1
         continue
-    if in_hooks:
-        m = re.match(r'^(\s*exclude_commands\s*=\s*)\[(.*)\]\s*$', line.rstrip("\n"))
+    if stripped.startswith("[") and stripped.endswith("]") and "=" not in stripped:
+        in_hooks = stripped == "[hooks]"
+        i += 1
+        continue
+    if in_hooks and start is None:
+        m = re.match(r'^(\s*exclude_commands\s*=\s*)(.*)$', line.rstrip("\n"))
         if m:
-            prefix, inner = m.group(1), m.group(2)
-            entries = [e.strip() for e in inner.split(",") if e.strip()]
-            if any(e.strip("\"'") == "git" for e in entries):
-                fixed = True  # already present — nothing to do
-                break
-            entries.append('"git"')
-            lines[i] = prefix + "[" + ", ".join(entries) + "]\n"
-            fixed = True
-            break
+            start = i
+            rest = m.group(2)
+            if "]" in rest:
+                raw, end = rest[: rest.index("]") + 1], i
+            else:
+                raw = rest
+                j = i + 1
+                while j < len(lines):
+                    if lines[j].strip().startswith("#"):
+                        j += 1
+                        continue
+                    if "]" in lines[j]:
+                        raw += lines[j][: lines[j].index("]") + 1]
+                        end = j
+                        break
+                    raw += lines[j]
+                    j += 1
+            i = (end if end is not None else j) + 1
+            continue
+    i += 1
 
-if not fixed:
-    raise SystemExit(1)
+if start is None:
+    if mode == "check":
+        print("no")
+        sys.exit(0)
+    sys.exit(1)  # fix: nothing to append "git" to
 
+inner = raw.strip()
+inner = inner[1:] if inner.startswith("[") else inner
+inner = inner[:-1] if inner.endswith("]") else inner
+entries = [e.strip().strip("\"'") for e in inner.split(",") if e.strip()]
+has_git = "git" in entries
+
+if mode == "check":
+    print("yes" if has_git else "no")
+    sys.exit(0)
+
+# mode == fix
+if has_git:
+    print("noop")
+    sys.exit(0)
+
+entries.append("git")
+new_array = "[" + ", ".join('"{}"'.format(e) for e in entries) + "]"
+prefix = re.match(r'^(\s*exclude_commands\s*=\s*)', lines[start]).group(1)
+lines[start : end + 1] = [prefix + new_array + "\n"]
 with open(path, "w") as f:
     f.writelines(lines)
+print("fixed")
 PYEOF
-  )
-  if ! RTK_CONFIG_PATH="$cfg" python3 -c "$py_src"; then
+)
+
+# rtk_config_git_excluded CFG
+#   Prints "yes"/"no" — see RTK_HOOKS_PARSER's RTK_PARSE_MODE=check contract
+#   above. CFG must already exist; callers check that first.
+rtk_config_git_excluded() {
+  RTK_CONFIG_PATH="$1" RTK_PARSE_MODE=check python3 -c "$RTK_HOOKS_PARSER"
+}
+
+# Applies the fix check_rtk_git_exclusion (below) reports: adds "git" to
+# rtk's own [hooks].exclude_commands in its config.toml, via RTK_HOOKS_PARSER
+# above. Only reached behind an explicit --fix — this is the one place in
+# this script that edits a companion tool's own persistent config rather
+# than this repo's, gated the same way install_pyte is gated behind
+# --install-deps: never as a side effect of a bare invocation.
+fix_rtk_git_exclusion() {
+  local cfg="$1"
+
+  if [[ ! -f "$cfg" ]]; then
+    echo "rtk hasn't created its config file yet ($cfg doesn't exist)." >&2
+    echo "  Run 'rtk config --create' first, then re-run with --fix." >&2
+    return 1
+  fi
+
+  local result
+  if ! result="$(RTK_CONFIG_PATH="$cfg" RTK_PARSE_MODE=fix python3 -c "$RTK_HOOKS_PARSER")"; then
     echo "Could not automatically edit $cfg — no exclude_commands line found" >&2
     echo "  under [hooks]. Add \"git\" to it yourself; see" >&2
     echo "  docs/companion-plugins.md's rtk section." >&2
     return 1
   fi
+  [[ "$result" == "noop" ]] && return 0
 
   echo "✓ Added \"git\" to rtk's exclude_commands in $cfg"
   echo "  Verify with:"
@@ -502,16 +581,38 @@ PYEOF
 # missing from that list — same posture as the rest of this file: never edit
 # a companion tool's own config as a side effect of setup.sh unless asked.
 # `rtk config` always prints "Config: <path>" as its first line, so the path
-# is read from there rather than guessed per-platform (macOS vs. XDG). The
-# exclude_commands check itself is a plain substring grep, not a TOML parser
-# — good enough for an advisory check, and consistent with this repo not
-# carrying a TOML-parsing dependency anywhere else.
+# is read from there rather than guessed per-platform (macOS vs. XDG). A
+# path rtk reports but hasn't actually created yet (before `rtk config
+# --create` has ever run) still means git is unexcluded — rtk's own default
+# config doesn't exclude it — so that case warns too, rather than being
+# silently skipped just because nothing exists there yet.
 check_rtk_git_exclusion() {
   local cfg
   cfg="$(rtk config 2>/dev/null | sed -n 's/^Config: //p')"
-  [[ -n "$cfg" && -f "$cfg" ]] || return 0
+  [[ -n "$cfg" ]] || return 0
 
-  if awk '/^\[hooks\]/{f=1;next} /^\[/{f=0} f' "$cfg" | grep -q 'exclude_commands.*"git"'; then
+  if [[ ! -f "$cfg" ]]; then
+    if [[ "$FIX" == "1" ]]; then
+      fix_rtk_git_exclusion "$cfg"
+      return
+    fi
+    {
+      echo
+      echo "⚠ rtk hasn't created its config file yet ($cfg doesn't exist),"
+      echo "  so it's still using its built-in defaults — which do NOT exclude"
+      echo "  git, so 'git ...' Bash commands get rewritten into 'rtk git ...'"
+      echo "  and Claude Code's worktree-isolation check can't recognize them"
+      echo "  (blocks ALL git commands inside any EnterWorktree session; the"
+      echo "  main checkout is unaffected). Run:"
+      echo "    rtk config --create"
+      echo "  then add \"git\" to exclude_commands under [hooks], or re-run"
+      echo "  this script with --fix once that file exists."
+      echo
+    } >&2
+    return 0
+  fi
+
+  if [[ "$(rtk_config_git_excluded "$cfg")" == "yes" ]]; then
     return 0
   fi
 

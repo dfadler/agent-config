@@ -210,6 +210,33 @@ assert '/hook-b.sh' in cmds, 'hook-b missing'
   [ "$status" -eq 0 ]
 }
 
+@test "deregistered: preserves an unrelated already-empty entry under the same event" {
+  # Reproduces a real finding: an entry that was already "hooks": [] before
+  # this call (foreign, or otherwise not ours) must survive even when some
+  # OTHER entry under the same event legitimately empties out and gets
+  # dropped — the two must not be conflated just because both end up with
+  # an empty "hooks" array by the time the rewrite happens.
+  python3 -c "
+import json
+d = {'hooks': {'PreToolUse': [
+    {'matcher': 'Bash', 'hooks': []},
+    {'matcher': 'Edit|Write', 'hooks': [{'type': 'command', 'command': '/hook-a.sh'}]},
+]}}
+open('$SETTINGS', 'w').write(json.dumps(d))
+"
+  ensure_hook_deregistered "PreToolUse" "/hook-a.sh" "$SETTINGS"
+  run python3 -c "
+import json
+d = json.load(open('$SETTINGS'))
+entries = d['hooks']['PreToolUse']
+assert any(e.get('matcher') == 'Bash' and e.get('hooks') == [] for e in entries), \
+    'the unrelated already-empty entry was dropped'
+assert not any(e.get('matcher') == 'Edit|Write' for e in entries), \
+    '/hook-a.sh entry should have been removed once emptied'
+"
+  [ "$status" -eq 0 ]
+}
+
 @test "deregistered: leaves hooks under other events intact" {
   python3 -c "
 import json
