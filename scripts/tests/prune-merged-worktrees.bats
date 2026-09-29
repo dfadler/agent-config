@@ -646,7 +646,13 @@ teardown() {
   refute_output_contains "REMOVE"
 }
 
-@test "a dry run reports the marker block as uncommitted and never reverts it" {
+@test "a dry run correctly previews a marker-only diff as REMOVE, without reverting it" {
+  # Regression test: classify_worktree is apply-blind by construction, so a
+  # dry run must agree with what --yes would actually do — this worktree's
+  # only diff is the configured marker block, which is safe to revert, so
+  # dry run must report REMOVE too. It must NOT actually mutate anything
+  # (no --yes/--auto was passed): the marker file on disk stays untouched
+  # and the worktree directory stays in place either way.
   configure_cruft_marker regenerated.md "<!-- BEGIN:test-marker -->" "<!-- END:test-marker -->"
   local wt="$REPO/.claude/worktrees/done"
   add_worktree done merged-marker-block >/dev/null
@@ -654,8 +660,8 @@ teardown() {
   run prune "$REPO"
 
   assert_success
-  assert_output_contains "uncommitted changes"
-  refute_output_contains "REMOVE"
+  assert_output_contains "REMOVE"
+  refute_output_contains "uncommitted changes"
   grep -q "BEGIN:test-marker" "$wt/regenerated.md"
   [ -d "$wt" ]
 }

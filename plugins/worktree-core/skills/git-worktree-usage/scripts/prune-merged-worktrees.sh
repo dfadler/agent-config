@@ -360,6 +360,86 @@ removable_paths=()
 removable_branches=()
 report_lines=()
 
+# --- classify_worktree and its rules -----------------------------------------
+#
+# Fixes a real bug: flush() used to have two DIFFERENT decision paths — one
+# reached only when $apply was true (which also checked cruft-marker safety),
+# and a separate dry-run fallback that never checked markers at all. A dry
+# run could report "keep — uncommitted changes" for a worktree that --yes
+# would actually remove, because the two paths silently disagreed. Every
+# KEEP_RULES entry below is apply-blind BY CONSTRUCTION — $apply isn't even
+# passed to a rule — so classify_worktree computes the exact same REMOVE/KEEP
+# decision regardless of mode; only whether the decision gets ACTED on
+# (ON_REMOVE_HOOKS, below) depends on $apply. This is an internal seam:
+# flush() only ever calls classify_worktree, never a rule directly.
+#
+# Rule contract — a rule is `rule_<name> PATH BRANCH LOCKED`:
+#   exit 0, no stdout  → this worktree passes; try the next rule.
+#   exit 1, reason on stdout → KEEP, for exactly this reason.
+# Evaluated in array order, which IS the safety-ordering guarantee: cheap
+# same-worktree-identity checks (self/locked) before the GitHub-derived merge
+# check, before anything that touches the configured marker files.
+rule_self() {
+  [ "$1" = "$self" ] || return 0
+  printf 'current session\n'
+  return 1
+}
+
+rule_locked() {
+  "$3" || return 0
+  printf 'locked (another session is using it)\n'
+  return 1
+}
+
+rule_merged() {
+  is_merged "$2" "$(git -C "$1" rev-parse HEAD 2>/dev/null)" && return 0
+  printf 'no merged PR for %s\n' "$2"
+  return 1
+}
+
+# Folds in all_cruft_markers_safe (non-mutating) rather than calling
+# revert_cruft_markers itself — mutation is ON_REMOVE_HOOKS's job, run only
+# once classify_worktree has already returned REMOVE.
+rule_clean() {
+  local path="$1"
+  if [ -z "$(git -C "$path" status --porcelain -- . "${cruft_marker_exclude_pathspecs[@]+"${cruft_marker_exclude_pathspecs[@]}"}" 2>/dev/null)" ] &&
+    all_cruft_markers_safe "$path"; then
+    return 0
+  fi
+  printf 'uncommitted changes\n'
+  return 1
+}
+
+rule_pushed_or_main() {
+  _pushed_or_already_on_main "$1" && return 0
+  printf 'unpushed commits (or no upstream)\n'
+  return 1
+}
+
+KEEP_RULES=(rule_self rule_locked rule_merged rule_clean rule_pushed_or_main)
+
+# Runs only once classify_worktree has independently returned REMOVE, and
+# only when $apply is true — never as part of a rule's own decision. Reverts
+# every configured marker file; the worktree-removal loop (remove_removable)
+# runs separately afterward.
+ON_REMOVE_HOOKS=(revert_cruft_markers)
+
+# classify_worktree PATH BRANCH LOCKED
+#   Pure, read-only, apply-blind. Prints exactly one line to stdout:
+#   "REMOVE\t$branch merged" or "KEEP\t<reason>". Callers split on the tab.
+classify_worktree() {
+  local path="$1" branch="$2" locked="$3"
+  local rule reason status
+  for rule in "${KEEP_RULES[@]}"; do
+    reason="$("$rule" "$path" "$branch" "$locked")"
+    status=$?
+    [ "$status" -eq 0 ] && continue
+    printf 'KEEP\t%s\n' "$reason"
+    return 0
+  done
+  printf 'REMOVE\t%s merged\n' "$branch"
+}
+
 # Classify one worktree record parsed from `git worktree list --porcelain`.
 path=""
 branch=""
@@ -385,33 +465,21 @@ flush() {
     ;;
   esac
 
-  local name="${path#"$repo_root"/}"
-  if [ "$path" = "$self" ]; then
-    report_lines+=("keep    $name — current session")
-  elif $locked; then
-    report_lines+=("keep    $name — locked (another session is using it)")
-  elif ! is_merged "$branch" "$(git -C "$path" rev-parse HEAD 2>/dev/null)"; then
-    report_lines+=("keep    $name — no merged PR for $branch")
-  elif $apply &&
-    [ -z "$(git -C "$path" status --porcelain -- . "${cruft_marker_exclude_pathspecs[@]+"${cruft_marker_exclude_pathspecs[@]}"}" 2>/dev/null)" ] &&
-    all_cruft_markers_safe "$path" &&
-    _pushed_or_already_on_main "$path"; then
-    # Every other condition for REMOVE already holds with the configured
-    # marker files set aside — mutating them here can only ever complete a
-    # removal that was already going to happen, never touch a worktree
-    # we're about to keep.
-    revert_cruft_markers "$path"
+  local name="${path#"$repo_root"/}" decision reason
+  IFS=$'\t' read -r decision reason < <(classify_worktree "$path" "$branch" "$locked")
+  if [ "$decision" = "REMOVE" ]; then
+    if $apply; then
+      # Every REMOVE condition already holds — mutating the configured
+      # marker files here can only ever complete a removal that was already
+      # going to happen, never touch a worktree we're about to keep.
+      local hook
+      for hook in "${ON_REMOVE_HOOKS[@]}"; do "$hook" "$path"; done
+    fi
     removable_paths+=("$path")
     removable_branches+=("$branch")
-    report_lines+=("REMOVE  $name — $branch merged")
-  elif [ -n "$(git -C "$path" status --porcelain 2>/dev/null)" ]; then
-    report_lines+=("keep    $name — uncommitted changes")
-  elif ! _pushed_or_already_on_main "$path"; then
-    report_lines+=("keep    $name — unpushed commits (or no upstream)")
+    report_lines+=("REMOVE  $name — $reason")
   else
-    removable_paths+=("$path")
-    removable_branches+=("$branch")
-    report_lines+=("REMOVE  $name — $branch merged")
+    report_lines+=("keep    $name — $reason")
   fi
   path=""
   branch=""
