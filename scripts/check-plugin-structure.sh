@@ -13,6 +13,9 @@
 # Checks, per plugin under plugins/*/:
 #   * .claude-plugin/plugin.json parses as JSON, has name/version/description,
 #     and its `name` matches the plugin directory.
+#   * a root-level SKILL.md (single-skill plugin; loads as the bare name, not
+#     <plugin>:<skill>) has the same frontmatter, with `name` matching the
+#     plugin directory.
 #   * every skills/*/SKILL.md has delimited frontmatter carrying `name` and a
 #     non-empty `description`, and `name` matches the skill directory.
 #   * every agents/*.md has the same, with `name` matching the filename.
@@ -284,6 +287,14 @@ for plugin_dir in "${plugins[@]}"; do
   plugin_dir="${plugin_dir%/}"
   check_manifest "$plugin_dir"
   check_hooks "$plugin_dir"
+
+  if [[ -f "$plugin_dir/SKILL.md" ]]; then
+    check_frontmatter_doc "$plugin_dir/SKILL.md" "$(basename "$plugin_dir")" "plugin directory"
+    for script in "$plugin_dir"/scripts/*.sh "$plugin_dir"/scripts/*.py; do
+      [[ -e "$script" ]] || continue
+      [[ -x "$script" ]] || fail "$script: not executable (chmod +x)"
+    done
+  fi
 
   for skill_dir in "$plugin_dir"/skills/*/; do
     skill_dir="${skill_dir%/}"

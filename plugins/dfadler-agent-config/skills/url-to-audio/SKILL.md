@@ -65,7 +65,7 @@ python3 -c "import trafilatura" 2>/dev/null && command -v trafilatura >/dev/null
 
 **If missing, this is a fetch-and-execute-style install** (a one-off tool
 acquisition, not a project's own lockfile) — follow this repo's
-`fetch-execute-guide:fetch-execute-guide` skill: show the user the exact command
+`fetch-execute-guide` skill: show the user the exact command
 (`pip3 install --user trafilatura`) and what it installs, and wait for
 explicit, request-scoped permission before running it. Don't install it
 silently just because the broader task was approved. If it's still not on

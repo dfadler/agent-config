@@ -1,12 +1,12 @@
 # Third-party notice
 
-This plugin's `a11y-review` skill draws on two external sources. Neither is
+This plugin's `accessibility-skills` skill draws on two external sources. Neither is
 vendored verbatim; both are adapted and rewritten for a static, agent-driven code
 review rather than the runtime tool each was originally written for.
 
 ## The A11Y Project checklist
 
-`skills/a11y-review/references/checklist.md` is adapted from
+`references/checklist.md` is adapted from
 [The A11Y Project's checklist](https://www.a11yproject.com/checklist/), retrieved
 2026-09-12, licensed under the [Apache License 2.0](https://www.apache.org/licenses/LICENSE-2.0)
 ("© 2013–2026 The Accessibility Project"). Each checklist item is reworded and
@@ -22,7 +22,7 @@ automated re-pin workflow here (unlike
 
 ## AccessLint grading methodology
 
-`skills/a11y-review/references/grading.md`'s evidence-basis (●/◐/○) and severity
+`references/grading.md`'s evidence-basis (●/◐/○) and severity
 grading structure is adapted from the methodology in
 [AccessLint/skills](https://github.com/AccessLint/skills) (MIT licensed), which
 grades findings from a live-DOM audit. The grade *definitions* here are rewritten

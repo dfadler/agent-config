@@ -63,7 +63,7 @@ places, and nothing enforces that they stay in sync:
       [`claude/conventions/cite-platform-claims.md`](../claude/conventions/cite-platform-claims.md)
       — don't copy it from a similar prior entry.
 - [ ] If the install is fetch-and-execute (`curl | sh`, `npx <pkg>@latest`), say so
-      and point at the `fetch-execute-guide:fetch-execute-guide` skill, as the
+      and point at the `fetch-execute-guide` skill, as the
       `rtk-ai/rtk` entry does; the advisory check must never run it.
 
 ### Why skills here don't declare `allowed-tools`
@@ -163,6 +163,7 @@ Behavioral tests for a skill live in `plugins/<name>/evals/<case>/case.yaml` (or
 Code 2.1.269+; real model calls, so they cost money; each case runs with and without
 the plugin so `Δ` shows what the skill adds). Only `fetch-execute-guide` has cases
 today (`fetch-execute-asks-first` and `fetch-execute-runs-with-permission`); results land in the gitignored `evals/results/`.
+`fetch-execute-guide` keeps its plugin wrapper (with `SKILL.md` at the plugin root) because bare skills have no eval path.
 `plugins/gha-ci-audit/evals/evals.json` is the separate skill-creator format, which
 `claude plugin eval` does not read. Docs: [plugin evals](https://code.claude.com/docs/en/plugin-evals);
 background in [#387](https://github.com/dfadler/agent-config/issues/387).

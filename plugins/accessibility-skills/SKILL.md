@@ -1,5 +1,5 @@
 ---
-name: a11y-review
+name: accessibility-skills
 description: |
   Static, dependency-free WCAG 2.2 code review for web markup (HTML, JSX, Vue,
   Svelte, Astro) and CSS. Checks source against the a11yproject.com checklist
@@ -21,7 +21,7 @@ metadata:
 
 Adapted from [The A11Y Project](https://www.a11yproject.com/checklist/) (checklist
 content, Apache-2.0) and [AccessLint](https://github.com/AccessLint/skills)
-(evidence-basis/severity grading approach, MIT). See `../../NOTICE.md` for
+(evidence-basis/severity grading approach, MIT). See `NOTICE.md` for
 provenance.
 
 This skill locates and grades; it doesn't fix (hand findings to the user or a

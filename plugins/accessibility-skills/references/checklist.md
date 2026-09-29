@@ -1,7 +1,7 @@
 # WCAG 2.2 checklist (source material)
 
 Adapted from [The A11Y Project's checklist](https://www.a11yproject.com/checklist/)
-(Apache License 2.0). See `../../../NOTICE.md` for provenance. Each item maps to a
+(Apache License 2.0). See `../NOTICE.md` for provenance. Each item maps to a
 WCAG 2.2 success criterion (SC) — cite the SC number in findings, not just the
 checklist wording.
 

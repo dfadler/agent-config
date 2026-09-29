@@ -83,7 +83,7 @@ third-party package over the network on every `setup.sh` run. The same reasoning
 applies to an agent running the `skills add`/`npx skills@latest` command above on the
 user's behalf: it's a fetch-and-execute install, not an ordinary dependency change, so
 it needs explicit, per-run permission — see the
-`fetch-execute-guide:fetch-execute-guide` skill.
+`fetch-execute-guide` skill.
 
 An earlier version of this section vendored these two skills into their own plugin
 here instead of referencing them — reverted (#211's review) once it turned out `skills
@@ -267,7 +267,7 @@ Prefer the Homebrew tap or a pre-built binary from
 [GitHub Releases](https://github.com/rtk-ai/rtk/releases) over RTK's own
 `curl | sh` one-liner — piping a remote script into a shell is a fetch-and-execute
 install and needs the explicit, per-run permission the
-`fetch-execute-guide:fetch-execute-guide` skill describes, the same as any other
+`fetch-execute-guide` skill describes, the same as any other
 `curl | sh`/`npx <pkg>@latest` command. That gate applies whether a human runs it
 themselves or asks an agent to.
 
