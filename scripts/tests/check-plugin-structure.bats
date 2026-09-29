@@ -58,6 +58,19 @@ EOF
   assert_output_contains "does not match plugin directory 'demo'"
 }
 
+@test "passes on a single-skill plugin with a root SKILL.md" {
+  printf -- '---\nname: demo\ndescription: A root skill.\n---\nBody\n' >"$ROOT/plugins/demo/SKILL.md"
+  check
+  assert_success
+}
+
+@test "fails when a root SKILL.md name does not match the plugin directory" {
+  printf -- '---\nname: other\ndescription: A root skill.\n---\nBody\n' >"$ROOT/plugins/demo/SKILL.md"
+  check
+  assert_failure
+  assert_output_contains "does not match plugin directory 'demo'"
+}
+
 @test "fails when a skill directory has no SKILL.md" {
   mkdir -p "$ROOT/plugins/demo/skills/empty-skill"
   check

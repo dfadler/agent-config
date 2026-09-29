@@ -4,7 +4,7 @@ This review has no browser and no rule engine — it reads source only. That bou
 what any finding can honestly claim. The evidence-basis/severity split below is
 adapted from [AccessLint](https://github.com/AccessLint/skills)'s methodology (MIT)
 for a live-DOM audit; the grade definitions here are rewritten for what source
-inspection alone can and can't support. See `../../../NOTICE.md`.
+inspection alone can and can't support. See `../NOTICE.md`.
 
 The stance: this review augments a real check, it doesn't replace one. A finding
 here is a starting point for a scanner (axe-core, Lighthouse) and human/AT testing,

@@ -72,7 +72,7 @@ nothing to confirm.
   workflow waiting for it to end — `ps`, a bounded `top -b -n 1`/single
   `htop` snapshot (not an interactive, unbounded session), `pgrep`. Route a
   genuinely interactive `top`/`htop`/`journalctl -f` session through
-  `detached-terminal:detached-terminal` instead of treating it as Tier 1.
+  `detached-terminal` instead of treating it as Tier 1.
 - **Package queries**: `apt list|search|show`, `apt-cache policy`,
   `apt update` (refreshes the package index only — installs/upgrades
   nothing), `dnf list|info|repoquery`, `dnf check-update`, `dpkg -l|-s`,
@@ -117,7 +117,7 @@ same as any other "Explicit permission required" action.
   targeted case above.
 - **Fetch-and-execute installs** (`curl <url> | sh`, `curl <url> | sudo
   bash`, an install script piped straight into a shell): governed by the
-  `fetch-execute-guide:fetch-execute-guide` skill, not this skill's
+  `fetch-execute-guide` skill, not this skill's
   own tiering — that skill's per-run, exact-command permission gate applies
   here unchanged, so this is Tier 2 (confirmation-required), not Tier 3.
   Root/sudo context (`curl <url> | sudo bash`) raises the stakes further:

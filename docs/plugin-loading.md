@@ -7,9 +7,12 @@ contains a `plugin.json` file into `~/.claude/skills/<name>`, and the plugin loa
 straight out of this working copy. Edits here are live in the next session; there's
 nothing to commit, push, or update first.
 
-This repo currently ships ten plugins under `plugins/`:
-`accessibility-skills`, `detached-terminal`, `dfadler-agent-config`, `fetch-execute-guide`, `gh-attach-image`,
-`gha-ci-audit`, `pr-visual-capture`, `typescript-gotchas`, `vite`, and `worktree-core`.
+This repo currently ships eleven plugins under `plugins/`:
+`accessibility-skills`, `detached-terminal`, `dfadler-agent-config`, `fetch-execute-guide`,
+`gh-attach-image`, `gha-ci-audit`, `screen-capture`, `second-brain`, `typescript-gotchas`,
+`vite`, and `worktree-core`. Five single-skill plugins (`accessibility-skills`,
+`detached-terminal`, `fetch-execute-guide`, `gh-attach-image`, `typescript-gotchas`) keep
+`SKILL.md` at the plugin root and load under a bare name.
 Each gets its own `~/.claude/skills/<name>` link and loads under its own namespace.
 The sections below use `dfadler-agent-config` as the concrete example; the mechanics
 apply identically to every plugin in the list.

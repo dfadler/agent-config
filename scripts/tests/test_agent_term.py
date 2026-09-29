@@ -30,15 +30,7 @@ import pytest
 Runner = Callable[..., "subprocess.CompletedProcess[str]"]
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
-SCRIPT = (
-    REPO_ROOT
-    / "plugins"
-    / "detached-terminal"
-    / "skills"
-    / "detached-terminal"
-    / "scripts"
-    / "agent_term.py"
-)
+SCRIPT = REPO_ROOT / "plugins" / "detached-terminal" / "scripts" / "agent_term.py"
 
 
 def _load_module() -> Any:

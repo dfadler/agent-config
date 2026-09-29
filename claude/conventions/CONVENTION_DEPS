@@ -13,4 +13,4 @@
 focus-stealing.md:dfadler-agent-config|detached-terminal
 vite-plugin.md:vite
 git-worktree-usage.md:dfadler-agent-config|worktree-core
-visual-verification.md:dfadler-agent-config|pr-visual-capture
+visual-verification.md:screen-capture

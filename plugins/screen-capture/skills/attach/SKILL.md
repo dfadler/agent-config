@@ -2,11 +2,11 @@
 name: attach
 description: |
   Attach already-captured screenshot/video artefacts (e.g. from
-  pr-visual-capture) to a destination, routed by a `--target` flag. This
+  screen-capture:capture) to a destination, routed by a `--target` flag. This
   skill owns destination-specific formatting — for `--target=github` (the
   only implemented target), that means the before/after PR comment table and
   video embed — and delegates the raw upload mechanics to
-  `gh-attach-image:gh-attach-image`. Use this whenever a task needs captured
+  `gh-attach-image`. Use this whenever a task needs captured
   visual artefacts posted somewhere, rather than re-deriving the comment
   layout or the upload call by hand each time.
 license: MIT
@@ -54,7 +54,7 @@ or silently no-op.
 ### `--target=github` (v1 — implemented)
 
 1. **Upload.** Delegate the raw file upload to
-   `gh-attach-image:gh-attach-image` (its `scripts/upload.sh`) — this skill
+   `gh-attach-image` (its `scripts/upload.sh`) — this skill
    never re-derives the `uploads.github.com` call itself. Upload every
    supplied file (`--before`, `--after`, `--video`) in one `upload.sh`
    invocation so the returned URLs are ready before formatting.
@@ -82,11 +82,10 @@ or silently no-op.
 3. **Post.** Save the formatted section the same way `gh-attach-image`
    documents: `gh pr edit --body-file` / `gh issue edit --body-file` (default),
    or `gh pr comment` / `gh issue comment` (`--comment`). This is also what
-   "claims" the uploaded assets — see `gh-attach-image:gh-attach-image`'s
+   "claims" the uploaded assets — see `gh-attach-image`'s
    SKILL.md for why an unsaved upload URL 404s.
 4. **Verify.** `curl -sI -L <url>` each attached URL and confirm `200`, not
-   `404`, after saving — same verification step `gh-attach-image` and
-   `pr-visual-capture` both call out.
+   `404`, after saving — same verification step `gh-attach-image` calls out.
 
 ### `--target=jira` (not implemented)
 
