@@ -140,6 +140,29 @@ make_worktree_sandbox() {
   make_git_sandbox
   mkdir -p "$REPO/.claude/worktrees"
   _install_gh_pr_shim
+  # A tracked file for the marker-revert fixtures (see the merged-marker-*
+  # add_worktree states below) — matches the real shape (a project's own
+  # tracked file some tool regenerates a block into), not a modeling
+  # shortcut. Harmless for every other test, which never references it.
+  echo "static content" >"$REPO/regenerated.md"
+  git -C "$REPO" add regenerated.md
+  git -C "$REPO" commit -q -m "add regenerated.md"
+  git -C "$REPO" push -q origin main
+}
+
+# configure_cruft_marker <path> <begin_marker> <end_marker> — writes
+# $REPO/.claude/settings.json with a single-entry worktree.autoPruneCruftMarkers
+# config. The script reads this from the MAIN checkout ($REPO here),
+# regardless of which worktree under it is being classified — see
+# read_cruft_markers's own header. endMarker is required by the real config
+# schema (see the script's own header comment on why) — this helper takes it
+# as a required argument too, deliberately, rather than defaulting it.
+configure_cruft_marker() {
+  local path="$1" begin_marker="$2" end_marker="$3"
+  mkdir -p "$REPO/.claude"
+  jq -n --arg path "$path" --arg begin "$begin_marker" --arg end "$end_marker" \
+    '{worktree: {autoPruneCruftMarkers: [{path: $path, beginMarker: $begin, endMarker: $end}]}}' \
+    >"$REPO/.claude/settings.json"
 }
 
 _install_gh_pr_shim() {
@@ -193,7 +216,39 @@ _mark_merged() {
 # `claude/competent-fermi-33e7a1`).
 #   merged-clean     pushed (upstream, 0 unpushed) + clean + in merged list  -> REMOVE
 #   merged-dirty     merged + pushed but has an uncommitted change           -> keep
-#   merged-unpushed  merged + clean but no upstream (unpushed)               -> keep
+#   merged-unpushed  merged + clean but no upstream, HEAD has a commit not on
+#                    main (unpushed, unique content)                        -> keep
+#   merged-no-upstream-clean  merged, no upstream, but HEAD IS main's tip (no
+#                    unique content) — the ancestor-of-main fallback         -> REMOVE
+#   merged-marker-block  merged + pushed, the configured marker file's only
+#                    diff is the exact marker-delimited block               -> REMOVE
+#                    (after the block is reverted; requires
+#                    configure_cruft_marker to have been called first)
+#   merged-marker-file-deleted  merged + pushed, the marker file removed
+#                    entirely                                               -> keep
+#                    (a deletion is a diff from HEAD, not "no diff")
+#   merged-marker-block-real-edit  merged + pushed, the marker file has a
+#                    real edit mixed in alongside the block                 -> keep
+#                    (left alone entirely, never reverted)
+#   merged-marker-block-edit-in-separator  the exact block, but the required
+#                    blank line right before the begin marker is replaced by
+#                    a real edit instead — HEAD's own content is otherwise
+#                    untouched, so a prefix-length-only check can't see it   -> keep
+#                    (this is the actual exploit: a naive predicate that
+#                    only compares head -n (begin_line-2) against HEAD never
+#                    looks at line (begin_line-1) at all)
+#   merged-marker-block-then-real-edit  the exact block, but with a real
+#                    note appended AFTER the closing marker                 -> keep
+#                    (the whole-file revert must not discard it)
+#   merged-marker-block-and-dirty  the exact block, but ALSO an unrelated
+#                    dirty file                                             -> keep
+#                    (the marker file must be left alone too — reverting it
+#                    while the worktree is still kept would silently
+#                    discard part of its dirty state)
+#   merged-marker-block-no-upstream  the exact block, but no upstream AND a
+#                    real unique commit                                     -> keep
+#                    (same invariant: not being removed, so the marker file
+#                    must not be touched either)
 #   unmerged         clean + pushed but NOT in the merged list               -> keep
 #   locked           merged + clean + pushed but git-locked                  -> keep
 #   current          merged + clean + pushed (run the script from here)      -> keep
@@ -222,6 +277,105 @@ add_worktree() {
       ;;
     merged-unpushed)
       # Never pushed: no @{u}, so the script's upstream check reports unpushed.
+      git -C "$path" commit -q --allow-empty -m "local only"
+      _mark_merged "$branch" "$(git -C "$path" rev-parse HEAD)"
+      ;;
+    merged-no-upstream-clean)
+      # Never pushed either, but no commit was ever added — HEAD is exactly
+      # main's tip, so the is-ancestor-of-main fallback must clear it.
+      _mark_merged "$branch" "$(git -C "$path" rev-parse HEAD)"
+      ;;
+    merged-marker-block)
+      git -C "$path" push -q -u origin "$branch"
+      {
+        echo ""
+        echo "<!-- BEGIN:test-marker -->"
+        echo "some regenerated text"
+        echo "<!-- END:test-marker -->"
+      } >>"$path/regenerated.md"
+      _mark_merged "$branch" "$(git -C "$path" rev-parse HEAD)"
+      ;;
+    merged-marker-file-deleted)
+      # The marker file removed from the worktree entirely — a deletion IS a
+      # diff from HEAD, not "no diff"; must never be mistaken for the
+      # vacuous "file doesn't exist on either side" case.
+      git -C "$path" push -q -u origin "$branch"
+      rm "$path/regenerated.md"
+      _mark_merged "$branch" "$(git -C "$path" rev-parse HEAD)"
+      ;;
+    merged-marker-block-staged)
+      # Same exact block, but `git add`ed before the script ever runs — a
+      # plain `git diff --quiet` (no HEAD) would wrongly see this as already
+      # clean (working tree matches the index); catches that regression.
+      git -C "$path" push -q -u origin "$branch"
+      {
+        echo ""
+        echo "<!-- BEGIN:test-marker -->"
+        echo "some regenerated text"
+        echo "<!-- END:test-marker -->"
+      } >>"$path/regenerated.md"
+      git -C "$path" add regenerated.md
+      _mark_merged "$branch" "$(git -C "$path" rev-parse HEAD)"
+      ;;
+    merged-marker-block-real-edit)
+      git -C "$path" push -q -u origin "$branch"
+      {
+        echo "a real edit, not just the regenerated block"
+        echo ""
+        echo "<!-- BEGIN:test-marker -->"
+        echo "some regenerated text"
+        echo "<!-- END:test-marker -->"
+      } >>"$path/regenerated.md"
+      _mark_merged "$branch" "$(git -C "$path" rev-parse HEAD)"
+      ;;
+    merged-marker-block-edit-in-separator)
+      # No blank line at all — the line right before the begin marker is a
+      # real edit instead. HEAD is exactly "static content" (1 line), and
+      # this file's line 1 is also exactly "static content", unchanged; the
+      # only difference from the safe merged-marker-block fixture is that
+      # line 2 (which should be blank) carries real text.
+      git -C "$path" push -q -u origin "$branch"
+      {
+        echo "a real edit hiding on the separator line"
+        echo "<!-- BEGIN:test-marker -->"
+        echo "some regenerated text"
+        echo "<!-- END:test-marker -->"
+      } >>"$path/regenerated.md"
+      _mark_merged "$branch" "$(git -C "$path" rev-parse HEAD)"
+      ;;
+    merged-marker-block-then-real-edit)
+      # A real note appended AFTER the closing marker — the block sits at
+      # the bottom of the file, so this is a very natural place for a user
+      # to add content. The predicate must not mistake this for "only the
+      # block": the whole-file revert would silently destroy it too.
+      git -C "$path" push -q -u origin "$branch"
+      {
+        echo ""
+        echo "<!-- BEGIN:test-marker -->"
+        echo "some regenerated text"
+        echo "<!-- END:test-marker -->"
+        echo "my real followup note"
+      } >>"$path/regenerated.md"
+      _mark_merged "$branch" "$(git -C "$path" rev-parse HEAD)"
+      ;;
+    merged-marker-block-and-dirty)
+      git -C "$path" push -q -u origin "$branch"
+      {
+        echo ""
+        echo "<!-- BEGIN:test-marker -->"
+        echo "some regenerated text"
+        echo "<!-- END:test-marker -->"
+      } >>"$path/regenerated.md"
+      echo "uncommitted" >"$path/scratch.txt"
+      _mark_merged "$branch" "$(git -C "$path" rev-parse HEAD)"
+      ;;
+    merged-marker-block-no-upstream)
+      {
+        echo ""
+        echo "<!-- BEGIN:test-marker -->"
+        echo "some regenerated text"
+        echo "<!-- END:test-marker -->"
+      } >>"$path/regenerated.md"
       git -C "$path" commit -q --allow-empty -m "local only"
       _mark_merged "$branch" "$(git -C "$path" rev-parse HEAD)"
       ;;
@@ -264,12 +418,59 @@ delete_origin_branch() {
   git -C "$ORIGIN" update-ref -d "refs/heads/$branch"
 }
 
+# add_orphaned_dir <name> [populate] — creates .claude/worktrees/<name> as a
+# plain directory that git's own worktree list knows nothing about, simulating
+# a worktree-creation call that made the directory but never completed
+# `git worktree add` (real-world wreckage, not a modeling shortcut). The
+# directory's mtime is "now" — pair with age_dir below to simulate one old
+# enough for the sweep to consider. populate=populate drops a real file
+# inside it; populate=symlink drops a (dangling) symlink instead — both must
+# make the sweep leave it alone, for different reasons (real content vs. an
+# entry type `find -type f` doesn't match). Prints the directory path.
+add_orphaned_dir() {
+  local name="$1" populate="${2:-}"
+  local d="$REPO/.claude/worktrees/$name"
+  mkdir -p "$d/.claude"
+  case "$populate" in
+    populate) echo "real content" >"$d/some-file.txt" ;;
+    symlink) ln -s /nonexistent-target "$d/node_modules" ;;
+  esac
+  printf '%s' "$d"
+}
+
+# age_dir <path> <seconds-ago> — backdates a directory's mtime so the
+# orphan-sweep's grace-period check treats it as old enough to consider.
+# `touch -t` accepts the same [[CC]YY]MMDDhhmm[.SS] format on both BSD
+# (macOS) and GNU touch, so no fallback branch is needed there — only `date`
+# itself differs (BSD `-v-Ns`, GNU `-d "-N seconds"`).
+age_dir() {
+  local d="$1" seconds_ago="$2" ts
+  ts="$(date -v-"${seconds_ago}"S +%Y%m%d%H%M.%S 2>/dev/null || date -d "-${seconds_ago} seconds" +%Y%m%d%H%M.%S)"
+  touch -t "$ts" "$d"
+}
+
 # prune <cwd> [args...] — run the real prune-merged-worktrees.sh from <cwd>.
 prune() {
   local cwd="$1"
   shift
   local script="$REPO_ROOT/plugins/worktree-core/skills/git-worktree-usage/scripts/prune-merged-worktrees.sh"
   (cd "$cwd" && bash "$script" "$@")
+}
+
+# marker_block_bounds FILE BEGIN END — call the real, pure marker_block_bounds
+# function directly against a plain file, with none of the git/worktree/gh
+# machinery the rest of prune-merged-worktrees.sh needs. Sourcing the whole
+# script isn't an option (its top-level code calls `exit`, which would exit
+# the test process too) — sed extracts just this one function's own text
+# (its `}` closes at column 0, same as every top-level function in this
+# script, so the range is unambiguous) and evals it in an isolated `bash -c`.
+# This is the actual point of extracting the function in the first place:
+# it's now testable with plain temp files, not the full add_worktree harness.
+marker_block_bounds() {
+  local script="$REPO_ROOT/plugins/worktree-core/skills/git-worktree-usage/scripts/prune-merged-worktrees.sh"
+  local fn_src
+  fn_src="$(sed -n '/^marker_block_bounds() {/,/^}/p' "$script")"
+  bash -c "$fn_src"$'\n''marker_block_bounds "$@"' _ "$@"
 }
 
 # A fake python3 placed ahead of PATH in its own bin, so a test can suppress or

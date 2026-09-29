@@ -540,6 +540,431 @@ teardown() {
   assert_output_contains "No Claude worktrees found"
 }
 
+# --- no-upstream-but-already-on-main fallback --------------------------------
+# A worktree branch is often never individually pushed — the branch a PR
+# actually merged from can be a different name entirely. `is_merged` already
+# confirmed via `gh` that SOME branch under this name merged at this exact
+# commit; if this branch's HEAD is also already an ancestor of main, it has
+# no unique content either way, upstream or not.
+
+@test "reports REMOVE for a merged worktree with no upstream whose HEAD is already on main (dry run)" {
+  add_worktree done merged-no-upstream-clean >/dev/null
+
+  run prune "$REPO"
+
+  assert_success
+  assert_output_contains "REMOVE"
+  refute_output_contains "unpushed commits"
+}
+
+@test "--yes removes a merged worktree with no upstream whose HEAD is already on main" {
+  local wt="$REPO/.claude/worktrees/done"
+  add_worktree done merged-no-upstream-clean >/dev/null
+
+  run prune "$REPO" --yes
+
+  assert_success
+  assert_output_contains "Removing"
+  [ ! -d "$wt" ]
+}
+
+@test "keeps a merged worktree with no upstream and a real unpushed commit" {
+  local wt="$REPO/.claude/worktrees/done"
+  add_worktree done merged-unpushed >/dev/null
+
+  run prune "$REPO" --yes
+
+  assert_success
+  refute_output_contains "Removing $wt"
+  [ -d "$wt" ]
+}
+
+# --- marker_block_bounds (pure, unit-level) ----------------------------------
+# Direct tests against the extracted pure predicate, via the marker_block_bounds
+# helper in helpers.bash — plain temp files, no git/worktree/gh at all. This
+# is the actual point of extracting it out of file_diff_is_only_marker_block:
+# every edge case below used to need the full add_worktree integration
+# fixture to exercise; now it's a 3-argument function call against a file.
+
+@test "marker_block_bounds: finds a well-formed block and prints begin/end lines" {
+  local f="$SANDBOX/f.txt"
+  printf 'one\ntwo\nBEGIN\nthree\nEND\n' >"$f"
+  run marker_block_bounds "$f" BEGIN END
+  assert_success
+  [ "$output" = "$(printf '3\t5')" ]
+}
+
+@test "marker_block_bounds: fails when the begin marker is absent" {
+  local f="$SANDBOX/f.txt"
+  printf 'one\ntwo\nEND\n' >"$f"
+  run marker_block_bounds "$f" BEGIN END
+  [ "$status" -ne 0 ]
+  [ -z "$output" ]
+}
+
+@test "marker_block_bounds: fails on an unclosed block (begin present, no end)" {
+  local f="$SANDBOX/f.txt"
+  printf 'one\nBEGIN\ntwo\n' >"$f"
+  run marker_block_bounds "$f" BEGIN END
+  [ "$status" -ne 0 ]
+  [ -z "$output" ]
+}
+
+@test "marker_block_bounds: fails when the end marker's only occurrence is before the begin marker" {
+  # Guards against a coincidental earlier occurrence computing a nonsensical
+  # negative-length span.
+  local f="$SANDBOX/f.txt"
+  printf 'END\none\nBEGIN\ntwo\n' >"$f"
+  run marker_block_bounds "$f" BEGIN END
+  [ "$status" -ne 0 ]
+  [ -z "$output" ]
+}
+
+@test "marker_block_bounds: uses the LAST end marker at or after the begin marker" {
+  local f="$SANDBOX/f.txt"
+  printf 'BEGIN\none\nEND\ntwo\nEND\n' >"$f"
+  run marker_block_bounds "$f" BEGIN END
+  assert_success
+  [ "$output" = "$(printf '1\t5')" ]
+}
+
+# --- config-driven cruft-marker revert ---------------------------------------
+# A project may declare, in its own .claude/settings.json, a tracked file
+# whose diff is safe to revert before the clean check IFF the entire diff is
+# exactly an appended marker-delimited block (see the script's own header).
+# The revert only ever fires once every OTHER REMOVE condition already holds —
+# reverting first and classifying after would mutate a worktree the script
+# ends up keeping for an unrelated reason.
+
+@test "with no marker configured, a marker-shaped diff is just an ordinary dirty file" {
+  add_worktree done merged-marker-block >/dev/null
+
+  run prune "$REPO"
+
+  assert_success
+  assert_output_contains "uncommitted changes"
+  refute_output_contains "REMOVE"
+}
+
+@test "a dry run correctly previews a marker-only diff as REMOVE, without reverting it" {
+  # Regression test: classify_worktree is apply-blind by construction, so a
+  # dry run must agree with what --yes would actually do — this worktree's
+  # only diff is the configured marker block, which is safe to revert, so
+  # dry run must report REMOVE too. It must NOT actually mutate anything
+  # (no --yes/--auto was passed): the marker file on disk stays untouched
+  # and the worktree directory stays in place either way.
+  configure_cruft_marker regenerated.md "<!-- BEGIN:test-marker -->" "<!-- END:test-marker -->"
+  local wt="$REPO/.claude/worktrees/done"
+  add_worktree done merged-marker-block >/dev/null
+
+  run prune "$REPO"
+
+  assert_success
+  assert_output_contains "REMOVE"
+  refute_output_contains "uncommitted changes"
+  grep -q "BEGIN:test-marker" "$wt/regenerated.md"
+  [ -d "$wt" ]
+}
+
+@test "--yes never removes a merged worktree whose marker file was deleted" {
+  # A deletion IS a diff from HEAD, not "no diff" — must not be mistaken for
+  # the vacuous "no file on either side" case the predicate also returns
+  # true for.
+  configure_cruft_marker regenerated.md "<!-- BEGIN:test-marker -->" "<!-- END:test-marker -->"
+  local wt="$REPO/.claude/worktrees/done"
+  add_worktree done merged-marker-file-deleted >/dev/null
+
+  run prune "$REPO" --yes
+
+  assert_success
+  assert_output_contains "uncommitted changes"
+  refute_output_contains "Removing $wt"
+  [ -d "$wt" ]
+  [ ! -f "$wt/regenerated.md" ]
+}
+
+@test "--auto never removes a merged worktree whose marker file was deleted" {
+  configure_cruft_marker regenerated.md "<!-- BEGIN:test-marker -->" "<!-- END:test-marker -->"
+  local wt="$REPO/.claude/worktrees/done"
+  add_worktree done merged-marker-file-deleted >/dev/null
+
+  run prune "$REPO" --auto
+
+  assert_success
+  refute_output_contains "Removed"
+  [ -d "$wt" ]
+}
+
+@test "--yes reverts an exact marker block and removes the worktree" {
+  configure_cruft_marker regenerated.md "<!-- BEGIN:test-marker -->" "<!-- END:test-marker -->"
+  local wt="$REPO/.claude/worktrees/done"
+  add_worktree done merged-marker-block >/dev/null
+
+  run prune "$REPO" --yes
+
+  assert_success
+  assert_output_contains "Removing"
+  [ ! -d "$wt" ]
+}
+
+@test "--yes reverts an exact marker block even when it's staged" {
+  # A plain `git diff --quiet` (no HEAD) compares the working tree to the
+  # INDEX, so a staged-but-uncommitted block would short-circuit as "clean"
+  # without the HEAD-explicit fix — this proves the block still gets
+  # detected and actually reverted (index AND working tree) when staged.
+  configure_cruft_marker regenerated.md "<!-- BEGIN:test-marker -->" "<!-- END:test-marker -->"
+  local wt="$REPO/.claude/worktrees/done"
+  add_worktree done merged-marker-block-staged >/dev/null
+
+  run prune "$REPO" --yes
+
+  assert_success
+  assert_output_contains "Removing"
+  [ ! -d "$wt" ]
+}
+
+@test "--auto reverts an exact marker block and removes the worktree" {
+  configure_cruft_marker regenerated.md "<!-- BEGIN:test-marker -->" "<!-- END:test-marker -->"
+  local wt="$REPO/.claude/worktrees/done"
+  add_worktree done merged-marker-block >/dev/null
+
+  run prune "$REPO" --auto
+
+  assert_success
+  assert_output_contains "Removed 1 merged worktree(s)"
+  [ ! -d "$wt" ]
+}
+
+@test "--yes leaves a real edit in the marker file alone and keeps the worktree" {
+  configure_cruft_marker regenerated.md "<!-- BEGIN:test-marker -->" "<!-- END:test-marker -->"
+  local wt="$REPO/.claude/worktrees/done"
+  add_worktree done merged-marker-block-real-edit >/dev/null
+
+  run prune "$REPO" --yes
+
+  assert_success
+  refute_output_contains "Removing $wt"
+  [ -d "$wt" ]
+  grep -q "a real edit, not just the regenerated block" "$wt/regenerated.md"
+}
+
+@test "--yes never reverts a real edit hiding on the required blank separator line" {
+  # The actual exploit a naive prefix-length check misses: HEAD's own
+  # content is completely untouched, but the line that's supposed to be a
+  # blank separator right before the begin marker carries a real edit
+  # instead. A predicate that only compares `head -n (begin_line-2)`
+  # against HEAD never looks at that line at all, so it can't tell "the
+  # separator is blank" from "the separator has an edit in it" — this must
+  # be caught and the worktree kept.
+  configure_cruft_marker regenerated.md "<!-- BEGIN:test-marker -->" "<!-- END:test-marker -->"
+  local wt="$REPO/.claude/worktrees/done"
+  add_worktree done merged-marker-block-edit-in-separator >/dev/null
+
+  run prune "$REPO" --yes
+
+  assert_success
+  refute_output_contains "Removing $wt"
+  [ -d "$wt" ]
+  grep -q "a real edit hiding on the separator line" "$wt/regenerated.md"
+}
+
+@test "--auto never reverts a real edit hiding on the required blank separator line" {
+  configure_cruft_marker regenerated.md "<!-- BEGIN:test-marker -->" "<!-- END:test-marker -->"
+  local wt="$REPO/.claude/worktrees/done"
+  add_worktree done merged-marker-block-edit-in-separator >/dev/null
+
+  run prune "$REPO" --auto
+
+  assert_success
+  refute_output_contains "Removed"
+  [ -d "$wt" ]
+  grep -q "a real edit hiding on the separator line" "$wt/regenerated.md"
+}
+
+@test "--yes never discards a real note appended after the closing marker, and keeps the worktree" {
+  configure_cruft_marker regenerated.md "<!-- BEGIN:test-marker -->" "<!-- END:test-marker -->"
+  local wt="$REPO/.claude/worktrees/done"
+  add_worktree done merged-marker-block-then-real-edit >/dev/null
+
+  run prune "$REPO" --yes
+
+  assert_success
+  refute_output_contains "Removing $wt"
+  [ -d "$wt" ]
+  grep -q "my real followup note" "$wt/regenerated.md"
+}
+
+@test "--auto never discards a real note appended after the closing marker, and keeps the worktree" {
+  configure_cruft_marker regenerated.md "<!-- BEGIN:test-marker -->" "<!-- END:test-marker -->"
+  local wt="$REPO/.claude/worktrees/done"
+  add_worktree done merged-marker-block-then-real-edit >/dev/null
+
+  run prune "$REPO" --auto
+
+  assert_success
+  refute_output_contains "Removed"
+  [ -d "$wt" ]
+  grep -q "my real followup note" "$wt/regenerated.md"
+}
+
+@test "a marker entry missing endMarker is silently ignored, not applied" {
+  # endMarker is required by the real schema — an entry that omits it must
+  # never fall back to "everything from beginMarker to EOF is the block".
+  mkdir -p "$REPO/.claude"
+  jq -n '{worktree: {autoPruneCruftMarkers: [{path: "regenerated.md", beginMarker: "<!-- BEGIN:test-marker -->"}]}}' \
+    >"$REPO/.claude/settings.json"
+  local wt="$REPO/.claude/worktrees/done"
+  add_worktree done merged-marker-block >/dev/null
+
+  run prune "$REPO" --yes
+
+  assert_success
+  refute_output_contains "Removing $wt"
+  [ -d "$wt" ]
+  grep -q "BEGIN:test-marker" "$wt/regenerated.md"
+}
+
+@test "--yes never reverts the marker file when another file is also dirty, and keeps the worktree" {
+  configure_cruft_marker regenerated.md "<!-- BEGIN:test-marker -->" "<!-- END:test-marker -->"
+  local wt="$REPO/.claude/worktrees/done"
+  add_worktree done merged-marker-block-and-dirty >/dev/null
+
+  run prune "$REPO" --yes
+
+  assert_success
+  refute_output_contains "Removing $wt"
+  [ -d "$wt" ]
+  grep -q "BEGIN:test-marker" "$wt/regenerated.md"
+}
+
+@test "--auto never reverts the marker file when another file is also dirty, and keeps the worktree" {
+  configure_cruft_marker regenerated.md "<!-- BEGIN:test-marker -->" "<!-- END:test-marker -->"
+  local wt="$REPO/.claude/worktrees/done"
+  add_worktree done merged-marker-block-and-dirty >/dev/null
+
+  run prune "$REPO" --auto
+
+  assert_success
+  refute_output_contains "Removed"
+  [ -d "$wt" ]
+  grep -q "BEGIN:test-marker" "$wt/regenerated.md"
+}
+
+@test "--yes never reverts the marker file when the branch has an unpushed commit, and keeps the worktree" {
+  configure_cruft_marker regenerated.md "<!-- BEGIN:test-marker -->" "<!-- END:test-marker -->"
+  local wt="$REPO/.claude/worktrees/done"
+  add_worktree done merged-marker-block-no-upstream >/dev/null
+
+  run prune "$REPO" --yes
+
+  assert_success
+  refute_output_contains "Removing $wt"
+  [ -d "$wt" ]
+  grep -q "BEGIN:test-marker" "$wt/regenerated.md"
+}
+
+# --- orphaned-directory sweep ------------------------------------------------
+# A directory under .claude/worktrees/ that git's own worktree list doesn't
+# know about at all — e.g. a worktree-creation call that mkdir'd it but never
+# finished `git worktree add`. Distinct failure mode from a merged-but-kept
+# worktree; swept only when it's both old enough (past the grace period, so a
+# concurrent session's still-in-progress worktree-creation call is never
+# caught by an unlucky-timing SessionStart sweep) and holds no file or
+# symlink anywhere in its tree, and only under --yes/--auto. Every "should be
+# swept" fixture below is explicitly aged past ORPHAN_GRACE_SECONDS; a fresh
+# one is covered separately by the grace-period tests.
+
+@test "a dry run reports an orphaned empty directory but never removes it" {
+  local d
+  d="$(add_orphaned_dir stray)"
+  age_dir "$d" 700
+
+  run prune "$REPO"
+
+  assert_success
+  [ -d "$d" ]
+}
+
+@test "--yes removes an empty orphaned directory git doesn't know about" {
+  local d
+  d="$(add_orphaned_dir stray)"
+  age_dir "$d" 700
+
+  run prune "$REPO" --yes
+
+  assert_success
+  assert_output_contains "not a registered worktree"
+  [ ! -d "$d" ]
+}
+
+@test "--auto removes an empty orphaned directory git doesn't know about" {
+  local d
+  d="$(add_orphaned_dir stray)"
+  age_dir "$d" 700
+
+  run prune "$REPO" --auto
+
+  assert_success
+  assert_output_contains "orphaned worktree director"
+  [ ! -d "$d" ]
+}
+
+@test "--yes leaves a non-empty orphaned directory alone" {
+  local d
+  d="$(add_orphaned_dir stray populate)"
+  age_dir "$d" 700
+
+  run prune "$REPO" --yes
+
+  assert_success
+  [ -d "$d" ]
+  [ -f "$d/some-file.txt" ]
+}
+
+@test "--yes never sweeps a directory younger than the grace period, even if empty" {
+  local d
+  d="$(add_orphaned_dir stray)"
+  # No age_dir call: this directory is as fresh as one a concurrent
+  # session's own worktree-creation call could still be in the middle of.
+
+  run prune "$REPO" --yes
+
+  assert_success
+  [ -d "$d" ]
+}
+
+@test "--auto never sweeps a directory younger than the grace period, even if empty" {
+  local d
+  d="$(add_orphaned_dir stray)"
+
+  run prune "$REPO" --auto
+
+  assert_success
+  refute_output_contains "orphaned worktree director"
+  [ -d "$d" ]
+}
+
+@test "--yes never sweeps an old directory containing only a symlink" {
+  local d
+  d="$(add_orphaned_dir stray symlink)"
+  age_dir "$d" 700
+
+  run prune "$REPO" --yes
+
+  assert_success
+  [ -d "$d" ]
+  [ -L "$d/node_modules" ]
+}
+
+@test "--yes never sweeps a directory that IS a real (kept) worktree" {
+  add_worktree wip unmerged >/dev/null
+
+  run prune "$REPO" --yes
+
+  assert_success
+  [ -d "$REPO/.claude/worktrees/wip" ]
+}
+
 # --- hermeticity guard ------------------------------------------------------
 
 @test "the sandbox blocks real network tools" {

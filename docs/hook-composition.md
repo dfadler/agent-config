@@ -76,6 +76,18 @@ act" mode (its `--hook` flag) is reached via the env var's or settings'
 unset entirely (which skips the prune script altogether — see that hook's
 own header for why "unconfigured" and "off" are different outcomes there).
 
+`prune-merged-worktrees-hook.sh` also reads one settings.json key that isn't
+an on/off signal at all and so isn't in the table above:
+`worktree.autoPruneCruftMarkers`, an array of `{"path", "beginMarker",
+"endMarker"}` entries naming tracked files some tool regenerates a
+marker-delimited block into (see the prune script's own header and
+`SKILL.md` for the full mechanism). `endMarker` is required — an entry
+missing it is silently ignored rather than falling back to "everything from
+`beginMarker` to EOF." It's read via `read_cruft_markers` directly, not
+`resolve_enable_mode` — there's no on/off state to resolve, only "which
+files, if any." Empty/absent by default, and inert unless `autoPrune` is
+also on.
+
 ### Turning a hook on per project via settings.json
 
 ```json
@@ -83,6 +95,13 @@ own header for why "unconfigured" and "off" are different outcomes there).
   "worktree": {
     "enforce": "block",
     "autoPrune": true,
+    "autoPruneCruftMarkers": [
+      {
+        "path": "CLAUDE.md",
+        "beginMarker": "<!-- BEGIN:some-marker -->",
+        "endMarker": "<!-- END:some-marker -->"
+      }
+    ],
     "symlinkCheck": "on"
   }
 }
