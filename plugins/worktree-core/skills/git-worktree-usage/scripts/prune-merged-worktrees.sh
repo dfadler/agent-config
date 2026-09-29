@@ -57,8 +57,14 @@ set -uo pipefail
 # is exactly an appended marker-delimited block (some tooling — e.g. `next
 # dev` — regenerates such a block on every run):
 #   { "worktree": { "autoPruneCruftMarkers": [
-#     { "path": "CLAUDE.md", "beginMarker": "<!-- BEGIN:some-marker -->" }
+#     { "path": "CLAUDE.md", "beginMarker": "<!-- BEGIN:some-marker -->",
+#       "endMarker": "<!-- END:some-marker -->" }
 #   ] } }
+# endMarker is required, not optional: an entry missing it is silently
+# ignored (a no-op, not an error) rather than falling back to "everything
+# from beginMarker to EOF is the block" — that fallback couldn't tell real
+# content appended after the true end of the block apart from the block
+# itself, and the revert discards the whole file, not just a region.
 # The revert only ever fires once every OTHER condition for REMOVE already
 # holds (everything else clean, the branch carries no unique content) — never
 # on a worktree that's being kept for an unrelated reason. Any other
@@ -202,38 +208,71 @@ _pushed_or_already_on_main() {
 # whichever worktree the script happens to be invoked from, and not the
 # CANDIDATE worktree being classified, either of which could be sitting on an
 # old branch that predates the config, or simply differ from the policy the
-# project currently wants applied uniformly. Emits "path<TAB>beginMarker"
-# lines; empty (no markers) when jq is missing, the file is absent, or the
-# key is unset — this whole mechanism is a no-op for every project that
-# hasn't opted in.
+# project currently wants applied uniformly. Emits "path<TAB>beginMarker<TAB>
+# endMarker" lines; empty (no markers) when jq is missing, the file is
+# absent, the key is unset, or an entry omits endMarker (see
+# file_diff_is_only_marker_block for why that field is required, not
+# optional) — this whole mechanism is a no-op for every project that hasn't
+# opted in.
 read_cruft_markers() {
   local settings="$repo_root/.claude/settings.json"
   command -v jq >/dev/null 2>&1 || return 0
   [ -f "$settings" ] || return 0
-  jq -r '.worktree.autoPruneCruftMarkers // [] | .[] | [.path, .beginMarker] | @tsv' \
+  jq -r '.worktree.autoPruneCruftMarkers // [] | .[] | select(.endMarker != null and .endMarker != "") | [.path, .beginMarker, .endMarker] | @tsv' \
     "$settings" 2>/dev/null
 }
 cruft_markers="$(read_cruft_markers)"
 
 # True (no mutation) when a configured tracked file has no diff from HEAD at
 # all, or its ENTIRE diff is exactly the appended marker-delimited block —
-# the marker line, plus the one blank line it's always appended after. False
-# for any other difference anywhere in the file (a real edit mixed in), so
-# genuine work is never mistaken for cruft. A pure predicate — callers decide
-# whether reverting is actually safe (see flush()) BEFORE calling
-# revert_cruft_markers.
+# from the begin marker's own line through the end marker's own line, plus
+# the one blank line the block is always appended after. False for any other
+# difference anywhere in the file, BEFORE the block (a real edit mixed in)
+# OR AFTER it (real content appended past the closing marker — a very
+# natural place to add a note, since the block sits at the bottom of the
+# file), so genuine work is never mistaken for cruft. Checking only the
+# prefix before the begin marker isn't enough on its own: the caller's
+# revert discards the ENTIRE file back to HEAD, so anything genuine sitting
+# after the end marker would be silently destroyed right along with the
+# block unless this predicate also confirms nothing real follows it — which
+# is why endMarker is a required part of the config, not optional: without
+# a defined end boundary there's no way to tell "just the block" from "the
+# block, plus more". A pure predicate — callers decide whether reverting is
+# actually safe (see flush()) BEFORE calling revert_cruft_markers.
+#
+# The prefix check below does two things a naive `head -n | string-compare`
+# can't: it independently confirms the line immediately before the begin
+# marker is the single blank separator (not just trusting "whatever's there
+# must be the separator"), and it confirms HEAD's own line count via `git
+# show | wc -l` rather than only a string comparison. Without the first
+# check, a real edit could hide in exactly that slot — sitting past
+# HEAD's own last line, before the begin marker, invisible to the
+# prefix/HEAD comparison since that comparison never looks at that one line
+# at all. Without the second, command substitution stripping ALL trailing
+# newlines from both sides of the string comparison could mask a
+# HEAD-ends-in-blank-line(s) vs. prefix-missing-them mismatch that a pure
+# string compare wouldn't catch on its own.
 file_diff_is_only_marker_block() {
-  local path="$1" rel_file="$2" marker="$3" marker_line stripped head_version
-  [ -f "$path/$rel_file" ] || return 0
+  local path="$1" rel_file="$2" begin_marker="$3" end_marker="$4"
+  local file begin_line end_line stripped trailing head_version head_line_count
+  file="$path/$rel_file"
+  [ -f "$file" ] || return 0
   # Compares against HEAD explicitly, not a bare `diff --quiet` (which only
   # compares the working tree to the INDEX): a staged-but-uncommitted change
   # would otherwise short-circuit here as "no diff", misreporting a real
   # diff from HEAD as clean.
   git -C "$path" diff --quiet HEAD -- "$rel_file" 2>/dev/null && return 0
-  marker_line="$(grep -Fn -- "$marker" "$path/$rel_file" | head -1 | cut -d: -f1)"
-  [ -n "$marker_line" ] || return 1
+  begin_line="$(grep -Fn -- "$begin_marker" "$file" | head -1 | cut -d: -f1)"
+  [ -n "$begin_line" ] && [ "$begin_line" -ge 2 ] || return 1
+  end_line="$(grep -Fn -- "$end_marker" "$file" | tail -1 | cut -d: -f1)"
+  [ -n "$end_line" ] || return 1
+  trailing="$(tail -n +"$((end_line + 1))" "$file")"
+  [ -z "$trailing" ] || return 1
+  [ -z "$(sed -n "$((begin_line - 1))p" "$file")" ] || return 1
   head_version="$(git -C "$path" show "HEAD:$rel_file" 2>/dev/null)" || return 1
-  stripped="$(head -n "$((marker_line - 2))" "$path/$rel_file")"
+  head_line_count="$(git -C "$path" show "HEAD:$rel_file" 2>/dev/null | wc -l | tr -d ' ')"
+  [ "$head_line_count" = "$((begin_line - 2))" ] || return 1
+  stripped="$(head -n "$((begin_line - 2))" "$file")"
   [ "$stripped" = "$head_version" ]
 }
 
@@ -241,10 +280,10 @@ file_diff_is_only_marker_block() {
 # file_diff_is_only_marker_block. Vacuously true when no markers are
 # configured — the mechanism is then simply inert.
 all_cruft_markers_safe() {
-  local path="$1" rel_file marker
-  while IFS=$'\t' read -r rel_file marker; do
+  local path="$1" rel_file begin_marker end_marker
+  while IFS=$'\t' read -r rel_file begin_marker end_marker; do
     [ -n "$rel_file" ] || continue
-    file_diff_is_only_marker_block "$path" "$rel_file" "$marker" || return 1
+    file_diff_is_only_marker_block "$path" "$rel_file" "$begin_marker" "$end_marker" || return 1
   done <<<"$cruft_markers"
   return 0
 }
@@ -255,8 +294,8 @@ all_cruft_markers_safe() {
 # it when a file has nothing to revert is a no-op, but it does NOT know
 # whether the worktree as a whole is otherwise clean.
 revert_cruft_markers() {
-  local path="$1" rel_file marker
-  while IFS=$'\t' read -r rel_file marker; do
+  local path="$1" rel_file begin_marker end_marker
+  while IFS=$'\t' read -r rel_file begin_marker end_marker; do
     [ -n "$rel_file" ] || continue
     [ -f "$path/$rel_file" ] || continue
     git -C "$path" diff --quiet HEAD -- "$rel_file" 2>/dev/null && continue
@@ -273,7 +312,7 @@ revert_cruft_markers() {
 # anything ELSE need to stay dirty" status check — built once since
 # cruft_markers doesn't change during a run.
 cruft_marker_exclude_pathspecs=()
-while IFS=$'\t' read -r _cm_path _cm_marker; do
+while IFS=$'\t' read -r _cm_path _cm_begin _cm_end; do
   [ -n "$_cm_path" ] && cruft_marker_exclude_pathspecs+=(":!$_cm_path")
 done <<<"$cruft_markers"
 
@@ -314,7 +353,7 @@ flush() {
   elif ! is_merged "$branch" "$(git -C "$path" rev-parse HEAD 2>/dev/null)"; then
     report_lines+=("keep    $name — no merged PR for $branch")
   elif $apply &&
-    [ -z "$(git -C "$path" status --porcelain -- . "${cruft_marker_exclude_pathspecs[@]}" 2>/dev/null)" ] &&
+    [ -z "$(git -C "$path" status --porcelain -- . "${cruft_marker_exclude_pathspecs[@]+"${cruft_marker_exclude_pathspecs[@]}"}" 2>/dev/null)" ] &&
     all_cruft_markers_safe "$path" &&
     _pushed_or_already_on_main "$path"; then
     # Every other condition for REMOVE already holds with the configured

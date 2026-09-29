@@ -150,15 +150,18 @@ make_worktree_sandbox() {
   git -C "$REPO" push -q origin main
 }
 
-# configure_cruft_marker <path> <marker> — writes $REPO/.claude/settings.json
-# with a single-entry worktree.autoPruneCruftMarkers config. The script reads
-# this from the MAIN checkout ($REPO here), regardless of which worktree
-# under it is being classified — see read_cruft_markers's own header.
+# configure_cruft_marker <path> <begin_marker> <end_marker> — writes
+# $REPO/.claude/settings.json with a single-entry worktree.autoPruneCruftMarkers
+# config. The script reads this from the MAIN checkout ($REPO here),
+# regardless of which worktree under it is being classified — see
+# read_cruft_markers's own header. endMarker is required by the real config
+# schema (see the script's own header comment on why) — this helper takes it
+# as a required argument too, deliberately, rather than defaulting it.
 configure_cruft_marker() {
-  local path="$1" marker="$2"
+  local path="$1" begin_marker="$2" end_marker="$3"
   mkdir -p "$REPO/.claude"
-  jq -n --arg path "$path" --arg marker "$marker" \
-    '{worktree: {autoPruneCruftMarkers: [{path: $path, beginMarker: $marker}]}}' \
+  jq -n --arg path "$path" --arg begin "$begin_marker" --arg end "$end_marker" \
+    '{worktree: {autoPruneCruftMarkers: [{path: $path, beginMarker: $begin, endMarker: $end}]}}' \
     >"$REPO/.claude/settings.json"
 }
 
@@ -224,6 +227,16 @@ _mark_merged() {
 #   merged-marker-block-real-edit  merged + pushed, the marker file has a
 #                    real edit mixed in alongside the block                 -> keep
 #                    (left alone entirely, never reverted)
+#   merged-marker-block-edit-in-separator  the exact block, but the required
+#                    blank line right before the begin marker is replaced by
+#                    a real edit instead — HEAD's own content is otherwise
+#                    untouched, so a prefix-length-only check can't see it   -> keep
+#                    (this is the actual exploit: a naive predicate that
+#                    only compares head -n (begin_line-2) against HEAD never
+#                    looks at line (begin_line-1) at all)
+#   merged-marker-block-then-real-edit  the exact block, but with a real
+#                    note appended AFTER the closing marker                 -> keep
+#                    (the whole-file revert must not discard it)
 #   merged-marker-block-and-dirty  the exact block, but ALSO an unrelated
 #                    dirty file                                             -> keep
 #                    (the marker file must be left alone too — reverting it
@@ -275,6 +288,7 @@ add_worktree() {
         echo ""
         echo "<!-- BEGIN:test-marker -->"
         echo "some regenerated text"
+        echo "<!-- END:test-marker -->"
       } >>"$path/regenerated.md"
       _mark_merged "$branch" "$(git -C "$path" rev-parse HEAD)"
       ;;
@@ -287,6 +301,7 @@ add_worktree() {
         echo ""
         echo "<!-- BEGIN:test-marker -->"
         echo "some regenerated text"
+        echo "<!-- END:test-marker -->"
       } >>"$path/regenerated.md"
       git -C "$path" add regenerated.md
       _mark_merged "$branch" "$(git -C "$path" rev-parse HEAD)"
@@ -298,6 +313,37 @@ add_worktree() {
         echo ""
         echo "<!-- BEGIN:test-marker -->"
         echo "some regenerated text"
+        echo "<!-- END:test-marker -->"
+      } >>"$path/regenerated.md"
+      _mark_merged "$branch" "$(git -C "$path" rev-parse HEAD)"
+      ;;
+    merged-marker-block-edit-in-separator)
+      # No blank line at all — the line right before the begin marker is a
+      # real edit instead. HEAD is exactly "static content" (1 line), and
+      # this file's line 1 is also exactly "static content", unchanged; the
+      # only difference from the safe merged-marker-block fixture is that
+      # line 2 (which should be blank) carries real text.
+      git -C "$path" push -q -u origin "$branch"
+      {
+        echo "a real edit hiding on the separator line"
+        echo "<!-- BEGIN:test-marker -->"
+        echo "some regenerated text"
+        echo "<!-- END:test-marker -->"
+      } >>"$path/regenerated.md"
+      _mark_merged "$branch" "$(git -C "$path" rev-parse HEAD)"
+      ;;
+    merged-marker-block-then-real-edit)
+      # A real note appended AFTER the closing marker — the block sits at
+      # the bottom of the file, so this is a very natural place for a user
+      # to add content. The predicate must not mistake this for "only the
+      # block": the whole-file revert would silently destroy it too.
+      git -C "$path" push -q -u origin "$branch"
+      {
+        echo ""
+        echo "<!-- BEGIN:test-marker -->"
+        echo "some regenerated text"
+        echo "<!-- END:test-marker -->"
+        echo "my real followup note"
       } >>"$path/regenerated.md"
       _mark_merged "$branch" "$(git -C "$path" rev-parse HEAD)"
       ;;
@@ -307,6 +353,7 @@ add_worktree() {
         echo ""
         echo "<!-- BEGIN:test-marker -->"
         echo "some regenerated text"
+        echo "<!-- END:test-marker -->"
       } >>"$path/regenerated.md"
       echo "uncommitted" >"$path/scratch.txt"
       _mark_merged "$branch" "$(git -C "$path" rev-parse HEAD)"
@@ -316,6 +363,7 @@ add_worktree() {
         echo ""
         echo "<!-- BEGIN:test-marker -->"
         echo "some regenerated text"
+        echo "<!-- END:test-marker -->"
       } >>"$path/regenerated.md"
       git -C "$path" commit -q --allow-empty -m "local only"
       _mark_merged "$branch" "$(git -C "$path" rev-parse HEAD)"

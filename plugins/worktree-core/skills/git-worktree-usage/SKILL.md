@@ -153,17 +153,27 @@ session — both catch their own errors and always exit 0.
 
   A project may additionally declare `worktree.autoPruneCruftMarkers` in its
   own `.claude/settings.json` — an array of `{"path": "...", "beginMarker":
-  "..."}` entries naming tracked files some tool regenerates a
-  marker-delimited block into on every run (e.g. `next dev` re-appending its
-  own instructions block into a project's `CLAUDE.md`). When a configured
-  file's ENTIRE diff from `HEAD` is exactly that appended block (the marker
-  line onward, plus the one blank line it's always appended after), the
-  script reverts it before the clean check — but only once every other
-  REMOVE condition already holds for that worktree; any other difference
-  anywhere in the file (a real edit mixed in) leaves it untouched, and a
-  worktree kept for an unrelated reason (another dirty file, an unpushed
-  commit) never has a configured file touched either. Empty/absent by
-  default — inert for every project that hasn't opted in.
+  "...", "endMarker": "..."}` entries naming tracked files some tool
+  regenerates a marker-delimited block into on every run (e.g. `next dev`
+  re-appending its own instructions block into a project's `CLAUDE.md`).
+  `endMarker` is required, not optional: an entry missing it is silently
+  ignored rather than falling back to "everything from `beginMarker` to EOF
+  is the block" — that fallback couldn't tell real content appended after
+  the block apart from the block itself. When a configured file's ENTIRE
+  diff from `HEAD` is exactly that appended block — from the begin marker's
+  own line through the end marker's own line, plus the one blank separator
+  line it's always appended after, and nothing after the end marker — the
+  script reverts it before the clean check. The check independently
+  confirms the separator line is actually blank (not just trusting that
+  whatever's there must be it) and that `HEAD`'s own line count matches
+  exactly, so a real edit can't hide in that one line the way a naive
+  prefix-length comparison alone would miss. This only fires once every
+  other REMOVE condition already holds for that worktree; any other
+  difference anywhere in the file (a real edit mixed in, or real content
+  appended after the end marker) leaves it untouched, and a worktree kept
+  for an unrelated reason (another dirty file, an unpushed commit) never has
+  a configured file touched either. Empty/absent by default — inert for
+  every project that hasn't opted in.
 
 - **`require-worktree-hook.sh`** is a `PreToolUse` hook that enforces an
   edit policy when the current working directory is the main git checkout

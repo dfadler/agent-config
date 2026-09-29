@@ -598,7 +598,7 @@ teardown() {
 }
 
 @test "a dry run reports the marker block as uncommitted and never reverts it" {
-  configure_cruft_marker regenerated.md "<!-- BEGIN:test-marker -->"
+  configure_cruft_marker regenerated.md "<!-- BEGIN:test-marker -->" "<!-- END:test-marker -->"
   local wt="$REPO/.claude/worktrees/done"
   add_worktree done merged-marker-block >/dev/null
 
@@ -611,7 +611,7 @@ teardown() {
 }
 
 @test "--yes reverts an exact marker block and removes the worktree" {
-  configure_cruft_marker regenerated.md "<!-- BEGIN:test-marker -->"
+  configure_cruft_marker regenerated.md "<!-- BEGIN:test-marker -->" "<!-- END:test-marker -->"
   local wt="$REPO/.claude/worktrees/done"
   add_worktree done merged-marker-block >/dev/null
 
@@ -627,7 +627,7 @@ teardown() {
   # INDEX, so a staged-but-uncommitted block would short-circuit as "clean"
   # without the HEAD-explicit fix — this proves the block still gets
   # detected and actually reverted (index AND working tree) when staged.
-  configure_cruft_marker regenerated.md "<!-- BEGIN:test-marker -->"
+  configure_cruft_marker regenerated.md "<!-- BEGIN:test-marker -->" "<!-- END:test-marker -->"
   local wt="$REPO/.claude/worktrees/done"
   add_worktree done merged-marker-block-staged >/dev/null
 
@@ -639,7 +639,7 @@ teardown() {
 }
 
 @test "--auto reverts an exact marker block and removes the worktree" {
-  configure_cruft_marker regenerated.md "<!-- BEGIN:test-marker -->"
+  configure_cruft_marker regenerated.md "<!-- BEGIN:test-marker -->" "<!-- END:test-marker -->"
   local wt="$REPO/.claude/worktrees/done"
   add_worktree done merged-marker-block >/dev/null
 
@@ -651,7 +651,7 @@ teardown() {
 }
 
 @test "--yes leaves a real edit in the marker file alone and keeps the worktree" {
-  configure_cruft_marker regenerated.md "<!-- BEGIN:test-marker -->"
+  configure_cruft_marker regenerated.md "<!-- BEGIN:test-marker -->" "<!-- END:test-marker -->"
   local wt="$REPO/.claude/worktrees/done"
   add_worktree done merged-marker-block-real-edit >/dev/null
 
@@ -663,8 +663,84 @@ teardown() {
   grep -q "a real edit, not just the regenerated block" "$wt/regenerated.md"
 }
 
+@test "--yes never reverts a real edit hiding on the required blank separator line" {
+  # The actual exploit a naive prefix-length check misses: HEAD's own
+  # content is completely untouched, but the line that's supposed to be a
+  # blank separator right before the begin marker carries a real edit
+  # instead. A predicate that only compares `head -n (begin_line-2)`
+  # against HEAD never looks at that line at all, so it can't tell "the
+  # separator is blank" from "the separator has an edit in it" — this must
+  # be caught and the worktree kept.
+  configure_cruft_marker regenerated.md "<!-- BEGIN:test-marker -->" "<!-- END:test-marker -->"
+  local wt="$REPO/.claude/worktrees/done"
+  add_worktree done merged-marker-block-edit-in-separator >/dev/null
+
+  run prune "$REPO" --yes
+
+  assert_success
+  refute_output_contains "Removing $wt"
+  [ -d "$wt" ]
+  grep -q "a real edit hiding on the separator line" "$wt/regenerated.md"
+}
+
+@test "--auto never reverts a real edit hiding on the required blank separator line" {
+  configure_cruft_marker regenerated.md "<!-- BEGIN:test-marker -->" "<!-- END:test-marker -->"
+  local wt="$REPO/.claude/worktrees/done"
+  add_worktree done merged-marker-block-edit-in-separator >/dev/null
+
+  run prune "$REPO" --auto
+
+  assert_success
+  refute_output_contains "Removed"
+  [ -d "$wt" ]
+  grep -q "a real edit hiding on the separator line" "$wt/regenerated.md"
+}
+
+@test "--yes never discards a real note appended after the closing marker, and keeps the worktree" {
+  configure_cruft_marker regenerated.md "<!-- BEGIN:test-marker -->" "<!-- END:test-marker -->"
+  local wt="$REPO/.claude/worktrees/done"
+  add_worktree done merged-marker-block-then-real-edit >/dev/null
+
+  run prune "$REPO" --yes
+
+  assert_success
+  refute_output_contains "Removing $wt"
+  [ -d "$wt" ]
+  grep -q "my real followup note" "$wt/regenerated.md"
+}
+
+@test "--auto never discards a real note appended after the closing marker, and keeps the worktree" {
+  configure_cruft_marker regenerated.md "<!-- BEGIN:test-marker -->" "<!-- END:test-marker -->"
+  local wt="$REPO/.claude/worktrees/done"
+  add_worktree done merged-marker-block-then-real-edit >/dev/null
+
+  run prune "$REPO" --auto
+
+  assert_success
+  refute_output_contains "Removed"
+  [ -d "$wt" ]
+  grep -q "my real followup note" "$wt/regenerated.md"
+}
+
+@test "a marker entry missing endMarker is silently ignored, not applied" {
+  # endMarker is required by the real schema — an entry that omits it must
+  # never fall back to "everything from beginMarker to EOF is the block".
+  mkdir -p "$REPO/.claude"
+  jq -n '{worktree: {autoPruneCruftMarkers: [{path: "regenerated.md", beginMarker: "<!-- BEGIN:test-marker -->"}]}}' \
+    >"$REPO/.claude/settings.json"
+  local wt="$REPO/.claude/worktrees/done"
+  add_worktree done merged-marker-block >/dev/null
+
+  run prune "$REPO" --yes
+
+  assert_success
+  refute_output_contains "Removing $wt"
+  [ -d "$wt" ]
+  grep -q "BEGIN:test-marker" "$wt/regenerated.md"
+}
+
 @test "--yes never reverts the marker file when another file is also dirty, and keeps the worktree" {
-  configure_cruft_marker regenerated.md "<!-- BEGIN:test-marker -->"
+  configure_cruft_marker regenerated.md "<!-- BEGIN:test-marker -->" "<!-- END:test-marker -->"
   local wt="$REPO/.claude/worktrees/done"
   add_worktree done merged-marker-block-and-dirty >/dev/null
 
@@ -677,7 +753,7 @@ teardown() {
 }
 
 @test "--auto never reverts the marker file when another file is also dirty, and keeps the worktree" {
-  configure_cruft_marker regenerated.md "<!-- BEGIN:test-marker -->"
+  configure_cruft_marker regenerated.md "<!-- BEGIN:test-marker -->" "<!-- END:test-marker -->"
   local wt="$REPO/.claude/worktrees/done"
   add_worktree done merged-marker-block-and-dirty >/dev/null
 
@@ -690,7 +766,7 @@ teardown() {
 }
 
 @test "--yes never reverts the marker file when the branch has an unpushed commit, and keeps the worktree" {
-  configure_cruft_marker regenerated.md "<!-- BEGIN:test-marker -->"
+  configure_cruft_marker regenerated.md "<!-- BEGIN:test-marker -->" "<!-- END:test-marker -->"
   local wt="$REPO/.claude/worktrees/done"
   add_worktree done merged-marker-block-no-upstream >/dev/null
 
