@@ -37,6 +37,36 @@ that prefix, from back when they were linked in individually and shared a flat n
 with every project's own skills; inside a namespaced plugin it only produced
 `generic-tools:dfadler-agent-config-pr-babysit`, saying the same thing twice.
 
+## Single-skill plugins: bare skill vs. plugin
+
+A plugin isn't required for one skill. Claude Code loads a skill straight from
+`~/.claude/skills/<name>/SKILL.md` (personal), `.claude/skills/<name>/SKILL.md`
+(project, committed), or `--add-dir`'s `.claude/skills/`, symlinks included, with no
+manifest ([Skills: choose where skills load](https://code.claude.com/docs/en/skills);
+[Plugins: do you need one](https://code.claude.com/docs/en/plugins#decide-whether-you-need-a-plugin)).
+Pick by what the skill needs:
+
+| Need | Bare skill | Plugin |
+|---|---|---|
+| Name | `/name`, no prefix; collides with same-named personal/project skills (enterprise > personal > project) | `/plugin:skill`; doesn't collide with bare skill names (two enabled plugins with the same manifest name still resolve by source precedence) |
+| Extras (agents, hooks, MCP) | No | Yes |
+| Install / update / disable / version | Copy or symlink by hand | `claude plugin list/disable`, marketplace updates |
+| `claude plugin validate` | Not applicable | Yes |
+| Share with others | Commit to `.claude/skills/` (repo-scoped only) | Marketplace; project scope via `.claude/settings.json` (each collaborator still installs it) |
+
+Recommended pattern here: a single-skill plugin that only lives on this machine can
+stay a plugin (it gets `claude plugin details`/`validate`), but put `SKILL.md` at the
+plugin root instead of under `skills/` so it loads as `name`, not `name:name` (see
+above). Use a plain bare skill for a throwaway or project-only skill. Agents and
+hooks can sit alongside a root `SKILL.md`; use the `skills/` layout and its namespace
+only for additional skills.
+
+Platform gap: none found. A bare skill just has no namespace, validate, or
+marketplace path; that is the intended trade, not a missing feature. The
+root-`SKILL.md` plugin behavior above is observed here, not something the docs state
+outright, so recheck it after Claude Code upgrades. Detail in
+[#389](https://github.com/dfadler/agent-config/issues/389).
+
 Sharing the plugin with another machine or person would need a
 `.claude-plugin/marketplace.json` at the repo root; that isn't here yet, and adding it
 later wouldn't change how this machine loads the plugin.
