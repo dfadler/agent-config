@@ -46,6 +46,7 @@ Full reasoning for each verdict, plus the duplication check and follow-up list:
 | `git-worktree-usage.md` | Opt-in include |
 | `tooling-over-manual-scanning.md` | Opt-in include |
 | `why-question-shape.md` | Opt-in include |
+| `prefer-real-chrome.md` | Opt-in include (advisory; the deny rule it names is the enforced form) |
 | `visual-verification.md` | Merge into skill |
 | `concurrency.md` | Merge into skill |
 | `shell-script-hygiene.md` | Convert to skill |
