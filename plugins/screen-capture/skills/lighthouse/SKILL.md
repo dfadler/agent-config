@@ -19,12 +19,11 @@ metadata:
 Runs `npx lighthouse` for one or both form factors and stores the JSON
 results in second-brain so scores are queryable/comparable across runs
 instead of living only in a PR comment or a throwaway temp file. The CLI
-invocations here are adapted from `pr-visual-capture`'s Lighthouse section;
-this skill adds config-driven form-factor selection and vault storage on
+invocations here are the standard Lighthouse CLI form; this skill adds config-driven form-factor selection and vault storage on
 top of the same underlying commands.
 
 This is a scripted CLI pass, not a substitute for the manual resize-and-look
-pass in `screen-capture:capture` (or the legacy `pr-visual-capture` skill) —
+pass in `screen-capture:capture` —
 Lighthouse scores performance/accessibility/best-practices but won't catch
 overflow, clipping, or dead-space layout bugs the way actually resizing a
 live page does.
@@ -112,8 +111,7 @@ knowledge/lighthouse/agent-config/2026-09-25T143022-mobile.json
 knowledge/lighthouse/agent-config/2026-09-25T143022-desktop.json
 ```
 
-This mirrors `pr-visual-capture`'s flat `lighthouse-mobile.json` /
-`lighthouse-desktop.json` naming, just namespaced by project and timestamped
+Files are named per form factor and namespaced by project and timestamped
 so repeated runs accumulate in the vault instead of overwriting each other.
 
 ## No second-brain available

@@ -165,7 +165,7 @@ COVERAGE_PY_JSON := $(COVERAGE_PY_DIR)/py-coverage.json
 # and #181's web-research injection-hardening section pushed it further to
 # 505; 520 was that measurement plus the same style of headroom. #191's
 # audit moved duplicated mechanics out to the skills that already owned them
-# (visual-verification capture steps to pr-visual-capture, the CI-checks
+# (visual-verification capture steps to screen-capture, the CI-checks
 # escalation order to pr-checks, and PR-review-comment classification to
 # pr-comments — CLAUDE.md keeps only the policy/pointer), pulling it back
 # down to 460, and the repo-wide git-stash-hazard bullet pushed it back up

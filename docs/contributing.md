@@ -93,9 +93,9 @@ skills:
 - **Legitimately broad skills** (`pr-babysit`) read, edit, run `gh`, push, and rerun
   CI as its actual job. A "minimal" list for it would just restate "most tools,"
   adding a maintenance burden with no corresponding safety gain.
-- **Narrow skills** (`gh-attach-image`, `pr-visual-capture`) could carry an accurate
-  short list, but accuracy for two skills isn't worth an inconsistent, partially-
-  fictional convention across the other three.
+- **Narrow skills** (`gh-attach-image`) could carry an accurate
+  short list, but accuracy for one skill isn't worth an inconsistent, partially-
+  fictional convention across the other skills.
 
 The real boundary is the one this repo's global `CLAUDE.md` and every session already
 operate under: Claude Code's permission rules, hooks, and the active permission mode

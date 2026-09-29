@@ -2,7 +2,7 @@
 name: attach
 description: |
   Attach already-captured screenshot/video artefacts (e.g. from
-  pr-visual-capture) to a destination, routed by a `--target` flag. This
+  screen-capture:capture) to a destination, routed by a `--target` flag. This
   skill owns destination-specific formatting — for `--target=github` (the
   only implemented target), that means the before/after PR comment table and
   video embed — and delegates the raw upload mechanics to
@@ -85,8 +85,7 @@ or silently no-op.
    "claims" the uploaded assets — see `gh-attach-image:gh-attach-image`'s
    SKILL.md for why an unsaved upload URL 404s.
 4. **Verify.** `curl -sI -L <url>` each attached URL and confirm `200`, not
-   `404`, after saving — same verification step `gh-attach-image` and
-   `pr-visual-capture` both call out.
+   `404`, after saving — same verification step `gh-attach-image` calls out.
 
 ### `--target=jira` (not implemented)
 

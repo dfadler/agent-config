@@ -22,8 +22,8 @@ This is the *mechanics* skill for producing the file. It has no opinion on
 what the caller does with it afterwards (attach to a PR, embed in a doc,
 etc.) — for the PR/issue-attachment workflow specifically (before/after
 tables, GitHub upload, responsive/Lighthouse passes), see
-`pr-visual-capture:pr-visual-capture`, which this skill's Chrome+CDP path is
-adapted from.
+`screen-capture:compare`, `screen-capture:attach`, and
+`screen-capture:lighthouse`.
 
 ## Config resolution
 
@@ -121,9 +121,8 @@ names the file with an internal UUID, not something you choose up front.
 
 Use this engine when `engine` resolves to `chrome-cdp` — e.g. a machine
 without Playwright's browser binaries available, or a project that already
-standardizes on system Chrome. Mechanics below are adapted from
-`pr-visual-capture:pr-visual-capture`; see that skill for the full detail this
-condenses (auth-gated routes, cropping, Lighthouse/responsive passes).
+standardizes on system Chrome. Mechanics below are a condensed
+recipe; for Lighthouse/responsive passes see `screen-capture:lighthouse`.
 
 **macOS-only paths below** (`/Applications/Google Chrome.app/...`); on Linux
 substitute `google-chrome`/`chromium`.
@@ -186,9 +185,8 @@ producing a blank image — drive Chrome over CDP instead (Node's built-in
 8. **Teardown, unconditionally, including on a failure path:**
    `kill "$chrome_pid"; rm -rf "$profile_dir"`.
 
-Full CDP envelope details, auth-gated-route handling, and the
-`--remote-allow-origins` fallback are in `pr-visual-capture:pr-visual-capture`
-— reuse that recipe rather than re-deriving it.
+If Chrome rejects the CDP websocket connection, retry with the
+`--remote-allow-origins=*` fallback flag.
 
 ### `output_type: video` (either Chrome path)
 

@@ -33,9 +33,9 @@ automatically, with no per-project copy to keep in sync.
     user-attachments endpoint so they render inline in PR/issue bodies.
   - `gha-ci-audit/` — audit GitHub Actions usage for any repository: workflow
     volumes, critical-path analysis, cost/performance improvement opportunities.
-  - `pr-visual-capture/` — produce screenshot (PNG) and walkthrough video (MP4)
-    files for PR/issue visual verification using headless Chrome and CDP. Requires
-    `gh-attach-image` to upload results.
+  - `screen-capture/` — screenshot (PNG) and walkthrough video (MP4) capture,
+    before/after comparison, Lighthouse, and attach skills for PR/issue visual
+    verification. Uses `gh-attach-image` to upload results.
   - `worktree-core/` — `git-worktree-usage` skill plus hooks that enforce worktree
     isolation and auto-prune merged worktrees.
 - `docs/` — reference material for this repo's own tooling and CI.
