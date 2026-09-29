@@ -121,7 +121,7 @@ rule to `~/.claude/settings.json` that pre-approves exactly that pinned command,
 agent session doesn't have to stop and ask. It's an exact-string match tied to one specific
 version and checksum — not a blanket `curl *` allow — and it only *allowlists* the command;
 it doesn't run the installer itself. This is the reference example the
-`dfadler-agent-config:fetch-execute-guide` skill points to for when a standing,
+`fetch-execute-guide:fetch-execute-guide` skill points to for when a standing,
 already-approved rule like this one is allowed to skip the ask-every-time default: the user
 approved this exact pinned command once, visibly, through this y/n prompt — a broad or
 wildcard rule never gets the same treatment. The prompt is skipped cleanly (no hang) when there's no

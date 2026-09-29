@@ -117,7 +117,7 @@ same as any other "Explicit permission required" action.
   targeted case above.
 - **Fetch-and-execute installs** (`curl <url> | sh`, `curl <url> | sudo
   bash`, an install script piped straight into a shell): governed by the
-  `dfadler-agent-config:fetch-execute-guide` skill, not this skill's
+  `fetch-execute-guide:fetch-execute-guide` skill, not this skill's
   own tiering — that skill's per-run, exact-command permission gate applies
   here unchanged, so this is Tier 2 (confirmation-required), not Tier 3.
   Root/sudo context (`curl <url> | sudo bash`) raises the stakes further:

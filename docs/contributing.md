@@ -63,7 +63,7 @@ places, and nothing enforces that they stay in sync:
       [`claude/conventions/cite-platform-claims.md`](../claude/conventions/cite-platform-claims.md)
       — don't copy it from a similar prior entry.
 - [ ] If the install is fetch-and-execute (`curl | sh`, `npx <pkg>@latest`), say so
-      and point at the `dfadler-agent-config:fetch-execute-guide` skill, as the
+      and point at the `fetch-execute-guide:fetch-execute-guide` skill, as the
       `rtk-ai/rtk` entry does; the advisory check must never run it.
 
 ### Why skills here don't declare `allowed-tools`
