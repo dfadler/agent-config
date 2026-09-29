@@ -28,7 +28,7 @@ SHELL := /usr/bin/env bash
 SH_FIND := find scripts plugins setup.sh teardown.sh doctor.sh -type f -name '*.sh' -print0
 
 # Python sources: the skill's implementation plus its tests.
-PY_SOURCES := plugins/detached-terminal/skills/detached-terminal/scripts/agent_term.py \
+PY_SOURCES := plugins/detached-terminal/scripts/agent_term.py \
               scripts/tests/test_agent_term.py \
               plugins/dfadler-agent-config/skills/url-to-audio/scripts/chunk_text.py \
               scripts/tests/test_chunk_text.py \

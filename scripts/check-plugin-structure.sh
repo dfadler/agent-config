@@ -18,6 +18,8 @@
 #     plugin directory.
 #   * every skills/*/SKILL.md has delimited frontmatter carrying `name` and a
 #     non-empty `description`, and `name` matches the skill directory.
+#   * a root-level SKILL.md (single-skill plugin, loads as bare `<plugin>`) has
+#     the same frontmatter, with `name` matching the plugin directory.
 #   * every agents/*.md has the same, with `name` matching the filename.
 #   * every *.sh or *.py shipped under a skill's scripts/ is executable — one that
 #     documents `scripts/foo.sh` is useless if the mode bit didn't survive.
@@ -311,6 +313,14 @@ for plugin_dir in "${plugins[@]}"; do
       [[ -x "$script" ]] || fail "$script: not executable (chmod +x)"
     done
   done
+
+  if [[ -f "$plugin_dir/SKILL.md" ]]; then
+    check_frontmatter_doc "$plugin_dir/SKILL.md" "$(basename "$plugin_dir")" "plugin directory"
+    for script in "$plugin_dir"/scripts/*.sh "$plugin_dir"/scripts/*.py; do
+      [[ -e "$script" ]] || continue
+      [[ -x "$script" ]] || fail "$script: not executable (chmod +x)"
+    done
+  fi
 
   for agent_md in "$plugin_dir"/agents/*.md; do
     agent_name="$(basename "$agent_md" .md)"
