@@ -56,6 +56,9 @@ instead:
 ./setup.sh --include=adversarial-review,dfadler-agent-config
 ```
 
+After a run that used either flag, setup.sh prints the exact `./setup.sh --skip=...` or
+`--include=...` command to reproduce it.
+
 The two are opposite selections over the same names, so passing both in one run is
 rejected with an error rather than guessing which one wins. Naming a plugin opts out (or
 in) its skills, agents, and hooks together — a plugin is linked into `~/.claude/skills/`

@@ -487,6 +487,26 @@ run_setup_with() {
   refute_output_contains "Removed"
 }
 
+@test "--include prints the exact re-run command as the last output" {
+  run_setup_with --no-companions --include=demo,dfadler-agent-config
+  assert_success
+  [ "${lines[$((${#lines[@]} - 2))]}" = "To re-run with this feature selection:" ]
+  [ "${lines[$((${#lines[@]} - 1))]}" = "  ./setup.sh --include=demo,dfadler-agent-config" ]
+}
+
+@test "--skip prints the exact re-run command as the last output" {
+  run_setup_with --no-companions --skip=demo
+  assert_success
+  [ "${lines[$((${#lines[@]} - 2))]}" = "To re-run with this feature selection:" ]
+  [ "${lines[$((${#lines[@]} - 1))]}" = "  ./setup.sh --skip=demo" ]
+}
+
+@test "no re-run hint when neither --skip nor --include is used" {
+  run_setup
+  assert_success
+  refute_output_contains "To re-run"
+}
+
 @test "dropping --include on a later run re-links everything" {
   run_setup_with --include=demo
   assert_success
