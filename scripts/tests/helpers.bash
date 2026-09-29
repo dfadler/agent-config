@@ -224,6 +224,9 @@ _mark_merged() {
 #                    diff is the exact marker-delimited block               -> REMOVE
 #                    (after the block is reverted; requires
 #                    configure_cruft_marker to have been called first)
+#   merged-marker-file-deleted  merged + pushed, the marker file removed
+#                    entirely                                               -> keep
+#                    (a deletion is a diff from HEAD, not "no diff")
 #   merged-marker-block-real-edit  merged + pushed, the marker file has a
 #                    real edit mixed in alongside the block                 -> keep
 #                    (left alone entirely, never reverted)
@@ -290,6 +293,14 @@ add_worktree() {
         echo "some regenerated text"
         echo "<!-- END:test-marker -->"
       } >>"$path/regenerated.md"
+      _mark_merged "$branch" "$(git -C "$path" rev-parse HEAD)"
+      ;;
+    merged-marker-file-deleted)
+      # The marker file removed from the worktree entirely — a deletion IS a
+      # diff from HEAD, not "no diff"; must never be mistaken for the
+      # vacuous "file doesn't exist on either side" case.
+      git -C "$path" push -q -u origin "$branch"
+      rm "$path/regenerated.md"
       _mark_merged "$branch" "$(git -C "$path" rev-parse HEAD)"
       ;;
     merged-marker-block-staged)

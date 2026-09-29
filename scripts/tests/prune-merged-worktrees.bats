@@ -610,6 +610,35 @@ teardown() {
   grep -q "BEGIN:test-marker" "$wt/regenerated.md"
 }
 
+@test "--yes never removes a merged worktree whose marker file was deleted" {
+  # A deletion IS a diff from HEAD, not "no diff" — must not be mistaken for
+  # the vacuous "no file on either side" case the predicate also returns
+  # true for.
+  configure_cruft_marker regenerated.md "<!-- BEGIN:test-marker -->" "<!-- END:test-marker -->"
+  local wt="$REPO/.claude/worktrees/done"
+  add_worktree done merged-marker-file-deleted >/dev/null
+
+  run prune "$REPO" --yes
+
+  assert_success
+  assert_output_contains "uncommitted changes"
+  refute_output_contains "Removing $wt"
+  [ -d "$wt" ]
+  [ ! -f "$wt/regenerated.md" ]
+}
+
+@test "--auto never removes a merged worktree whose marker file was deleted" {
+  configure_cruft_marker regenerated.md "<!-- BEGIN:test-marker -->" "<!-- END:test-marker -->"
+  local wt="$REPO/.claude/worktrees/done"
+  add_worktree done merged-marker-file-deleted >/dev/null
+
+  run prune "$REPO" --auto
+
+  assert_success
+  refute_output_contains "Removed"
+  [ -d "$wt" ]
+}
+
 @test "--yes reverts an exact marker block and removes the worktree" {
   configure_cruft_marker regenerated.md "<!-- BEGIN:test-marker -->" "<!-- END:test-marker -->"
   local wt="$REPO/.claude/worktrees/done"

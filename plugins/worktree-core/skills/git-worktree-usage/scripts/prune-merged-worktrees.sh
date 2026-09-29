@@ -256,13 +256,19 @@ file_diff_is_only_marker_block() {
   local path="$1" rel_file="$2" begin_marker="$3" end_marker="$4"
   local file begin_line end_line stripped trailing head_version head_line_count
   file="$path/$rel_file"
-  [ -f "$file" ] || return 0
+  # No `[ -f "$file" ] || return 0` short-circuit here on purpose: a missing
+  # working-tree file IS a diff from HEAD (a deletion) whenever HEAD has the
+  # file, not "no diff" — the check below already handles both the genuine
+  # no-file-either-side case (exits 0, correctly "safe") and the
+  # deleted-but-tracked-at-HEAD case (exits nonzero, correctly falls through
+  # to the marker check, which fails closed since $file doesn't exist).
+  #
   # Compares against HEAD explicitly, not a bare `diff --quiet` (which only
   # compares the working tree to the INDEX): a staged-but-uncommitted change
   # would otherwise short-circuit here as "no diff", misreporting a real
   # diff from HEAD as clean.
   git -C "$path" diff --quiet HEAD -- "$rel_file" 2>/dev/null && return 0
-  begin_line="$(grep -Fn -- "$begin_marker" "$file" | head -1 | cut -d: -f1)"
+  begin_line="$(grep -Fn -- "$begin_marker" "$file" 2>/dev/null | head -1 | cut -d: -f1)"
   [ -n "$begin_line" ] && [ "$begin_line" -ge 2 ] || return 1
   end_line="$(grep -Fn -- "$end_marker" "$file" | tail -1 | cut -d: -f1)"
   [ -n "$end_line" ] || return 1
