@@ -27,6 +27,8 @@ automatically, with no per-project copy to keep in sync.
     with an evidence-basis/severity system.
   - `detached-terminal/` — run and drive an interactive terminal (TUI, REPL,
     alternate-screen app) on a headless PTY without stealing focus. Requires `pyte`.
+  - `fetch-execute-guide/` — skill with the scope and procedure for asking permission
+    before fetch-and-execute installs (`npx <pkg>@latest`, `curl | sh`).
   - `gh-attach-image/` — upload local images and videos to GitHub's
     user-attachments endpoint so they render inline in PR/issue bodies.
   - `gha-ci-audit/` — audit GitHub Actions usage for any repository: workflow

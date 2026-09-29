@@ -23,8 +23,9 @@ Two patterns fall out of this:
 
 - **Policy include + mechanics skill.** When the *decision* has to fire early but the
   *how* is long, the include holds a one-paragraph rule and points at a skill for the
-  procedure. `fetch-execute-installs.md` → `fetch-execute-guide` and
-  `git-worktree-usage.md` → the `git-worktree-usage` skill already work this way.
+  procedure. `git-worktree-usage.md` → the `git-worktree-usage` skill already works this way.
+  (`fetch-execute-installs.md` is self-contained instead, so a default-on include
+  carries no plugin dependency.)
 - **A pointer with no policy of its own is dead weight.** If the included file only
   says "see skill X" and skill X's description already triggers on the same
   situation, the include adds nothing. Delete it.
