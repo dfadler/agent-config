@@ -185,8 +185,12 @@ producing a blank image — drive Chrome over CDP instead (Node's built-in
 8. **Teardown, unconditionally, including on a failure path:**
    `kill "$chrome_pid"; rm -rf "$profile_dir"`.
 
-If Chrome rejects the CDP websocket connection, retry with the
-`--remote-allow-origins=*` fallback flag.
+If Chrome rejects the CDP websocket connection, retry with
+`--remote-allow-origins=http://127.0.0.1:<port>` (the exact debugging origin, using the
+port Chrome reports for `--remote-debugging-port=0`).
+Use the `*` wildcard only as a last resort: it lets any page that can reach the
+debugging port drive the capture browser, so keep the throwaway profile and
+ephemeral port, and tear the browser down as soon as the capture finishes.
 
 ### `output_type: video` (either Chrome path)
 
