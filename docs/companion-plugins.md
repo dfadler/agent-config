@@ -301,7 +301,8 @@ check can no longer recognize the command as `git` and refuses to run it at all.
 only happens **inside** an `EnterWorktree` session — the main checkout is unaffected,
 which is what makes it easy to miss until someone hits it mid-task.
 
-rtk's own config (path printed by `rtk config`, under `[hooks]`) has an
+rtk's own config (path printed by `rtk config`, under `[hooks]`; run
+`rtk config --create` first if that path doesn't exist yet) has an
 `exclude_commands` list built for exactly this:
 
 ```toml

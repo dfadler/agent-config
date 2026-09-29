@@ -98,10 +98,16 @@ event_hooks = hooks.get(event, [])
 new_entries = []
 removed     = False
 for entry in event_hooks:
-    remaining = [h for h in entry.get("hooks", []) if h.get("command") != cmd]
-    if len(remaining) < len(entry.get("hooks", [])):
+    original = entry.get("hooks", [])
+    remaining = [h for h in original if h.get("command") != cmd]
+    entry_changed = len(remaining) < len(original)
+    if entry_changed:
         removed = True
-    if remaining:
+    # Drop an entry only when THIS removal emptied it out — an entry that
+    # was already "hooks": [] (foreign, or otherwise not ours) is preserved
+    # as-is rather than silently swept away just because some other entry
+    # in the same event happened to lose its last hook in this same pass.
+    if remaining or not entry_changed:
         new_entry          = dict(entry)
         new_entry["hooks"] = remaining
         new_entries.append(new_entry)
