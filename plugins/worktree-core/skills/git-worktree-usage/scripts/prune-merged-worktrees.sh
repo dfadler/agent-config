@@ -430,9 +430,16 @@ remove_removable() {
 # instead of this one.
 ORPHAN_GRACE_SECONDS=600
 
-# Portable mtime-in-epoch-seconds: BSD stat (macOS) then GNU stat (Linux).
+# Portable mtime-in-epoch-seconds. Order matters here, and isn't arbitrary:
+# GNU stat's `-c FORMAT` fails cleanly (exit 1, "illegal option") on BSD
+# stat, but the reverse doesn't hold — GNU's `-f` means "filesystem status"
+# (a bare flag, not "format", unlike BSD), so `stat -f %m` on GNU parses `%m`
+# as a second, nonexistent FILE argument rather than erroring, and still
+# exits 0 with unrelated multi-line output. A `||` fallback only works when
+# the first branch fails loudly on the platform it doesn't belong to — GNU
+# form first is the one direction that's actually safe both ways.
 _dir_mtime_epoch() {
-  stat -f %m "$1" 2>/dev/null || stat -c %Y "$1" 2>/dev/null
+  stat -c %Y "$1" 2>/dev/null || stat -f %m "$1" 2>/dev/null
 }
 
 # Sweep .claude/worktrees/ for directories git no longer even considers a
