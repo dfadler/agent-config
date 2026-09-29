@@ -240,21 +240,55 @@ cruft_markers="$(read_cruft_markers)"
 # block, plus more". A pure predicate — callers decide whether reverting is
 # actually safe (see flush()) BEFORE calling revert_cruft_markers.
 #
-# The prefix check below does two things a naive `head -n | string-compare`
-# can't: it independently confirms the line immediately before the begin
-# marker is the single blank separator (not just trusting "whatever's there
-# must be the separator"), and it confirms HEAD's own line count via `git
-# show | wc -l` rather than only a string comparison. Without the first
-# check, a real edit could hide in exactly that slot — sitting past
-# HEAD's own last line, before the begin marker, invisible to the
-# prefix/HEAD comparison since that comparison never looks at that one line
-# at all. Without the second, command substitution stripping ALL trailing
-# newlines from both sides of the string comparison could mask a
-# HEAD-ends-in-blank-line(s) vs. prefix-missing-them mismatch that a pure
-# string compare wouldn't catch on its own.
+# Pure text predicate — no git, no worktree, no reference to anything but
+# FILE itself. Locates the marker-delimited block's outermost span: the
+# line containing the FIRST occurrence of BEGIN_MARKER through the line
+# containing the LAST occurrence of END_MARKER at or after it. On success,
+# prints "<begin_line>\t<end_line>" (1-indexed) and returns 0; prints
+# nothing and returns 1 if BEGIN_MARKER isn't present at all, or if no
+# END_MARKER is found at or after wherever BEGIN_MARKER is (a malformed or
+# unclosed block — this also guards against END_MARKER's text coincidentally
+# appearing earlier in the file, before BEGIN_MARKER, which would otherwise
+# compute a nonsensical negative-length span).
+#
+# Deliberately the whole reason file_diff_is_only_marker_block below is
+# split in two: this half is directly unit-testable against a plain temp
+# file, with none of the git/worktree/gh-shim integration machinery the
+# other half needs — see scripts/tests/prune-merged-worktrees.bats's
+# "marker_block_bounds" tests for exactly that.
+marker_block_bounds() {
+  local file="$1" begin_marker="$2" end_marker="$3" begin_line end_line
+  begin_line="$(grep -Fn -- "$begin_marker" "$file" 2>/dev/null | head -1 | cut -d: -f1)"
+  [ -n "$begin_line" ] || return 1
+  end_line="$(grep -Fn -- "$end_marker" "$file" 2>/dev/null | tail -1 | cut -d: -f1)"
+  [ -n "$end_line" ] && [ "$end_line" -ge "$begin_line" ] || return 1
+  printf '%s\t%s\n' "$begin_line" "$end_line"
+}
+
+# The git-coupled half: is REL_FILE's entire diff from HEAD, inside worktree
+# PATH, nothing but the block marker_block_bounds locates plus the one
+# blank separator line it's always appended after? False for any other
+# difference anywhere in the file, BEFORE the block (a real edit mixed in)
+# OR AFTER it (real content appended past the closing marker — a very
+# natural place to add a note, since the block sits at the bottom of the
+# file), so genuine work is never mistaken for cruft. A pure predicate
+# (beyond the git reads themselves) — callers decide whether reverting is
+# actually safe (see flush()) BEFORE calling revert_cruft_markers.
+#
+# The checks below do two things a naive `head -n | string-compare` can't:
+# independently confirm the line immediately before the begin marker is the
+# single blank separator (not just trusting "whatever's there must be it"),
+# and confirm HEAD's own line count via `git show | wc -l` rather than only
+# a string comparison. Without the first, a real edit could hide in exactly
+# that slot — sitting past HEAD's own last line, before the begin marker,
+# invisible to the prefix/HEAD comparison since that comparison never looks
+# at that one line at all. Without the second, command substitution
+# stripping ALL trailing newlines from both sides of the string comparison
+# could mask a HEAD-ends-in-blank-line(s) vs. prefix-missing-them mismatch
+# that a pure string compare wouldn't catch on its own.
 file_diff_is_only_marker_block() {
   local path="$1" rel_file="$2" begin_marker="$3" end_marker="$4"
-  local file begin_line end_line stripped trailing head_version head_line_count
+  local file bounds begin_line end_line stripped trailing head_version head_line_count
   file="$path/$rel_file"
   # No `[ -f "$file" ] || return 0` short-circuit here on purpose: a missing
   # working-tree file IS a diff from HEAD (a deletion) whenever HEAD has the
@@ -268,10 +302,10 @@ file_diff_is_only_marker_block() {
   # would otherwise short-circuit here as "no diff", misreporting a real
   # diff from HEAD as clean.
   git -C "$path" diff --quiet HEAD -- "$rel_file" 2>/dev/null && return 0
-  begin_line="$(grep -Fn -- "$begin_marker" "$file" 2>/dev/null | head -1 | cut -d: -f1)"
-  [ -n "$begin_line" ] && [ "$begin_line" -ge 2 ] || return 1
-  end_line="$(grep -Fn -- "$end_marker" "$file" | tail -1 | cut -d: -f1)"
-  [ -n "$end_line" ] || return 1
+  bounds="$(marker_block_bounds "$file" "$begin_marker" "$end_marker")" || return 1
+  begin_line="${bounds%%$'\t'*}"
+  end_line="${bounds##*$'\t'}"
+  [ "$begin_line" -ge 2 ] || return 1
   trailing="$(tail -n +"$((end_line + 1))" "$file")"
   [ -z "$trailing" ] || return 1
   [ -z "$(sed -n "$((begin_line - 1))p" "$file")" ] || return 1

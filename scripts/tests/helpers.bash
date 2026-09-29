@@ -457,6 +457,22 @@ prune() {
   (cd "$cwd" && bash "$script" "$@")
 }
 
+# marker_block_bounds FILE BEGIN END — call the real, pure marker_block_bounds
+# function directly against a plain file, with none of the git/worktree/gh
+# machinery the rest of prune-merged-worktrees.sh needs. Sourcing the whole
+# script isn't an option (its top-level code calls `exit`, which would exit
+# the test process too) — sed extracts just this one function's own text
+# (its `}` closes at column 0, same as every top-level function in this
+# script, so the range is unambiguous) and evals it in an isolated `bash -c`.
+# This is the actual point of extracting the function in the first place:
+# it's now testable with plain temp files, not the full add_worktree harness.
+marker_block_bounds() {
+  local script="$REPO_ROOT/plugins/worktree-core/skills/git-worktree-usage/scripts/prune-merged-worktrees.sh"
+  local fn_src
+  fn_src="$(sed -n '/^marker_block_bounds() {/,/^}/p' "$script")"
+  bash -c "$fn_src"$'\n''marker_block_bounds "$@"' _ "$@"
+}
+
 # A fake python3 placed ahead of PATH in its own bin, so a test can suppress or
 # control the pyte-probe output that check-companions.sh emits. The fake binary
 # only intercepts calls shaped like the pyte probe (ones whose -c argument

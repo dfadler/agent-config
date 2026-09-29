@@ -579,6 +579,55 @@ teardown() {
   [ -d "$wt" ]
 }
 
+# --- marker_block_bounds (pure, unit-level) ----------------------------------
+# Direct tests against the extracted pure predicate, via the marker_block_bounds
+# helper in helpers.bash — plain temp files, no git/worktree/gh at all. This
+# is the actual point of extracting it out of file_diff_is_only_marker_block:
+# every edge case below used to need the full add_worktree integration
+# fixture to exercise; now it's a 3-argument function call against a file.
+
+@test "marker_block_bounds: finds a well-formed block and prints begin/end lines" {
+  local f="$SANDBOX/f.txt"
+  printf 'one\ntwo\nBEGIN\nthree\nEND\n' >"$f"
+  run marker_block_bounds "$f" BEGIN END
+  assert_success
+  [ "$output" = "$(printf '3\t5')" ]
+}
+
+@test "marker_block_bounds: fails when the begin marker is absent" {
+  local f="$SANDBOX/f.txt"
+  printf 'one\ntwo\nEND\n' >"$f"
+  run marker_block_bounds "$f" BEGIN END
+  [ "$status" -ne 0 ]
+  [ -z "$output" ]
+}
+
+@test "marker_block_bounds: fails on an unclosed block (begin present, no end)" {
+  local f="$SANDBOX/f.txt"
+  printf 'one\nBEGIN\ntwo\n' >"$f"
+  run marker_block_bounds "$f" BEGIN END
+  [ "$status" -ne 0 ]
+  [ -z "$output" ]
+}
+
+@test "marker_block_bounds: fails when the end marker's only occurrence is before the begin marker" {
+  # Guards against a coincidental earlier occurrence computing a nonsensical
+  # negative-length span.
+  local f="$SANDBOX/f.txt"
+  printf 'END\none\nBEGIN\ntwo\n' >"$f"
+  run marker_block_bounds "$f" BEGIN END
+  [ "$status" -ne 0 ]
+  [ -z "$output" ]
+}
+
+@test "marker_block_bounds: uses the LAST end marker at or after the begin marker" {
+  local f="$SANDBOX/f.txt"
+  printf 'BEGIN\none\nEND\ntwo\nEND\n' >"$f"
+  run marker_block_bounds "$f" BEGIN END
+  assert_success
+  [ "$output" = "$(printf '1\t5')" ]
+}
+
 # --- config-driven cruft-marker revert ---------------------------------------
 # A project may declare, in its own .claude/settings.json, a tracked file
 # whose diff is safe to revert before the clean check IFF the entire diff is
@@ -608,6 +657,7 @@ teardown() {
   assert_output_contains "uncommitted changes"
   refute_output_contains "REMOVE"
   grep -q "BEGIN:test-marker" "$wt/regenerated.md"
+  [ -d "$wt" ]
 }
 
 @test "--yes never removes a merged worktree whose marker file was deleted" {
