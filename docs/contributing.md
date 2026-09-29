@@ -161,8 +161,8 @@ down in a fixture, so it can't collide with a live session either.
 Behavioral tests for a skill live in `plugins/<name>/evals/<case>/case.yaml` (or
 `prompt.md` + `graders/`) and run with `claude plugin eval plugins/<name>` (Claude
 Code 2.1.269+; real model calls, so they cost money; each case runs with and without
-the plugin so `Δ` shows what the skill adds). Only `dfadler-agent-config` has cases
-today (`fetch-execute-guide`); results land in the gitignored `evals/results/`.
+the plugin so `Δ` shows what the skill adds). Only `fetch-execute-guide` has cases
+today (`fetch-execute-asks-first` and `fetch-execute-runs-with-permission`); results land in the gitignored `evals/results/`.
 `plugins/gha-ci-audit/evals/evals.json` is the separate skill-creator format, which
 `claude plugin eval` does not read. Docs: [plugin evals](https://code.claude.com/docs/en/plugin-evals);
 background in [#387](https://github.com/dfadler/agent-config/issues/387).

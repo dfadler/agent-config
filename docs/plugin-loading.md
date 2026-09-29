@@ -48,17 +48,18 @@ Pick by what the skill needs:
 
 | Need | Bare skill | Plugin |
 |---|---|---|
-| Name | `/name`, no prefix; collides with same-named personal/project skills (enterprise > personal > project) | `/plugin:skill`, never collides |
+| Name | `/name`, no prefix; collides with same-named personal/project skills (enterprise > personal > project) | `/plugin:skill`; doesn't collide with bare skill names (two enabled plugins with the same manifest name still resolve by source precedence) |
 | Extras (agents, hooks, MCP) | No | Yes |
 | Install / update / disable / version | Copy or symlink by hand | `claude plugin list/disable`, marketplace updates |
 | `claude plugin validate` | Not applicable | Yes |
-| Share with others | Commit to `.claude/skills/` (repo-scoped only) | Marketplace |
+| Share with others | Commit to `.claude/skills/` (repo-scoped only) | Marketplace; project scope via `.claude/settings.json` (each collaborator still installs it) |
 
 Recommended pattern here: a single-skill plugin that only lives on this machine can
 stay a plugin (it gets `claude plugin details`/`validate`), but put `SKILL.md` at the
 plugin root instead of under `skills/` so it loads as `name`, not `name:name` (see
-above). Use a plain bare skill for a throwaway or project-only skill. Anything with
-an agent, hook, or a second skill needs the `skills/` layout and its namespace.
+above). Use a plain bare skill for a throwaway or project-only skill. Agents and
+hooks can sit alongside a root `SKILL.md`; use the `skills/` layout and its namespace
+only for additional skills.
 
 Platform gap: none found. A bare skill just has no namespace, validate, or
 marketplace path; that is the intended trade, not a missing feature. The
