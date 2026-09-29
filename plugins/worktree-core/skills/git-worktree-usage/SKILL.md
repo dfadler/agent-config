@@ -140,7 +140,10 @@ session — both catch their own errors and always exit 0.
   Separately sweeps `.claude/worktrees/` for directories git's own `worktree
   list` doesn't know about at all — wreckage from a worktree-creation call
   that made the directory but never completed `git worktree add` — removed
-  only when the directory holds zero files anywhere in its tree. **Off by
+  only when the directory is older than 10 minutes (a concurrent session's
+  own in-progress worktree creation looks identical to abandoned wreckage
+  from the outside, so anything younger is left for a later sweep to judge
+  instead) and holds no file or symlink anywhere in its tree. **Off by
   default** — the hook does nothing until a project opts in. Auto-prune
   mode (highest priority first): the `WORKTREE_AUTO_PRUNE` env var
   (`0`/`false`/`no`/`off` → nudge-only; `1`/`true`/`yes`/`on` →

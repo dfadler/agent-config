@@ -278,6 +278,19 @@ add_worktree() {
       } >>"$path/regenerated.md"
       _mark_merged "$branch" "$(git -C "$path" rev-parse HEAD)"
       ;;
+    merged-marker-block-staged)
+      # Same exact block, but `git add`ed before the script ever runs — a
+      # plain `git diff --quiet` (no HEAD) would wrongly see this as already
+      # clean (working tree matches the index); catches that regression.
+      git -C "$path" push -q -u origin "$branch"
+      {
+        echo ""
+        echo "<!-- BEGIN:test-marker -->"
+        echo "some regenerated text"
+      } >>"$path/regenerated.md"
+      git -C "$path" add regenerated.md
+      _mark_merged "$branch" "$(git -C "$path" rev-parse HEAD)"
+      ;;
     merged-marker-block-real-edit)
       git -C "$path" push -q -u origin "$branch"
       {
@@ -349,15 +362,32 @@ delete_origin_branch() {
 # add_orphaned_dir <name> [populate] — creates .claude/worktrees/<name> as a
 # plain directory that git's own worktree list knows nothing about, simulating
 # a worktree-creation call that made the directory but never completed
-# `git worktree add` (real-world wreckage, not a modeling shortcut). Pass
-# populate=1 to also drop a real file inside it, which the sweep must leave
-# alone. Prints the directory path.
+# `git worktree add` (real-world wreckage, not a modeling shortcut). The
+# directory's mtime is "now" — pair with age_dir below to simulate one old
+# enough for the sweep to consider. populate=populate drops a real file
+# inside it; populate=symlink drops a (dangling) symlink instead — both must
+# make the sweep leave it alone, for different reasons (real content vs. an
+# entry type `find -type f` doesn't match). Prints the directory path.
 add_orphaned_dir() {
   local name="$1" populate="${2:-}"
   local d="$REPO/.claude/worktrees/$name"
   mkdir -p "$d/.claude"
-  [ -n "$populate" ] && echo "real content" >"$d/some-file.txt"
+  case "$populate" in
+    populate) echo "real content" >"$d/some-file.txt" ;;
+    symlink) ln -s /nonexistent-target "$d/node_modules" ;;
+  esac
   printf '%s' "$d"
+}
+
+# age_dir <path> <seconds-ago> — backdates a directory's mtime so the
+# orphan-sweep's grace-period check treats it as old enough to consider.
+# `touch -t` accepts the same [[CC]YY]MMDDhhmm[.SS] format on both BSD
+# (macOS) and GNU touch, so no fallback branch is needed there — only `date`
+# itself differs (BSD `-v-Ns`, GNU `-d "-N seconds"`).
+age_dir() {
+  local d="$1" seconds_ago="$2" ts
+  ts="$(date -v-"${seconds_ago}"S +%Y%m%d%H%M.%S 2>/dev/null || date -d "-${seconds_ago} seconds" +%Y%m%d%H%M.%S)"
+  touch -t "$ts" "$d"
 }
 
 # prune <cwd> [args...] — run the real prune-merged-worktrees.sh from <cwd>.

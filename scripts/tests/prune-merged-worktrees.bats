@@ -622,6 +622,22 @@ teardown() {
   [ ! -d "$wt" ]
 }
 
+@test "--yes reverts an exact marker block even when it's staged" {
+  # A plain `git diff --quiet` (no HEAD) compares the working tree to the
+  # INDEX, so a staged-but-uncommitted block would short-circuit as "clean"
+  # without the HEAD-explicit fix — this proves the block still gets
+  # detected and actually reverted (index AND working tree) when staged.
+  configure_cruft_marker regenerated.md "<!-- BEGIN:test-marker -->"
+  local wt="$REPO/.claude/worktrees/done"
+  add_worktree done merged-marker-block-staged >/dev/null
+
+  run prune "$REPO" --yes
+
+  assert_success
+  assert_output_contains "Removing"
+  [ ! -d "$wt" ]
+}
+
 @test "--auto reverts an exact marker block and removes the worktree" {
   configure_cruft_marker regenerated.md "<!-- BEGIN:test-marker -->"
   local wt="$REPO/.claude/worktrees/done"
@@ -690,11 +706,17 @@ teardown() {
 # A directory under .claude/worktrees/ that git's own worktree list doesn't
 # know about at all — e.g. a worktree-creation call that mkdir'd it but never
 # finished `git worktree add`. Distinct failure mode from a merged-but-kept
-# worktree; swept only when empty, and only under --yes/--auto.
+# worktree; swept only when it's both old enough (past the grace period, so a
+# concurrent session's still-in-progress worktree-creation call is never
+# caught by an unlucky-timing SessionStart sweep) and holds no file or
+# symlink anywhere in its tree, and only under --yes/--auto. Every "should be
+# swept" fixture below is explicitly aged past ORPHAN_GRACE_SECONDS; a fresh
+# one is covered separately by the grace-period tests.
 
 @test "a dry run reports an orphaned empty directory but never removes it" {
   local d
   d="$(add_orphaned_dir stray)"
+  age_dir "$d" 700
 
   run prune "$REPO"
 
@@ -705,6 +727,7 @@ teardown() {
 @test "--yes removes an empty orphaned directory git doesn't know about" {
   local d
   d="$(add_orphaned_dir stray)"
+  age_dir "$d" 700
 
   run prune "$REPO" --yes
 
@@ -716,6 +739,7 @@ teardown() {
 @test "--auto removes an empty orphaned directory git doesn't know about" {
   local d
   d="$(add_orphaned_dir stray)"
+  age_dir "$d" 700
 
   run prune "$REPO" --auto
 
@@ -727,12 +751,48 @@ teardown() {
 @test "--yes leaves a non-empty orphaned directory alone" {
   local d
   d="$(add_orphaned_dir stray populate)"
+  age_dir "$d" 700
 
   run prune "$REPO" --yes
 
   assert_success
   [ -d "$d" ]
   [ -f "$d/some-file.txt" ]
+}
+
+@test "--yes never sweeps a directory younger than the grace period, even if empty" {
+  local d
+  d="$(add_orphaned_dir stray)"
+  # No age_dir call: this directory is as fresh as one a concurrent
+  # session's own worktree-creation call could still be in the middle of.
+
+  run prune "$REPO" --yes
+
+  assert_success
+  [ -d "$d" ]
+}
+
+@test "--auto never sweeps a directory younger than the grace period, even if empty" {
+  local d
+  d="$(add_orphaned_dir stray)"
+
+  run prune "$REPO" --auto
+
+  assert_success
+  refute_output_contains "orphaned worktree director"
+  [ -d "$d" ]
+}
+
+@test "--yes never sweeps an old directory containing only a symlink" {
+  local d
+  d="$(add_orphaned_dir stray symlink)"
+  age_dir "$d" 700
+
+  run prune "$REPO" --yes
+
+  assert_success
+  [ -d "$d" ]
+  [ -L "$d/node_modules" ]
 }
 
 @test "--yes never sweeps a directory that IS a real (kept) worktree" {

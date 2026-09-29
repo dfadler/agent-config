@@ -225,7 +225,11 @@ cruft_markers="$(read_cruft_markers)"
 file_diff_is_only_marker_block() {
   local path="$1" rel_file="$2" marker="$3" marker_line stripped head_version
   [ -f "$path/$rel_file" ] || return 0
-  git -C "$path" diff --quiet -- "$rel_file" 2>/dev/null && return 0
+  # Compares against HEAD explicitly, not a bare `diff --quiet` (which only
+  # compares the working tree to the INDEX): a staged-but-uncommitted change
+  # would otherwise short-circuit here as "no diff", misreporting a real
+  # diff from HEAD as clean.
+  git -C "$path" diff --quiet HEAD -- "$rel_file" 2>/dev/null && return 0
   marker_line="$(grep -Fn -- "$marker" "$path/$rel_file" | head -1 | cut -d: -f1)"
   [ -n "$marker_line" ] || return 1
   head_version="$(git -C "$path" show "HEAD:$rel_file" 2>/dev/null)" || return 1
@@ -255,8 +259,13 @@ revert_cruft_markers() {
   while IFS=$'\t' read -r rel_file marker; do
     [ -n "$rel_file" ] || continue
     [ -f "$path/$rel_file" ] || continue
-    git -C "$path" diff --quiet -- "$rel_file" 2>/dev/null && continue
-    git -C "$path" checkout -- "$rel_file"
+    git -C "$path" diff --quiet HEAD -- "$rel_file" 2>/dev/null && continue
+    # Explicit HEAD, not a bare `checkout -- <path>`: the latter restores
+    # from the INDEX, which for a staged-but-uncommitted block is already
+    # the modified content — a no-op that would leave the file dirty
+    # relative to HEAD. `checkout HEAD -- <path>` updates both the index
+    # and the working tree, actually reverting a staged change too.
+    git -C "$path" checkout HEAD -- "$rel_file"
   done <<<"$cruft_markers"
 }
 
@@ -372,22 +381,47 @@ remove_removable() {
   git worktree prune 2>/dev/null || true
 }
 
+# Directories younger than this are never swept, no matter how empty —
+# indistinguishable from one a concurrent session's own worktree-creation
+# call is still in the middle of creating (projects using this hook
+# routinely run several sessions at once, each in its own worktree). A
+# worktree-creation call normally completes in well under a minute even on a
+# slow machine, so this is generous headroom, not a meaningful delay for
+# genuinely abandoned wreckage — it just gets swept on a later session start
+# instead of this one.
+ORPHAN_GRACE_SECONDS=600
+
+# Portable mtime-in-epoch-seconds: BSD stat (macOS) then GNU stat (Linux).
+_dir_mtime_epoch() {
+  stat -f %m "$1" 2>/dev/null || stat -c %Y "$1" 2>/dev/null
+}
+
 # Sweep .claude/worktrees/ for directories git no longer even considers a
 # worktree — e.g. a worktree-creation call that made the directory but never
 # completed `git worktree add`, leaving inert wreckage indistinguishable by
-# name alone from a real worktree. Removed ONLY when the directory holds zero
-# files anywhere in its tree (an empty scaffold); anything with real content
-# is left for a human to look at. `known` is $all_worktree_paths — anything
-# git still lists, in or out of flush()'s scope, is never touched here.
+# name alone from a real worktree. Removed ONLY when the directory is older
+# than $ORPHAN_GRACE_SECONDS (see above) AND holds nothing but empty
+# subdirectories anywhere in its tree — no regular file, no symlink (a
+# worktree can get a symlinked directory very early in its setup, before
+# `git worktree add` has written anything else; `find`'s default `-type f`
+# doesn't match a symlink at all, so checking for "no directory entries"
+# rather than "no files" is what actually catches that case). Anything with
+# real content, or too young to judge, is left for a human — or a later
+# sweep — to look at. `known` is $all_worktree_paths — anything git still
+# lists, in or out of flush()'s scope, is never touched here.
 removed_orphans=()
 sweep_orphaned_dirs() {
-  local known="$1" verbose="$2" d
+  local known="$1" verbose="$2" d mtime now
   [ -d "$wt_prefix" ] || return 0
+  now="$(date +%s)"
   for d in "$wt_prefix"*/; do
     d="${d%/}"
     [ -d "$d" ] || continue
     printf '%s\n' "$known" | grep -Fxq -- "$d" && continue
-    [ -n "$(find "$d" -type f -print -quit 2>/dev/null)" ] && continue
+    mtime="$(_dir_mtime_epoch "$d")" || continue
+    [ -n "$mtime" ] || continue
+    [ "$((now - mtime))" -lt "$ORPHAN_GRACE_SECONDS" ] && continue
+    [ -n "$(find "$d" -mindepth 1 ! -type d -print -quit 2>/dev/null)" ] && continue
     rm -rf -- "$d"
     removed_orphans+=("${d#"$repo_root"/}")
     $verbose && echo "==> Removing $d (empty, not a registered worktree)"
