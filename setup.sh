@@ -564,3 +564,12 @@ if [[ "$NO_COMPANIONS" != "1" ]]; then
   [[ "$FIX" == "1" ]] && COMPANION_ARGS+=(--fix)
   "$REPO_ROOT/scripts/check-companions.sh" ${COMPANION_ARGS[@]+"${COMPANION_ARGS[@]}"}
 fi
+
+# Echo the selection flag back so the run is reproducible without the user
+# having to remember it. Printed last so it isn't buried under the companion
+# checks. Only the selection flag is repeated, not --install-deps/--fix.
+if [[ -n "$SKIP_LIST" ]]; then
+  printf '\nTo re-run with this feature selection:\n  ./setup.sh --skip=%s\n' "$SKIP_LIST"
+elif [[ "$INCLUDE_SET" == 1 ]]; then
+  printf '\nTo re-run with this feature selection:\n  ./setup.sh --include=%s\n' "$INCLUDE_LIST"
+fi
