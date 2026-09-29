@@ -156,6 +156,17 @@ even though `setup.sh`'s whole job is writing symlinks into it. The `pytest` sui
 forks real PTYs, with `AGENT_TERM_STATE` redirected per test and every session torn
 down in a fixture, so it can't collide with a live session either.
 
+## Plugin evals
+
+Behavioral tests for a skill live in `plugins/<name>/evals/<case>/case.yaml` (or
+`prompt.md` + `graders/`) and run with `claude plugin eval plugins/<name>` (Claude
+Code 2.1.269+; real model calls, so they cost money; each case runs with and without
+the plugin so `Δ` shows what the skill adds). Only `dfadler-agent-config` has cases
+today (`fetch-execute-guide`); results land in the gitignored `evals/results/`.
+`plugins/gha-ci-audit/evals/evals.json` is the separate skill-creator format, which
+`claude plugin eval` does not read. Docs: [plugin evals](https://code.claude.com/docs/en/plugin-evals);
+background in [#387](https://github.com/dfadler/agent-config/issues/387).
+
 ## GitHub operations
 
 This repo uses the `gh` CLI for all GitHub operations — issues and PRs, review
