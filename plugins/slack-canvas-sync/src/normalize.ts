@@ -157,7 +157,36 @@ export function normalizeBody(markdown: string): string {
  * callout) as its own canvas section, so this is the unit the sync diffs.
  */
 export function normalizeSections(markdown: string): string[] {
-  return parseBlocks(markdown.replace(/\r\n?/g, "\n").split("\n"));
+  const lines = markdown.replace(/\r\n?/g, "\n").split("\n");
+  return parseBlocks(canonicalMentions(lines));
+}
+
+const USER_MENTION = /<@([UW][A-Z0-9]+)(?:\|[^>]*)?>/g;
+const CHANNEL_MENTION = /<#(C[A-Z0-9]+)(?:\|[^>]*)?>/g;
+
+/**
+ * Slack takes mentions in canvas syntax (`![](@U123)`, `![](#C123)`) but reads
+ * them back in message syntax (`<@U123>`, `<#C123>`), verified live for user
+ * mentions. Both sides are rewritten to the canvas form so a mention is never
+ * a difference. Fenced code is left alone.
+ */
+function canonicalMentions(lines: string[]): string[] {
+  let fence: string | null = null;
+  return lines.map((line) => {
+    const trimmed = line.trim();
+    if (fence !== null) {
+      if (trimmed.startsWith(fence) && /^[`~]+$/.test(trimmed)) fence = null;
+      return line;
+    }
+    const open = FENCE.exec(trimmed);
+    if (open !== null) {
+      fence = open[1] ?? null;
+      return line;
+    }
+    return line
+      .replace(USER_MENTION, "![](@$1)")
+      .replace(CHANNEL_MENTION, "![](#$1)");
+  });
 }
 
 /** Join sections back into canonical body text. */

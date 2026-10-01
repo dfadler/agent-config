@@ -40,6 +40,7 @@ Skipped (not checked):
   - http:// and https:// links
   - mailto: links
   - anchor-only links (#foo)
+  - Slack mention syntax (![](@U123), ![](#C123))
 
 Exit status:
   0   every relative link resolved
@@ -130,7 +131,8 @@ for file in ${files[@]+"${files[@]}"}; do
     [ -n "$link" ] || continue
 
     case "$link" in
-      http://* | https://* | mailto:*) continue ;;
+      # `@...` is Slack's user-mention syntax, ![](@U123), not a path.
+      http://* | https://* | mailto:* | @*) continue ;;
     esac
 
     link_resolves "$base_dir" "$link" ||

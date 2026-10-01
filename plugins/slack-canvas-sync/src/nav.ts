@@ -125,7 +125,10 @@ export function buildNavBlocks(files: NavFile[]): NavBlocks {
 
     const lines = ["::: {.callout}", NAV_BLOCK_HEADER];
     if (ancestors.length > 0) {
+      // Its own paragraph: Slack turns a single line break inside a paragraph
+      // into a space, which ran the breadcrumb into the heading (seen live).
       lines.push(
+        "",
         [...ancestors.map(link), file.title.replace(/[[\]]/g, "\\$&")].join(" > "),
       );
     }

@@ -70,6 +70,11 @@ test("a child shows a breadcrumb; its parent lists it as a child", () => {
   assert.ok(blocks.get("index.md")?.includes("* [Projects](https://example.invalid/projects/index.md)"));
 });
 
+test("the breadcrumb is its own paragraph, since Slack folds a line break into a space", () => {
+  const { blocks } = buildNavBlocks([file("index.md", "Home"), file("a.md", "A")]);
+  assert.ok(blocks.get("a.md")?.includes(`${NAV_BLOCK_HEADER}\n\n[Home]`));
+});
+
 test("links are whole-canvas links, never section anchors", () => {
   const { blocks } = buildNavBlocks([file("index.md", "Home"), file("a.md", "A")]);
   for (const block of blocks.values()) assert.equal(block.includes("focus_section_id"), false);

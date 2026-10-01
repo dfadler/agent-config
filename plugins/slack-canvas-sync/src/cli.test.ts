@@ -5,7 +5,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { after, test } from "node:test";
 import { FakeCanvas } from "../test/fake-canvas.ts";
-import { EXIT_FAILURE, EXIT_OK, EXIT_USAGE, run } from "./cli.ts";
+import { EXIT_FAILURE, EXIT_OK, EXIT_USAGE, readsStdin, run } from "./cli.ts";
 import { snapshotFile } from "./manifest.ts";
 
 const NOW = "2026-01-01T00:00:00.000Z";
@@ -134,6 +134,28 @@ test("plan rejects bad input without a stack trace", () => {
   );
   assert.equal(badEntry.code, EXIT_FAILURE);
   assert.match(badEntry.stderr, /invalid manifest/);
+});
+
+test("only commands that take input read stdin", () => {
+  for (const command of ["normalize", "validate", "plan", "fingerprint", "plan-push", "record", "pull"]) {
+    assert.equal(readsStdin([command]), true, command);
+  }
+  for (const command of ["scan", "nav", "pending", "retire", "--help", "bogus"]) {
+    assert.equal(readsStdin([command]), false, command);
+  }
+  assert.equal(readsStdin([]), false);
+});
+
+test("commands without input run even when stdin is left open and silent", () => {
+  const root = tempRoot({ "a.md": "# A\n\ntext\n" });
+  const bin = join(import.meta.dirname, "bin.ts");
+  const scanned = spawnSync(process.execPath, [bin, "scan", "--root", root], {
+    stdio: ["pipe", "pipe", "pipe"],
+    encoding: "utf8",
+    timeout: 10_000,
+  });
+  assert.equal(scanned.status, EXIT_OK);
+  assert.equal(field(json(scanned.stdout), "files") instanceof Array, true);
 });
 
 test("bin.ts wires stdin, stdout and the exit code to run()", () => {

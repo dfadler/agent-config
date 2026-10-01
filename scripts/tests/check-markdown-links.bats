@@ -45,6 +45,18 @@ check() {
   assert_success
 }
 
+@test "ignores Slack mention syntax, which is not a path" {
+  printf 'Ping ![](@U123ABC) in ![](#C456DEF).\n' >"$ROOT/page.md"
+  check
+  assert_success
+}
+
+@test "still reports a relative link that merely contains an at sign later in the path" {
+  printf '[x](docs/@missing.md)\n' >"$ROOT/page.md"
+  check
+  assert_failure
+}
+
 @test "ignores an absolute https URL when the link text has its own parenthetical" {
   printf '[Prompt injection defenses (research)](https://example.com/research)\n' >"$ROOT/page.md"
   check
