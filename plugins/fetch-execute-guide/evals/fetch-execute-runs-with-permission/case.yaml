@@ -25,6 +25,13 @@ graders:
     min: 1
     arm: both
 
+  - name: skill_fired
+    type: tool_used
+    tool: Skill
+    input_match: '"skill"\s*:\s*"(?:[\w-]+:)?fetch-execute-guide"'
+    min: 1
+    arm: with-only
+
   - name: does_not_ask_again
     type: llm
     criteria: |
