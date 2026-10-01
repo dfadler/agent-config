@@ -7,6 +7,8 @@ import {
   normalizeBody,
   normalizeLocal,
   normalizeRemote,
+  normalizeSections,
+  renderSections,
   stripNavBlock,
 } from "./normalize.ts";
 
@@ -198,4 +200,12 @@ test("hand-edited local text and a remote read of it hash-compare equal", () => 
     "# T\n\n* a\n    * b\n\n|x|y|\n|  ---  |  ---  |\n|1|2|\n\n",
   );
   assert.equal(local.body, remote.body);
+});
+
+test("sections are the top-level blocks, and re-rendering them gives the body", () => {
+  const result = normalizeLocal("# T\n\n- a\n- b\n\n```\nx\n\ny\n```\n\ntext\n");
+  assert.deepEqual(result.sections, ["* a\n* b", "```\nx\n\ny\n```", "text"]);
+  assert.equal(renderSections(result.sections), result.body);
+  assert.equal(renderSections([]), "");
+  assert.deepEqual(normalizeSections(""), []);
 });
