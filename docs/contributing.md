@@ -28,9 +28,10 @@
      `plugin.json`, so no manual changes to `setup.sh` are needed.
      **If the plugin depends on another plugin's skill or hooks** (e.g.
      `dfadler-agent-config` requiring `worktree-core` for `git-worktree-usage`),
-     declare it in `requires` in the manifest — note that Claude Code does not
-     enforce this field at load time — and document the dependency in the
-     plugin's README and, if hooks are involved, in `docs/hook-composition.md`.
+     declare it in the manifest's `dependencies` array ([plugin dependencies](https://code.claude.com/docs/en/plugins/dependencies);
+     `requires` is not a Claude Code field and is ignored) and document the
+     dependency in the plugin's README and, if hooks are involved, in
+     `docs/hook-composition.md`.
 2. Name skills and agents plainly — `pr-babysit`, not `dfadler-agent-config-pr-babysit`
    — in both the directory/filename and the frontmatter `name:`. The plugin namespace
    already prevents collisions with a project's own skills, so a prefix here would just

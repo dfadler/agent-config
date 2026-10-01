@@ -150,15 +150,18 @@ left alone with a warning rather than replaced.
 git-worktree-usage skill plus these three hooks — no other skills or agents. It is the
 single source for both: `dfadler-agent-config` no longer carries its own copy of the
 skill or `hooks/hooks.json` (it did until [#334](https://github.com/dfadler/agent-config/issues/334),
-when the duplicate was removed). `dfadler-agent-config`'s manifest now declares
-`"requires": ["worktree-core"]` to record that dependency, though Claude Code does not
-enforce `requires` at load time (see `claude plugin validate`'s warning) — installing
-both plugins together (e.g. `./setup.sh --include=dfadler-agent-config,worktree-core`)
-is still the user's responsibility.
+when the duplicate was removed). `dfadler-agent-config`'s manifest declares
+`"dependencies": ["worktree-core"]` to record that dependency. (It used to say
+`"requires"`, which isn't a Claude Code field: `claude plugin validate` warns that it
+is ignored at load time.) Per the
+[plugin dependencies docs](https://code.claude.com/docs/en/plugins/dependencies), a
+bare name resolves in the declaring plugin's own marketplace, and a plugin whose
+dependency is disabled or absent doesn't load. This repo loads plugins as
+`<name>@skills-dir` with no marketplace ([plugin-loading.md](./plugin-loading.md)), so
+install both together (e.g. `./setup.sh --include=dfadler-agent-config,worktree-core`).
 
 Since only `worktree-core` registers these hooks now, there is no double-firing to
-guard against. A machine that enables `dfadler-agent-config` without also enabling
-`worktree-core` simply won't get the worktree hooks (or the skill) at all.
+guard against.
 
 ## Guidance for authors of other plugins
 

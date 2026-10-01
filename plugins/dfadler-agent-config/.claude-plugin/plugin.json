@@ -15,5 +15,5 @@
     "code-review",
     "ci"
   ],
-  "requires": ["worktree-core"]
+  "dependencies": ["worktree-core"]
 }
