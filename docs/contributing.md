@@ -125,7 +125,7 @@ make check          # lint + structure + typecheck + test + actionlint + coverag
 | `make test-sh` | `bats` suites under `scripts/tests/` |
 | `make test-py` | `pytest` suite under `scripts/tests/` |
 | `make coverage` | Re-runs the `bats` suites under `kcov` and enforces the coverage floor (Linux only) |
-| `make lint-ts` / `typecheck-ts` / `test-ts` / `coverage-ts` | `eslint`, `tsc --noEmit`, `node:test`, and its coverage floor over `scripts/ts/` |
+| `make lint-ts` / `typecheck-ts` / `test-ts` / `coverage-ts` | `eslint`, `tsc --noEmit`, Vitest, and its coverage floor over `scripts/ts/` (see [`testing.md`](testing.md)) |
 | `make fmt` | Rewrites sources to the repo's `shfmt` / `ruff` style |
 | `make lint-actions` | `actionlint` over `.github/workflows/` |
 

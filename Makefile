@@ -229,13 +229,14 @@ lint-ts: node-modules ## eslint over scripts/ts
 typecheck-ts: node-modules ## tsc --noEmit over the TypeScript sources
 	@pnpm run --silent typecheck
 
-test-ts: node-modules ## Run the node:test suite
+test-ts: node-modules ## Run the Vitest suite (flaky-test flags: docs/testing.md)
 	@pnpm test --silent
 
 # Floor is a MEASURED baseline, same discipline as COVERAGE_MIN: the only
 # source today is the hash helper at 100%, and package.json holds the 90
-# floor so a future untested file can't quietly drag the number down.
-coverage-ts: node-modules ## Measure node:test coverage and enforce the floor
+# floor (in vitest.config.ts) so a future untested file can't quietly drag the
+# number down.
+coverage-ts: node-modules ## Measure Vitest (v8) coverage and enforce the floor
 	@pnpm run --silent coverage
 
 lint: lint-sh lint-py ## Lint shell and Python

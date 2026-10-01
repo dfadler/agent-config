@@ -19,10 +19,4 @@ export default tseslint.config(
       "@typescript-eslint/no-non-null-assertion": "error",
     },
   },
-  {
-    // node:test's top-level `test()` returns a promise the runner tracks
-    // itself; awaiting it would serialize the suite for no benefit.
-    files: ["**/*.test.ts"],
-    rules: { "@typescript-eslint/no-floating-promises": "off" },
-  },
 );
