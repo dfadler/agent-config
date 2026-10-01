@@ -17,6 +17,7 @@ name: Shell
 #   structure     make structure
 #   test-sh       make test-sh
 #   coverage      make coverage   (needs test-sh: guards the kcov build)
+#   typescript    make lint-ts / typecheck-ts / test-ts / coverage-ts (typescript.yml)
 
 on:
   pull_request:
@@ -63,6 +64,13 @@ jobs:
     permissions:
       contents: read
 
+  # TypeScript is not a shell check, but it rides this sentinel so branch
+  # protection needs no per-job settings change.
+  typescript:
+    uses: ./.github/workflows/typescript.yml
+    permissions:
+      contents: read
+
   # coverage re-runs the bats suite under kcov. Guarded by needs: [test-sh]
   # so the expensive kcov build doesn't run against a broken test suite.
   coverage:
@@ -79,7 +87,7 @@ jobs:
     name: all-checks
     runs-on: ubuntu-latest
     if: always()
-    needs: [shellcheck, shfmt, set-flags, claude-md-size, structure, test-sh, coverage]
+    needs: [shellcheck, shfmt, set-flags, claude-md-size, structure, test-sh, coverage, typescript]
     steps:
       - name: All checks passed
         run: |
