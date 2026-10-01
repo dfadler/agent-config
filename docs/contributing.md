@@ -136,7 +136,9 @@ nvm use            # TypeScript side: Node from .nvmrc, then `make node-modules`
 
 The TypeScript targets need the Node in `.nvmrc` (22.18+ for native type
 stripping — the system Homebrew Node may not qualify), so run `nvm use` first.
-Dependencies are pinned by `package-lock.json`; `make node-modules` runs `npm ci`.
+The package manager is pnpm, pinned by `packageManager` in `package.json`;
+dependencies are pinned by `pnpm-lock.yaml`, and `make node-modules` runs
+`pnpm install --frozen-lockfile`.
 
 `make check` uses `.venv` when it exists and otherwise falls back to whatever
 `python3` is on `PATH`, so a shell-only change doesn't require building one.

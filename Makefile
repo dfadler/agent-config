@@ -212,30 +212,31 @@ $(VENV_STAMP): requirements-dev.txt
 
 # TypeScript side (#420). Runs under the Node pinned in .nvmrc — `nvm use`
 # first; the system Node may be too old for native type stripping (22.18+).
-# A stamp file, like the venv's, so repeat runs skip `npm ci`.
+# The package manager is pnpm, pinned by `packageManager` in package.json.
+# A stamp file, like the venv's, so repeat runs skip the install.
 NODE_STAMP := node_modules/.installed
 
-node-modules: $(NODE_STAMP) ## Install pinned Node dependencies (npm ci)
+node-modules: $(NODE_STAMP) ## Install pinned Node dependencies (pnpm install --frozen-lockfile)
 
-$(NODE_STAMP): package.json package-lock.json
-	@npm ci --silent
+$(NODE_STAMP): package.json pnpm-lock.yaml
+	@pnpm install --frozen-lockfile --silent
 	@touch $(NODE_STAMP)
 	@echo "✓ node_modules ready"
 
 lint-ts: node-modules ## eslint over scripts/ts
-	@npm run --silent lint
+	@pnpm run --silent lint
 
 typecheck-ts: node-modules ## tsc --noEmit over the TypeScript sources
-	@npm run --silent typecheck
+	@pnpm run --silent typecheck
 
 test-ts: node-modules ## Run the node:test suite
-	@npm test --silent
+	@pnpm test --silent
 
 # Floor is a MEASURED baseline, same discipline as COVERAGE_MIN: the only
 # source today is the hash helper at 100%, and package.json holds the 90
 # floor so a future untested file can't quietly drag the number down.
 coverage-ts: node-modules ## Measure node:test coverage and enforce the floor
-	@npm run --silent coverage
+	@pnpm run --silent coverage
 
 lint: lint-sh lint-py ## Lint shell and Python
 

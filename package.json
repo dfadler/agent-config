@@ -3,6 +3,7 @@
   "private": true,
   "type": "module",
   "description": "TypeScript tooling for agent-config scripts. Not published; pins dev dependencies and exposes the commands the Makefile calls.",
+  "packageManager": "pnpm@11.13.0",
   "engines": {
     "node": ">=22.18"
   },
