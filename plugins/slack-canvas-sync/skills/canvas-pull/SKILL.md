@@ -116,4 +116,6 @@ committed (see `canvas-status`). The sync never deletes; the user does.
 ## Known limits
 
 - Canvases that were never pushed from this directory cannot be pulled in.
-- No navigation blocks yet: agent-config#424.
+- Each canvas's generated navigation block (breadcrumb, children, related) is never
+  pulled into a file, so it cannot cause a diff or a conflict. Edits made inside it
+  in Slack are not kept; they are reported at the next `canvas-push`.

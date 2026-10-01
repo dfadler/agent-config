@@ -53,6 +53,11 @@ Summarize, grouped:
 
 - **New** (`state: "new"`): no canvas yet; `canvas-push` creates one.
 - **Changed** (`state: "tracked"`, `local_changed: true`): has edits to push.
+- **Navigation out of date** (`nav_stale: true`): the file itself is unchanged but
+  the links in its canvas are not (a sibling was added, renamed, or removed). The
+  next `canvas-push` refreshes it. `CANVAS nav --root "$ROOT"` prints the block each
+  file should have, plus warnings such as a `related:` path that is not a synced
+  file; offer it when the user asks why a link looks wrong.
 - **Unchanged** tracked files, and files opted out with `sync: false`.
 - **Invalid** (`validation_errors > 0`): will be refused by `canvas-push`; offer
   to show the issues with `CANVAS validate < file`.

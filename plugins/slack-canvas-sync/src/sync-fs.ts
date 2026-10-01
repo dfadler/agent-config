@@ -24,10 +24,21 @@ import {
   bodyHash,
   emptyManifest,
   readManifest,
+  carriedFields,
+  withNavFields,
   writeManifest,
   type Manifest,
   type PendingDeletion,
 } from "./manifest.ts";
+import {
+  buildNavBlocks,
+  canvasUrl,
+  parseRelated,
+  planNav,
+  type NavAction,
+  type NavBlocks,
+  type NavFile,
+} from "./nav.ts";
 import { normalizeLocal, type Normalized } from "./normalize.ts";
 import {
   DELETE_STEPS,
@@ -40,6 +51,7 @@ import { applyPlan, nextEntry, planFile, type Plan } from "./plan.ts";
 import {
   parseRemoteRead,
   toUpdateBatches,
+  withNavEdit,
   type UpdateSection,
 } from "./slack-read.ts";
 import { validate, type Issue } from "./validate.ts";
@@ -170,6 +182,8 @@ export interface ScanFile {
   state: "new" | "tracked";
   canvas_id: string | null;
   local_changed: boolean;
+  /** The canvas's navigation block is out of date and needs a push. */
+  nav_stale: boolean;
   validation_errors: number;
 }
 
@@ -203,11 +217,13 @@ export function trackedInGit(root: string): string[] {
 export function scan(root: string): ScanResult {
   const manifest = loadManifest(root);
   const paths = listMarkdown(root);
+  const navBlocks = loadNav(root, manifest);
   const files = paths.map((path): ScanFile => {
     const text = readFileSync(absPath(root, path), "utf8");
     const sync = isSyncEnabled(parseFrontmatter(text));
     const local = normalizeLocal(text);
     const entry = manifest.files[path];
+    const desired = navBlocks.blocks.get(path) ?? "";
     return {
       path,
       sync,
@@ -218,6 +234,10 @@ export function scan(root: string): ScanResult {
         entry === undefined ||
         bodyHash(local.sections) !== entry.body_hash ||
         (local.title !== null && local.title !== entry.title),
+      nav_stale:
+        entry !== undefined &&
+        sync &&
+        (desired === "" ? undefined : hashText(desired)) !== entry.nav_hash,
       validation_errors: validate(text).filter((issue) => issue.severity === "error").length,
     };
   });
@@ -334,6 +354,33 @@ export interface PlanResult {
   read_fingerprint: string | null;
   conflicts: { local: string[]; remote: string[] }[];
   title_conflict: { local: string | null; remote: string | null } | null;
+  /** The canvas's navigation block, for an existing canvas. */
+  nav: {
+    action: NavAction;
+    /** Changed in Slack since the last push; applying discards that edit. */
+    edited_in_slack: boolean;
+    /** Pass to `record --nav-hash` after applying this plan. */
+    record_value: string;
+    warnings: string[];
+  } | null;
+}
+
+/** Navigation blocks for every synced file under the root. */
+export function loadNav(root: string, manifest: Manifest): NavBlocks {
+  const files: NavFile[] = [];
+  for (const path of listMarkdown(root)) {
+    const text = readFileSync(absPath(root, path), "utf8");
+    const frontmatter = parseFrontmatter(text);
+    if (!isSyncEnabled(frontmatter)) continue;
+    const entry = manifest.files[path];
+    files.push({
+      path,
+      title: normalizeLocal(text).title ?? defaultTitle(path),
+      url: entry === undefined ? null : canvasUrl(manifest, entry),
+      related: parseRelated(frontmatter.fields["related"]),
+    });
+  }
+  return buildNavBlocks(files);
 }
 
 /**
@@ -343,7 +390,8 @@ export interface PlanResult {
 export function planPush(root: string, rel: string, read: unknown): PlanResult {
   const { text, local } = readLocal(root, rel);
   const validation = validate(text);
-  const base = loadManifest(root).files[rel] ?? null;
+  const manifest = loadManifest(root);
+  const base = manifest.files[rel] ?? null;
   const blockedByValidation = validation.some((issue) => issue.severity === "error");
 
   if (read === null) {
@@ -364,6 +412,7 @@ export function planPush(root: string, rel: string, read: unknown): PlanResult {
       read_fingerprint: null,
       conflicts: [],
       title_conflict: null,
+      nav: null,
     };
   }
 
@@ -375,6 +424,15 @@ export function planPush(root: string, rel: string, read: unknown): PlanResult {
   const applied = applyPlan(plan, local, remote.content);
   const conflicted = applied.conflicts.length > 0 || applied.titleConflict !== null;
   const blocked = blockedByValidation ? "validation" : conflicted ? "conflict" : null;
+
+  const navBlocks = loadNav(root, manifest);
+  const nav = planNav({
+    desired: navBlocks.blocks.get(rel) ?? "",
+    base,
+    navId: remote.navId,
+    navText: remote.navText,
+    titleId: remote.titleId,
+  });
   return {
     path: rel,
     kind: "update",
@@ -383,10 +441,17 @@ export function planPush(root: string, rel: string, read: unknown): PlanResult {
     validation,
     chunks: countChunks(plan),
     create: null,
-    batches: blocked === null ? toUpdateBatches(applied.ops, remote) : [],
+    batches:
+      blocked === null ? withNavEdit(toUpdateBatches(applied.ops, remote), nav.edit) : [],
     read_fingerprint: readFingerprint(read),
     conflicts: applied.conflicts.map((c) => ({ local: c.local, remote: c.remote })),
     title_conflict: applied.titleConflict,
+    nav: {
+      action: nav.action,
+      edited_in_slack: nav.editedInSlack,
+      record_value: nav.recordValue,
+      warnings: navBlocks.warnings.get(rel) ?? [],
+    },
   };
 }
 
@@ -413,6 +478,7 @@ export function recordStep(
   after: "push" | "pull",
   now: string,
   canvasUrl?: string,
+  navHash?: string,
 ): RecordResult {
   const { local } = readLocal(root, rel);
   const manifest = loadManifest(root);
@@ -433,7 +499,7 @@ export function recordStep(
   }
   if (problem !== null) return { path: rel, recorded: false, remaining, problem };
 
-  const entry = nextEntry({
+  const stepped = nextEntry({
     base,
     plan,
     local,
@@ -441,7 +507,17 @@ export function recordStep(
     canvasId: remote.canvasId,
     now,
   });
-  if (canvasUrl !== undefined) entry.canvas_url = canvasUrl;
+  const withUrl = canvasUrl === undefined ? stepped : { ...stepped, canvas_url: canvasUrl };
+  // After a push, remember what the canvas's navigation block looks like now
+  // (so a later edit in Slack is noticed) and what we meant it to say. A pull
+  // changes neither.
+  const entry =
+    after === "push"
+      ? withNavFields(withUrl, {
+          hash: navHash === undefined ? withUrl.nav_hash : navHash === "none" ? undefined : navHash,
+          remote: remote.navText === null ? undefined : hashText(remote.navText),
+        })
+      : withUrl;
   manifest.files[rel] = entry;
   // A scratch canvas will need deleting by hand eventually; say so up front.
   if (base === null && isScratchTitle(remote.content.title)) {
@@ -499,14 +575,17 @@ export function pullStep(
     if (apply) {
       writeInside(root, file, renderLocalFile(null, remote.content.title, remote.content.body));
       const restored = normalizeLocal(readFileSync(file, "utf8"));
-      manifest.files[rel] = nextEntry({
-        base: null,
-        plan: planFile(null, restored, remote.content),
-        local: restored,
-        remoteIds: remote.sectionIds,
-        canvasId: remote.canvasId,
-        now,
-      });
+      manifest.files[rel] = {
+        ...nextEntry({
+          base: null,
+          plan: planFile(null, restored, remote.content),
+          local: restored,
+          remoteIds: remote.sectionIds,
+          canvasId: remote.canvasId,
+          now,
+        }),
+        ...carriedFields(base),
+      };
       saveManifest(root, manifest);
     }
     return {

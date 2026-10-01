@@ -8,8 +8,8 @@ across the issues listed there.
 ## Status
 
 Working: the TypeScript logic under `src/`, and the `canvas-push` and `canvas-pull`
-skills that drive it, plus `canvas-status` and pending-deletion tracking. Still to
-come: navigation blocks (#424) and a live verification pass (#426).
+skills that drive it, `canvas-status` and pending-deletion tracking, and generated
+navigation blocks. Still to come: a live verification pass (#426).
 
 ## Skills
 
@@ -32,6 +32,28 @@ come: navigation blocks (#424) and a live verification pass (#426).
 All three skills use only the Slack connector's canvas tools and never delete
 anything. They need the sync root (`CANVAS_SYNC_ROOT` or an argument) and Node
 22.18+ (see `.nvmrc`).
+
+## Navigation blocks
+
+Slack canvases are flat, so the folder tree is turned into a hierarchy with a
+generated callout at the top of each canvas (first line `:compass: **Navigation**`):
+
+- a **breadcrumb** of parent canvases (`Home > Projects > Alpha`),
+- a **Children** list, and
+- a **Related** list from the file's `related:` frontmatter (paths relative to the
+  file, e.g. `related: [beta.md, ../notes.md]`).
+
+A folder's canvas is its `index.md`; a file's parent is the nearest `index.md` in its
+folder or above. A lone note with no parent, children, or related links gets no
+block. Links are whole-canvas links, never section anchors (those embed section IDs
+that may not last).
+
+The block is derived, so it is never stored in a file: pull strips it, push
+regenerates it. It is compared by hash against what was last written and last read
+back, so how Slack stores it can never cause endless rewrites, and an edit made
+inside it in Slack is detected and reported before being overwritten. Creating a
+tree takes two passes: create the canvases, then update them so every link has a
+target (see the `canvas-push` skill). Not implemented: a backlinks section.
 
 ## Sync root layout
 

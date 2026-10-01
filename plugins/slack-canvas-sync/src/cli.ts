@@ -23,6 +23,8 @@ import {
   SyncError,
   pendingAdd,
   pendingList,
+  loadManifest,
+  loadNav,
   pendingResolve,
   planPush,
   pullStep,
@@ -58,9 +60,11 @@ result unless noted):
   scan --root DIR                 files, their state, missing files, pending deletions
   plan-push --root DIR --path P   plan pushing one file; empty stdin = no canvas yet.
                                   Never writes.
-  record --root DIR --path P --after push|pull [--canvas-url URL]
+  record --root DIR --path P --after push|pull [--canvas-url URL] [--nav-hash H]
                                   record a finished step from a fresh read; the
-                                  URL (from slack_create_canvas) is kept locally
+                                  URL (from slack_create_canvas) is kept locally;
+                                  H is the plan's nav.record_value
+  nav --root DIR                  the generated navigation block for every file
   pull --root DIR --path P [--apply]
                                   take canvas-only changes into the file; without
                                   --apply it only reports
@@ -178,7 +182,16 @@ function runPlan(stdin: string, now: string): CliResult {
   });
 }
 
-const VALUED_FLAGS = ["root", "path", "after", "canvas-id", "title", "reason", "canvas-url"];
+const VALUED_FLAGS = [
+  "root",
+  "path",
+  "after",
+  "canvas-id",
+  "title",
+  "reason",
+  "canvas-url",
+  "nav-hash",
+];
 
 function deletionReason(
   value: string | undefined,
@@ -232,6 +245,13 @@ function runRootCommand(command: string, rest: string[], stdin: string, now: str
   if (root === undefined) return fail(`${command}: --root is required`);
 
   if (command === "scan") return ok(scan(root));
+  if (command === "nav") {
+    const nav = loadNav(root, loadManifest(root));
+    return ok({
+      blocks: Object.fromEntries(nav.blocks),
+      warnings: Object.fromEntries(nav.warnings),
+    });
+  }
 
   const path = flag(parsed, "path");
   if (path === undefined) return fail(`${command}: --path is required`);
@@ -258,7 +278,15 @@ function runRootCommand(command: string, rest: string[], stdin: string, now: str
   if (command === "record") {
     const after = flag(parsed, "after");
     if (after !== "push" && after !== "pull") return fail("record: --after push|pull is required");
-    const result = recordStep(root, path, readValue, after, now, flag(parsed, "canvas-url"));
+    const result = recordStep(
+      root,
+      path,
+      readValue,
+      after,
+      now,
+      flag(parsed, "canvas-url"),
+      flag(parsed, "nav-hash"),
+    );
     return ok(result, result.recorded ? EXIT_OK : EXIT_FAILURE);
   }
 
@@ -301,6 +329,7 @@ export function run(argv: string[], stdin: string, now: string): CliResult {
     if (command === "pending") return runPending(rest, now);
     if (
       command === "scan" ||
+      command === "nav" ||
       command === "plan-push" ||
       command === "record" ||
       command === "pull" ||

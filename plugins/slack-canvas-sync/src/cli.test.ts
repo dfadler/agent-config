@@ -182,6 +182,7 @@ test("scan lists the files under a root", () => {
         state: "new",
         canvas_id: null,
         local_changed: true,
+        nav_stale: false,
         validation_errors: 0,
       },
     ],
@@ -189,6 +190,17 @@ test("scan lists the files under a root", () => {
     pending_manual_deletion: [],
     tracked_in_git: [],
   });
+});
+
+test("nav prints the generated navigation block per file, and warnings", () => {
+  const root = tempRoot({ "index.md": "# Home\n", "a.md": "---\nrelated: [nope.md]\n---\n\n# A\n" });
+  const out = json(run(["nav", "--root", root], "", NOW).stdout);
+  const blocks = field(out, "blocks");
+  assert.match(String(field(blocks, "a.md")), /Home/);
+  assert.match(String(field(blocks, "index.md")), /\*\*Children\*\*/);
+  assert.deepEqual(field(field(out, "warnings"), "a.md"), [
+    'related "nope.md" is not a synced file under the root',
+  ]);
 });
 
 test("pending entries are listed, added, and resolved through the CLI", () => {
