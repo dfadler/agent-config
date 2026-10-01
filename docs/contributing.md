@@ -174,8 +174,9 @@ the plugin so `Δ` shows what the skill adds). A case's `allowed_tools` cannot g
 `Bash`, `Write`, `Edit`, `WebFetch` or `WebSearch`: the run withholds them unless you pass
 `--allow-tools` (put the target first), so a grader that needs one can never pass and a
 `max: 0` check on it can never fail. Only `fetch-execute-guide` has cases
-today (`fetch-execute-asks-first` and `fetch-execute-runs-with-permission`, both listing
-`Bash`; their rework is tracked in [#442](https://github.com/dfadler/agent-config/issues/442));
+today (`fetch-execute-asks-first` and `fetch-execute-runs-with-permission`); each records
+its exact `--allow-tools` command in a comment at the top of its `case.yaml`, and the
+run needs that grant ([#442](https://github.com/dfadler/agent-config/issues/442));
 results land in `<plugin>/evals/results/<timestamp>/` (gitignored via `**/evals/results/`).
 `fetch-execute-guide` keeps its plugin wrapper (with `SKILL.md` at the plugin root) because bare skills have no eval path.
 `plugins/gha-ci-audit/evals/evals.json` is the separate skill-creator format, which
