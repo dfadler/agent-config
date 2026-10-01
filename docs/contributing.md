@@ -4,7 +4,8 @@
 
 1. Put it in the right place:
    - A **skill** → a new directory under `plugins/dfadler-agent-config/skills/`,
-     containing a `SKILL.md`.
+     containing a `SKILL.md`. Once the skill is stable, add evals — see
+     [`docs/plugin-evals.md`](./plugin-evals.md).
    - An **agent** → a new `.md` file under `plugins/dfadler-agent-config/agents/`.
    - A **slash command** → a new `.md` file under `claude/commands/`.
    - A **convention** (global guidance for `CLAUDE.md`) → first check
