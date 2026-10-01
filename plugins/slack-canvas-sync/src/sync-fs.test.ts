@@ -1,4 +1,5 @@
 import assert from "node:assert/strict";
+import { execFileSync } from "node:child_process";
 import {
   existsSync,
   mkdirSync,
@@ -20,11 +21,16 @@ import {
   defaultTitle,
   listMarkdown,
   loadManifest,
+  pendingAdd,
+  pendingList,
+  pendingResolve,
   planPush,
   pullStep,
   readFingerprint,
   recordStep,
+  retirePath,
   scan,
+  trackedInGit,
   type PlanResult,
   type RecordResult,
 } from "./sync-fs.ts";
@@ -383,6 +389,93 @@ test("paths that escape the root are rejected before any file is touched", () =>
   const canvas = new FakeCanvas("T", ["x"]);
   assert.throws(() => planPush(root, "../outside.md", null), SyncError);
   assert.throws(() => pullStep(root, "/etc/x.md", canvas.readResult(), true, NOW), SyncError);
+});
+
+// --- pending manual deletion ---
+
+test("a canvas created from a scratch-titled file is flagged for deletion up front", () => {
+  const root = makeRoot({
+    "scratch.md": "# [agent-sync-scratch] try it\n\nbody\n",
+    "real.md": "# Real\n\nbody\n",
+  });
+  const first = push(root, "scratch.md", null);
+  push(root, "real.md", null);
+  assert.equal(first.record?.recorded, true);
+
+  const pending = pendingList(root).pending;
+  assert.equal(pending.length, 1);
+  assert.deepEqual(
+    pending.map(({ reason, title }) => ({ reason, title })),
+    [{ reason: "test", title: "[agent-sync-scratch] try it" }],
+  );
+
+  writeFile(root, "scratch.md", "# [agent-sync-scratch] try it\n\nbody v2\n");
+  push(root, "scratch.md", first.canvas);
+  assert.equal(pendingList(root).pending.length, 1);
+});
+
+test("the canvas link given at record time is kept and survives later steps", () => {
+  const root = makeRoot({ "note.md": NOTE });
+  const out = push(root, "note.md", null);
+  assert.ok(out.canvas);
+  recordStep(root, "note.md", out.canvas.readResult(), "push", NOW, "https://example.invalid/docs/T/F1");
+  assert.equal(loadManifest(root).files["note.md"]?.canvas_url, "https://example.invalid/docs/T/F1");
+
+  out.canvas.uiEdit(0, "edited in Slack");
+  pullStep(root, "note.md", out.canvas.readResult(), true, NOW);
+  assert.equal(loadManifest(root).files["note.md"]?.canvas_url, "https://example.invalid/docs/T/F1");
+});
+
+test("retiring a file whose local copy is gone flags its canvas and stops tracking it", () => {
+  const root = makeRoot({ "note.md": NOTE });
+  const out = push(root, "note.md", null);
+  assert.ok(out.canvas);
+  recordStep(root, "note.md", out.canvas.readResult(), "push", NOW, "https://example.invalid/F1");
+
+  assert.throws(() => retirePath(root, "note.md", "local-file-removed", NOW), /still exists/);
+  rmSync(join(root, "note.md"));
+  assert.equal(scan(root).missing.length, 1);
+
+  const item = retirePath(root, "note.md", "local-file-removed", NOW);
+  assert.equal(item.canvas_url, "https://example.invalid/F1");
+  assert.deepEqual(loadManifest(root).files, {});
+  assert.deepEqual(scan(root).missing, []);
+  const listed = pendingList(root);
+  assert.equal(listed.pending[0]?.reason, "local-file-removed");
+  assert.match(listed.delete_steps, /Delete canvas/);
+});
+
+test("pending entries can be added by hand and cleared once the canvas is gone", () => {
+  const root = makeRoot({});
+  assert.deepEqual(pendingAdd(root, { canvasId: "FX", title: "Old", reason: "superseded" }, NOW), { added: true });
+  assert.deepEqual(pendingAdd(root, { canvasId: "FX", title: "Old", reason: "superseded" }, NOW), { added: false });
+  assert.equal(pendingList(root).pending.length, 1);
+  assert.deepEqual(pendingResolve(root, "FX"), { resolved: true });
+  assert.deepEqual(pendingResolve(root, "FX"), { resolved: false });
+  assert.deepEqual(pendingList(root).pending, []);
+});
+
+function git(cwd: string, ...args: string[]): void {
+  execFileSync("git", args, { cwd, stdio: "ignore" });
+}
+
+test("sync state that git tracks is reported", () => {
+  const root = makeRoot({ "note.md": NOTE });
+  push(root, "note.md", null);
+  assert.deepEqual(trackedInGit(root), []);
+
+  git(root, "init", "-q");
+  assert.deepEqual(trackedInGit(root), [], "state dir ignores itself");
+
+  writeFile(root, "sub/note.md.remote.md", "conflict copy\n");
+  git(root, "add", "-f", `${STATE_DIR}/manifest.json`, "sub/note.md.remote.md");
+  assert.deepEqual(trackedInGit(root).sort(), [`${STATE_DIR}/manifest.json`, "sub/note.md.remote.md"]);
+  assert.deepEqual(scan(root).tracked_in_git.length, 2);
+  assert.equal(pendingList(root).tracked_in_git.length, 2);
+});
+
+test("a root outside any git repository reports nothing tracked", () => {
+  assert.deepEqual(trackedInGit(makeRoot({ "a.md": NOTE })), []);
 });
 
 test("writes never follow a symlink out of the root", () => {

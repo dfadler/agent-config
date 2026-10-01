@@ -44,6 +44,8 @@ export interface FileEntry {
   body_hash: string;
   sections: SectionSnapshot[];
   last_synced_at: string;
+  /** Link to the canvas, from the create call. Local only; never shared. */
+  canvas_url?: string;
 }
 
 /** A canvas the user has to delete by hand (the connector cannot). */
@@ -52,7 +54,11 @@ export interface PendingDeletion {
   title: string | null;
   reason: DeletionReason;
   added_at: string;
+  canvas_url?: string;
 }
+
+/** Scratch and test canvases carry this title prefix so they are easy to spot. */
+export const SCRATCH_TITLE_PREFIX = "[agent-sync-scratch]";
 
 export interface Manifest {
   version: typeof MANIFEST_VERSION;
@@ -120,7 +126,16 @@ export function parseEntry(value: unknown, where: string): FileEntry {
       parseSection(section, `${where}.sections[${String(i)}]`),
     ),
     last_synced_at: str(value["last_synced_at"], `${where}.last_synced_at`),
+    ...optionalUrl(value, where),
   };
+}
+
+function optionalUrl(
+  value: Record<string, unknown>,
+  where: string,
+): { canvas_url?: string } {
+  const url = value["canvas_url"];
+  return url === undefined ? {} : { canvas_url: str(url, `${where}.canvas_url`) };
 }
 
 function parsePending(value: unknown, where: string): PendingDeletion {
@@ -134,6 +149,7 @@ function parsePending(value: unknown, where: string): PendingDeletion {
     title: strOrNull(value["title"], `${where}.title`),
     reason,
     added_at: str(value["added_at"], `${where}.added_at`),
+    ...optionalUrl(value, where),
   };
 }
 

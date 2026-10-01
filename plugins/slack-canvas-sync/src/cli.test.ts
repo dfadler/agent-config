@@ -187,7 +187,69 @@ test("scan lists the files under a root", () => {
     ],
     missing: [],
     pending_manual_deletion: [],
+    tracked_in_git: [],
   });
+});
+
+test("pending entries are listed, added, and resolved through the CLI", () => {
+  const root = tempRoot({});
+  const added = run(
+    ["pending", "add", "--root", root, "--canvas-id", "F7", "--reason", "superseded", "--title", "Old", "--canvas-url", "https://example.invalid/F7"],
+    "",
+    NOW,
+  );
+  assert.equal(added.code, EXIT_OK);
+  assert.deepEqual(json(added.stdout), { added: true });
+
+  const listed = json(run(["pending", "list", "--root", root], "", NOW).stdout);
+  assert.deepEqual(field(listed, "pending"), [
+    { canvas_id: "F7", title: "Old", reason: "superseded", added_at: NOW, canvas_url: "https://example.invalid/F7" },
+  ]);
+  assert.match(String(field(listed, "delete_steps")), /Delete canvas/);
+
+  const resolved = run(["pending", "resolve", "--root", root, "--canvas-id", "F7"], "", NOW);
+  assert.deepEqual(json(resolved.stdout), { resolved: true });
+  assert.deepEqual(field(json(run(["pending", "list", "--root", root], "", NOW).stdout), "pending"), []);
+});
+
+test("retire flags a removed file's canvas and refuses a file that still exists", () => {
+  const root = tempRoot({ "a.md": "# A\n\none\n" });
+  const canvas = new FakeCanvas("A", ["one"]);
+  run(
+    ["record", "--root", root, "--path", "a.md", "--after", "push", "--canvas-url", "https://example.invalid/F1"],
+    JSON.stringify(canvas.readResult()),
+    NOW,
+  );
+
+  const early = run(["retire", "--root", root, "--path", "a.md", "--reason", "superseded"], "", NOW);
+  assert.equal(early.code, EXIT_FAILURE);
+  assert.match(early.stderr, /still exists/);
+
+  rmSync(join(root, "a.md"));
+  const done = run(["retire", "--root", root, "--path", "a.md", "--reason", "local-file-removed"], "", NOW);
+  assert.equal(done.code, EXIT_OK);
+  assert.equal(field(field(json(done.stdout), "retired"), "canvas_url"), "https://example.invalid/F1");
+
+  const missing = run(["retire", "--root", root, "--path", "a.md", "--reason", "superseded"], "", NOW);
+  assert.equal(missing.code, EXIT_FAILURE);
+  assert.match(missing.stderr, /not tracked/);
+});
+
+test("pending and retire report usage problems as usage errors", () => {
+  const cases: [string[], RegExp][] = [
+    [["pending", "list"], /--root is required/],
+    [["pending", "bogus", "--root", "."], /expected list, add, or resolve/],
+    [["pending", "resolve", "--root", "."], /--canvas-id is required/],
+    [["pending", "add", "--root", ".", "--canvas-id", "F1"], /--reason .* is required/],
+    [["pending", "add", "--root", ".", "--canvas-id", "F1", "--reason", "because"], /--reason .* is required/],
+    [["retire", "--root", ".", "--path", "a.md"], /--reason local-file-removed\|superseded is required/],
+    [["retire", "--root", ".", "--path", "a.md", "--reason", "test"], /--reason local-file-removed\|superseded is required/],
+  ];
+  for (const [argv, pattern] of cases) {
+    const result = run(argv, "", NOW);
+    assert.equal(result.code, EXIT_USAGE, argv.join(" "));
+    assert.match(result.stderr, pattern);
+  }
 });
 
 test("push, record and pull run end to end through the CLI", () => {

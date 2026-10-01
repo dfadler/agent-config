@@ -146,6 +146,7 @@ export function nextEntry(args: {
     body_hash: bodyHashOfHashes(sections.map((section) => section.hash)),
     sections,
     last_synced_at: args.now,
+    ...(base?.canvas_url === undefined ? {} : { canvas_url: base.canvas_url }),
   };
 }
 

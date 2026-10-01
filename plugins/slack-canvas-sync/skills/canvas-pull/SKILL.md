@@ -108,6 +108,11 @@ Per file: pulled, restored, in sync, or conflicted. Remind the user that:
 - Conflict copies under `.canvas-sync/conflicts/` are ignored by git; delete them
   when resolved.
 
+Then run `CANVAS pending list --root "$ROOT"` and, if `pending` is not empty, show
+each canvas (title, reason, link) with the `delete_steps`. If `tracked_in_git` is
+not empty, warn that those files hold canvas IDs or content and must not be
+committed (see `canvas-status`). The sync never deletes; the user does.
+
 ## Known limits
 
 - Canvases that were never pushed from this directory cannot be pulled in.

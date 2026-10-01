@@ -17,6 +17,7 @@ import {
   writeFileSync,
 } from "node:fs";
 import { dirname, join, resolve, sep } from "node:path";
+import { execFileSync } from "node:child_process";
 import { hashText } from "../../../scripts/ts/hash.ts";
 import { isSyncEnabled, parseFrontmatter, renderLocalFile } from "./frontmatter.ts";
 import {
@@ -25,8 +26,16 @@ import {
   readManifest,
   writeManifest,
   type Manifest,
+  type PendingDeletion,
 } from "./manifest.ts";
 import { normalizeLocal, type Normalized } from "./normalize.ts";
+import {
+  DELETE_STEPS,
+  addPending,
+  isScratchTitle,
+  resolvePending,
+  retireFile,
+} from "./pending.ts";
 import { applyPlan, nextEntry, planFile, type Plan } from "./plan.ts";
 import {
   parseRemoteRead,
@@ -169,6 +178,26 @@ export interface ScanResult {
   /** In the manifest but gone from disk. Never pushed; pull restores them. */
   missing: { path: string; canvas_id: string }[];
   pending_manual_deletion: Manifest["pending_manual_deletion"];
+  /** Sync state or conflict copies that git tracks; they must not be. */
+  tracked_in_git: string[];
+}
+
+/**
+ * Files git tracks that hold canvas IDs or canvas content: anything under the
+ * state directory, and conflict copies anywhere. Empty when the root is not in
+ * a git repository or git is unavailable.
+ */
+export function trackedInGit(root: string): string[] {
+  try {
+    const out = execFileSync(
+      "git",
+      ["-C", realRoot(root), "ls-files", "-z", "--", STATE_DIR, "*.remote.md"],
+      { encoding: "utf8", stdio: ["ignore", "pipe", "ignore"] },
+    );
+    return out.split("\0").filter((path) => path !== "");
+  } catch {
+    return [];
+  }
 }
 
 export function scan(root: string): ScanResult {
@@ -200,7 +229,63 @@ export function scan(root: string): ScanResult {
       .map(([path, entry]) => ({ path, canvas_id: entry.canvas_id }))
       .sort((a, b) => a.path.localeCompare(b.path)),
     pending_manual_deletion: manifest.pending_manual_deletion,
+    tracked_in_git: trackedInGit(root),
   };
+}
+
+// --- pending manual deletion ---
+
+export interface PendingList {
+  pending: Manifest["pending_manual_deletion"];
+  /** How to delete a canvas in Slack. */
+  delete_steps: string;
+  tracked_in_git: string[];
+}
+
+export function pendingList(root: string): PendingList {
+  return {
+    pending: loadManifest(root).pending_manual_deletion,
+    delete_steps: DELETE_STEPS,
+    tracked_in_git: trackedInGit(root),
+  };
+}
+
+export function pendingAdd(
+  root: string,
+  item: Parameters<typeof addPending>[1],
+  now: string,
+): { added: boolean } {
+  const manifest = loadManifest(root);
+  const added = addPending(manifest, item, now);
+  if (added) saveManifest(root, manifest);
+  return { added };
+}
+
+export function pendingResolve(root: string, canvasId: string): { resolved: boolean } {
+  const manifest = loadManifest(root);
+  const resolved = resolvePending(manifest, canvasId);
+  if (resolved) saveManifest(root, manifest);
+  return { resolved };
+}
+
+/**
+ * Stop tracking a file whose local copy is gone and flag its canvas for manual
+ * deletion. Refuses while the file still exists so a live note is never
+ * orphaned by mistake.
+ */
+export function retirePath(
+  root: string,
+  rel: string,
+  reason: "local-file-removed" | "superseded",
+  now: string,
+): PendingDeletion {
+  if (existsSync(absPath(root, rel))) {
+    throw new SyncError(`${rel} still exists; remove or move it first`);
+  }
+  const manifest = loadManifest(root);
+  const item = retireFile(manifest, rel, reason, now);
+  saveManifest(root, manifest);
+  return item;
 }
 
 // --- plan ---
@@ -327,6 +412,7 @@ export function recordStep(
   read: unknown,
   after: "push" | "pull",
   now: string,
+  canvasUrl?: string,
 ): RecordResult {
   const { local } = readLocal(root, rel);
   const manifest = loadManifest(root);
@@ -347,7 +433,7 @@ export function recordStep(
   }
   if (problem !== null) return { path: rel, recorded: false, remaining, problem };
 
-  manifest.files[rel] = nextEntry({
+  const entry = nextEntry({
     base,
     plan,
     local,
@@ -355,6 +441,21 @@ export function recordStep(
     canvasId: remote.canvasId,
     now,
   });
+  if (canvasUrl !== undefined) entry.canvas_url = canvasUrl;
+  manifest.files[rel] = entry;
+  // A scratch canvas will need deleting by hand eventually; say so up front.
+  if (base === null && isScratchTitle(remote.content.title)) {
+    addPending(
+      manifest,
+      {
+        canvasId: remote.canvasId,
+        title: remote.content.title,
+        reason: "test",
+        canvasUrl: entry.canvas_url,
+      },
+      now,
+    );
+  }
   saveManifest(root, manifest);
   return { path: rel, recorded: true, remaining, problem: null };
 }
