@@ -170,8 +170,13 @@ down in a fixture, so it can't collide with a live session either.
 Behavioral tests for a skill live in `plugins/<name>/evals/<case>/case.yaml` (or
 `prompt.md` + `graders/`) and run with `claude plugin eval plugins/<name>` (Claude
 Code 2.1.269+; real model calls, so they cost money; each case runs with and without
-the plugin so `Δ` shows what the skill adds). Only `fetch-execute-guide` has cases
-today (`fetch-execute-asks-first` and `fetch-execute-runs-with-permission`); results land in the gitignored `evals/results/`.
+the plugin so `Δ` shows what the skill adds). A case's `allowed_tools` cannot grant
+`Bash`, `Write`, `Edit`, `WebFetch` or `WebSearch`: the run withholds them unless you pass
+`--allow-tools` (put the target first), so a grader that needs one can never pass and a
+`max: 0` check on it can never fail. Only `fetch-execute-guide` has cases
+today (`fetch-execute-asks-first` and `fetch-execute-runs-with-permission`, both listing
+`Bash`; their rework is tracked in [#442](https://github.com/dfadler/agent-config/issues/442));
+results land in `<plugin>/evals/results/<timestamp>/` (gitignored via `**/evals/results/`).
 `fetch-execute-guide` keeps its plugin wrapper (with `SKILL.md` at the plugin root) because bare skills have no eval path.
 `plugins/gha-ci-audit/evals/evals.json` is the separate skill-creator format, which
 `claude plugin eval` does not read. Docs: [plugin evals](https://code.claude.com/docs/en/plugin-evals);
