@@ -46,6 +46,8 @@ automatically, with no per-project copy to keep in sync.
   - `vite/` — skills and agents for authoring, reviewing, testing, and maintaining
     Vite plugins: lifecycle, hook selection, deprecation guards, testing patterns,
     and peer-dependency maintenance.
+  - `vitest/` — skills (`test-conventions`, `flaky-tests`) and a report-only
+    `flaky-test-investigator` agent for writing Vitest tests and reproducing flaky ones.
   - `worktree-core/` — `git-worktree-usage` skill plus hooks that enforce worktree
     isolation and auto-prune merged worktrees.
 - `docs/` — reference material for this repo's own tooling and CI.

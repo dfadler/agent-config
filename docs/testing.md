@@ -14,6 +14,10 @@ order with `--sequence.seed=<n>`.
 
 ## Hunting a flaky test
 
+The step-by-step procedure lives in the `vitest:flaky-tests` skill (and the
+`flaky-test-investigator` agent in `plugins/vitest/`); `.claude/rules/vitest.md`
+loads the short rules whenever Claude touches a test file. The flags:
+
 Flags are from the [Vitest CLI docs](https://vitest.dev/guide/cli.html) and
 [`maxWorkers`](https://vitest.dev/config/maxworkers). Extra args go straight
 after the pnpm script name; don't insert a `--`, because the flags after it
