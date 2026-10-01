@@ -1,0 +1,48 @@
+schema_version: "1.1"
+name: flaky-tests-ignores-deterministic-failure
+description: >
+  A test that fails every time with a clear assertion error is not flaky;
+  flaky-tests should stay out of the way and the failure should be fixed directly.
+tags: [vitest, flaky-tests, negative]
+
+execution:
+  prompt: |
+    This Vitest test fails every single time I run it:
+
+        import { expect, test } from "vitest";
+        import { sumUpTo } from "./sum.ts";
+
+        test("sumUpTo(3) is 6", () => {
+          expect(sumUpTo(3)).toBe(6);
+        });
+
+    and sum.ts is:
+
+        export function sumUpTo(n: number): number {
+          let total = 0;
+          for (let i = 1; i < n; i++) total += i;
+          return total;
+        }
+
+    The error is "expected 3 to be 6". What's wrong?
+  max_turns: 4
+  allowed_tools:
+    - Skill
+
+graders:
+  - name: flaky_tests_not_invoked
+    type: tool_used
+    tool: Skill
+    input_match: '"skill"\s*:\s*"(?:[\w-]+:)?flaky-tests"'
+    min: 0
+    max: 0
+    arm: both
+
+  - name: fixes_off_by_one
+    type: llm
+    criteria: |
+      PASS only if the response identifies the off-by-one bug (the loop should
+      use i <= n, or equivalent) AND does not suggest --repeats, shuffle seeds,
+      worker throttling, or retries.
+      FAIL if it treats the failure as flaky or intermittent, or does not
+      identify the loop bound as the cause.

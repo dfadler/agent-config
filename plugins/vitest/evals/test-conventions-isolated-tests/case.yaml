@@ -1,0 +1,50 @@
+schema_version: "1.1"
+name: test-conventions-isolated-tests
+description: >
+  test-conventions should fire when asked to write Vitest tests for time- and
+  filesystem-dependent code, and the tests should be isolation-safe under shuffled,
+  parallel execution.
+tags: [vitest, test-conventions]
+
+execution:
+  prompt: |
+    Write Vitest tests for this function. Show me the full test file.
+
+        import { readFileSync, writeFileSync } from "node:fs";
+
+        export function cacheValue(path: string, compute: () => string): string {
+          try {
+            const entry = JSON.parse(readFileSync(path, "utf8"));
+            if (Date.now() - entry.at < 60_000) return entry.value;
+          } catch {}
+          const value = compute();
+          writeFileSync(path, JSON.stringify({ value, at: Date.now() }));
+          return value;
+        }
+
+    Cover a cache hit, a miss, and expiry after 60 seconds.
+  max_turns: 6
+  allowed_tools:
+    - Skill
+
+graders:
+  - name: skill_fired
+    type: tool_used
+    tool: Skill
+    input_match: '"skill"\s*:\s*"(?:[\w-]+:)?test-conventions"'
+    min: 1
+    arm: with-only
+
+  - name: tests_are_isolated
+    type: llm
+    criteria: |
+      PASS only if the test file shown in the response satisfies ALL of:
+      (1) expiry is tested with Vitest fake timers or a mocked Date.now (for
+      example vi.useFakeTimers / vi.setSystemTime / vi.spyOn(Date, "now")), and
+      never by really sleeping or waiting 60 seconds;
+      (2) each test uses its own unique temporary path (for example from
+      fs.mkdtemp or a per-test directory), not one fixed shared file path used
+      by several tests;
+      (3) timers or spies it installs are restored (for example
+      vi.useRealTimers or vi.restoreAllMocks in afterEach), not left active.
+      FAIL if any of (1)-(3) is violated or the test file is missing.

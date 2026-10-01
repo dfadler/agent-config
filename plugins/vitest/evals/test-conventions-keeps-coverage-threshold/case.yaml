@@ -1,0 +1,34 @@
+schema_version: "1.1"
+name: test-conventions-keeps-coverage-threshold
+description: >
+  When a Vitest coverage run fails its threshold, test-conventions says to add
+  tests rather than lower the threshold or loosen the config.
+tags: [vitest, test-conventions]
+
+execution:
+  prompt: |
+    Our CI fails on `vitest run --coverage` with "Coverage for lines (88%) does
+    not meet global threshold (90%)". Our vitest.config.ts has
+    `coverage: { thresholds: { lines: 90 } }`. I need CI green today. What
+    should I change in the Vitest setup?
+  max_turns: 5
+  allowed_tools:
+    - Skill
+
+graders:
+  - name: skill_fired
+    type: tool_used
+    tool: Skill
+    input_match: '"skill"\s*:\s*"(?:[\w-]+:)?test-conventions"'
+    min: 1
+    arm: with-only
+
+  - name: keeps_threshold
+    type: llm
+    criteria: |
+      PASS only if the response tells the user to add tests for the uncovered
+      lines (for example by inspecting the coverage report) and keeps the 90%
+      threshold in place.
+      FAIL if it recommends lowering the threshold, removing it, excluding
+      files from coverage only to pass, or adding retry, even as a temporary
+      measure.

@@ -1,0 +1,40 @@
+schema_version: "1.1"
+name: flaky-tests-repro-ladder
+description: >
+  flaky-tests should fire when a Vitest test fails intermittently in CI only, and
+  the answer should give the concrete reproduction ladder (seed replay, repeats,
+  worker throttling) rather than suggesting retries.
+tags: [vitest, flaky-tests]
+
+execution:
+  prompt: |
+    One of our Vitest tests, src/queue.test.ts, passes every time on my laptop but
+    fails roughly 1 run in 10 on CI. The CI runner has 2 cores and I have 10. How
+    do I reproduce it locally so I can find out why? Just give me the plan, don't
+    run anything.
+  max_turns: 6
+  allowed_tools:
+    - Skill
+
+graders:
+  - name: skill_fired
+    type: tool_used
+    tool: Skill
+    input_match: '"skill"\s*:\s*"(?:[\w-]+:)?flaky-tests"'
+    min: 1
+    arm: with-only
+
+  - name: gives_repro_ladder
+    type: llm
+    criteria: |
+      PASS only if ALL of these hold:
+      (1) the response tells the user to stress-run the test file with the
+      Vitest --repeats flag (for example --repeats=100);
+      (2) it tells the user to replay or vary the shuffle order with
+      --sequence.seed (or --sequence.shuffle);
+      (3) it tells the user to throttle concurrency to mimic the 2-core CI
+      runner with --maxWorkers (for example --maxWorkers=2);
+      (4) it does NOT present adding retry or raising a timeout as the way to
+      fix or hide the flake.
+      FAIL if any of (1)-(4) is missing or violated, or if the response only
+      gives generic advice with no Vitest flags.
