@@ -1,0 +1,21 @@
+{
+  "name": "agent-config-scripts",
+  "private": true,
+  "type": "module",
+  "description": "TypeScript tooling for agent-config scripts. Not published; pins dev dependencies and exposes the commands the Makefile calls.",
+  "engines": {
+    "node": ">=22.18"
+  },
+  "scripts": {
+    "lint": "eslint scripts/ts",
+    "typecheck": "tsc --noEmit",
+    "test": "node --test 'scripts/ts/**/*.test.ts'",
+    "coverage": "node --test --experimental-test-coverage --test-coverage-include='scripts/ts/**/*.ts' --test-coverage-exclude='**/*.test.ts' --test-coverage-lines=90 'scripts/ts/**/*.test.ts'"
+  },
+  "devDependencies": {
+    "@types/node": "22.20.4",
+    "eslint": "10.11.0",
+    "typescript": "6.0.3",
+    "typescript-eslint": "8.71.0"
+  }
+}

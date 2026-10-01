@@ -124,13 +124,19 @@ make check          # lint + structure + typecheck + test + actionlint + coverag
 | `make test-sh` | `bats` suites under `scripts/tests/` |
 | `make test-py` | `pytest` suite under `scripts/tests/` |
 | `make coverage` | Re-runs the `bats` suites under `kcov` and enforces the coverage floor (Linux only) |
+| `make lint-ts` / `typecheck-ts` / `test-ts` / `coverage-ts` | `eslint`, `tsc --noEmit`, `node:test`, and its coverage floor over `scripts/ts/` |
 | `make fmt` | Rewrites sources to the repo's `shfmt` / `ruff` style |
 | `make lint-actions` | `actionlint` over `.github/workflows/` |
 
 ```bash
 brew install shellcheck shfmt bats-core actionlint
 make venv          # Python side: .venv from requirements-dev.txt
+nvm use            # TypeScript side: Node from .nvmrc, then `make node-modules`
 ```
+
+The TypeScript targets need the Node in `.nvmrc` (22.18+ for native type
+stripping — the system Homebrew Node may not qualify), so run `nvm use` first.
+Dependencies are pinned by `package-lock.json`; `make node-modules` runs `npm ci`.
 
 `make check` uses `.venv` when it exists and otherwise falls back to whatever
 `python3` is on `PATH`, so a shell-only change doesn't require building one.
