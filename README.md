@@ -38,8 +38,9 @@ automatically, with no per-project copy to keep in sync.
     verification. Uses `gh-attach-image` to upload results.
   - `second-brain/` — vault-path-agnostic Obsidian skills (capture, query, config,
     sync). Vault path resolves from `SECOND_BRAIN_VAULT_PATH` env var or
-    `secondBrain.vaultPath` in `~/.claude/settings.json`. Degrades gracefully when
-    the Obsidian MCP is disconnected.
+    `secondBrain.vaultPath` in `~/.claude/settings.json`. The config skill degrades
+    gracefully when the Obsidian MCP is disconnected; capture, query, and sync
+    require it.
   - `typescript-gotchas/` — TypeScript/JS patterns that compile but cause runtime
     bugs or are better expressed with a safer API (e.g. `.at()` over indexed reads).
   - `vite/` — skills and agents for authoring, reviewing, testing, and maintaining
