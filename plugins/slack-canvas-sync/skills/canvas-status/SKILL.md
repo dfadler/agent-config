@@ -92,19 +92,29 @@ there is one (`canvas_url`). Then show `delete_steps` once. Reasons:
 
 If the list is empty, say so.
 
-**Optional check (only if the user wants it):** for each entry, call
-`slack_read_canvas` with its `canvas_id`. If the call fails because the canvas no
-longer exists (a not-found error such as `canvas_not_found`), the user already
-deleted it:
+**Optional check (only if the user wants it):** see whether each entry's canvas is
+already gone. Verified live (agent-config#426): a canvas deleted in Slack **can
+still be read** for a while (Slack lets the owner restore a deleted canvas for 24
+hours), but **writing to it fails with `file_not_found`**, and reading an ID that
+never existed or has been purged also fails with `file_not_found`. So:
+
+1. Call `slack_read_canvas` with the entry's `canvas_id`. If it fails with
+   `file_not_found`, the canvas is gone.
+2. If the read succeeds, probe with a no-op write: call `slack_update_canvas` with
+   one `replace` of the title section (the first key of `section_id_mapping`) with
+   exactly its current text. If that fails with `file_not_found`, the canvas is
+   deleted. If it succeeds, the canvas still exists and nothing changed except its
+   last-edited time; leave the entry. Only do this for canvases on the pending
+   list, which are waiting to be deleted anyway.
+
+When the canvas is gone:
 
 ```bash
 CANVAS pending resolve --root "$ROOT" --canvas-id "$ID"
 ```
 
 Any other error (permissions, rate limits): leave the entry and report the error.
-The exact error a deleted canvas returns through the connector is not yet
-verified (agent-config#426), so if the result is ambiguous, ask the user instead
-of clearing.
+If the result is ambiguous, ask the user instead of clearing.
 
 **When the user says they deleted one**, run `pending resolve` for it. Do not
 clear entries on any other signal.

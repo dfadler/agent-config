@@ -161,8 +161,16 @@ Verified against a live Pro workspace (#426), details in the issue:
   the sync cannot warn per section. It can only tell that the canvas has open
   threads.
 
-Not verified live: the error a deleted canvas returns, whether a comment still shows
-attached in the Slack UI after its section is replaced or deleted, and rate limits on
-a large first sync (docs only: create is Tier 2, update Tier 3).
+- Deleted canvases: after a canvas is deleted in Slack, `slack_read_canvas` **still
+  returns its content** (Slack allows restoring a deleted canvas for 24 hours), but
+  `slack_update_canvas` fails with `file_not_found`; reading an ID that never existed
+  fails with `file_not_found` too. A push to a deleted canvas therefore fails loudly,
+  and `canvas-status` detects a deleted canvas with a no-op title write rather than
+  a read.
+
+Not verified live: whether a comment still shows attached in the Slack UI after its
+section is replaced or deleted, whether a read starts failing once Slack purges a
+deleted canvas, and rate limits on a large first sync (docs only: create is Tier 2,
+update Tier 3).
 
 Run with `make test-ts` (needs the Node from `.nvmrc`).
