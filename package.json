@@ -8,10 +8,10 @@
     "node": ">=22.18"
   },
   "scripts": {
-    "lint": "eslint scripts/ts",
+    "lint": "eslint scripts/ts 'plugins/*/src/**/*.ts'",
     "typecheck": "tsc --noEmit",
-    "test": "node --test 'scripts/ts/**/*.test.ts'",
-    "coverage": "node --test --experimental-test-coverage --test-coverage-include='scripts/ts/**/*.ts' --test-coverage-exclude='**/*.test.ts' --test-coverage-lines=90 'scripts/ts/**/*.test.ts'"
+    "test": "node --test 'scripts/ts/**/*.test.ts' 'plugins/*/src/**/*.test.ts'",
+    "coverage": "node --test --experimental-test-coverage --test-coverage-include='scripts/ts/**/*.ts' --test-coverage-include='plugins/*/src/**/*.ts' --test-coverage-exclude='**/*.test.ts' --test-coverage-lines=90 'scripts/ts/**/*.test.ts' 'plugins/*/src/**/*.test.ts'"
   },
   "devDependencies": {
     "@types/node": "22.20.4",
