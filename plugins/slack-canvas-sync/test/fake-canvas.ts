@@ -15,11 +15,14 @@ import {
 } from "../src/normalize.ts";
 import { applyPlan, planFile, type Applied, type Plan, type RemoteOp } from "../src/plan.ts";
 import { snapshotFile, type FileEntry } from "../src/manifest.ts";
+import type { UpdateSection } from "../src/slack-read.ts";
 
 interface Section {
   id: string;
   text: string;
 }
+
+const TITLE_ID = "temp:C:VLOTITLE";
 
 export class FakeCanvas {
   title: string;
@@ -47,6 +50,65 @@ export class FakeCanvas {
 
   texts(): string[] {
     return this.sections.map((section) => section.text);
+  }
+
+  /** The exact shape of a `slack_read_canvas` result. */
+  readResult(canvasId = "FTEST000001"): {
+    canvas_id: string;
+    markdown_content: string;
+    section_id_mapping: Record<string, string>;
+  } {
+    const mapping: Record<string, string> = { [TITLE_ID]: `# ${this.title}` };
+    for (const section of this.sections) mapping[section.id] = section.text;
+    return {
+      canvas_id: canvasId,
+      markdown_content: this.read().markdown,
+      section_id_mapping: mapping,
+    };
+  }
+
+  /**
+   * What `slack_update_canvas` does with a `sections` argument: edits are
+   * addressed by section ID and applied atomically. Replacing the title
+   * section renames; appending after it inserts at the top of the body.
+   */
+  applyUpdate(edits: UpdateSection[]): void {
+    const known = new Set([TITLE_ID, ...this.sections.map((s) => s.id)]);
+    const replaced = new Map<string, string>();
+    const deleted = new Set<string>();
+    const appended = new Map<string, string>();
+    for (const edit of edits) {
+      if (!known.has(edit.section_id)) {
+        throw new Error(`unknown section ${edit.section_id}`);
+      }
+      if (edit.edit_type === "delete") deleted.add(edit.section_id);
+      else if (edit.edit_type === "replace") replaced.set(edit.section_id, edit.content ?? "");
+      else appended.set(edit.section_id, edit.content ?? "");
+    }
+    const title = replaced.get(TITLE_ID);
+    if (title !== undefined) this.title = title.replace(/^#\s+/, "");
+
+    const next: Section[] = [];
+    const addAfter = (id: string): void => {
+      const text = appended.get(id);
+      if (text === undefined) return;
+      for (const piece of normalizeSections(text)) next.push(this.make(piece));
+    };
+    addAfter(TITLE_ID);
+    for (const section of this.sections) {
+      if (!deleted.has(section.id)) {
+        const text = replaced.get(section.id);
+        if (text === undefined) {
+          next.push(section);
+        } else {
+          const [first, ...rest] = normalizeSections(text);
+          next.push({ id: section.id, text: first ?? "" });
+          for (const piece of rest) next.push(this.make(piece));
+        }
+      }
+      addAfter(section.id);
+    }
+    this.sections = next;
   }
 
   /**

@@ -5,7 +5,7 @@
 
 import { hashText } from "../../../scripts/ts/hash.ts";
 import { diff3, diff3Scalar, type Chunk, type ChunkKind } from "./diff3.ts";
-import type { FileEntry } from "./manifest.ts";
+import { bodyHashOfHashes, type FileEntry } from "./manifest.ts";
 import { renderSections, type Normalized } from "./normalize.ts";
 
 export type PlanStatus = "in-sync" | "push" | "pull" | "mixed" | "conflict";
@@ -64,7 +64,12 @@ export function planFile(
     hashes(local.sections),
     hashes(remote.sections),
   );
-  const title = diff3Scalar(base?.title ?? null, local.title, remote.title);
+  // A file with no title of its own never renames the canvas or takes the
+  // canvas's name, so the title is simply not part of the comparison.
+  const title =
+    local.title === null
+      ? "same"
+      : diff3Scalar(base?.title ?? null, local.title, remote.title);
 
   const kinds = new Set<ChunkKind>([title, ...chunks.map((c) => c.kind)]);
   const push = kinds.has("push");
@@ -104,6 +109,44 @@ function opsForPush(
       text: incoming.slice(paired).join("\n\n"),
     });
   }
+}
+
+/**
+ * The manifest entry to record after a sync step, given a plan made from the
+ * state *after* that step. One rule covers push and pull alike: sections the
+ * two sides now agree on become the new base; anything still pending
+ * (a push not yet made, a pull not yet taken, a conflict) keeps its old base,
+ * so the next run still sees it as a change.
+ */
+export function nextEntry(args: {
+  base: FileEntry | null;
+  plan: Plan;
+  local: Normalized;
+  remoteIds: string[];
+  canvasId: string;
+  now: string;
+}): FileEntry {
+  const { base, plan, local } = args;
+  const sections: FileEntry["sections"] = [];
+  for (const chunk of plan.chunks) {
+    if (chunk.kind === "same" || chunk.kind === "converged") {
+      for (let k = 0; k < chunk.local.end - chunk.local.start; k += 1) {
+        const hash = hashText(local.sections[chunk.local.start + k] ?? "");
+        const id = args.remoteIds[chunk.remote.start + k];
+        sections.push(id === undefined ? { hash } : { hash, section_id: id });
+      }
+    } else if (base !== null) {
+      sections.push(...base.sections.slice(chunk.base.start, chunk.base.end));
+    }
+  }
+  const adoptTitle = plan.title === "same" || plan.title === "converged";
+  return {
+    canvas_id: args.canvasId,
+    title: adoptTitle ? local.title : (base?.title ?? null),
+    body_hash: bodyHashOfHashes(sections.map((section) => section.hash)),
+    sections,
+    last_synced_at: args.now,
+  };
 }
 
 /** Resolve a plan into canvas edits, new local content and conflicts. */

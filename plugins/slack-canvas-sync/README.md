@@ -7,9 +7,30 @@ across the issues listed there.
 
 ## Status
 
-Scaffold. Today this holds the pure TypeScript logic the skills will call, under
-`src/`. Skills (`canvas-push`, `canvas-pull`, `canvas-status`) land in follow-up
-issues.
+Working: the TypeScript logic under `src/`, and the `canvas-push` and `canvas-pull`
+skills that drive it. Still to come: navigation blocks (#424), `canvas-status` and
+pending-deletion tracking (#425), and a live verification pass (#426).
+
+## Skills
+
+- **`canvas-push`**: creates canvases for new files and sends local edits to synced
+  ones, section by section. Dry run first; nothing is written to Slack until you
+  confirm. Stops on conflicts.
+- **`canvas-pull`**: brings canvas-only changes into the local files, keeping
+  unsent local edits and each file's frontmatter. On a conflict it saves the
+  canvas's version under `.canvas-sync/conflicts/` and writes nothing else.
+
+Both are user-invoked only (`disable-model-invocation`), use only the Slack
+connector's canvas tools, and never delete anything. They need the sync root
+(`CANVAS_SYNC_ROOT` or an argument) and Node 22.18+ (see `.nvmrc`).
+
+## Sync root layout
+
+One dedicated directory. Each `.md` file is one canvas; its title is the
+frontmatter `title:`, else a leading `# Heading`, else the file name. Files with
+`canvas_sync: false` in frontmatter are skipped. State lives in
+`<root>/.canvas-sync/` (manifest and conflict copies), which holds a `.gitignore`
+that ignores everything in it, so canvas IDs never reach git.
 
 ## `src/normalize.ts`
 
@@ -61,6 +82,11 @@ node plugins/slack-canvas-sync/src/bin.ts normalize --side local < note.md
 node plugins/slack-canvas-sync/src/bin.ts validate < note.md
 node plugins/slack-canvas-sync/src/bin.ts plan < plan-input.json
 ```
+
+The skills use the sync-root commands (`scan`, `plan-push`, `record`, `pull`,
+`fingerprint`); `--help` lists them. `src/sync-fs.ts` rejects any path that is
+absolute, contains `..`, is not a `.md` file, or would write through a symlink out
+of the root.
 
 Needs the Node from `.nvmrc`. Exit codes: 0 ok, 1 the check found a problem
 (validation errors, bad input shape), 2 usage error.

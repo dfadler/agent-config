@@ -1,7 +1,7 @@
 /**
- * JSON-in/JSON-out entry point for the sync logic, so skills can call it
- * instead of reimplementing any of it. Pure: input text in, result out. The
- * only process-touching code is in `bin.ts`.
+ * JSON-in/JSON-out entry point for the sync logic, so skills call this instead
+ * of reimplementing any of it. Input text in, result out; the only code that
+ * touches the process is in `bin.ts`.
  *
  * Exit codes follow the repo's shell taxonomy: 0 ok, 1 the check ran and
  * found something wrong, 2 usage error.
@@ -11,6 +11,15 @@ import { hashText } from "../../../scripts/ts/hash.ts";
 import { ManifestError, parseEntry, snapshotFile, bodyHash } from "./manifest.ts";
 import { normalizeLocal, normalizeRemote } from "./normalize.ts";
 import { applyPlan, planFile } from "./plan.ts";
+import { ReadError } from "./slack-read.ts";
+import {
+  SyncError,
+  planPush,
+  pullStep,
+  readFingerprint,
+  recordStep,
+  scan,
+} from "./sync-fs.ts";
 import { validate } from "./validate.ts";
 
 export const EXIT_OK = 0;
@@ -25,12 +34,24 @@ export interface CliResult {
 
 export const USAGE = `Usage: bin.ts <command> [options] < input
 
-Commands (input on stdin, JSON result on stdout):
+Pure commands (input on stdin, JSON result on stdout):
   normalize --side local|remote   markdown -> title, sections, hashes
   validate                        markdown -> canvas-rule issues (exit 1 on errors)
   plan                            {entry, local, remote, canvas_id?, section_ids?}
                                   -> status, chunks, canvas edits, new local
                                   content, conflicts, and the next manifest entry
+  fingerprint                     slack_read_canvas result -> change fingerprint
+
+Sync-root commands (--root DIR is the sync root; stdin is a slack_read_canvas
+result unless noted):
+  scan --root DIR                 files, their state, missing files, pending deletions
+  plan-push --root DIR --path P   plan pushing one file; empty stdin = no canvas yet.
+                                  Never writes.
+  record --root DIR --path P --after push|pull
+                                  record a finished step from a fresh read
+  pull --root DIR --path P [--apply]
+                                  take canvas-only changes into the file; without
+                                  --apply it only reports
 
   -h, --help                      show this message
 `;
@@ -53,13 +74,48 @@ function requireString(input: Record<string, unknown>, key: string): string {
   return value;
 }
 
-function runPlan(stdin: string, now: string): CliResult {
-  let input: unknown;
-  try {
-    input = JSON.parse(stdin);
-  } catch {
-    return fail("plan: stdin is not valid JSON");
+/** Parse `--key value` pairs and bare boolean flags. */
+function parseFlags(
+  args: string[],
+  valued: readonly string[],
+  boolean: readonly string[],
+): Map<string, string | true> | string {
+  const flags = new Map<string, string | true>();
+  for (let i = 0; i < args.length; i += 1) {
+    const arg = args[i] ?? "";
+    const name = arg.replace(/^--/, "");
+    if (!arg.startsWith("--")) return `unexpected argument "${arg}"`;
+    if (boolean.includes(name)) {
+      flags.set(name, true);
+    } else if (valued.includes(name)) {
+      const value = args[i + 1];
+      if (value === undefined || value.startsWith("--")) return `--${name} needs a value`;
+      flags.set(name, value);
+      i += 1;
+    } else {
+      return `unknown option "${arg}"`;
+    }
   }
+  return flags;
+}
+
+function flag(flags: Map<string, string | true>, name: string): string | undefined {
+  const value = flags.get(name);
+  return typeof value === "string" ? value : undefined;
+}
+
+function parseJson(text: string): { value: unknown } | null {
+  try {
+    return { value: JSON.parse(text) };
+  } catch {
+    return null;
+  }
+}
+
+function runPlan(stdin: string, now: string): CliResult {
+  const parsed = parseJson(stdin);
+  if (parsed === null) return fail("plan: stdin is not valid JSON");
+  const input = parsed.value;
   if (!isRecord(input)) return fail("plan: stdin must be a JSON object");
 
   const entry = input["entry"];
@@ -98,6 +154,43 @@ function runPlan(stdin: string, now: string): CliResult {
   });
 }
 
+function runRootCommand(command: string, rest: string[], stdin: string, now: string): CliResult {
+  const parsed = parseFlags(
+    rest,
+    ["root", "path", "after"],
+    command === "pull" ? ["apply"] : [],
+  );
+  if (typeof parsed === "string") return fail(`${command}: ${parsed}`);
+  const root = flag(parsed, "root");
+  if (root === undefined) return fail(`${command}: --root is required`);
+
+  if (command === "scan") return ok(scan(root));
+
+  const path = flag(parsed, "path");
+  if (path === undefined) return fail(`${command}: --path is required`);
+
+  const read = stdin.trim() === "" ? null : parseJson(stdin);
+  if (stdin.trim() !== "" && read === null) return fail(`${command}: stdin is not valid JSON`);
+  const readValue = read === null ? null : read.value;
+
+  if (command === "plan-push") {
+    const result = planPush(root, path, readValue);
+    return ok(result, result.blocked === null ? EXIT_OK : EXIT_FAILURE);
+  }
+
+  if (readValue === null) return fail(`${command}: a slack_read_canvas result is required on stdin`);
+
+  if (command === "record") {
+    const after = flag(parsed, "after");
+    if (after !== "push" && after !== "pull") return fail("record: --after push|pull is required");
+    const result = recordStep(root, path, readValue, after, now);
+    return ok(result, result.recorded ? EXIT_OK : EXIT_FAILURE);
+  }
+
+  const result = pullStep(root, path, readValue, parsed.get("apply") === true, now);
+  return ok(result, result.blocked === null ? EXIT_OK : EXIT_FAILURE);
+}
+
 /** Run one command. `now` is injected so results stay deterministic. */
 export function run(argv: string[], stdin: string, now: string): CliResult {
   const [command, ...rest] = argv;
@@ -125,8 +218,26 @@ export function run(argv: string[], stdin: string, now: string): CliResult {
       return ok({ ok: !hasError, issues }, hasError ? EXIT_FAILURE : EXIT_OK);
     }
     if (command === "plan") return runPlan(stdin, now);
+    if (command === "fingerprint") {
+      const parsed = parseJson(stdin);
+      if (parsed === null) return fail("fingerprint: stdin is not valid JSON");
+      return ok({ fingerprint: readFingerprint(parsed.value) });
+    }
+    if (
+      command === "scan" ||
+      command === "plan-push" ||
+      command === "record" ||
+      command === "pull"
+    ) {
+      return runRootCommand(command, rest, stdin, now);
+    }
   } catch (error) {
-    if (error instanceof ManifestError || error instanceof TypeError) {
+    if (
+      error instanceof SyncError ||
+      error instanceof ReadError ||
+      error instanceof ManifestError ||
+      error instanceof TypeError
+    ) {
       return fail(`${command}: ${error.message}`, EXIT_FAILURE);
     }
     throw error;
