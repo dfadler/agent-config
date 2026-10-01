@@ -36,6 +36,15 @@ automatically, with no per-project copy to keep in sync.
   - `screen-capture/` — screenshot (PNG) and walkthrough video (MP4) capture,
     before/after comparison, Lighthouse, and attach skills for PR/issue visual
     verification. Uses `gh-attach-image` to upload results.
+  - `second-brain/` — vault-path-agnostic Obsidian skills (capture, query, config,
+    sync). Vault path resolves from `SECOND_BRAIN_VAULT_PATH` env var or
+    `secondBrain.vaultPath` in `~/.claude/settings.json`. Degrades gracefully when
+    the Obsidian MCP is disconnected.
+  - `typescript-gotchas/` — TypeScript/JS patterns that compile but cause runtime
+    bugs or are better expressed with a safer API (e.g. `.at()` over indexed reads).
+  - `vite/` — skills and agents for authoring, reviewing, testing, and maintaining
+    Vite plugins: lifecycle, hook selection, deprecation guards, testing patterns,
+    and peer-dependency maintenance.
   - `worktree-core/` — `git-worktree-usage` skill plus hooks that enforce worktree
     isolation and auto-prune merged worktrees.
 - `docs/` — reference material for this repo's own tooling and CI.
