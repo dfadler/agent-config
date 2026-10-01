@@ -154,8 +154,15 @@ Verified against a live Pro workspace (#426), details in the issue:
   sent (the normalizer already renumbers lists and drops table alignment before
   sending).
 
-Not verified live: the error a deleted canvas returns, comment threads when a
-section is replaced, and rate limits on a large first sync (docs only: create is
-Tier 2, update Tier 3).
+- Comment threads: a comment added in the Slack UI is reported by `slack_read_canvas`
+  as `comment_threads`. The thread stays listed, unchanged, after its section is
+  replaced and after the section is deleted. But a thread's `section_id` is never one
+  of the IDs in `section_id_mapping`, so a comment cannot be matched to a section and
+  the sync cannot warn per section. It can only tell that the canvas has open
+  threads.
+
+Not verified live: the error a deleted canvas returns, whether a comment still shows
+attached in the Slack UI after its section is replaced or deleted, and rate limits on
+a large first sync (docs only: create is Tier 2, update Tier 3).
 
 Run with `make test-ts` (needs the Node from `.nvmrc`).
