@@ -39,6 +39,13 @@ a CI failure here.
   more than the duplication it would remove. Revisit once a third near-identical
   instance of something bigger appears, or once an actual shared multi-job
   pipeline exists (e.g. a release workflow several triggers need identically).
+- **Node setup is the `.github/actions/setup-node-pnpm` composite.** Node from
+  `.nvmrc`, pnpm from `packageManager`, then `make node-modules`. Any workflow
+  whose `make` target depends on `node-modules` runs it right after checkout
+  instead of repeating the three steps (`typescript.yml` and
+  `sh-claude-md-size.yml` do; the other `sh-*.yml` files add it as their checks
+  move to TypeScript). Its external actions are
+  SHA-pinned inside the composite, so a bump happens in one place.
 - **`env:` blocks do not propagate across `workflow_call` boundaries.** An
   `env:` key defined at the orchestrator level (or in the caller's job) is
   invisible inside the called workflow — the called workflow's steps see only
@@ -64,8 +71,9 @@ a CI failure here.
   silently satisfy the required check. The sentinel itself fails on any
   dependency result other than `success`, so a skipped job cannot pass it.
   **Here the required branch-protection context is the job name `all-checks`**
-  (defined only in `all-checks.yml`); the workflow name "All checks" is just a
-  UI prefix. To add a new gating check, call its reusable workflow from a job in
+  (defined only in `all-checks.yml`); the workflow name "CI" is just a
+  UI prefix, kept different from the job name so the UI does not show two
+  `all-checks` rows. To add a new gating check, call its reusable workflow from a job in
   `all-checks.yml` and add that job to the sentinel's `needs:`. Gating therefore
   covers shell, TypeScript and Python checks; a failing Python check blocks merge.
 - **GitHub check names for reusable workflow callers** take the form

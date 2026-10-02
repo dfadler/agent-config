@@ -2,7 +2,7 @@
   "$schema": "https://json.schemastore.org/claude-code-plugin-manifest.json",
   "name": "eval-authoring",
   "version": "0.1.0",
-  "description": "Helps Claude author, review and diagnose claude plugin eval cases.",
+  "description": "Author, lint, run and diagnose `claude plugin eval` cases so each eval can fail, tells the plugin from no plugin, and gives a stable signal.",
   "author": {
     "name": "Dustin Fadler",
     "url": "https://github.com/dfadler"
