@@ -43,6 +43,27 @@ teardown() {
   destroy_sandbox
 }
 
+# Assertions on $output. Written as functions with an explicit return rather
+# than bare [[ ]]: a failing [[ ]] in the middle of a test does not abort it on
+# every bash bats can run under, so it would pass vacuously.
+has() {
+  [[ "$output" == *"$1"* ]] || {
+    echo "expected plan to contain: $1" >&2
+    echo "plan was:" >&2
+    echo "$output" >&2
+    return 1
+  }
+}
+
+lacks() {
+  [[ "$output" != *"$1"* ]] || {
+    echo "expected plan NOT to contain: $1" >&2
+    echo "plan was:" >&2
+    echo "$output" >&2
+    return 1
+  }
+}
+
 # Run the plan (no writes) with extra flags; sets $output/$status.
 plan() {
   run bash "$FAKE_REPO/setup.sh" --plan "$@"
@@ -86,20 +107,20 @@ hook_lines() {
 @test "plan: --dry-run is an alias and writes nothing under HOME" {
   run bash "$FAKE_REPO/setup.sh" --dry-run
   [ "$status" -eq 0 ]
-  [[ "$output" == *"claude-md${T}create${T}"* ]]
+  has "claude-md${T}create${T}"
   [ -z "$(ls -A "$HOME")" ]
 }
 
 @test "plan: --plan does not run companion checks or print the re-run footer" {
   plan --skip=demo
   [ "$status" -eq 0 ]
-  [[ "$output" != *"To re-run"* ]]
+  lacks "To re-run"
 }
 
 @test "plan: help documents --plan and --dry-run" {
   run bash "$FAKE_REPO/setup.sh" --help
   [ "$status" -eq 0 ]
-  [[ "$output" == *"--plan, --dry-run"* ]]
+  has "--plan, --dry-run"
 }
 
 @test "plan: already-installed state yields an empty plan" {
@@ -123,26 +144,26 @@ hook_lines() {
 @test "plan: --skip leaves a command and a plugin out and reports why" {
   plan --skip=demo,worktree-core
   [ "$status" -eq 0 ]
-  [[ "$output" == *"skip-plugin${T}worktree-core${T}--skip"* ]]
-  [[ "$output" == *"skip-command${T}$CLAUDE/commands/demo.md${T}--skip${T}demo"* ]]
-  [[ "$output" != *"link${T}$FAKE_REPO/claude/commands/demo.md"* ]]
-  [[ "$output" != *"link${T}$FAKE_REPO/plugins/worktree-core"* ]]
-  [[ "$output" == *"link${T}$FAKE_REPO/claude/commands/other.md"* ]]
-  [[ "$output" == *"link${T}$FAKE_REPO/plugins/dfadler-agent-config"* ]]
+  has "skip-plugin${T}worktree-core${T}--skip"
+  has "skip-command${T}$CLAUDE/commands/demo.md${T}--skip${T}demo"
+  lacks "link${T}$FAKE_REPO/claude/commands/demo.md"
+  lacks "link${T}$FAKE_REPO/plugins/worktree-core"
+  has "link${T}$FAKE_REPO/claude/commands/other.md"
+  has "link${T}$FAKE_REPO/plugins/dfadler-agent-config"
   # Hooks of the skipped plugin are not registered; the other plugin's are.
-  [[ "$output" != *"register-hook${T}PreToolUse"* ]]
-  [[ "$output" == *"register-hook${T}Stop${T}$MH_HOOK"* ]]
+  lacks "register-hook${T}PreToolUse"
+  has "register-hook${T}Stop${T}$MH_HOOK"
 }
 
 @test "plan: --include keeps only what it names and says 'not in --include'" {
   plan --include=other,dfadler-agent-config
   [ "$status" -eq 0 ]
-  [[ "$output" == *"skip-plugin${T}worktree-core${T}not in --include"* ]]
-  [[ "$output" == *"skip-command${T}$CLAUDE/commands/demo.md${T}not in --include${T}demo"* ]]
-  [[ "$output" == *"link${T}$FAKE_REPO/claude/commands/other.md"* ]]
-  [[ "$output" == *"link${T}$FAKE_REPO/plugins/dfadler-agent-config"* ]]
-  [[ "$output" != *"link${T}$FAKE_REPO/claude/commands/demo.md"* ]]
-  [[ "$output" != *"link${T}$FAKE_REPO/plugins/worktree-core"* ]]
+  has "skip-plugin${T}worktree-core${T}not in --include"
+  has "skip-command${T}$CLAUDE/commands/demo.md${T}not in --include${T}demo"
+  has "link${T}$FAKE_REPO/claude/commands/other.md"
+  has "link${T}$FAKE_REPO/plugins/dfadler-agent-config"
+  lacks "link${T}$FAKE_REPO/claude/commands/demo.md"
+  lacks "link${T}$FAKE_REPO/plugins/worktree-core"
 }
 
 @test "plan: --include and --skip selections are the complement of each other" {
@@ -157,13 +178,13 @@ hook_lines() {
   install
   plan --skip=demo,worktree-core
   [ "$status" -eq 0 ]
-  [[ "$output" == *"unlink${T}opted-out${T}$CLAUDE/commands/demo.md${T}$FAKE_REPO/claude/commands/demo.md"* ]]
-  [[ "$output" == *"unlink${T}superseded${T}$CLAUDE/skills/worktree-core${T}$FAKE_REPO/plugins/worktree-core"* ]]
-  [[ "$output" == *"deregister-hook${T}PreToolUse${T}$WT_HOOKS/require-worktree-hook.sh"* ]]
-  [[ "$output" == *"deregister-hook${T}SessionStart${T}$WT_HOOKS/check-worktree-symlinks-hook.sh"* ]]
-  [[ "$output" == *"deregister-hook${T}SessionStart${T}$WT_HOOKS/prune-merged-worktrees-hook.sh"* ]]
+  has "unlink${T}opted-out${T}$CLAUDE/commands/demo.md${T}$FAKE_REPO/claude/commands/demo.md"
+  has "unlink${T}superseded${T}$CLAUDE/skills/worktree-core${T}$FAKE_REPO/plugins/worktree-core"
+  has "deregister-hook${T}PreToolUse${T}$WT_HOOKS/require-worktree-hook.sh"
+  has "deregister-hook${T}SessionStart${T}$WT_HOOKS/check-worktree-symlinks-hook.sh"
+  has "deregister-hook${T}SessionStart${T}$WT_HOOKS/prune-merged-worktrees-hook.sh"
   # The kept plugin's hook is already registered: no action for it.
-  [[ "$output" != *"Stop"* ]]
+  lacks "Stop"
 }
 
 @test "plan: a hook that is already registered is not planned again" {
@@ -178,9 +199,9 @@ json.dump(data, open(path, "w"))
 PY
   plan
   [ "$status" -eq 0 ]
-  [[ "$output" == *"register-hook${T}Stop${T}$MH_HOOK"* ]]
-  [[ "$output" != *"register-hook${T}PreToolUse"* ]]
-  [[ "$output" == *"link${T}$FAKE_REPO/plugins/dfadler-agent-config${T}$CLAUDE/skills/dfadler-agent-config"* ]]
+  has "register-hook${T}Stop${T}$MH_HOOK"
+  lacks "register-hook${T}PreToolUse"
+  has "link${T}$FAKE_REPO/plugins/dfadler-agent-config${T}$CLAUDE/skills/dfadler-agent-config"
 }
 
 @test "plan: a stale symlink this repo owns is replaced; a foreign or real one is only warned about" {
@@ -189,12 +210,12 @@ PY
   ln -s "$SANDBOX/elsewhere" "$CLAUDE/commands/other.md"
   plan
   [ "$status" -eq 0 ]
-  [[ "$output" == *"relink${T}$FAKE_REPO/claude/commands/demo.md${T}$CLAUDE/commands/demo.md${T}$FAKE_REPO/claude/commands/gone.md"* ]]
-  [[ "$output" == *"warn-foreign-symlink${T}$CLAUDE/commands/other.md${T}$SANDBOX/elsewhere"* ]]
+  has "relink${T}$FAKE_REPO/claude/commands/demo.md${T}$CLAUDE/commands/demo.md${T}$FAKE_REPO/claude/commands/gone.md"
+  has "warn-foreign-symlink${T}$CLAUDE/commands/other.md${T}$SANDBOX/elsewhere"
   rm "$CLAUDE/commands/other.md"
   echo "mine" >"$CLAUDE/commands/other.md"
   plan
-  [[ "$output" == *"warn-exists${T}$CLAUDE/commands/other.md"* ]]
+  has "warn-exists${T}$CLAUDE/commands/other.md"
 }
 
 @test "plan: a superseded plugin link is unlinked and then linked fresh, not 'relinked'" {
@@ -202,16 +223,16 @@ PY
   ln -s "$FAKE_REPO/plugins/worktree-core" "$CLAUDE/skills/dfadler-agent-config"
   plan
   [ "$status" -eq 0 ]
-  [[ "$output" == *"unlink${T}superseded${T}$CLAUDE/skills/dfadler-agent-config${T}$FAKE_REPO/plugins/worktree-core"* ]]
-  [[ "$output" == *"link${T}$FAKE_REPO/plugins/dfadler-agent-config${T}$CLAUDE/skills/dfadler-agent-config"* ]]
-  [[ "$output" != *"relink"* ]]
+  has "unlink${T}superseded${T}$CLAUDE/skills/dfadler-agent-config${T}$FAKE_REPO/plugins/worktree-core"
+  has "link${T}$FAKE_REPO/plugins/dfadler-agent-config${T}$CLAUDE/skills/dfadler-agent-config"
+  lacks "relink"
 }
 
 @test "plan: a leftover per-skill link into plugins/ under agents/ is unlinked" {
   mkdir -p "$CLAUDE/agents"
   ln -s "$FAKE_REPO/plugins/worktree-core/agents/old.md" "$CLAUDE/agents/old.md"
   plan
-  [[ "$output" == *"unlink${T}superseded${T}$CLAUDE/agents/old.md${T}$FAKE_REPO/plugins/worktree-core/agents/old.md"* ]]
+  has "unlink${T}superseded${T}$CLAUDE/agents/old.md${T}$FAKE_REPO/plugins/worktree-core/agents/old.md"
 }
 
 @test "plan: an existing hand-written CLAUDE.md is migrated aside, then the section is created" {
@@ -219,9 +240,9 @@ PY
   echo "my own notes" >"$CLAUDE/CLAUDE.md"
   plan
   [ "$status" -eq 0 ]
-  [[ "$output" == *"personal-migrate${T}$CLAUDE/CLAUDE.md${T}$CLAUDE/CLAUDE.personal.md"* ]]
-  [[ "$output" == *"claude-md${T}create${T}$CLAUDE/CLAUDE.md"* ]]
-  [[ "$output" != *"personal-create"* ]]
+  has "personal-migrate${T}$CLAUDE/CLAUDE.md${T}$CLAUDE/CLAUDE.personal.md"
+  has "claude-md${T}create${T}$CLAUDE/CLAUDE.md"
+  lacks "personal-create"
 }
 
 @test "plan: claude-md mode follows the state of the generated file" {
@@ -230,17 +251,17 @@ PY
   # Legacy symlink to the repo.
   ln -s "$FAKE_REPO/claude/CLAUDE.md" "$CLAUDE/CLAUDE.md"
   plan
-  [[ "$output" == *"claude-md${T}replace-symlink${T}$CLAUDE/CLAUDE.md"* ]]
+  has "claude-md${T}replace-symlink${T}$CLAUDE/CLAUDE.md"
   rm "$CLAUDE/CLAUDE.md"
   # A real file without our section.
   echo "user content" >"$CLAUDE/CLAUDE.md"
   plan
-  [[ "$output" == *"claude-md${T}prepend${T}$CLAUDE/CLAUDE.md"* ]]
+  has "claude-md${T}prepend${T}$CLAUDE/CLAUDE.md"
   # A section whose body is stale.
   printf '%s\n@/old/location/CLAUDE.md\n%s\n' \
     "# >>> agent-config managed begin <<<" "# >>> agent-config managed end <<<" >"$CLAUDE/CLAUDE.md"
   plan
-  [[ "$output" == *"claude-md${T}update${T}$CLAUDE/CLAUDE.md"* ]]
+  has "claude-md${T}update${T}$CLAUDE/CLAUDE.md"
 }
 
 @test "plan: a changed DEFAULT_ENABLED shows up as an update with the new include" {
