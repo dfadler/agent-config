@@ -7,7 +7,7 @@ across the issues listed there.
 
 ## Status
 
-Working: the TypeScript logic under `src/`, and the `canvas-push` and `canvas-pull`
+Working: the TypeScript logic under `scripts/ts/`, and the `canvas-push` and `canvas-pull`
 skills that drive it, `canvas-status` and pending-deletion tracking, and generated
 navigation blocks. Still to come: a live verification pass (#426).
 
@@ -63,7 +63,7 @@ frontmatter `title:`, else a leading `# Heading`, else the file name. Files with
 `<root>/.canvas-sync/` (manifest and conflict copies), which holds a `.gitignore`
 that ignores everything in it, so canvas IDs never reach git.
 
-## `src/normalize.ts`
+## `scripts/ts/normalize.ts`
 
 Turns local markdown and `slack_read_canvas` output into one canonical form so
 they can be hashed and diffed. Slack rewrites markdown on read (`-` bullets
@@ -76,14 +76,14 @@ headings become h3), so comparing raw text would report false changes.
 - Both strip the generated navigation block (see `NAV_BLOCK_HEADER`) so it never
   causes a diff.
 
-## `src/validate.ts`
+## `scripts/ts/validate.ts`
 
 `validate(markdown)` reports content Slack would reject or alter, instead of
 silently mangling it: headings or code blocks inside list items, mixed list
 nesting, tables over 300 cells, content over 1 MiB, and tables or callouts inside
 layouts. h4+ headings are reported as warnings because Slack clamps them to h3.
 
-## `src/diff3.ts`, `src/plan.ts`, `src/manifest.ts`
+## `scripts/ts/diff3.ts`, `plan.ts`, `manifest.ts`
 
 The three-way sync engine. For one file it compares **base** (what the last sync
 recorded), **local**, and **remote** (the canvas now), section by section:
@@ -104,18 +104,18 @@ recorded), **local**, and **remote** (the canvas now), section by section:
 Pulling rewrites the local file in normalized form, so formatting the user chose
 (for example `-` bullets) is replaced by the canonical form on a pull.
 
-## `src/cli.ts` / `src/bin.ts`
+## `scripts/ts/cli.ts` / `bin.ts`
 
 JSON in, JSON out, so skills call this instead of reimplementing it:
 
 ```bash
-node plugins/slack-canvas-sync/src/bin.ts normalize --side local < note.md
-node plugins/slack-canvas-sync/src/bin.ts validate < note.md
-node plugins/slack-canvas-sync/src/bin.ts plan < plan-input.json
+node plugins/slack-canvas-sync/scripts/ts/bin.ts normalize --side local < note.md
+node plugins/slack-canvas-sync/scripts/ts/bin.ts validate < note.md
+node plugins/slack-canvas-sync/scripts/ts/bin.ts plan < plan-input.json
 ```
 
 The skills use the sync-root commands (`scan`, `plan-push`, `record`, `pull`,
-`fingerprint`); `--help` lists them. `src/sync-fs.ts` rejects any path that is
+`fingerprint`); `--help` lists them. `scripts/ts/sync-fs.ts` rejects any path that is
 absolute, contains `..`, is not a `.md` file, or would write through a symlink out
 of the root.
 
@@ -124,7 +124,7 @@ Needs the Node from `.nvmrc`. Exit codes: 0 ok, 1 the check found a problem
 
 ## Tests and fixtures
 
-`test/fixtures/` pairs a local source with what `slack_read_canvas` returns for
+`scripts/ts/fixtures/` pairs a local source with what `slack_read_canvas` returns for
 it, and the tests assert both normalize to the same body. `basic.md` is a
 recording from a live canvas (one link made absolute so the repo's relative-link
 checker passes); `edits.md` is hand-built from behavior
@@ -132,7 +132,7 @@ observed there (h4 clamped to h3, a UI-added paragraph, section anchor links).
 Fixtures use dummy content only: no real workspace host, team ID, canvas ID,
 user, or channel.
 
-`test/fake-canvas.ts` is an in-memory canvas (read, atomic section edits, and
+`scripts/ts/fake-canvas.ts` is an in-memory canvas (read, atomic section edits, and
 UI-style edits) used to drive end-to-end sync scenarios and a seeded fuzz test
 that checks both sides converge. No network.
 

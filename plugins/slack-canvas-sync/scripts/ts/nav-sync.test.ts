@@ -3,7 +3,7 @@ import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "nod
 import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
 import { afterAll as after, test } from "vitest";
-import { FakeCanvas } from "../test/fake-canvas.ts";
+import { FakeCanvas } from "./fake-canvas.ts";
 import { NAV_BLOCK_HEADER, normalizeSections } from "./normalize.ts";
 import {
   loadManifest,

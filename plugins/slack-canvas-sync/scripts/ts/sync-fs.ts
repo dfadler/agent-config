@@ -18,7 +18,7 @@ import {
 } from "node:fs";
 import { dirname, join, resolve, sep } from "node:path";
 import { execFileSync } from "node:child_process";
-import { hashText } from "../../../scripts/ts/hash.ts";
+import { hashText } from "./hash.ts";
 import { isSyncEnabled, parseFrontmatter, renderLocalFile } from "./frontmatter.ts";
 import {
   bodyHash,
