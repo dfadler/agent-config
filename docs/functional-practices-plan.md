@@ -80,9 +80,12 @@ refactors the script 2 tests); 5 needs 1 and 4; 6 comes last.
 2. **Idempotence tests for `setup.sh` and `teardown.sh`.** bats tests, hermetic
    per the shell-hygiene convention: run twice in a throwaway `HOME`, assert the
    second run changes nothing.
-3. **Pure plan, thin shell for setup.** Extract the install-plan derivation
-   (from `DEFAULT_ENABLED` and manifests) into a pure function with tests;
-   the shell applies the plan.
+3. **Pure plan, thin shell for setup (bash).** Extract the install-plan
+   derivation (from `DEFAULT_ENABLED`, flags, and current state) into a pure
+   bash function that prints plan lines as data, with tests; a thin applier
+   executes them. Bash, not TypeScript, because `setup.sh` bootstraps a fresh
+   machine before Node exists. Stacks on phase 2. If the phase 8 migration
+   reaches `setup.sh`, this layer is replaced, so keep the line format simple.
 4. **TypeScript `lib/`.** `Result`, `pipe`, `collect`, with `fast-check`
    property tests. Add `eslint-plugin-functional` (immutability, no `let`) and
    `switch-exhaustiveness-check` for core directories. Verify rule names
@@ -98,6 +101,11 @@ refactors the script 2 tests); 5 needs 1 and 4; 6 comes last.
    is host-local, and `pnpm-lock.yaml` drift already fails under
    `--frozen-lockfile`). Tracked in
    [#492](https://github.com/dfadler/agent-config/issues/492).
+8. **Repo-wide TypeScript migration (fast follow).** Move the repo's scripts to
+   TypeScript on the phase 4 library, building on #419 (Python scripts) and
+   extending to shell where it makes sense. Scope, ordering, and which scripts
+   must stay shell (bootstrap, pre-Node hooks) come from an inventory in
+   progress; this phase is a stub until that lands.
 
 ## Verification
 
@@ -124,6 +132,7 @@ refactors the script 2 tests); 5 needs 1 and 4; 6 comes last.
 
 ## Non-goals
 
-- Rewriting working shell scripts into TypeScript for style reasons.
+- Rewriting a script that cannot assume Node (bootstrap, pre-Node hooks)
+  without first deciding how Node gets there.
 - An always-on convention longer than a paragraph.
 - Adopting Effect or fp-ts now.
