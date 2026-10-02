@@ -46,6 +46,9 @@ jobs:
       - name: Typecheck (tsc --noEmit)
         run: make typecheck-ts
 
+      - name: Skill contracts
+        run: make check-skills
+
       - name: Test (vitest)
         run: make test-ts
 

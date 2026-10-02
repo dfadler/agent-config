@@ -21,6 +21,15 @@ metadata:
 
 # Explicit permission for publishing to GitHub
 
+## Contract
+
+- **Input:** a pending GitHub publish action (issue, PR, comment, review, or a
+  `gh api` POST to a comments/reviews endpoint) that the session is about to take.
+- **Output:** a go/no-go decision: proceed (explicit, request-scoped permission or a
+  listed exception), or stop and ask the user first.
+- **Does not:** run the publish itself, or replace the `permissions.ask` prompt that
+  enforces it.
+
 ## The problem this solves
 
 It's easy for "handle this bug" or "can you look into X" to quietly expand

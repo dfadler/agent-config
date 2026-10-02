@@ -4,7 +4,8 @@
 
 1. Put it in the right place:
    - A **skill** → a new directory under `plugins/dfadler-agent-config/skills/`,
-     containing a `SKILL.md`.
+     containing a `SKILL.md`. A skill that another skill will call needs a
+     `## Contract` section; see [`docs/skill-composition.md`](./skill-composition.md).
    - An **agent** → a new `.md` file under `plugins/dfadler-agent-config/agents/`.
    - A **slash command** → a new `.md` file under `claude/commands/`.
    - A **convention** (global guidance for `CLAUDE.md`) → first check
@@ -130,6 +131,7 @@ make check          # lint + structure + typecheck + test + actionlint + coverag
 | `make test-py` | `pytest` suite under `scripts/tests/` |
 | `make coverage` | Re-runs the `bats` suites under `kcov` and enforces the coverage floor (Linux only) |
 | `make lint-ts` / `typecheck-ts` / `test-ts` / `coverage-ts` | `eslint`, `tsc --noEmit`, Vitest, and its coverage floor over `scripts/ts/` (see [`testing.md`](testing.md)) |
+| `make check-skills` | A skill another skill references must have a `## Contract` (Input/Output), and references must resolve ([`docs/skill-composition.md`](./skill-composition.md)) |
 | `make fmt` | Rewrites sources to the repo's `shfmt` / `ruff` style |
 | `make lint-actions` | `actionlint` over `.github/workflows/` |
 
