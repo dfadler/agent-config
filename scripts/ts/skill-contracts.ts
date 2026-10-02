@@ -26,18 +26,27 @@ function contractSection(body: string): string | undefined {
 
 /**
  * Names (as `plugin:skill`) of the skills `skill` points at, either with a
- * relative sibling link or with a namespaced `plugin:skill` mention. A
- * mention only counts when `plugin` is one of `plugins`, so prose like
- * `Step 2: diagnose` is never read as a reference.
+ * relative sibling link or with a namespaced `plugin:skill` mention.
+ *
+ * A colon-delimited token is not always a skill reference (`node:fs`,
+ * `Step 2: diagnose`, a CSS declaration), so a mention counts only when its
+ * namespace is one of `plugins`, or when its skill part is the name of a real
+ * skill in `skillNames`. The second case keeps a misspelled namespace such as
+ * `screen-captuer:capture` visible as an unresolved reference instead of
+ * silently dropping it.
  */
-export function references(skill: Skill, plugins: ReadonlySet<string>): string[] {
+export function references(
+  skill: Skill,
+  plugins: ReadonlySet<string>,
+  skillNames: ReadonlySet<string>,
+): string[] {
   const found = new Set<string>();
   for (const m of skill.body.matchAll(SIBLING_LINK)) {
     found.add(`${skill.plugin}:${m[1] ?? ""}`);
   }
   for (const m of skill.body.matchAll(/\b([a-z][a-z0-9-]*):([a-z][a-z0-9-]*)\b/g)) {
     const [, plugin = "", name = ""] = m;
-    if (plugins.has(plugin)) found.add(`${plugin}:${name}`);
+    if (plugins.has(plugin) || skillNames.has(name)) found.add(`${plugin}:${name}`);
   }
   found.delete(`${skill.plugin}:${skill.name}`);
   return [...found].sort();
@@ -53,11 +62,12 @@ export function references(skill: Skill, plugins: ReadonlySet<string>): string[]
 export function findViolations(skills: readonly Skill[]): string[] {
   const byId = new Map(skills.map((s) => [`${s.plugin}:${s.name}`, s]));
   const plugins = new Set(skills.map((s) => s.plugin));
+  const skillNames = new Set(skills.map((s) => s.name));
   const errors: string[] = [];
   const referenced = new Set<string>();
 
   for (const skill of skills) {
-    for (const ref of references(skill, plugins)) {
+    for (const ref of references(skill, plugins, skillNames)) {
       if (byId.has(ref)) referenced.add(ref);
       else errors.push(`${skill.path}: references ${ref}, which is not a skill in this repo`);
     }
@@ -72,7 +82,8 @@ export function findViolations(skills: readonly Skill[]): string[] {
       continue;
     }
     for (const label of ["Input", "Output"]) {
-      if (!new RegExp(`\\*\\*${label}:\\*\\*\\s*\\S`).test(section)) {
+      // Anchored to a list item so a label mentioned mid-sentence doesn't count.
+      if (!new RegExp(`^[ \\t]*[-*][ \\t]+\\*\\*${label}:\\*\\*[ \\t]*\\S`, "m").test(section)) {
         errors.push(`${skill.path}: "## Contract" is missing a "**${label}:**" line`);
       }
     }

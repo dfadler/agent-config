@@ -58,8 +58,38 @@ test("an unreferenced skill needs no contract", () => {
 
 test("prose like 'Step 2: diagnose' is not read as a reference", () => {
   const a = skill("a", "Step 2: diagnose. Note: carefully.");
-  expect(references(a, new Set(["p"]))).toEqual([]);
+  expect(references(a, new Set(["p"]), new Set(["a"]))).toEqual([]);
   expect(findViolations([a])).toEqual([]);
+});
+
+test("a token like node:fs is not a reference, since fs is not a skill", () => {
+  expect(findViolations([skill("a", "Imports `node:fs` and runs `test:ci`.")])).toEqual([]);
+});
+
+test("a misspelled namespace on a real skill name is reported, not dropped", () => {
+  const skills = [skill("caller", "See `pp:callee`."), skill("callee", CONTRACT)];
+  expect(findViolations(skills)).toEqual([
+    "plugins/p/skills/caller/SKILL.md: references pp:callee, which is not a skill in this repo",
+  ]);
+});
+
+test("Input and Output labels mentioned mid-sentence do not satisfy the contract", () => {
+  const skills = [
+    skill("caller", "See p:callee."),
+    skill("callee", "## Contract\n\nThe fields are **Input:** x and **Output:** y\n"),
+  ];
+  expect(findViolations(skills)).toEqual([
+    'plugins/p/skills/callee/SKILL.md: "## Contract" is missing a "**Input:**" line',
+    'plugins/p/skills/callee/SKILL.md: "## Contract" is missing a "**Output:**" line',
+  ]);
+});
+
+test("a contract written with * bullets and indentation still passes", () => {
+  const skills = [
+    skill("caller", "See p:callee."),
+    skill("callee", "## Contract\n\n  * **Input:** x\n  * **Output:** y\n"),
+  ];
+  expect(findViolations(skills)).toEqual([]);
 });
 
 test("a skill mentioning its own namespaced name is not a self-reference", () => {

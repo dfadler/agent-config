@@ -21,7 +21,9 @@ metadata:
 - **Input:** a URL, plus the `lighthouse_enabled`, `lighthouse_form_factors`, and
   `lighthouse_output_dir` config keys (see "Config keys").
 - **Output:** Lighthouse JSON results for each configured form factor, stored under
-  `knowledge/lighthouse/<project>/` in the second-brain vault.
+  `knowledge/lighthouse/<project>/` in the second-brain vault by default, or under
+  `lighthouse_output_dir` when that is configured (the configured path takes
+  precedence and opts out of vault storage).
 - **Does not:** replace the manual resize-and-look pass, or run when
   `lighthouse_enabled` is off.
 
