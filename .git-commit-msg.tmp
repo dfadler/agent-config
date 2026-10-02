@@ -1,8 +1,0 @@
-fix(slack-canvas-sync): close a fence in mention handling the same way as everywhere else
-
-The mention canonicalizer closed a code fence on any line of backticks or
-tildes that started with the opener, the same bug CodeRabbit found in the
-validator on #428. It now uses the shared closesFence (same character, at
-least as long), so a mention after a non-closing line stays inside the code.
-
-Co-Authored-By: Claude Sonnet 5.5 <noreply@anthropic.com>
