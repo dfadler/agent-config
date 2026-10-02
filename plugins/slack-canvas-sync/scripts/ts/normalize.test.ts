@@ -10,7 +10,7 @@ import {
   stripNavBlock,
 } from "./normalize.ts";
 
-const fixtures = join(import.meta.dirname, "..", "test", "fixtures");
+const fixtures = join(import.meta.dirname, "fixtures");
 
 function fixture(side: "local" | "remote", name: string): string {
   return readFileSync(join(fixtures, side, name), "utf8");

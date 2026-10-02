@@ -14,5 +14,7 @@ jobs:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
+      # `make lint-claude-md` runs a TypeScript check (needs Node + pnpm deps).
+      - uses: ./.github/actions/setup-node-pnpm
       - name: Lint (claude-md-size)
         run: make lint-claude-md

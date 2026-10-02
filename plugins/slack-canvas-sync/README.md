@@ -8,10 +8,10 @@ across the issues listed there.
 ## Status
 
 Scaffold. Today this holds the pure TypeScript logic the skills will call, under
-`src/`. Skills (`canvas-push`, `canvas-pull`, `canvas-status`) land in follow-up
+`scripts/ts/`. Skills (`canvas-push`, `canvas-pull`, `canvas-status`) land in follow-up
 issues.
 
-## `src/normalize.ts`
+## `scripts/ts/normalize.ts`
 
 Turns local markdown and `slack_read_canvas` output into one canonical form so
 they can be hashed and diffed. Slack rewrites markdown on read (`-` bullets
@@ -24,7 +24,7 @@ headings become h3), so comparing raw text would report false changes.
 - Both strip the generated navigation block (see `NAV_BLOCK_HEADER`) so it never
   causes a diff.
 
-## `src/validate.ts`
+## `scripts/ts/validate.ts`
 
 `validate(markdown)` reports content Slack would reject or alter, instead of
 silently mangling it: headings or code blocks inside list items, mixed list
@@ -33,7 +33,7 @@ layouts. h4+ headings are reported as warnings because Slack clamps them to h3.
 
 ## Tests and fixtures
 
-`test/fixtures/` pairs a local source with what `slack_read_canvas` returns for
+`scripts/ts/fixtures/` pairs a local source with what `slack_read_canvas` returns for
 it, and the tests assert both normalize to the same body. `basic.md` is a
 recording from a live canvas (one link made absolute so the repo's relative-link
 checker passes); `edits.md` is hand-built from behavior

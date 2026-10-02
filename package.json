@@ -8,7 +8,7 @@
     "node": ">=22.18"
   },
   "scripts": {
-    "lint": "eslint scripts/ts 'plugins/*/src/**/*.ts'",
+    "lint": "eslint --no-error-on-unmatched-pattern scripts/ts \"plugins/*/scripts/ts/**/*.ts\"",
     "typecheck": "tsc --noEmit",
     "check-skills": "node scripts/ts/check-skill-contracts.ts .",
     "test": "vitest run",
