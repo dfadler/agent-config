@@ -184,10 +184,9 @@ only its own run command and why its graders are shaped as they are.
   fail ([#442](https://github.com/dfadler/agent-config/issues/442)). A case that needs a
   grant records its exact command in its header; a case without one needs only `Skill`.
   Add `--ablation with-without` where the header says to.
-- **Grader deviation.** [#411](https://github.com/dfadler/agent-config/issues/411) asks for
-  one `tool_used` plus one `llm` grader per case. Cases deviate where a regex is reliable
-  (free, no judge variance) and keep a narrow `llm` grader only for a judgment a regex
-  cannot make. Each header says which, so it is not repeated there.
+- **Grader shape.** Prefer free `regex` graders where a literal string is reliable and
+  keep an `llm` grader only for a judgment a regex cannot make; rationale in
+  [#411](https://github.com/dfadler/agent-config/issues/411).
 - **`skill_fired`.** Positive cases carry a `tool_used` grader on `Skill` with
   `arm: with-only`; negative cases use `min: 0`, `max: 0`, `arm: both`. Copy the block
   from a sibling case and change only the skill name.
@@ -198,8 +197,7 @@ only its own run command and why its graders are shaped as they are.
 - **Layout.** `fetch-execute-guide` keeps its plugin wrapper (with `SKILL.md` at the
   plugin root) because bare skills have no eval path.
   `plugins/gha-ci-audit/evals/evals.json` is the separate skill-creator format, which
-  `claude plugin eval` does not read. Current vitest results are in
-  [#447](https://github.com/dfadler/agent-config/pull/447).
+  `claude plugin eval` does not read.
 
 ## GitHub operations
 

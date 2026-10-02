@@ -230,8 +230,7 @@ lint-ts: node-modules ## eslint over scripts/ts
 typecheck-ts: node-modules ## tsc --noEmit over the TypeScript sources
 	@pnpm run --silent typecheck
 
-test-ts: node-modules ## Run the Vitest suite (flaky tests: vitest:flaky-tests skill)
-	@pnpm test --silent
+test-ts: node-modules ## Run the Vitest suite	@pnpm test --silent
 
 # Floor is a MEASURED baseline, same discipline as COVERAGE_MIN: the only
 # source today is the hash helper at 100%, and vitest.config.ts owns the

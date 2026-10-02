@@ -13,8 +13,8 @@ metadata:
 
 Invoke Vitest through the project's package manager, and forward flags the way that
 manager requires. pnpm: flags directly after the script, no separator
-(`pnpm test --repeats=100`); a `--` made Vitest ignore the flags after it when tried.
-npm: the `--` separator is required (`npm test -- --repeats=100`), per the
+(`pnpm test --repeats=100`), per the [pnpm run docs](https://pnpm.io/cli/run) (arguments
+after the script name are appended to it). npm: the `--` separator is required (`npm test -- --repeats=100`), per the
 [npm run-script docs](https://docs.npmjs.com/cli/v10/commands/npm-run-script).
 Running the installed binary (`pnpm vitest run ...`) needs no separator. Examples below show bare flags.
 
@@ -39,9 +39,13 @@ Work down the ladder; stop at the first rung that reproduces the failure.
 5. **Constrain concurrency.** `--maxWorkers=2` (or `--maxWorkers=1
    --no-file-parallelism`) to mimic a small CI runner. Fails only constrained: a
    timeout too tight, or tests contending for a port, directory, or temp file.
-6. **Constrain memory.** `NODE_OPTIONS=--max-old-space-size=512 vitest run`. Use
-   `NODE_OPTIONS` so worker processes inherit the cap; passing the flag to `node`
-   only caps the parent. For CPU too, run in a container with `--cpus=0.5 --memory=512m`.
+6. **Constrain memory.** `NODE_OPTIONS=--max-old-space-size=512 vitest run`.
+   `NODE_OPTIONS` is read as if given on the `node` command line
+   ([Node CLI docs](https://nodejs.org/docs/latest-v22.x/api/cli.html)), and child
+   processes ([`child_process`](https://nodejs.org/docs/latest-v22.x/api/child_process.html))
+   and worker threads ([`worker_threads`](https://nodejs.org/docs/latest-v22.x/api/worker_threads.html))
+   get a copy of the parent's environment by default, so the cap reaches Vitest's
+   workers; passing the flag to the outer `node` alone would not.
 
 `poolOptions.threads.maxThreads` / `poolOptions.forks.maxForks` are not in the
 Vitest 5 CLI docs; use `--maxWorkers`. Check any other flag with `vitest --help` for

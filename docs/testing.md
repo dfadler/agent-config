@@ -9,9 +9,12 @@ pnpm test        # vitest run
 pnpm coverage    # vitest run --coverage; fails below the thresholds in vitest.config.ts
 ```
 
-Test order is shuffled by default (`sequence.shuffle`), so the seed alone replays a
-failing order in this repo.
+Flaky-test flags ([Vitest CLI docs](https://vitest.dev/guide/cli.html)); the ladder
+for using them, and package-manager forwarding, is the `vitest:flaky-tests` skill:
 
-The procedure for reproducing a flaky test (seed replay, repeats, CI worker and
-memory limits, and how to forward flags per package manager) lives in one place: the
-`vitest:flaky-tests` skill in `plugins/vitest/`.
+| Flag | Effect |
+|---|---|
+| `--repeats=N` | Run each test 1+N times |
+| `--sequence.shuffle.tests --sequence.seed=<n>` | Replay a shuffled order (the seed is ignored unless shuffling is on) |
+| `--maxWorkers=N` / `--no-file-parallelism` | Limit worker count / run files serially |
+| `NODE_OPTIONS=--max-old-space-size=512` | Cap the V8 heap of the run and its workers |

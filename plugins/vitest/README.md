@@ -7,7 +7,7 @@ Skills and an agent for Vitest-based projects. Flag names are checked against th
 |-------|-----|
 | `vitest:test-conventions` | Writing or editing a `*.test.ts` file or `vitest.config.ts` |
 | `vitest:flaky-tests` | A test passes locally but fails in CI, or intermittently; procedure for reproducing it |
-| `flaky-test-investigator` agent | Runs the flaky-tests procedure in isolation and reports a cause and fix; never edits files. Preloads `flaky-tests` via `skills:`. Not covered by an eval (an action-based eval was tried and dropped; see issue #474) |
+| `flaky-test-investigator` agent | Runs the flaky-tests procedure in isolation and reports a cause and fix; never edits files. Preloads `flaky-tests` via `skills:`. Not covered by an eval |
 
 `flaky-tests` is the single owner of the reproduction ladder and the pnpm/npm flag
 forwarding rule; the agent and this repo's docs point to it rather than restating it.

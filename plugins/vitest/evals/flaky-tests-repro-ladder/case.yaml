@@ -7,12 +7,12 @@
 # forwarding. Regex where a distinctive string is reliable; two narrow llm graders
 # for ideas a regex cannot judge.
 # Sabotage map (flaky-tests/SKILL.md; quoted text, not line numbers):
-#   no_double_dash_for_pnpm       "a `--` made Vitest ignore the flags after it"
+#   no_double_dash_for_pnpm       "pnpm: flags directly after the script, no separator"
 #   replays_with_shuffle_tests    "The seed only takes effect while shuffling is on, so replay"
 #   seed_needs_shuffle            same sentence, and "without shuffle a seed changes nothing"
 #   replays_seed_before_repeats   step order: "Replay the order" before "Stress the single file"
 #   mentions_no_file_parallelism  "--no-file-parallelism"
-#   memory_cap_via_node_options   "so worker processes inherit the cap"
+#   memory_cap_via_node_options   "so the cap reaches Vitest's"
 schema_version: "1.1"
 name: flaky-tests-repro-ladder
 description: >
