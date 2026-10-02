@@ -8,7 +8,7 @@ For any non-trivial bash script:
   only after verifying every real call site sources the file rather than
   executing it. A missing shebang alone is NOT that evidence — a file with
   no shebang can still be run via `bash path/to/file.sh` or a wrapper
-  (#168). `scripts/check-shell-set-flags.sh` enforces this.
+  (#168). `scripts/ts/check-shell-set-flags.ts` enforces this.
 - Run it through shellcheck (correctness) and shfmt (formatting) before considering
   it done, if the project has those set up.
 - A shellcheck disable needs a justification at the same bar as a TypeScript type
