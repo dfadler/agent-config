@@ -89,6 +89,13 @@ Install **only** specific features, leaving everything else out (`--include`):
 ./setup.sh --include=dfadler-agent-config,worktree-core
 ```
 
+Preview what a run would do, without changing anything (`--dry-run` is an alias; it
+combines with `--skip` and `--include`):
+
+```bash
+./setup.sh --plan
+```
+
 `--skip` and `--include` cannot be combined. Neither flag is remembered across runs —
 re-running plain `./setup.sh` relinks anything a previous `--skip` or `--include` left
 out. See [`docs/setup.md`](docs/setup.md) for the full details including subset
