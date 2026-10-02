@@ -8,7 +8,7 @@
     "node": ">=22.18"
   },
   "scripts": {
-    "lint": "eslint scripts/ts",
+    "lint": "eslint scripts/ts plugins/eval-authoring/scripts",
     "typecheck": "tsc --noEmit",
     "check-skills": "node scripts/ts/check-skill-contracts.ts .",
     "test": "vitest run",

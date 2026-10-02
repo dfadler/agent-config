@@ -2,7 +2,10 @@ import { defineConfig } from "vitest/config";
 
 export default defineConfig({
   test: {
-    include: ["scripts/ts/**/*.test.ts"],
+    include: [
+      "scripts/ts/**/*.test.ts",
+      "plugins/eval-authoring/scripts/**/*.test.ts",
+    ],
     // Random order surfaces order-dependent flakes.
     sequence: { shuffle: true },
     coverage: {
