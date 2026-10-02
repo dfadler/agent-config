@@ -4,7 +4,8 @@
 
 1. Put it in the right place:
    - A **skill** → a new directory under `plugins/dfadler-agent-config/skills/`,
-     containing a `SKILL.md`.
+     containing a `SKILL.md`. A skill that another skill will call needs a
+     `## Contract` section; see [`docs/skill-composition.md`](./skill-composition.md).
    - An **agent** → a new `.md` file under `plugins/dfadler-agent-config/agents/`.
    - A **slash command** → a new `.md` file under `claude/commands/`.
    - A **convention** (global guidance for `CLAUDE.md`) → first check
@@ -26,11 +27,16 @@
      and `skills/`. Keep the directory name and the manifest `name` identical.
      `setup.sh` auto-discovers any directory under `plugins/` that carries a
      `plugin.json`, so no manual changes to `setup.sh` are needed.
-     **If the plugin depends on another plugin's skill or hooks** (e.g.
-     `dfadler-agent-config` requiring `worktree-core` for `git-worktree-usage`),
-     declare it in `requires` in the manifest — note that Claude Code does not
-     enforce this field at load time — and document the dependency in the
-     plugin's README and, if hooks are involved, in `docs/hook-composition.md`.
+     **If the plugin calls another plugin's skill or hooks at runtime**, declare it in
+     the manifest's `dependencies` array ([plugin dependencies](https://code.claude.com/docs/en/plugins/dependencies);
+     `requires` is not a Claude Code field and is ignored). A declared dependency is
+     enforced at load time, and it is not resolved inside a `claude plugin eval` run:
+     a plugin with an unmet dependency is silently dropped ([#450](https://github.com/dfadler/agent-config/issues/450)),
+     so a plugin that needs evals must also load the dependency from inside its own
+     directory through the case's `plugins:` field. If the plugin only pairs with
+     another (as `dfadler-agent-config` does with `worktree-core`), don't declare it:
+     document the pairing in the plugin's README and, if hooks are involved, in
+     `docs/hook-composition.md`.
 2. Name skills and agents plainly — `pr-babysit`, not `dfadler-agent-config-pr-babysit`
    — in both the directory/filename and the frontmatter `name:`. The plugin namespace
    already prevents collisions with a project's own skills, so a prefix here would just
@@ -124,7 +130,8 @@ make check          # lint + structure + typecheck + test + actionlint + coverag
 | `make test-sh` | `bats` suites under `scripts/tests/` |
 | `make test-py` | `pytest` suite under `scripts/tests/` |
 | `make coverage` | Re-runs the `bats` suites under `kcov` and enforces the coverage floor (Linux only) |
-| `make lint-ts` / `typecheck-ts` / `test-ts` / `coverage-ts` | `eslint`, `tsc --noEmit`, `node:test`, and its coverage floor over `scripts/ts/` |
+| `make lint-ts` / `typecheck-ts` / `test-ts` / `coverage-ts` | `eslint`, `tsc --noEmit`, Vitest, and its coverage floor over `scripts/ts/` (see [`testing.md`](testing.md)) |
+| `make check-skills` | A skill another skill references must have a `## Contract` (Input/Output), and references must resolve ([`docs/skill-composition.md`](./skill-composition.md)) |
 | `make fmt` | Rewrites sources to the repo's `shfmt` / `ruff` style |
 | `make lint-actions` | `actionlint` over `.github/workflows/` |
 
@@ -167,14 +174,36 @@ down in a fixture, so it can't collide with a live session either.
 ## Plugin evals
 
 Behavioral tests for a skill live in `plugins/<name>/evals/<case>/case.yaml` (or
-`prompt.md` + `graders/`) and run with `claude plugin eval plugins/<name>` (Claude
-Code 2.1.269+; real model calls, so they cost money; each case runs with and without
-the plugin so `Δ` shows what the skill adds). Only `fetch-execute-guide` has cases
-today (`fetch-execute-asks-first` and `fetch-execute-runs-with-permission`); results land in the gitignored `evals/results/`.
-`fetch-execute-guide` keeps its plugin wrapper (with `SKILL.md` at the plugin root) because bare skills have no eval path.
-`plugins/gha-ci-audit/evals/evals.json` is the separate skill-creator format, which
-`claude plugin eval` does not read. Docs: [plugin evals](https://code.claude.com/docs/en/plugin-evals);
-background in [#387](https://github.com/dfadler/agent-config/issues/387).
+`prompt.md` + `graders/`) and run with `claude plugin eval plugins/<name> --case <case>`
+(Claude Code 2.1.269+). They make real model calls, so they cost money; each case runs
+with and without the plugin so `Δ` shows what the skill adds. Results land in
+`<plugin>/evals/results/<timestamp>/` (gitignored via `**/evals/results/`). Docs:
+[plugin evals](https://code.claude.com/docs/en/plugin-evals); background in
+[#387](https://github.com/dfadler/agent-config/issues/387).
+
+This section is the one home for facts shared by every case. A `case.yaml` header holds
+only its own run command and why its graders are shaped as they are.
+
+- **Grants.** A case's `allowed_tools` cannot grant `Bash`, `Write`, `Edit`, `WebFetch` or
+  `WebSearch`: the run withholds them unless you pass `--allow-tools` (put the target
+  first), so a grader that needs one can never pass and a `max: 0` check on it can never
+  fail ([#442](https://github.com/dfadler/agent-config/issues/442)). A case that needs a
+  grant records its exact command in its header; a case without one needs only `Skill`.
+  Add `--ablation with-without` where the header says to.
+- **Grader shape.** Prefer free `regex` graders where a literal string is reliable and
+  keep an `llm` grader only for a judgment a regex cannot make; rationale in
+  [#411](https://github.com/dfadler/agent-config/issues/411).
+- **`skill_fired`.** Positive cases carry a `tool_used` grader on `Skill` with
+  `arm: with-only`; negative cases use `min: 0`, `max: 0`, `arm: both`. Copy the block
+  from a sibling case and change only the skill name.
+- **Sabotage maps.** A header may map each grader to the skill text it checks, so you can
+  break that text and confirm the grader fails. Cite a short quoted phrase or the heading
+  name, never `SKILL.md` line numbers, which go wrong silently on any edit. Grep the
+  phrase in the skill when you write it.
+- **Layout.** `fetch-execute-guide` keeps its plugin wrapper (with `SKILL.md` at the
+  plugin root) because bare skills have no eval path.
+  `plugins/gha-ci-audit/evals/evals.json` is the separate skill-creator format, which
+  `claude plugin eval` does not read.
 
 ## GitHub operations
 

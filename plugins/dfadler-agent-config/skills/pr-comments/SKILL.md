@@ -20,6 +20,15 @@ metadata:
 
 # PR comment review and response
 
+## Contract
+
+- **Input:** one PR number or URL via `$ARGUMENTS` (always required), optionally with
+  pre-fetched thread/comment JSON in the "Data shape" below (skips Step 1's re-fetch).
+- **Output:** a reply on each handled thread or comment, resolved threads where the
+  feedback is settled, and a report of what was fixed, declined, escalated, or
+  spun off.
+- **Does not:** snapshot CI checks, update branches, or merge.
+
 This skill covers one PR's review feedback end to end: find every unresolved
 inline thread and every top-level comment, decide what each one deserves,
 reply through the right endpoint, resolve what's actually settled, and

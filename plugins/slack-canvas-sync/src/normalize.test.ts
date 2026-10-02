@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import { readFileSync, readdirSync } from "node:fs";
 import { join } from "node:path";
-import { test } from "node:test";
+import { test } from "vitest";
 import {
   NAV_BLOCK_HEADER,
   normalizeBody,
@@ -86,6 +86,32 @@ test("table cells are compacted and the separator is canonical", () => {
     normalizeBody("A | B\n---|---\n1 | 2\n"),
     "|A|B|\n|  ---  |  ---  |\n|1|2|\n",
   );
+});
+
+test("a table ends at a line that starts another block, even one containing a pipe", () => {
+  const table = "|a|b|\n|---|---|\n|1|2|\n";
+  assert.equal(
+    normalizeBody(`${table}- x | y\n`),
+    "|a|b|\n|  ---  |  ---  |\n|1|2|\n\n* x | y\n",
+  );
+  assert.equal(
+    normalizeBody(`${table}# Head | v\n`),
+    "|a|b|\n|  ---  |  ---  |\n|1|2|\n\n# Head | v\n",
+  );
+  assert.equal(
+    normalizeBody(`${table}> quote | v\n`),
+    "|a|b|\n|  ---  |  ---  |\n|1|2|\n\n> quote | v\n",
+  );
+  // The header and separator always belong to the table.
+  assert.equal(normalizeBody("|a|b|\n|---|---|\n"), "|a|b|\n|  ---  |  ---  |\n");
+});
+
+test("a code fence closes only with the same character and a run at least as long", () => {
+  assert.equal(
+    normalizeBody("```\n```~~\n~~~\n``\nstill code\n```\nafter\n"),
+    "```\n```~~\n~~~\n``\nstill code\n```\n\nafter\n",
+  );
+  assert.equal(normalizeBody("~~~\n```\n~~~~\nafter\n"), "~~~\n```\n~~~~\n\nafter\n");
 });
 
 test("an escaped pipe does not split a table cell", () => {

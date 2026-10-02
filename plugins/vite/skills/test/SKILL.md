@@ -12,6 +12,13 @@ metadata:
 
 # Testing a Vite Plugin
 
+## Contract
+
+- **Input:** a Vite plugin file with no test file, or a request to add tests for one.
+- **Output:** a Vitest test file covering whichever of the plugin's `transform`,
+  `generateBundle`, and `configureServer` hooks it implements, calling each directly.
+- **Does not:** start a Vite dev server, or change the plugin under test.
+
 Vite plugins are plain objects with hook functions. Test them by calling hooks
 directly — no need to spin up a full Vite dev server for unit tests.
 
