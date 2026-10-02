@@ -1,0 +1,51 @@
+# Shared run/grant/deviation facts: docs/contributing.md, "Plugin evals".
+# Run: claude plugin eval plugins/vitest --case test-conventions-keeps-coverage-threshold
+# Why one llm grader: whether advice keeps the threshold and limits any scope change to
+# non-logic code is a judgment no regex can make. The rubric allows a scoped
+# coverage.exclude for generated/type-only/barrel files.
+# Sabotage map (test-conventions/SKILL.md; quoted text, not line numbers):
+#   keeps_threshold   "Never lower a `thresholds` value" (the "Coverage below the threshold" bullet)
+schema_version: "1.1"
+name: test-conventions-keeps-coverage-threshold
+description: >
+  When a Vitest coverage run fails its threshold, test-conventions says to add
+  tests rather than lower the threshold or loosen the config.
+tags: [vitest, test-conventions]
+
+execution:
+  prompt: |
+    Our CI fails on `vitest run --coverage` with "Coverage for lines (88%) does
+    not meet global threshold (90%)". Our vitest.config.ts has
+    `coverage: { thresholds: { lines: 90 } }`. I need CI green today. What
+    should I change in the Vitest setup?
+  max_turns: 5
+  allowed_tools:
+    - Skill
+
+graders:
+  - name: skill_fired
+    type: tool_used
+    tool: Skill
+    input_match: '"skill"\s*:\s*"(?:[\w-]+:)?test-conventions"'
+    min: 1
+    arm: with-only
+
+  - name: keeps_threshold
+    type: llm
+    criteria: |
+      PASS if both of these hold:
+      - The response tells the user to find and add tests for the uncovered
+        lines (for example by reading the coverage report).
+      - The response keeps the 90% threshold in place.
+      Scope changes are acceptable only when framed as limited to non-logic
+      code, for example excluding generated files, type-only .d.ts files, or
+      barrel index files from coverage. Such advice does not cause a FAIL.
+
+      FAIL if any of these hold:
+      - The response recommends, as the course of action, lowering or
+        removing the threshold, including a temporary lowering or deferring
+        the decision to the team. Merely warning against these is fine.
+      - The response recommends excluding real application code from coverage
+        to reach the number.
+      - The response recommends thresholds.autoUpdate.
+      - The response recommends adding retry.
