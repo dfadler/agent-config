@@ -1,0 +1,83 @@
+# Grades what Claude RUNS (Bash commands), not what it says. Needs a Bash grant and
+# the scaffold, since a case's allowed_tools cannot grant Bash and the shim is built
+# by fixture.sh. Run this case with:
+#   claude plugin eval plugins/vitest --case flaky-tests-repro-ladder-actions --ablation with-without --scaffold --allow-tools "Bash(./bin/pnpm *)" "Bash(bin/pnpm *)"
+# fixture.sh creates ./bin/pnpm, a shim printing canned Vitest output (including the
+# CI seed line) so runs are deterministic and need no install or network; the prompt
+# points Claude at it, identically in both arms. The runner's documented fixture
+# mechanism is scaffold_script; a PATH-prepended evals/fixtures/bin (claimed in #411)
+# is not in the plugin-evals docs, so it is not used.
+# Granting Bash changes behavior, so rerun the other vitest cases after changing it.
+# All graders are free. Sabotage map (flaky-tests/SKILL.md lines):
+#   replays_seed_with_shuffle 26-29, 36-38; runs_no_file_parallelism 39-40;
+#   runs_repeats 33-35; no_double_dash_for_pnpm 14-19;
+#   replay_before_repeats 23-35 (swap steps 2 and 3).
+schema_version: "1.1"
+name: flaky-tests-repro-ladder-actions
+description: >
+  Action-based variant of flaky-tests-repro-ladder: flaky-tests should lead Claude
+  to actually run the replay with shuffle on before the repeats run, and a
+  concurrency-constrained run, with pnpm's flag forwarding done correctly.
+tags: [vitest, flaky-tests, pilot]
+context:
+  scaffold_script: fixture.sh
+
+execution:
+  prompt: |
+    One of our Vitest tests, src/queue.test.ts, passes every time on my laptop but
+    fails roughly 1 run in 10 on CI. The CI log of a failing run says
+    `Running tests with seed "812345"`. The CI runner has 2 cores, I'm not sure
+    whether our local config shuffles test order, and we run tests through pnpm.
+    This machine has no pnpm installed; use the wrapper at ./bin/pnpm in its
+    place (same arguments). Investigate by actually running the reproduction
+    commands with it, and tell me what you find.
+  max_turns: 12
+  allowed_tools:
+    - Bash
+    - Skill
+
+graders:
+  - name: skill_fired
+    type: tool_used
+    tool: Skill
+    input_match: '"skill"\s*:\s*"(?:[\w-]+:)?flaky-tests"'
+    min: 1
+    arm: with-only
+
+  - name: replays_seed_with_shuffle
+    type: tool_used
+    tool: Bash
+    input_match: 'pnpm\s.*(--sequence\.shuffle\.tests.*--sequence\.seed=812345|--sequence\.seed=812345.*--sequence\.shuffle\.tests)'
+    min: 1
+    arm: both
+
+  - name: runs_repeats
+    type: tool_used
+    tool: Bash
+    input_match: 'pnpm\s.*--repeats'
+    min: 1
+    arm: both
+
+  - name: runs_no_file_parallelism
+    type: tool_used
+    tool: Bash
+    input_match: 'pnpm\s.*--no-file-parallelism'
+    min: 1
+    arm: both
+
+  - name: no_double_dash_for_pnpm
+    type: tool_used
+    tool: Bash
+    input_match: 'pnpm\s+(run\s+)?test\s+--\s'
+    min: 0
+    max: 0
+    arm: both
+
+  - name: replay_before_repeats
+    type: tool_order
+    before:
+      tool: Bash
+      input_match: 'pnpm\s.*--sequence\.seed=812345'
+    after:
+      tool: Bash
+      input_match: 'pnpm\s.*--repeats'
