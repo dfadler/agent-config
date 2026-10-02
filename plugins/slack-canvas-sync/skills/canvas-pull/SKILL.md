@@ -41,7 +41,7 @@ Never reimplement its logic, and never edit `.canvas-sync/manifest.json` by hand
 3. The CLI, used as `CANVAS` below:
 
    ```bash
-   node "${CLAUDE_PLUGIN_ROOT}/src/bin.ts"
+   node "${CLAUDE_PLUGIN_ROOT}/scripts/ts/bin.ts"
    ```
 
 ## Step 1: Scan

@@ -40,7 +40,7 @@ shown, checked, and cleared. The TypeScript CLI owns the list; never edit
 3. The CLI, used as `CANVAS` below:
 
    ```bash
-   node "${CLAUDE_PLUGIN_ROOT}/src/bin.ts"
+   node "${CLAUDE_PLUGIN_ROOT}/scripts/ts/bin.ts"
    ```
 
 ## Step 1: Local status

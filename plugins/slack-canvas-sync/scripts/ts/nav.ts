@@ -9,7 +9,7 @@
  * (`NAV_BLOCK_HEADER`), not by position alone.
  */
 
-import { hashText } from "../../../scripts/ts/hash.ts";
+import { hashText } from "./hash.ts";
 import type { FileEntry, Manifest } from "./manifest.ts";
 import { NAV_BLOCK_HEADER, normalizeSections } from "./normalize.ts";
 import type { UpdateSection } from "./slack-read.ts";
