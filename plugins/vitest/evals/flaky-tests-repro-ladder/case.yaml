@@ -1,24 +1,34 @@
 # Needs no Bash grant (Skill tool only). Run this case with:
-#   claude plugin eval plugins/vitest --case flaky-tests-repro-ladder
-# The three required flags are literal strings, so they are free regex graders.
-# One short llm grader remains only for "does not recommend retry/longer timeout",
-# because a good answer may mention those words to warn against them. This
-# deviates from #411's "one tool_used + one llm" rule: several cheap regexes
-# plus one narrow judge are more stable than one judge checking everything.
+#   claude plugin eval plugins/vitest --case flaky-tests-repro-ladder --ablation with-without
+# Plain Claude already knows --repeats, --sequence.seed and --maxWorkers (a first
+# version graded only those and scored 1.00 with a flag removed from the skill), so
+# these graders check content specific to the flaky-tests skill: the
+# --sequence.shuffle.tests replay form, the "seed does nothing unless shuffle is on"
+# point, replay-before-repeats ordering, NODE_OPTIONS for the memory cap, and pnpm's
+# no-`--` forwarding. Regexes where a distinctive string is reliable; narrow llm
+# graders for the two ideas a regex cannot judge. This deviates from #411's
+# "one tool_used + one llm" rule on purpose: one judge over all of this was unstable.
+# Sabotage map (SKILL.md lines): replays_with_shuffle_tests 27/36, no_double_dash_for_pnpm
+# 15-16, mentions_no_file_parallelism 39-40, memory_cap_via_node_options 42-43,
+# seed_needs_shuffle 26/38, replays_seed_before_repeats 23-33.
 schema_version: "1.1"
 name: flaky-tests-repro-ladder
 description: >
   flaky-tests should fire when a Vitest test fails intermittently in CI only, and
-  the answer should give the concrete reproduction ladder (seed replay, repeats,
-  worker throttling) rather than suggesting retries.
+  the answer should follow the skill's ladder: replay the CI seed with shuffle on,
+  then repeats, then vary seeds, then constrain concurrency and memory, with the
+  right pnpm flag forwarding.
 tags: [vitest, flaky-tests]
 
 execution:
   prompt: |
     One of our Vitest tests, src/queue.test.ts, passes every time on my laptop but
-    fails roughly 1 run in 10 on CI. The CI runner has 2 cores and I have 10. How
-    do I reproduce it locally so I can find out why? Just give me the plan, don't
-    run anything.
+    fails roughly 1 run in 10 on CI. The CI log of a failing run says
+    `Running tests with seed "812345"`. We run tests through pnpm (`pnpm test`),
+    I'm not sure whether our local config shuffles test order, and the CI runner
+    has 2 cores and little RAM (we have seen OOM kills). Give me the plan to
+    reproduce it locally, with the exact commands. Just the plan, don't run
+    anything.
   max_turns: 6
   allowed_tools:
     - Skill
@@ -31,30 +41,48 @@ graders:
     min: 1
     arm: with-only
 
-  - name: mentions_repeats
+  - name: replays_with_shuffle_tests
     type: regex
     target: last_message
-    pattern: "--repeats"
+    pattern: "--sequence\\.shuffle\\.tests"
     match: contains
 
-  - name: mentions_seed_or_shuffle
+  - name: no_double_dash_for_pnpm
     type: regex
     target: last_message
-    pattern: "--sequence\\.(seed|shuffle)"
-    match: contains
+    pattern: "pnpm\\s+(run\\s+)?test\\s+--\\s"
+    match: not_contains
 
-  - name: mentions_maxworkers
+  - name: mentions_no_file_parallelism
     type: regex
     target: last_message
-    pattern: "--maxWorkers"
+    pattern: "--no-file-parallelism"
     match: contains
 
-  - name: no_retry_as_fix
+  - name: memory_cap_via_node_options
+    type: regex
+    target: last_message
+    pattern: "NODE_OPTIONS=\\S*--max-old-space-size"
+    match: contains
+
+  - name: seed_needs_shuffle
     type: llm
     criteria: |
-      PASS if the response does not present adding retry (the Vitest retry
-      option) or raising a test timeout as the way to fix or hide the flake.
-      Warning against retry or a longer timeout is a PASS.
+      PASS if the response says that the seed (--sequence.seed) only takes
+      effect, or only reproduces the order, when shuffling is enabled, and
+      tells the user to turn shuffling on in the replay command rather than
+      passing the seed alone.
 
-      FAIL if the response recommends adding retry or raising a timeout as
-      the way to deal with the flake.
+      FAIL if the response tells the user to replay with the seed alone and
+      says nothing about shuffling having to be on, or never uses the seed
+      from the CI log.
+
+  - name: replays_seed_before_repeats
+    type: llm
+    criteria: |
+      PASS if the response puts replaying the CI log's seed (812345) before
+      stress-running with --repeats, so that the seed replay is an earlier step
+      than the repeats step.
+
+      FAIL if --repeats comes first, if the seed is never replayed, or if
+      the response gives no ordering at all (an unordered list of options).
