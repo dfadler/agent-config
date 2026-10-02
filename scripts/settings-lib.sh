@@ -127,3 +127,35 @@ with open(settings_path, "w") as f:
 print("Deregistered {} hook from {}".format(event, settings_path))
 PYEOF
 }
+
+# hook_registration_state EVENT COMMAND SETTINGS_FILE
+#   Read-only probe: never writes. Returns 0 if a hook with COMMAND is
+#   registered under hooks.<EVENT>, 1 if it is not (including when
+#   SETTINGS_FILE is missing), and 2 if that cannot be determined (python3
+#   unavailable, or SETTINGS_FILE is not valid JSON). Prints nothing.
+hook_registration_state() {
+  local event="$1" cmd="$2" settings="$3"
+
+  [[ -f "$settings" ]] || return 1
+  command -v python3 >/dev/null 2>&1 || return 2
+
+  local rc=0
+  SETTINGS_FILE="$settings" HOOK_EVENT="$event" HOOK_CMD="$cmd" \
+    python3 <<'PYEOF' || rc=$?
+import json, os, sys
+
+try:
+    with open(os.environ["SETTINGS_FILE"]) as f:
+        data = json.load(f)
+    entries = data.get("hooks", {}).get(os.environ["HOOK_EVENT"], [])
+    found = any(
+        h.get("command") == os.environ["HOOK_CMD"]
+        for entry in entries
+        for h in entry.get("hooks", [])
+    )
+except Exception:
+    sys.exit(2)
+sys.exit(0 if found else 1)
+PYEOF
+  return "$rc"
+}

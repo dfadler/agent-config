@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import { spawnSync } from "node:child_process";
 import { join } from "node:path";
-import { test } from "node:test";
+import { test } from "vitest";
 import { EXIT_FAILURE, EXIT_OK, EXIT_USAGE, run } from "./cli.ts";
 import { snapshotFile } from "./manifest.ts";
 

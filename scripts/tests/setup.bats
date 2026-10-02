@@ -35,6 +35,7 @@ setup() {
   cp "$REPO_ROOT/scripts/settings-lib.sh" "$FAKE_REPO/scripts/settings-lib.sh"
   cp "$REPO_ROOT/scripts/plugin-hooks.sh" "$FAKE_REPO/scripts/plugin-hooks.sh"
   cp "$REPO_ROOT/scripts/symlink-lib.sh" "$FAKE_REPO/scripts/symlink-lib.sh"
+  cp "$REPO_ROOT/scripts/setup-plan-lib.sh" "$FAKE_REPO/scripts/setup-plan-lib.sh"
   cp "$REPO_ROOT/scripts/offer-safe-chain-permission.sh" \
     "$FAKE_REPO/scripts/offer-safe-chain-permission.sh"
   chmod +x "$FAKE_REPO/scripts/offer-safe-chain-permission.sh"

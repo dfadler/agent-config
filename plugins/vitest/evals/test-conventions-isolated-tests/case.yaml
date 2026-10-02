@@ -1,0 +1,69 @@
+# Shared run/grant/deviation facts: docs/contributing.md, "Plugin evals".
+# Run: claude plugin eval plugins/vitest --case test-conventions-isolated-tests --ablation with-without
+# Why these graders: they check rules plain Claude does not reliably apply (ephemeral
+# port 0, unstubAllEnvs / unstubEnvs, no direct process.env assignment, no hard-coded port).
+# Sabotage map (test-conventions/SKILL.md; quoted text, not line numbers):
+#   uses_ephemeral_port, no_hardcoded_port   "port 0 for servers"
+#   unstubs_env                              "vi.unstubAllEnvs()" and "unstubEnvs"
+#   no_direct_env_assignment                 "Prefer scoped helpers over mutating"
+schema_version: "1.1"
+name: test-conventions-isolated-tests
+description: >
+  test-conventions should fire when asked to write Vitest tests for code that reads
+  environment variables and listens on a port, and the tests should be safe under
+  shuffled, parallel execution.
+tags: [vitest, test-conventions]
+
+execution:
+  prompt: |
+    Write Vitest tests for this module and show me the full test file. Our CI
+    runs the suite in random order across several parallel workers, and we have
+    been burned by tests interfering with each other.
+
+        import { createServer, type Server } from "node:http";
+
+        export function startGreeter(port = 3000): Promise<Server> {
+          const prefix = process.env.GREETING_PREFIX ?? "Hello";
+          const server = createServer((_req, res) => {
+            res.end(`${prefix}, world`);
+          });
+          return new Promise((resolve) => server.listen(port, () => resolve(server)));
+        }
+
+    Cover the default prefix, a custom GREETING_PREFIX, and that a request to the
+    server returns the greeting.
+  max_turns: 6
+  allowed_tools:
+    - Skill
+
+graders:
+  - name: skill_fired
+    type: tool_used
+    tool: Skill
+    input_match: '"skill"\s*:\s*"(?:[\w-]+:)?test-conventions"'
+    min: 1
+    arm: with-only
+
+  - name: uses_ephemeral_port
+    type: regex
+    target: last_message
+    pattern: "startGreeter\\(\\s*0\\s*\\)|listen\\(\\s*0\\b"
+    match: contains
+
+  - name: no_hardcoded_port
+    type: regex
+    target: last_message
+    pattern: "startGreeter\\(\\s*[1-9]\\d{3,4}\\s*\\)|:3000"
+    match: not_contains
+
+  - name: unstubs_env
+    type: regex
+    target: last_message
+    pattern: "unstubAllEnvs|unstubEnvs"
+    match: contains
+
+  - name: no_direct_env_assignment
+    type: regex
+    target: last_message
+    pattern: "process\\.env\\.\\w+\\s*=[^=]|delete process\\.env"
+    match: not_contains

@@ -16,6 +16,15 @@ metadata:
 
 # Attach captured artefacts
 
+## Contract
+
+- **Input:** `--target`, the destination (`--repo` plus `--pr` or `--issue`), and local
+  files: `--before`/`--after` images and/or a `--video`, plus a `--caption`.
+- **Output:** the formatted before/after table or video embed, posted to the target
+  (body edit, or a new comment with `--comment`).
+- **Does not:** capture anything, or implement upload mechanics (those belong to
+  `gh-attach-image`).
+
 Thin routing layer over target-specific upload skills. It does two things:
 
 1. Picks the destination from `--target`.
