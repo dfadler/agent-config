@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { test } from "vitest";
-import { FakeCanvas, syncOnce } from "../test/fake-canvas.ts";
+import { FakeCanvas, syncOnce } from "./fake-canvas.ts";
 import type { FileEntry } from "./manifest.ts";
 import { normalizeLocal, renderSections } from "./normalize.ts";
 

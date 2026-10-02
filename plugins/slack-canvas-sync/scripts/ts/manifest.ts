@@ -6,7 +6,7 @@
  * issues, or PRs.
  */
 
-import { hashText } from "../../../scripts/ts/hash.ts";
+import { hashText } from "./hash.ts";
 
 export const MANIFEST_VERSION = 1;
 
