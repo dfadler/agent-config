@@ -147,7 +147,7 @@ COVERAGE_PY_MIN := 52
 #     see the PR that introduced this comment for why.
 COVERAGE_PY_JSON := $(COVERAGE_PY_DIR)/py-coverage.json
 
-# Ceiling for claude/CLAUDE.md (see scripts/check-claude-md-lines.sh). The
+# Ceiling for claude/CLAUDE.md (see scripts/ts/check-claude-md-lines.ts). The
 # global CLAUDE.md loads into every session on this machine regardless of
 # project, so unrelated content belongs in a skill/doc instead of growing this
 # file — #137 trimmed it from 352 to 302 lines by relocating the TypeScript
@@ -268,9 +268,10 @@ lint-shfmt: ## shfmt (check only)
 lint-set-flags: ## set-flags convention
 	@bash scripts/check-shell-set-flags.sh
 
-lint-claude-md: ## CLAUDE.md size
-	@bash scripts/check-claude-md-lines.sh claude/CLAUDE.md $(CLAUDE_MD_MAX_LINES)
+lint-claude-md: node-modules ## CLAUDE.md size
+	@node scripts/ts/check-claude-md-lines.ts claude/CLAUDE.md $(CLAUDE_MD_MAX_LINES)
 
+# lint-claude-md is TypeScript now, so lint-sh needs Node (node-modules).
 lint-sh: lint-shellcheck lint-shfmt lint-set-flags lint-claude-md ## shellcheck + shfmt + set-flags + CLAUDE.md size
 
 lint-py: venv ## ruff check + ruff format --check
@@ -344,5 +345,5 @@ lint-actions: ## Lint .github/workflows with actionlint
 # this repo's real tree when added (#96), but it hasn't been proven against
 # CI's own checkout, and a broken-link false positive there would go straight
 # to a red default branch. Fold it into `check`/`lint` once that's confirmed.
-check-links: ## Verify relative markdown links resolve to real files
-	@bash scripts/check-markdown-links.sh --path .
+check-links: node-modules ## Verify relative markdown links resolve to real files
+	@node scripts/ts/check-markdown-links.ts --path .

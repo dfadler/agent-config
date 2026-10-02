@@ -100,8 +100,8 @@ REPO_ROOT="$(cd -P "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 # bash's automatic expansion of an empty array is fine under nounset in
 # modern bash, but the macOS-shipped bash (3.2) this repo has to stay
 # compatible with does not reliably agree, so every use below goes through
-# the ${arr[@]+"${arr[@]}"} guard already established by
-# check-markdown-links.sh.
+# the ${arr[@]+"${arr[@]}"} guard used throughout this repo's shell
+# scripts.
 SKIP_FEATURES=()
 if [[ -n "$SKIP_LIST" ]]; then
   IFS=',' read -r -a SKIP_FEATURES <<<"$SKIP_LIST"
