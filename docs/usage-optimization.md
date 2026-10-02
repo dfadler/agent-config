@@ -110,7 +110,7 @@ Since then, the refactoring the audit recommended has been completed:
   moved to the `dfadler-agent-config:typescript-conventions` skill, which only loads
   on invocation, in TypeScript-containing repos.
 - A `CLAUDE_MD_MAX_LINES` ceiling (`Makefile:179`, currently 350) enforced by
-  `scripts/check-claude-md-lines.sh` as part of `make lint-sh` prevents the file
+  `scripts/ts/check-claude-md-lines.ts` as part of `make lint-sh` prevents the file
   from growing back.
 
 The current architecture is cache-friendly by design: `claude/CLAUDE.md` itself is
@@ -345,7 +345,7 @@ remaining items are open recommendations.
    `dfadler-agent-config:typescript-conventions` skill (§2).
 
 2. ~~**Add a `claude/CLAUDE.md` line-count gate to `make check`.**~~ **Done.**
-   `make lint-sh` now runs `scripts/check-claude-md-lines.sh` against a
+   `make lint-sh` now runs `scripts/ts/check-claude-md-lines.ts` against a
    `CLAUDE_MD_MAX_LINES` ceiling defined in `Makefile:179` (§2).
 
 3. **Document why each agent is pinned to its model tier — one comment per
