@@ -18,9 +18,14 @@ function isDeletionReason(value: string): value is DeletionReason {
   );
 }
 
+/** Hash of a whole body, derived from its per-section hashes. */
+export function bodyHashOfHashes(hashes: string[]): string {
+  return hashText(hashes.join("\n"));
+}
+
 /** Hash of a whole normalized body, given its sections. */
 export function bodyHash(sections: string[]): string {
-  return hashText(sections.join("\n\n"));
+  return bodyHashOfHashes(sections.map(hashText));
 }
 
 export interface SectionSnapshot {
