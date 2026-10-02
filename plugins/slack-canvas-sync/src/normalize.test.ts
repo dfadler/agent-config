@@ -243,6 +243,12 @@ test("mentions are canonicalized inside lists, tables, and callouts, but not in 
   assert.equal(normalizeBody(`${code}\n\n<@UAAA111>\n`), `${code}\n\n![](@UAAA111)\n`);
 });
 
+test("a mention after a line that does not close the fence is still inside the code", () => {
+  // "```~~" and "~~~" do not close a ``` fence, so the mention is still code.
+  const code = "```\n```~~\n~~~\n<@UAAA111>\n```";
+  assert.equal(normalizeBody(`${code}\n\n<@UAAA111>\n`), `${code}\n\n![](@UAAA111)\n`);
+});
+
 test("text that only looks like a mention is left alone", () => {
   assert.equal(normalizeBody("a <b> and <@not-an-id> c\n"), "a <b> and <@not-an-id> c\n");
 });

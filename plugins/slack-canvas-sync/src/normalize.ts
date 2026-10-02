@@ -187,7 +187,7 @@ function canonicalMentions(lines: string[]): string[] {
   return lines.map((line) => {
     const trimmed = line.trim();
     if (fence !== null) {
-      if (trimmed.startsWith(fence) && /^[`~]+$/.test(trimmed)) fence = null;
+      if (closesFence(trimmed, fence)) fence = null;
       return line;
     }
     const open = FENCE.exec(trimmed);
