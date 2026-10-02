@@ -10,7 +10,8 @@ pnpm coverage    # vitest run --coverage, 90% line floor (v8)
 
 Test order is shuffled by default (`sequence.shuffle`) to surface
 order-dependent flakes. Vitest prints the seed on a failing run; replay that
-order with `--sequence.seed=<n>`.
+order with `--sequence.seed=<n>` (the seed only matters while shuffling is on,
+which this repo's config guarantees).
 
 ## Hunting a flaky test
 
@@ -20,14 +21,16 @@ loads the short rules whenever Claude touches a test file. The flags:
 
 Flags are from the [Vitest CLI docs](https://vitest.dev/guide/cli.html) and
 [`maxWorkers`](https://vitest.dev/config/maxworkers). Extra args go straight
-after the pnpm script name; don't insert a `--`, because the flags after it
-were silently ignored when tried here.
+after the pnpm script name; with pnpm, don't insert a `--`, because the flags after
+it were silently ignored when tried here. (npm is the opposite: it needs
+`npm test -- --repeats=100`.)
 
 ```bash
 # Stress-run one file: each test runs 1 + 100 times
 pnpm test scripts/ts/foo.test.ts --repeats=100
 
-# Replay a specific shuffle order
+# Replay a specific shuffle order (shuffle is on via vitest.config.ts; if it
+# were off, also pass --sequence.shuffle.tests or the seed is ignored)
 pnpm test --sequence.seed=12345
 
 # Mimic a 2-core CI runner (replaces the old poolOptions.*.maxThreads/maxForks)

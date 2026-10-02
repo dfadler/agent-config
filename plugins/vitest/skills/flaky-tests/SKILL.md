@@ -11,23 +11,31 @@ metadata:
 
 # Hunting a flaky Vitest test
 
-Use the project's package manager to invoke Vitest (e.g. `pnpm test`, `pnpm vitest run`),
-and put flags directly after the command. A `--` separator made Vitest ignore the
-flags that followed it when tried on pnpm.
+Invoke Vitest through the project's package manager, and forward flags the way that
+manager requires. pnpm: flags directly after the script, no separator
+(`pnpm test --repeats=100`); a `--` made Vitest ignore the flags after it when tried.
+npm: the `--` separator is required (`npm test -- --repeats=100`), per the
+[npm run-script docs](https://docs.npmjs.com/cli/v10/commands/npm-run-script).
+Running the installed binary (`pnpm vitest run ...`) needs no separator. Examples below show bare flags.
 
 Work down the ladder; stop at the first rung that reproduces the failure.
 
 1. **Get the failing run's facts.** Note the test file, the error, and the shuffle
    seed (Vitest prints `Running tests with seed "<n>"`). Compare the CI job's core
    count and Node version with local.
-2. **Replay the order.** `vitest run --sequence.seed=<n>`. A reproduction means an
+2. **Replay the order.** The seed only takes effect while shuffling is on, so replay
+   both: `vitest run --sequence.shuffle.tests --sequence.seed=<n>` (add
+   `--sequence.shuffle.files` if CI shuffled files too; check the CI command and
+   config for which). If the local config already shuffles, the seed alone is enough.
+   A reproduction means an
    order dependency: shared module state, a leaked mock/timer/env var, a fixture
    written by an earlier test.
 3. **Stress the single file.** `vitest run path/to/file.test.ts --repeats=100`.
    `--repeats=N` runs each test 1+N times. Fails here but not in step 2: timing,
    randomness, or a real race inside the test itself.
-4. **Shuffle across seeds.** Run a few fresh seeds; add `--sequence.shuffle.tests`
-   if the config does not already shuffle.
+4. **Shuffle across seeds.** Enable shuffling first (`--sequence.shuffle.tests` if the
+   config does not already shuffle), then run a few fresh `--sequence.seed` values;
+   without shuffle a seed changes nothing.
 5. **Constrain concurrency.** `--maxWorkers=2` (or `--maxWorkers=1
    --no-file-parallelism`) to mimic a small CI runner. Fails only constrained: a
    timeout too tight, or tests contending for a port, directory, or temp file.
