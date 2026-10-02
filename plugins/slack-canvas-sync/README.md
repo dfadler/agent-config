@@ -7,7 +7,7 @@ across the issues listed there.
 
 ## Status
 
-Working: the TypeScript logic under `src/`, and the `canvas-push` and `canvas-pull`
+Working: the TypeScript logic under `scripts/ts/`, and the `canvas-push` and `canvas-pull`
 skills that drive it. Still to come: navigation blocks (#424), `canvas-status` and
 pending-deletion tracking (#425), and a live verification pass (#426).
 
@@ -32,7 +32,7 @@ frontmatter `title:`, else a leading `# Heading`, else the file name. Files with
 `<root>/.canvas-sync/` (manifest and conflict copies), which holds a `.gitignore`
 that ignores everything in it, so canvas IDs never reach git.
 
-## `src/normalize.ts`
+## `scripts/ts/normalize.ts`
 
 Turns local markdown and `slack_read_canvas` output into one canonical form so
 they can be hashed and diffed. Slack rewrites markdown on read (`-` bullets
@@ -45,7 +45,7 @@ headings become h3), so comparing raw text would report false changes.
 - Both strip the generated navigation block (see `NAV_BLOCK_HEADER`) so it never
   causes a diff.
 
-## `src/validate.ts`
+## `scripts/ts/validate.ts`
 
 `validate(markdown)` reports content Slack would reject or alter, instead of
 silently mangling it: headings or code blocks inside list items, mixed list
@@ -84,7 +84,7 @@ node plugins/slack-canvas-sync/scripts/ts/bin.ts plan < plan-input.json
 ```
 
 The skills use the sync-root commands (`scan`, `plan-push`, `record`, `pull`,
-`fingerprint`); `--help` lists them. `src/sync-fs.ts` rejects any path that is
+`fingerprint`); `--help` lists them. `scripts/ts/sync-fs.ts` rejects any path that is
 absolute, contains `..`, is not a `.md` file, or would write through a symlink out
 of the root.
 
@@ -93,7 +93,7 @@ Needs the Node from `.nvmrc`. Exit codes: 0 ok, 1 the check found a problem
 
 ## Tests and fixtures
 
-`test/fixtures/` pairs a local source with what `slack_read_canvas` returns for
+`scripts/ts/fixtures/` pairs a local source with what `slack_read_canvas` returns for
 it, and the tests assert both normalize to the same body. `basic.md` is a
 recording from a live canvas (one link made absolute so the repo's relative-link
 checker passes); `edits.md` is hand-built from behavior

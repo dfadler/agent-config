@@ -13,7 +13,7 @@ function codes(markdown: string): IssueCode[] {
   return validate(markdown).map((issue) => issue.code);
 }
 
-const localFixtures = join(import.meta.dirname, "..", "test", "fixtures", "local");
+const localFixtures = join(import.meta.dirname, "fixtures", "local");
 
 for (const name of readdirSync(localFixtures)) {
   test(`${name}: fixture has no errors`, () => {
