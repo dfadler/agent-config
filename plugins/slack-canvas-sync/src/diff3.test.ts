@@ -1,5 +1,5 @@
 import assert from "node:assert/strict";
-import { test } from "node:test";
+import { test } from "vitest";
 import { diff3, diff3Scalar, type Chunk, type ChunkKind } from "./diff3.ts";
 
 function kinds(base: string[], local: string[], remote: string[]): ChunkKind[] {

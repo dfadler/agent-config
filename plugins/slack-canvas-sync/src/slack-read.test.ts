@@ -1,5 +1,5 @@
 import assert from "node:assert/strict";
-import { test } from "node:test";
+import { test } from "vitest";
 import { NAV_BLOCK_HEADER } from "./normalize.ts";
 import { MAX_OPS_PER_CALL, ReadError, parseRemoteRead, toUpdateBatches } from "./slack-read.ts";
 

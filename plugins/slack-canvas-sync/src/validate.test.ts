@@ -1,9 +1,9 @@
 import assert from "node:assert/strict";
 import { readFileSync, readdirSync } from "node:fs";
 import { join } from "node:path";
-import { test } from "node:test";
+import { test } from "vitest";
 import {
-  MAX_CONTENT_CHARS,
+  MAX_CONTENT_BYTES,
   MAX_TABLE_CELLS,
   validate,
   type IssueCode,
@@ -32,8 +32,37 @@ test("valid content reports nothing", () => {
 });
 
 test("content over 1 MiB is an error", () => {
-  assert.deepEqual(codes("a".repeat(MAX_CONTENT_CHARS + 1)), ["content-too-large"]);
-  assert.deepEqual(codes("a".repeat(MAX_CONTENT_CHARS)), []);
+  assert.deepEqual(codes("a".repeat(MAX_CONTENT_BYTES + 1)), ["content-too-large"]);
+  assert.deepEqual(codes("a".repeat(MAX_CONTENT_BYTES)), []);
+});
+
+test("the content limit counts UTF-8 bytes, not UTF-16 code units", () => {
+  // 400,000 CJK characters are 1.2 MB in UTF-8 but only 400,000 code units.
+  const cjk = "字".repeat(400_000);
+  assert.ok(cjk.length < MAX_CONTENT_BYTES);
+  assert.deepEqual(codes(cjk), ["content-too-large"]);
+  assert.deepEqual(codes("字".repeat(300_000)), []);
+});
+
+test("a code fence closes only with the same character and a run at least as long", () => {
+  const body = "* a\n  # inside the code block\n";
+  // Mixed characters, a different character, and a shorter run do not close it.
+  for (const notClosing of ["```~~", "~~~", "``"]) {
+    assert.deepEqual(codes(`\`\`\`\n${notClosing}\n${body}`), [], notClosing);
+  }
+  // A longer run does close it, so the list after it is scanned again.
+  assert.deepEqual(codes(`\`\`\`\n\`\`\`\`\n${body}`), ["heading-in-list-item"]);
+  assert.deepEqual(codes(`~~~\n~~~\n${body}`), ["heading-in-list-item"]);
+});
+
+test("a table ends at a line that starts another block, like the normalizer", () => {
+  const rows = (n: number): string =>
+    Array.from({ length: n }, () => `|${"x|".repeat(10)}`).join("\n");
+  const header = `|${"h|".repeat(10)}\n|${"---|".repeat(10)}\n`;
+  // 29 body rows of 10 cells + the header row = 300 cells, the limit.
+  assert.deepEqual(codes(`${header}${rows(29)}\n`), []);
+  // The trailing "- a | b" is a list item, not a 31st row, so no overflow.
+  assert.deepEqual(codes(`${header}${rows(29)}\n- a | b\n`), []);
 });
 
 test("a table over 300 cells is an error, one at the limit is not", () => {
