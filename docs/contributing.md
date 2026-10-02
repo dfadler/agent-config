@@ -26,11 +26,15 @@
      and `skills/`. Keep the directory name and the manifest `name` identical.
      `setup.sh` auto-discovers any directory under `plugins/` that carries a
      `plugin.json`, so no manual changes to `setup.sh` are needed.
-     **If the plugin depends on another plugin's skill or hooks** (e.g.
-     `dfadler-agent-config` requiring `worktree-core` for `git-worktree-usage`),
-     declare it in the manifest's `dependencies` array ([plugin dependencies](https://code.claude.com/docs/en/plugins/dependencies);
-     `requires` is not a Claude Code field and is ignored) and document the
-     dependency in the plugin's README and, if hooks are involved, in
+     **If the plugin calls another plugin's skill or hooks at runtime**, declare it in
+     the manifest's `dependencies` array ([plugin dependencies](https://code.claude.com/docs/en/plugins/dependencies);
+     `requires` is not a Claude Code field and is ignored). A declared dependency is
+     enforced at load time, and it is not resolved inside a `claude plugin eval` run:
+     a plugin with an unmet dependency is silently dropped ([#450](https://github.com/dfadler/agent-config/issues/450)),
+     so a plugin that needs evals must also load the dependency from inside its own
+     directory through the case's `plugins:` field. If the plugin only pairs with
+     another (as `dfadler-agent-config` does with `worktree-core`), don't declare it:
+     document the pairing in the plugin's README and, if hooks are involved, in
      `docs/hook-composition.md`.
 2. Name skills and agents plainly — `pr-babysit`, not `dfadler-agent-config-pr-babysit`
    — in both the directory/filename and the frontmatter `name:`. The plugin namespace

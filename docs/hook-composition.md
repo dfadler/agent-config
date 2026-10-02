@@ -144,21 +144,27 @@ another tool's own append) is preserved verbatim on every re-run, and to the
 symlink directories: a real file or a symlink pointing outside this repo is
 left alone with a warning rather than replaced.
 
-## `dfadler-agent-config` and `worktree-core`: a required dependency, not a duplicate
+## `dfadler-agent-config` and `worktree-core`: companion plugins, not a declared dependency
 
 `plugins/worktree-core/` is a minimal, standalone plugin that ships the
 git-worktree-usage skill plus these three hooks — no other skills or agents. It is the
 single source for both: `dfadler-agent-config` no longer carries its own copy of the
 skill or `hooks/hooks.json` (it did until [#334](https://github.com/dfadler/agent-config/issues/334),
-when the duplicate was removed). `dfadler-agent-config`'s manifest declares
-`"dependencies": ["worktree-core"]` to record that dependency. (It used to say
-`"requires"`, which isn't a Claude Code field: `claude plugin validate` warns that it
-is ignored at load time.) Per the
+when the duplicate was removed). The two are meant to be installed together (a plain
+`./setup.sh` installs everything; to pick, use
+`./setup.sh --include=dfadler-agent-config,worktree-core`). Nothing in
+`dfadler-agent-config` calls `worktree-core` at runtime, so a machine that enables one
+without the other still works; it just lacks the worktree hooks and skill.
+
+`dfadler-agent-config`'s manifest does **not** declare `worktree-core` under
+`"dependencies"`. It did briefly ([#438](https://github.com/dfadler/agent-config/pull/438);
+before that it said `"requires"`, which isn't a Claude Code field). Per the
 [plugin dependencies docs](https://code.claude.com/docs/en/plugins/dependencies), a
-bare name resolves in the declaring plugin's own marketplace, and a plugin whose
-dependency is disabled or absent doesn't load. This repo loads plugins as
-`<name>@skills-dir` with no marketplace ([plugin-loading.md](./plugin-loading.md)), so
-install both together (e.g. `./setup.sh --include=dfadler-agent-config,worktree-core`).
+declared dependency is enforced at load time: a plugin whose dependency is disabled or
+absent doesn't load. It is also not resolved inside a `claude plugin eval` run, where the
+plugin under test is silently dropped ([#450](https://github.com/dfadler/agent-config/issues/450)).
+With nothing in the plugin needing `worktree-core`, enforcing it protected nothing and
+blocked evals for its skills (#409, #410).
 
 Since only `worktree-core` registers these hooks now, there is no double-firing to
 guard against.
