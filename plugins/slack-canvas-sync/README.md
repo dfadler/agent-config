@@ -8,8 +8,8 @@ across the issues listed there.
 ## Status
 
 Working: the TypeScript logic under `scripts/ts/`, and the `canvas-push` and `canvas-pull`
-skills that drive it. Still to come: navigation blocks (#424), `canvas-status` and
-pending-deletion tracking (#425), and a live verification pass (#426).
+skills that drive it, plus `canvas-status` and pending-deletion tracking. Still to
+come: navigation blocks (#424) and a live verification pass (#426).
 
 ## Skills
 
@@ -20,9 +20,18 @@ pending-deletion tracking (#425), and a live verification pass (#426).
   unsent local edits and each file's frontmatter. On a conflict it saves the
   canvas's version under `.canvas-sync/conflicts/` and writes nothing else.
 
-Both are user-invoked only (`disable-model-invocation`), use only the Slack
-connector's canvas tools, and never delete anything. They need the sync root
-(`CANVAS_SYNC_ROOT` or an argument) and Node 22.18+ (see `.nvmrc`).
+- **`canvas-status`**: local sync state at a glance, plus the **pending manual
+  deletion** list. The connector cannot delete canvases, so anything the sync leaves
+  behind (a removed file's canvas, a replaced canvas, a `[agent-sync-scratch]` test
+  canvas) is listed with its link and Slack's delete steps until you clear it. It
+  also warns if `.canvas-sync/` state or `*.remote.md` copies are tracked by git.
+  Clearing happens only on your say-so or when a read shows the canvas is gone;
+  nothing is ever deleted for you.
+
+`canvas-push` and `canvas-pull` are user-invoked only (`disable-model-invocation`).
+All three skills use only the Slack connector's canvas tools and never delete
+anything. They need the sync root (`CANVAS_SYNC_ROOT` or an argument) and Node
+22.18+ (see `.nvmrc`).
 
 ## Sync root layout
 
