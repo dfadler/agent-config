@@ -1,0 +1,5 @@
+# eslint-plugin-functional@10.0.1 declares deepmerge-ts ^7.1.5, which is
+# vulnerable to GHSA-ggr8-5vv4-36mx (fixed in 8.0.0). Drop this override once
+# the plugin's own range admits a patched release.
+overrides:
+  deepmerge-ts: 8.0.0

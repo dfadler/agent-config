@@ -3,13 +3,17 @@
 # claude/ -> ~/.claude/). Safe to re-run: fixes symlinks that already point
 # here, and reports (without touching) anything else already at the target.
 #
-# Usage: ./setup.sh [--install-deps] [--fix] [--skip=<feature,...>] [--include=<feature,...>] [--list-features] [--no-companions]
+# Usage: ./setup.sh [--install-deps] [--fix] [--skip=<feature,...>] [--include=<feature,...>] [--list-features] [--no-companions] [--plan]
+#
+# Structure: scripts/setup-plan-lib.sh decides what to do and prints it as plan
+# lines (pure: reads state, writes nothing); the applier below executes them.
 
 set -euo pipefail
 
 INSTALL_DEPS=0
 FIX=0
 NO_COMPANIONS=0
+DRY_RUN=0
 SKIP_LIST=""
 INCLUDE_LIST=""
 INCLUDE_SET=0
@@ -17,7 +21,7 @@ LIST_FEATURES=0
 
 usage() {
   cat <<'USAGE'
-Usage: ./setup.sh [--install-deps] [--skip=<feature,...>] [--include=<feature,...>] [--list-features]
+Usage: ./setup.sh [--install-deps] [--skip=<feature,...>] [--include=<feature,...>] [--list-features] [--plan]
 
 Symlinks this repo's config into ~/.claude, then checks that the runtime
 dependencies the linked skills need are importable by the interpreter that
@@ -56,6 +60,10 @@ run is rejected rather than guessing which one wins.
                      with --skip.
   --list-features    Print the feature names --skip and --include accept
                      and exit without linking anything.
+  --plan, --dry-run  Print what this run would do, one tab-separated action
+                     per line (format: scripts/setup-plan-lib.sh), and exit
+                     without changing anything. Combines with --skip and
+                     --include. An empty plan means nothing needs doing.
   --no-companions    Skip the advisory companion checks (git identity, pyte,
                      companion plugins). Linking still runs normally; only the
                      check-companions.sh step is omitted.
@@ -68,6 +76,7 @@ while [[ $# -gt 0 ]]; do
     --install-deps) INSTALL_DEPS=1 ;;
     --fix) FIX=1 ;;
     --no-companions) NO_COMPANIONS=1 ;;
+    --plan | --dry-run) DRY_RUN=1 ;;
     --skip=*) SKIP_LIST="${1#--skip=}" ;;
     --include=*)
       INCLUDE_LIST="${1#--include=}"
@@ -208,25 +217,6 @@ if [[ "$INCLUDE_SET" == 1 ]]; then
   done
 fi
 
-is_skipped() {
-  local name="$1" f
-  for f in ${SKIP_FEATURES[@]+"${SKIP_FEATURES[@]}"}; do
-    [[ "$f" == "$name" ]] && return 0
-  done
-  return 1
-}
-
-# Human-readable reason shown next to a feature this run is leaving
-# unlinked — "--skip" when the user named it directly, or "not in --include"
-# when --include's complement (computed above) is what excluded it.
-exclude_reason() {
-  if [[ "$INCLUDE_SET" == 1 ]]; then
-    printf 'not in --include'
-  else
-    printf -- '--skip'
-  fi
-}
-
 # Markers that delimit the block setup.sh writes into ~/.claude/CLAUDE.md,
 # and that teardown.sh strips back out — single source of truth.
 # shellcheck source=scripts/claude-md-lib.sh
@@ -241,315 +231,155 @@ source "$REPO_ROOT/scripts/plugin-hooks.sh"
 # Shared relative-symlink-to-absolute-path resolution.
 # shellcheck source=scripts/symlink-lib.sh
 source "$REPO_ROOT/scripts/symlink-lib.sh"
+# The decision half of this script: works out what to do and prints it as a
+# line-oriented plan (format documented in the library), without writing.
+# shellcheck source=scripts/setup-plan-lib.sh
+source "$REPO_ROOT/scripts/setup-plan-lib.sh"
 
-# Every directory under plugins/ that carries a .claude-plugin/plugin.json is a
-# plugin this repo ships (currently dfadler-agent-config and accessibility-skills)
-# - discovered rather than hardcoded so adding one doesn't require touching this
-# list by hand. The trailing "/" restricts the glob to directories; if plugins/
-# is ever empty the pattern itself fails the -f test below and the loop body
-# never runs, so no nullglob/-e guard is needed.
-#
-# A plugin excluded by --skip or --include's complement is left out of
-# PLUGIN_SRCS/PLUGIN_LINKS entirely rather than linked-then-removed — which
-# means prune_stale_plugin_links below (it already removes any
-# ~/.claude/{skills,agents} link into this repo's plugins/ that isn't in
-# PLUGIN_LINKS) also removes a previously opted-in plugin the moment a later
-# run opts it back out, for free.
-PLUGIN_SRCS=()
-PLUGIN_LINKS=()
-for plugin_dir in "$REPO_ROOT"/plugins/*/; do
-  plugin_dir="${plugin_dir%/}"
-  [[ -f "$plugin_dir/.claude-plugin/plugin.json" ]] || continue
-  plugin_name="$(basename "$plugin_dir")"
-  if is_skipped "$plugin_name"; then
-    echo "Skipping plugin ($(exclude_reason)): $plugin_name"
-    continue
-  fi
-  PLUGIN_SRCS+=("$plugin_dir")
-  PLUGIN_LINKS+=("$HOME/.claude/skills/$plugin_name")
-done
+# ---------------------------------------------------------------------------
+# The applier: executes plan lines, one verb each. It makes no decisions; every
+# check about what is already present lives in scripts/setup-plan-lib.sh.
+# ---------------------------------------------------------------------------
 
-link() {
-  local src="$1" dest="$2"
-  if [[ -L "$dest" ]]; then
-    local target
-    target="$(readlink "$dest")"
-    if [[ "$target" == "$src" ]]; then
-      return 0
-    fi
-    # Only take over a symlink this repo already owns, or one that is already
-    # broken (harmless to replace, and the case you get after moving the repo).
-    # ~/.claude/skills/ is shared with every other skills-dir plugin, so a live
-    # symlink pointing elsewhere belongs to someone else - leave it for them.
-    if [[ "$target" != "$REPO_ROOT/"* && -e "$dest" ]]; then
-      echo "Skipping $dest — symlink to $target, which this repo doesn't own" >&2
-      return 0
-    fi
-    echo "Replacing stale symlink: $dest -> $target"
-    rm "$dest"
-  elif [[ -e "$dest" ]]; then
-    echo "Skipping $dest — already exists and isn't a symlink to this repo" >&2
-    return 0
-  fi
-  ln -s "$src" "$dest"
-  echo "Linked $dest -> $src"
+# Write the generated ~/.claude/CLAUDE.md. MODE comes from the plan;
+# INCLUDE_REFS holds the plan's include lines (without the "@").
+#   create          the file is absent: write the managed section
+#   replace-symlink a legacy symlink to this repo: replace it with the section
+#   update          our section is present but stale: replace its body, keep
+#                   user additions below it
+#   prepend         the file has no section: prepend it, keep the user's content
+# Using a generated regular file rather than a symlink keeps the repo's working
+# tree clean: any tool that writes to ~/.claude/CLAUDE.md modifies only the
+# host-local generated file, never a tracked repo file.
+apply_claude_md() {
+  local mode="$1" claude_md="$2"
+  local body ref
+  body=""
+  for ref in ${INCLUDE_REFS[@]+"${INCLUDE_REFS[@]}"}; do
+    body="${body:+$body$'\n'}@$ref"
+  done
+
+  case "$mode" in
+    replace-symlink)
+      rm "$claude_md"
+      printf '%s\n%s\n%s\n' "$MANAGED_BEGIN" "$body" "$MANAGED_END" >"$claude_md"
+      echo "Replaced repo symlink with generated $claude_md"
+      ;;
+    create)
+      printf '%s\n%s\n%s\n' "$MANAGED_BEGIN" "$body" "$MANAGED_END" >"$claude_md"
+      echo "Created $claude_md"
+      ;;
+    update)
+      local tmp in_section=0 rawline
+      tmp="$(mktemp)"
+      while IFS= read -r rawline || [[ -n "$rawline" ]]; do
+        if [[ "$rawline" == "$MANAGED_BEGIN" ]]; then
+          printf '%s\n%s\n%s\n' "$MANAGED_BEGIN" "$body" "$MANAGED_END" >>"$tmp"
+          in_section=1
+          continue
+        fi
+        if [[ "$rawline" == "$MANAGED_END" ]]; then
+          in_section=0
+          continue
+        fi
+        [[ "$in_section" == 1 ]] && continue
+        printf '%s\n' "$rawline" >>"$tmp"
+      done <"$claude_md"
+      mv "$tmp" "$claude_md"
+      echo "Updated managed section in $claude_md"
+      ;;
+    prepend)
+      local tmp
+      tmp="$(mktemp)"
+      {
+        printf '%s\n%s\n%s\n\n' "$MANAGED_BEGIN" "$body" "$MANAGED_END"
+        cat "$claude_md"
+      } >"$tmp"
+      mv "$tmp" "$claude_md"
+      echo "Prepended managed section to $claude_md"
+      ;;
+    *)
+      echo "Unknown claude-md mode in plan: $mode" >&2
+      exit 20
+      ;;
+  esac
 }
 
-link_dir_contents() {
-  local src_dir="$1" dest_dir="$2"
-  mkdir -p "$dest_dir"
-  local entry name feature
-  for entry in "$src_dir"/*; do
-    [[ -e "$entry" ]] || continue
-    name="$(basename "$entry")"
-    # Feature name matches how COMMAND_NAMES above was built: basename minus
-    # a .md suffix (the only caller of this function today is commands/).
-    feature="${name%.md}"
-    if is_skipped "$feature"; then
-      echo "Skipping $dest_dir/$name ($(exclude_reason): $feature)"
-      continue
-    fi
-    link "$entry" "$dest_dir/$name"
+# apply_plan: read plan lines on stdin and execute them in order.
+apply_plan() {
+  local verb a b c
+  INCLUDE_REFS=()
+  while IFS=$'\t' read -r verb a b c; do
+    case "$verb" in
+      "") ;;
+      skip-plugin) echo "Skipping plugin ($b): $a" ;;
+      skip-command) echo "Skipping $a ($b: $c)" ;;
+      warn-foreign-symlink)
+        echo "Skipping $a — symlink to $b, which this repo doesn't own" >&2
+        ;;
+      warn-exists)
+        echo "Skipping $a — already exists and isn't a symlink to this repo" >&2
+        ;;
+      mkdir) mkdir -p "$a" ;;
+      personal-migrate)
+        mv "$a" "$b"
+        echo "Migrated $a → $b (personal instructions preserved there)"
+        ;;
+      personal-create)
+        # The sidecar marks it as setup-owned so teardown.sh can safely remove
+        # it without risking a user-owned empty file with the same name.
+        touch "$a" "${a}.setup-managed"
+        echo "Created empty $a (add machine-specific instructions there)"
+        ;;
+      include) INCLUDE_REFS+=("$a") ;;
+      claude-md)
+        apply_claude_md "$a" "$b"
+        INCLUDE_REFS=()
+        ;;
+      link)
+        ln -s "$a" "$b"
+        echo "Linked $b -> $a"
+        ;;
+      relink)
+        echo "Replacing stale symlink: $b -> $c"
+        rm "$b"
+        ln -s "$a" "$b"
+        echo "Linked $b -> $a"
+        ;;
+      unlink)
+        rm "$b"
+        case "$a" in
+          opted-out) echo "Removed opted-out symlink: $b -> $c" ;;
+          superseded) echo "Removed superseded symlink: $b -> $c" ;;
+          *)
+            echo "Unknown unlink reason in plan: $a" >&2
+            exit 20
+            ;;
+        esac
+        ;;
+      register-hook)
+        ensure_hook_registered "$a" "${c:-}" "$b" "$HOME/.claude/settings.json"
+        ;;
+      deregister-hook)
+        ensure_hook_deregistered "$a" "$b" "$HOME/.claude/settings.json"
+        ;;
+      *)
+        echo "Unknown plan verb: $verb" >&2
+        exit 20
+        ;;
+    esac
   done
 }
 
-# The inverse of the skip above: a command excluded AFTER a previous run
-# already linked it (whether via --skip or by falling outside a changed
-# --include list) needs its now-stale symlink removed, or re-running
-# wouldn't actually be idempotent — the old link would just sit there
-# forever. Only touches a symlink that both points into src_dir and whose
-# feature name is currently excluded; anything else (foreign symlinks, real
-# files) is left alone, same caution as prune_stale_plugin_links below.
-prune_skipped_dir_links() {
-  local dest_dir="$1" src_dir="$2"
-  [[ -d "$dest_dir" ]] || return 0
-  local entry target resolved name feature
-  for entry in "$dest_dir"/*; do
-    [[ -L "$entry" ]] || continue
-    target="$(readlink "$entry")"
-    resolved="$(resolve_symlink_target "$target" "$dest_dir")" || continue
-    [[ "$resolved" == "$src_dir/"* ]] || continue
-    name="$(basename "$entry")"
-    feature="${name%.md}"
-    is_skipped "$feature" || continue
-    rm "$entry"
-    echo "Removed opted-out symlink: $entry -> $target"
-  done
-}
+# Decide first, from the state as it is now; then (unless --plan) apply.
+PLAN="$(plan_install)"
 
-# Remove links this repo created that are no longer canonical. Two generations
-# of those exist: earlier versions linked dfadler-agent-config's skills and
-# agents into ~/.claude/{skills,agents} one entry at a time (each plugin now
-# supplies those itself, so a leftover would load the same skill twice), and
-# dfadler-agent-config used to be named generic-tools (that link is left
-# dangling by the rename). Anything under these directories pointing into this
-# repo's plugins/ that isn't one of the current plugin links (PLUGIN_LINKS) is
-# stale by definition.
-#
-# readlink reports the target exactly as stored, so a relative one has to be
-# made absolute before it can be compared against $REPO_ROOT - otherwise a
-# relative link into plugins/ reads as pointing elsewhere and survives, and the
-# "isn't the current plugin link" test above can't recognize the current link
-# either. resolve_symlink_target (scripts/symlink-lib.sh) does that
-# resolution — shared with teardown.sh, which needs the identical logic to
-# decide whether a symlink is one this repo owns.
-prune_stale_plugin_links() {
-  local dest_dir="$1"
-  [[ -d "$dest_dir" ]] || return 0
-  local entry target resolved i keep
-  for entry in "$dest_dir"/*; do
-    [[ -L "$entry" ]] || continue
-    target="$(readlink "$entry")"
-    resolved="$(resolve_symlink_target "$target" "$dest_dir")" || continue
-    if [[ "$resolved" != "$REPO_ROOT/plugins/"* ]]; then
-      continue
-    fi
-    keep=0
-    for i in "${!PLUGIN_LINKS[@]}"; do
-      if [[ "$entry" == "${PLUGIN_LINKS[$i]}" && "$resolved" == "${PLUGIN_SRCS[$i]}" ]]; then
-        keep=1
-        break
-      fi
-    done
-    [[ "$keep" == 1 ]] && continue
-    rm "$entry"
-    echo "Removed superseded symlink: $entry -> $target"
-  done
-}
+if [[ "$DRY_RUN" == 1 ]]; then
+  [[ -z "$PLAN" ]] || printf '%s\n' "$PLAN"
+  exit 0
+fi
 
-# Migrate an existing hand-maintained ~/.claude/CLAUDE.md to CLAUDE.personal.md
-# so it loads before the repo's symlinked version via the @CLAUDE.personal.md
-# directive in claude/CLAUDE.md. Called before `link` touches CLAUDE.md so the
-# personal file is always present when @CLAUDE.personal.md resolves at runtime.
-migrate_personal_claude_md() {
-  local personal="$HOME/.claude/CLAUDE.personal.md"
-  local current="$HOME/.claude/CLAUDE.md"
-
-  if [[ ! -e "$personal" ]]; then
-    if [[ -f "$current" && ! -L "$current" ]]; then
-      # A real (non-symlink) file exists — move it to the personal slot.
-      mv "$current" "$personal"
-      echo "Migrated $current → $personal (personal instructions preserved there)"
-    else
-      # Either nothing is there yet, or it's already a symlink this script will
-      # handle via link(). Create an empty personal file so @CLAUDE.personal.md
-      # in the repo's CLAUDE.md always resolves rather than erroring. The
-      # sidecar marks it as setup-owned so teardown.sh can safely remove it
-      # without risking a user-owned empty file with the same name.
-      touch "$personal" "${personal}.setup-managed"
-      echo "Created empty $personal (add machine-specific instructions there)"
-    fi
-  fi
-
-}
-
-# Print the managed-section body (everything between, not including, the
-# BEGIN/END markers): the personal-instructions include, this repo's CLAUDE.md,
-# then one @include per entry in claude/conventions/DEFAULT_ENABLED (skipping
-# blank lines and comments). Computed fresh each call so both "repo moved" and
-# "DEFAULT_ENABLED changed" are handled by regenerating the whole section,
-# rather than patching one line in place.
-managed_section_body() {
-  printf '@CLAUDE.personal.md\n'
-  printf '@%s/claude/CLAUDE.md\n' "$REPO_ROOT"
-  local manifest="$REPO_ROOT/claude/conventions/DEFAULT_ENABLED"
-  [[ -f "$manifest" ]] || return 0
-  local line
-  while IFS= read -r line || [[ -n "$line" ]]; do
-    line="${line%%#*}"
-    line="${line## }"
-    line="${line%% }"
-    [[ -n "$line" ]] || continue
-    printf '@%s/claude/conventions/%s\n' "$REPO_ROOT" "$line"
-  done <"$manifest"
-}
-
-# Write a thin host-local ~/.claude/CLAUDE.md whose managed section @-includes
-# the user's personal instructions, this repo's CLAUDE.md, and the default set
-# of convention files. Using a generated regular file rather than a symlink
-# keeps the repo's working tree clean: any tool that writes to
-# ~/.claude/CLAUDE.md modifies only the host-local generated file, never a
-# tracked repo file.
-#
-# Safe to re-run:
-#   • If the file is a legacy symlink to this repo, replace it.
-#   • If the file already has our managed section, replace its body with the
-#     freshly computed one (repo moved, or DEFAULT_ENABLED changed) and leave
-#     user additions below the section intact.
-#   • If the file exists without our section, prepend the section and keep
-#     the user's existing content below it.
-#   • If the file doesn't exist, create it.
-ensure_claude_md_includes() {
-  local claude_md="$HOME/.claude/CLAUDE.md"
-  local body
-  body="$(managed_section_body)"
-
-  if [[ -L "$claude_md" ]]; then
-    # Legacy format: symlink to our repo. Replace with generated file.
-    rm "$claude_md"
-    printf '%s\n%s\n%s\n' "$MANAGED_BEGIN" "$body" "$MANAGED_END" >"$claude_md"
-    echo "Replaced repo symlink with generated $claude_md"
-    return 0
-  fi
-
-  if [[ ! -e "$claude_md" ]]; then
-    printf '%s\n%s\n%s\n' "$MANAGED_BEGIN" "$body" "$MANAGED_END" >"$claude_md"
-    echo "Created $claude_md"
-    return 0
-  fi
-
-  if grep -qF "$MANAGED_BEGIN" "$claude_md"; then
-    # Our section is present. If its body already matches, nothing to do.
-    local existing_body
-    existing_body="$(sed -n "/^${MANAGED_BEGIN//\//\\/}\$/,/^${MANAGED_END//\//\\/}\$/p" "$claude_md" | sed '1d;$d')"
-    if [[ "$existing_body" == "$body" ]]; then
-      return 0
-    fi
-    # Body differs (repo moved, or DEFAULT_ENABLED changed): replace it.
-    local tmp in_section=0
-    tmp="$(mktemp)"
-    while IFS= read -r rawline || [[ -n "$rawline" ]]; do
-      if [[ "$rawline" == "$MANAGED_BEGIN" ]]; then
-        printf '%s\n%s\n%s\n' "$MANAGED_BEGIN" "$body" "$MANAGED_END" >>"$tmp"
-        in_section=1
-        continue
-      fi
-      if [[ "$rawline" == "$MANAGED_END" ]]; then
-        in_section=0
-        continue
-      fi
-      [[ "$in_section" == 1 ]] && continue
-      printf '%s\n' "$rawline" >>"$tmp"
-    done <"$claude_md"
-    mv "$tmp" "$claude_md"
-    echo "Updated managed section in $claude_md"
-  else
-    # No section yet: prepend, keeping user content below.
-    local tmp
-    tmp="$(mktemp)"
-    {
-      printf '%s\n%s\n%s\n\n' "$MANAGED_BEGIN" "$body" "$MANAGED_END"
-      cat "$claude_md"
-    } >"$tmp"
-    mv "$tmp" "$claude_md"
-    echo "Prepended managed section to $claude_md"
-  fi
-}
-
-mkdir -p "$HOME/.claude"
-migrate_personal_claude_md
-ensure_claude_md_includes
-link_dir_contents "$REPO_ROOT/claude/commands" "$HOME/.claude/commands"
-prune_skipped_dir_links "$HOME/.claude/commands" "$REPO_ROOT/claude/commands"
-
-prune_stale_plugin_links "$HOME/.claude/skills"
-prune_stale_plugin_links "$HOME/.claude/agents"
-
-# Each plugin under plugins/ is linked as a unit rather than its contents.
-# Claude Code auto-loads any directory under ~/.claude/skills/ that carries a
-# .claude-plugin/plugin.json as "<name>@skills-dir", and it follows symlinks -
-# so this keeps edits in this repo live (no install/update/restart cycle)
-# while still getting plugin identity: a version, `claude plugin disable`,
-# `claude plugin details` token accounting, `claude plugin validate`. Each
-# plugin's agents/ are discovered from inside it; don't link them separately.
-# The link basename must match its manifest's name so its skills resolve as
-# <plugin-name>:<skill>.
-mkdir -p "$HOME/.claude/skills"
-for i in "${!PLUGIN_SRCS[@]}"; do
-  link "${PLUGIN_SRCS[$i]}" "${PLUGIN_LINKS[$i]}"
-done
-
-# Register plugin hooks in ~/.claude/settings.json.
-#
-# Claude Code does not auto-invoke hooks from a skills-dir plugin's hooks.json;
-# the PreToolUse hook that enforces worktree usage must be registered explicitly
-# in the global settings so it fires on every Edit/Write tool call.  The hook
-# script itself is off-by-default (reads worktree.enforce from the project's own
-# .claude/settings.json), so registering it globally is safe for projects that
-# haven't opted in — it simply exits 0 without doing anything in those repos.
-#
-# Same story for worktree-core's two SessionStart hooks (self-healing
-# symlink check, merged-worktree prune) and dfadler-agent-config's Stop hook
-# (memory-hygiene reminder) — all three are off-by-default (env var or the
-# project's own .claude/settings.json key) and documented in
-# docs/hook-composition.md, but were never actually wired into
-# ~/.claude/settings.json, so they never fired regardless of configuration.
-#
-# When a plugin is excluded via --skip/--include, deregister its hooks to
-# keep settings.json in sync with the installed plugin set.
-#
-# The (event, matcher, owning feature, command) rows themselves live in
-# scripts/plugin-hooks.sh — sourced above — so a new hook is one row there
-# instead of a matching pair of edits in setup.sh and teardown.sh.
-GLOBAL_SETTINGS="$HOME/.claude/settings.json"
-for i in "${!PLUGIN_HOOK_EVENTS[@]}"; do
-  if ! is_skipped "${PLUGIN_HOOK_FEATURES[$i]}"; then
-    ensure_hook_registered "${PLUGIN_HOOK_EVENTS[$i]}" "${PLUGIN_HOOK_MATCHERS[$i]}" \
-      "${PLUGIN_HOOK_CMDS[$i]}" "$GLOBAL_SETTINGS"
-  else
-    ensure_hook_deregistered "${PLUGIN_HOOK_EVENTS[$i]}" "${PLUGIN_HOOK_CMDS[$i]}" "$GLOBAL_SETTINGS"
-  fi
-done
+apply_plan <<<"$PLAN"
 
 # Last, so the linking work is already done and reported when these speak up.
 # Advisory checks (git identity, pyte, companion plugins/tools, Aikido Safe

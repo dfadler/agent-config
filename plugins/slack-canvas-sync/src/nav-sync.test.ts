@@ -2,7 +2,7 @@ import assert from "node:assert/strict";
 import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
-import { after, test } from "node:test";
+import { afterAll as after, test } from "vitest";
 import { FakeCanvas } from "../test/fake-canvas.ts";
 import { NAV_BLOCK_HEADER, normalizeSections } from "./normalize.ts";
 import {

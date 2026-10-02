@@ -130,7 +130,19 @@ function renderList(items: ListItem[]): string {
   return out.join("\n");
 }
 
-function startsOtherBlock(line: string, next: string | undefined): boolean {
+/**
+ * Whether `line` closes a code fence opened with `opener` (the run of backticks
+ * or tildes): the same character only, and at least as many of them. Shared by
+ * the normalizer and the validator so they always agree where code ends.
+ */
+export function closesFence(line: string, opener: string): boolean {
+  const char = opener.startsWith("`") ? "`" : "~";
+  const trimmed = line.trim();
+  return trimmed.length >= opener.length && trimmed.replaceAll(char, "") === "";
+}
+
+/** Whether `line` begins a different block, so a table or paragraph ends before it. */
+export function startsOtherBlock(line: string, next: string | undefined): boolean {
   const trimmed = line.trim();
   return (
     FENCE.test(trimmed) ||
@@ -210,13 +222,12 @@ function parseBlocks(lines: string[]): string[] {
     const fence = FENCE.exec(trimmed);
     if (fence !== null) {
       const marker = fence[1] ?? "```";
-      const close = new RegExp(`^${marker[0] === "`" ? "`" : "~"}{${String(marker.length)},}\\s*$`);
       const out = [trimmed];
       i += 1;
       while (i < lines.length) {
         const inner = (lines[i] ?? "").replace(/\s+$/, "");
         i += 1;
-        if (close.test(inner.trim())) {
+        if (closesFence(inner, marker)) {
           out.push(inner.trim());
           break;
         }
@@ -302,7 +313,14 @@ function parseBlocks(lines: string[]): string[] {
       isTableSeparator(nextLine)
     ) {
       const rows: string[] = [];
-      while (i < lines.length && (lines[i] ?? "").trim().includes("|")) {
+      // The header and separator are always rows; after them a line that
+      // starts another block (a list item, heading, quote, ...) ends the table
+      // even if it happens to contain a pipe.
+      while (
+        i < lines.length &&
+        (lines[i] ?? "").trim().includes("|") &&
+        (rows.length < 2 || !startsOtherBlock(lines[i] ?? "", lines[i + 1]))
+      ) {
         rows.push(lines[i] ?? "");
         i += 1;
       }

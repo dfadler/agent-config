@@ -40,7 +40,9 @@ Two flags narrow that, over the same flat namespace of feature names: a slash co
 basename (`adversarial-review`, from `claude/commands/adversarial-review.md`) or a
 plugin's directory name (`dfadler-agent-config`, `accessibility-skills`, from
 `plugins/`). `./setup.sh --list-features` prints the exact names available on this
-checkout without linking anything.
+checkout without linking anything. `./setup.sh --plan` (alias `--dry-run`) prints what
+a run would do, one tab-separated action per line, without changing anything; the line
+format is documented at the top of `scripts/setup-plan-lib.sh`.
 
 To leave specific features out and keep everything else, pass `--skip` with a
 comma-separated list:

@@ -11,6 +11,13 @@ metadata:
 
 # Review a Vite Plugin
 
+## Contract
+
+- **Input:** a Vite plugin file, or a diff that touches one.
+- **Output:** findings against the checklist below, each with a file path and line
+  number; checklist items that don't apply are skipped.
+- **Does not:** edit the plugin.
+
 Work through each checklist item. Report every finding with the file path and
 line number. Skip items that don't apply to the plugin under review.
 

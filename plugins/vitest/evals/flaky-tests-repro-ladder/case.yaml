@@ -1,0 +1,90 @@
+# Shared run/grant/deviation facts: docs/contributing.md, "Plugin evals".
+# Run: claude plugin eval plugins/vitest --case flaky-tests-repro-ladder --ablation with-without
+# Why these graders: plain Claude already knows --repeats, --sequence.seed and
+# --maxWorkers, so they check what is specific to the flaky-tests skill: the
+# --sequence.shuffle.tests replay form, "seed does nothing unless shuffle is on",
+# replay-before-repeats ordering, NODE_OPTIONS for the memory cap, and pnpm's no-`--`
+# forwarding. Regex where a distinctive string is reliable; two narrow llm graders
+# for ideas a regex cannot judge.
+# Sabotage map (flaky-tests/SKILL.md; quoted text, not line numbers):
+#   no_double_dash_for_pnpm       "pnpm: flags directly after the script, no separator"
+#   replays_with_shuffle_tests    "The seed only takes effect while shuffling is on, so replay"
+#   seed_needs_shuffle            same sentence, and "without shuffle a seed changes nothing"
+#   replays_seed_before_repeats   step order: "Replay the order" before "Stress the single file"
+#   mentions_no_file_parallelism  "--no-file-parallelism"
+#   memory_cap_via_node_options   "so the cap reaches Vitest's"
+schema_version: "1.1"
+name: flaky-tests-repro-ladder
+description: >
+  flaky-tests should fire when a Vitest test fails intermittently in CI only, and
+  the answer should follow the skill's ladder: replay the CI seed with shuffle on,
+  then repeats, then vary seeds, then constrain concurrency and memory, with the
+  right pnpm flag forwarding.
+tags: [vitest, flaky-tests]
+
+execution:
+  prompt: |
+    One of our Vitest tests, src/queue.test.ts, passes every time on my laptop but
+    fails roughly 1 run in 10 on CI. The CI log of a failing run says
+    `Running tests with seed "812345"`. We run tests through pnpm (`pnpm test`),
+    I'm not sure whether our local config shuffles test order, and the CI runner
+    has 2 cores and little RAM (we have seen OOM kills). Give me the plan to
+    reproduce it locally, with the exact commands. Just the plan, don't run
+    anything.
+  max_turns: 6
+  allowed_tools:
+    - Skill
+
+graders:
+  - name: skill_fired
+    type: tool_used
+    tool: Skill
+    input_match: '"skill"\s*:\s*"(?:[\w-]+:)?flaky-tests"'
+    min: 1
+    arm: with-only
+
+  - name: replays_with_shuffle_tests
+    type: regex
+    target: last_message
+    pattern: "--sequence\\.shuffle\\.tests"
+    match: contains
+
+  - name: no_double_dash_for_pnpm
+    type: regex
+    target: last_message
+    pattern: "pnpm\\s+(run\\s+)?test\\s+--\\s"
+    match: not_contains
+
+  - name: mentions_no_file_parallelism
+    type: regex
+    target: last_message
+    pattern: "--no-file-parallelism"
+    match: contains
+
+  - name: memory_cap_via_node_options
+    type: regex
+    target: last_message
+    pattern: "NODE_OPTIONS=\\S*--max-old-space-size"
+    match: contains
+
+  - name: seed_needs_shuffle
+    type: llm
+    criteria: |
+      PASS if the response says that the seed (--sequence.seed) only takes
+      effect, or only reproduces the order, when shuffling is enabled, and
+      tells the user to turn shuffling on in the replay command rather than
+      passing the seed alone.
+
+      FAIL if the response tells the user to replay with the seed alone and
+      says nothing about shuffling having to be on, or never uses the seed
+      from the CI log.
+
+  - name: replays_seed_before_repeats
+    type: llm
+    criteria: |
+      PASS if the response puts replaying the CI log's seed (812345) before
+      stress-running with --repeats, so that the seed replay is an earlier step
+      than the repeats step.
+
+      FAIL if --repeats comes first, if the seed is never replayed, or if
+      the response gives no ordering at all (an unordered list of options).

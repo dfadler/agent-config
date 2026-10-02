@@ -11,7 +11,7 @@ import {
 } from "node:fs";
 import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
-import { after, test } from "node:test";
+import { afterAll as after, test } from "vitest";
 import { FakeCanvas } from "../test/fake-canvas.ts";
 import { normalizeSections } from "./normalize.ts";
 import {
