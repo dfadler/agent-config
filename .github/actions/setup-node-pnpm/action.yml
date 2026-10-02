@@ -7,8 +7,8 @@ description: >
 # working directory. Any workflow that runs a TypeScript check (a `make`
 # target that depends on node-modules) uses this one step instead of the
 # pnpm/action-setup + setup-node + install sequence, so the pins live in one
-# place. Only typescript.yml uses it today; sh-*.yml workflows add it as their
-# checks move to TypeScript.
+# place. typescript.yml and sh-claude-md-size.yml use it today; the other
+# sh-*.yml workflows add it as their checks move to TypeScript.
 #
 # Versions are not inputs on purpose: .nvmrc and `packageManager` are the
 # single source of truth (also used locally), and `--frozen-lockfile` inside

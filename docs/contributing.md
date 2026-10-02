@@ -123,7 +123,7 @@ make check          # lint + structure + typecheck + test + actionlint + coverag
 
 | Target | What it does |
 | --- | --- |
-| `make lint-sh` | `shellcheck`, `shfmt -i 2 -ci -d`, the `set -uo pipefail` convention, and the `claude/CLAUDE.md` line-count ceiling (`scripts/check-claude-md-lines.sh`) |
+| `make lint-sh` | `shellcheck`, `shfmt -i 2 -ci -d`, the `set -uo pipefail` convention, and the `claude/CLAUDE.md` line-count ceiling (`scripts/ts/check-claude-md-lines.ts`) |
 | `make lint-py` | `ruff check` and `ruff format --check` |
 | `make typecheck` | `mypy --strict` over the Python sources |
 | `make structure` | Plugin manifests and skill/agent frontmatter agree with their directories |
