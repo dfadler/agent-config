@@ -22,3 +22,11 @@ for using them, and package-manager forwarding, is the `vitest:flaky-tests` skil
 Sharding splits test files, not test cases; combine `--reporter=blob` with
 `--shard`, then `--merge-reports` ([Vitest performance
 guide](https://vitest.dev/guide/improving-performance)).
+
+## Functional core (`scripts/ts/lib/`)
+
+`lib/` holds the `Result`/`pipe` library and is the lint-enforced "core": no
+`let`, loops, classes, `this`, `throw`, or mutation, and parameters/types must be
+readonly (`eslint-plugin-functional`, scoped in `eslint.config.js`; add a
+directory to `CORE_FILES` there to opt it in). Its tests use
+[fast-check](https://fast-check.dev) property tests for the functor/monad laws.
