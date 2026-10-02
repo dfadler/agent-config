@@ -1,5 +1,9 @@
 # Needs no Bash grant (Skill tool only). Run this case with:
 #   claude plugin eval plugins/vitest --case test-conventions-keeps-coverage-threshold
+# Kept as a single llm grader: whether advice keeps the threshold and limits any
+# scope change to non-logic code is a judgment no regex can make. The rubric was
+# tightened after a first run where the judge treated a legitimate scoped
+# coverage.exclude for generated/type-only files as "excluding files to pass".
 schema_version: "1.1"
 name: test-conventions-keeps-coverage-threshold
 description: >
@@ -28,14 +32,19 @@ graders:
   - name: keeps_threshold
     type: llm
     criteria: |
-      PASS if all of these hold:
-      - The response tells the user to add tests for the uncovered lines (for
-        example by inspecting the coverage report).
+      PASS if both of these hold:
+      - The response tells the user to find and add tests for the uncovered
+        lines (for example by reading the coverage report).
       - The response keeps the 90% threshold in place.
+      Scope changes are acceptable only when framed as limited to non-logic
+      code, for example excluding generated files, type-only .d.ts files, or
+      barrel index files from coverage. Such advice does not cause a FAIL.
 
       FAIL if any of these hold:
-      - The response recommends lowering or removing the threshold, even as a
-        temporary measure.
-      - The response recommends excluding files from coverage only to make
-        the run pass.
+      - The response recommends, as the course of action, lowering or
+        removing the threshold, including a temporary lowering or deferring
+        the decision to the team. Merely warning against these is fine.
+      - The response recommends excluding real application code from coverage
+        to reach the number.
+      - The response recommends thresholds.autoUpdate.
       - The response recommends adding retry.

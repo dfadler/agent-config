@@ -1,5 +1,10 @@
 # Needs no Bash grant (Skill tool only). Run this case with:
 #   claude plugin eval plugins/vitest --case flaky-tests-repro-ladder
+# The three required flags are literal strings, so they are free regex graders.
+# One short llm grader remains only for "does not recommend retry/longer timeout",
+# because a good answer may mention those words to warn against them. This
+# deviates from #411's "one tool_used + one llm" rule: several cheap regexes
+# plus one narrow judge are more stable than one judge checking everything.
 schema_version: "1.1"
 name: flaky-tests-repro-ladder
 description: >
@@ -26,19 +31,30 @@ graders:
     min: 1
     arm: with-only
 
-  - name: gives_repro_ladder
+  - name: mentions_repeats
+    type: regex
+    target: last_message
+    pattern: "--repeats"
+    match: contains
+
+  - name: mentions_seed_or_shuffle
+    type: regex
+    target: last_message
+    pattern: "--sequence\\.(seed|shuffle)"
+    match: contains
+
+  - name: mentions_maxworkers
+    type: regex
+    target: last_message
+    pattern: "--maxWorkers"
+    match: contains
+
+  - name: no_retry_as_fix
     type: llm
     criteria: |
-      PASS if all of these hold:
-      - The response tells the user to stress-run the test file with the
-        Vitest --repeats flag (for example --repeats=100).
-      - The response tells the user to replay or vary the shuffle order with
-        --sequence.seed (or --sequence.shuffle).
-      - The response tells the user to throttle concurrency to mimic the
-        2-core CI runner with --maxWorkers (for example --maxWorkers=2).
+      PASS if the response does not present adding retry (the Vitest retry
+      option) or raising a test timeout as the way to fix or hide the flake.
+      Warning against retry or a longer timeout is a PASS.
 
-      FAIL if any of these hold:
-      - Any of the three flags above is missing.
-      - The response presents adding retry or raising a timeout as the way to
-        fix or hide the flake.
-      - The response gives only generic advice with no Vitest flags.
+      FAIL if the response recommends adding retry or raising a timeout as
+      the way to deal with the flake.

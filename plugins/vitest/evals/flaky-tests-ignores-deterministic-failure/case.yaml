@@ -1,5 +1,9 @@
 # Needs no Bash grant (Skill tool only). Run this case with:
 #   claude plugin eval plugins/vitest --case flaky-tests-ignores-deterministic-failure
+# Graders are free regexes over the final message: the required fix and the
+# forbidden flake tooling are literal strings, so no judge is needed. This
+# deviates from #411's "one tool_used + one llm" rule to avoid judge cost and
+# judge variance where a pattern is sufficient.
 schema_version: "1.1"
 name: flaky-tests-ignores-deterministic-failure
 description: >
@@ -40,15 +44,26 @@ graders:
     max: 0
     arm: both
 
-  - name: fixes_off_by_one
-    type: llm
-    criteria: |
-      PASS if all of these hold:
-      - The response identifies the off-by-one bug: the loop should use
-        i <= n, or an equivalent fix.
-      - The response does not suggest --repeats, shuffle seeds, worker
-        throttling, or retries.
+  - name: names_loop_bound_fix
+    type: regex
+    target: last_message
+    pattern: "<="
+    match: contains
 
-      FAIL if any of these hold:
-      - The response treats the failure as flaky or intermittent.
-      - The response does not identify the loop bound as the cause.
+  - name: no_repeats_flag
+    type: regex
+    target: last_message
+    pattern: "--repeats"
+    match: not_contains
+
+  - name: no_seed_flag
+    type: regex
+    target: last_message
+    pattern: "--sequence\\.seed"
+    match: not_contains
+
+  - name: no_maxworkers_flag
+    type: regex
+    target: last_message
+    pattern: "--maxWorkers"
+    match: not_contains

@@ -1,5 +1,9 @@
 # Needs no Bash grant (Skill tool only). Run this case with:
 #   claude plugin eval plugins/vitest --case test-conventions-ignores-unrelated-ts
+# Graders are free regexes over the final message (required term present,
+# testing terms absent), so no judge is needed. This deviates from #411's
+# "one tool_used + one llm" rule to avoid judge cost and variance where a
+# pattern is sufficient.
 schema_version: "1.1"
 name: test-conventions-ignores-unrelated-ts
 description: >
@@ -24,14 +28,15 @@ graders:
     max: 0
     arm: both
 
-  - name: answers_directly
-    type: llm
-    criteria: |
-      PASS if all of these hold:
-      - The response explains that flatMap maps and then flattens one level.
-      - The response gives a short example of each method.
-      - The response does not mention Vitest, tests, or flaky behavior.
+  - name: answers_about_flatmap
+    type: regex
+    target: last_message
+    pattern: "flatMap"
+    match: contains
 
-      FAIL if any of these hold:
-      - The example for either method is missing.
-      - The response drifts into testing advice.
+  - name: no_testing_drift
+    type: regex
+    target: last_message
+    pattern: "vitest|flaky"
+    flags: i
+    match: not_contains

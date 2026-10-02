@@ -1,5 +1,10 @@
 # Needs no Bash grant (Skill tool only). Run this case with:
 #   claude plugin eval plugins/vitest --case test-conventions-isolated-tests
+# The required API names are literal strings, so they are free regex graders.
+# One short llm grader remains only for the absence conditions (no real sleep,
+# no shared fixed path), which a regex cannot judge. This deviates from #411's
+# "one tool_used + one llm" rule: cheap regexes plus one narrow judge are more
+# stable than one judge checking everything.
 schema_version: "1.1"
 name: test-conventions-isolated-tests
 description: >
@@ -37,19 +42,32 @@ graders:
     min: 1
     arm: with-only
 
-  - name: tests_are_isolated
+  - name: uses_fake_time
+    type: regex
+    target: last_message
+    pattern: "useFakeTimers|setSystemTime|spyOn\\(Date"
+    match: contains
+
+  - name: uses_per_test_temp_path
+    type: regex
+    target: last_message
+    pattern: "mkdtemp"
+    match: contains
+
+  - name: restores_time_and_mocks
+    type: regex
+    target: last_message
+    pattern: "useRealTimers|restoreAllMocks"
+    match: contains
+
+  - name: no_real_sleep_or_shared_path
     type: llm
     criteria: |
-      PASS if the response shows a test file and all of these hold:
-      - Expiry is tested with Vitest fake timers or a mocked Date.now (for
-        example vi.useFakeTimers, vi.setSystemTime, or vi.spyOn(Date, "now")).
-      - Each test uses its own unique temporary path (for example from
-        fs.mkdtemp or a per-test directory).
-      - Timers or spies the tests install are restored (for example
-        vi.useRealTimers or vi.restoreAllMocks in afterEach).
+      PASS if the test file in the response tests expiry without really
+      sleeping or waiting 60 seconds, and its tests do not share one fixed
+      file path.
 
       FAIL if any of these hold:
       - The response shows no test file.
-      - Expiry is tested by really sleeping or waiting 60 seconds.
-      - Several tests share one fixed file path.
-      - Timers or spies are left active after a test.
+      - Expiry is tested by a real sleep or a real 60 second wait.
+      - Several tests read or write the same fixed file path.
