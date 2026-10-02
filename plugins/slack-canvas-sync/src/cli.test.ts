@@ -3,7 +3,7 @@ import { spawnSync } from "node:child_process";
 import { mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { after, test } from "node:test";
+import { afterAll as after, test } from "vitest";
 import { FakeCanvas } from "../test/fake-canvas.ts";
 import { EXIT_FAILURE, EXIT_OK, EXIT_USAGE, run } from "./cli.ts";
 import { snapshotFile } from "./manifest.ts";

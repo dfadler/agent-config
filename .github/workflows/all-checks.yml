@@ -1,0 +1,70 @@
+name: All checks
+
+# The single top-level CI workflow. It owns the triggers, the concurrency group
+# and the permissions, calls each language's checks as reusable workflows, and
+# gates on the all-checks sentinel below.
+#
+# Branch protection requires only the job named `all-checks` (the workflow name
+# above is just a UI prefix). To add a gating check: write a reusable workflow
+# (`on: workflow_call:`), call it from a job here, and add that job to the
+# sentinel's needs: — no branch-protection settings change.
+#
+#   shell       shell.yml        shellcheck, shfmt, set-flags, claude-md-size,
+#                                structure, test-sh, coverage (sh-*.yml)
+#   typescript  typescript.yml   make lint-ts / typecheck-ts / test-ts / coverage-ts
+#   python      python.yml       make lint-py / typecheck / test-py / coverage-py
+#
+# actionlint.yml (paths-filtered) and issue-bot.yml stay standalone: a
+# paths-filtered workflow cannot be gated here without leaving the required
+# check Pending on PRs that don't touch its paths.
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+# One live run per target: a new push to the same PR (or to main) supersedes
+# the in-flight run for the old commit. Called workflows must not declare their
+# own concurrency group; it would conflict with this one.
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  shell:
+    uses: ./.github/workflows/shell.yml
+    permissions:
+      contents: read
+
+  typescript:
+    uses: ./.github/workflows/typescript.yml
+    permissions:
+      contents: read
+
+  python:
+    uses: ./.github/workflows/python.yml
+    permissions:
+      contents: read
+
+  # Sentinel required by branch protection. Requiring each job name
+  # individually would need a settings update on every rename or addition;
+  # this job's name is the only one that ever needs to be required.
+  # if: always() prevents a skipped dependency from skipping this job too.
+  all-checks:
+    name: all-checks
+    runs-on: ubuntu-latest
+    if: always()
+    needs: [shell, typescript, python]
+    steps:
+      - name: All checks passed
+        env:
+          RESULTS: ${{ join(needs.*.result, ' ') }}
+        run: |
+          # Every gating job must report success; a skipped or cancelled job
+          # must not let the sentinel pass.
+          for result in $RESULTS; do
+            [[ "$result" == success ]] || { echo "gating job result: $result"; exit 1; }
+          done

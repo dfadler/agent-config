@@ -17,6 +17,14 @@ metadata:
 
 # PR checks: review and respond
 
+## Contract
+
+- **Input:** a PR number or URL via `$ARGUMENTS`, optionally with pre-fetched
+  `checks`/`failedRuns` JSON in the `pr-babysit` snapshot shape (skips the re-fetch).
+- **Output:** one report line per check (name, classification, action taken) plus a
+  one-line "in flight" summary a caller can lift verbatim.
+- **Does not:** snapshot other PRs, address review comments, or merge.
+
 Standalone entry point for one PR's CI status — snapshot, diagnose, classify,
 act, report. No project-supplied snapshot script or sibling skill is
 required: everything here has a plain `gh`-only path. If a caller (e.g.

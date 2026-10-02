@@ -16,6 +16,14 @@ metadata:
 
 # compare
 
+## Contract
+
+- **Input:** two reachable URLs, either an explicit `--before`/`--after` pair or ones
+  resolved from `.claude/settings.json`, each already served by a running dev server.
+- **Output:** a before/after comparison posted through `screen-capture:attach`, built
+  from one `screen-capture:capture` per URL.
+- **Does not:** start a dev server, drive a browser, or talk to GitHub directly.
+
 This skill resolves *which two URLs* to capture and *orchestrates* the two
 downstream skills that do the actual work. It does not talk to a browser
 itself (that's `screen-capture:capture`) and does not talk to GitHub itself
