@@ -1,0 +1,39 @@
+# Shared run/grant/deviation facts: docs/contributing.md, "Plugin evals".
+# Run: claude plugin eval plugins/vitest --case test-conventions-ignores-unrelated-ts
+# Why these graders: required term present, testing terms absent; free regexes suffice.
+schema_version: "1.1"
+name: test-conventions-ignores-unrelated-ts
+description: >
+  An ordinary TypeScript question with no tests involved should not trigger
+  test-conventions or flaky-tests.
+tags: [vitest, negative]
+
+execution:
+  prompt: |
+    In TypeScript, what is the difference between `Array.prototype.map` and
+    `Array.prototype.flatMap`? Give one short example of each.
+  max_turns: 3
+  allowed_tools:
+    - Skill
+
+graders:
+  - name: vitest_skills_not_invoked
+    type: tool_used
+    tool: Skill
+    input_match: '"skill"\s*:\s*"(?:[\w-]+:)?(test-conventions|flaky-tests)"'
+    min: 0
+    max: 0
+    arm: both
+
+  - name: answers_about_flatmap
+    type: regex
+    target: last_message
+    pattern: "flatMap"
+    match: contains
+
+  - name: no_testing_drift
+    type: regex
+    target: last_message
+    pattern: "vitest|flaky"
+    flags: i
+    match: not_contains

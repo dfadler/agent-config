@@ -188,7 +188,8 @@ help: ## Show available targets
 	@grep -E '^[a-z-]+:.*?## ' $(MAKEFILE_LIST) | awk -F':.*?## ' '{printf "  \033[36m%-14s\033[0m %s\n", $$1, $$2}'
 
 # `check` must be the UNION of what every workflow runs, because that is the
-# promise the README makes. The split, so a new target lands in both places:
+# promise the README makes (all-checks.yml calls the first three below, plus
+# actionlint.yml runs standalone). The split, so a new target lands in both places:
 #
 #   shell.yml      lint-shellcheck, lint-shfmt, lint-set-flags, lint-claude-md,
 #                  structure, test-sh, coverage
@@ -234,13 +235,13 @@ typecheck-ts: node-modules ## tsc --noEmit over the TypeScript sources
 check-skills: node-modules ## Skills that other skills reference must document a contract
 	@pnpm run --silent check-skills
 
-test-ts: node-modules ## Run the node:test suite
+test-ts: node-modules ## Run the Vitest suite
 	@pnpm test --silent
 
 # Floor is a MEASURED baseline, same discipline as COVERAGE_MIN: the only
-# source today is the hash helper at 100%, and package.json holds the 90
+# source today is the hash helper at 100%, and vitest.config.ts owns the
 # floor so a future untested file can't quietly drag the number down.
-coverage-ts: node-modules ## Measure node:test coverage and enforce the floor
+coverage-ts: node-modules ## Measure Vitest (v8) coverage and enforce the floor
 	@pnpm run --silent coverage
 
 lint: lint-sh lint-py ## Lint shell and Python
