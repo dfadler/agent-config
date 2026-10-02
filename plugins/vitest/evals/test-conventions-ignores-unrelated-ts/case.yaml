@@ -1,9 +1,6 @@
-# Needs no Bash grant (Skill tool only). Run this case with:
-#   claude plugin eval plugins/vitest --case test-conventions-ignores-unrelated-ts
-# Graders are free regexes over the final message (required term present,
-# testing terms absent), so no judge is needed. This deviates from #411's
-# "one tool_used + one llm" rule to avoid judge cost and variance where a
-# pattern is sufficient.
+# Shared run/grant/deviation facts: docs/contributing.md, "Plugin evals".
+# Run: claude plugin eval plugins/vitest --case test-conventions-ignores-unrelated-ts
+# Why these graders: required term present, testing terms absent; free regexes suffice.
 schema_version: "1.1"
 name: test-conventions-ignores-unrelated-ts
 description: >

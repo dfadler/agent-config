@@ -168,23 +168,38 @@ down in a fixture, so it can't collide with a live session either.
 ## Plugin evals
 
 Behavioral tests for a skill live in `plugins/<name>/evals/<case>/case.yaml` (or
-`prompt.md` + `graders/`) and run with `claude plugin eval plugins/<name>` (Claude
-Code 2.1.269+; real model calls, so they cost money; each case runs with and without
-the plugin so `Δ` shows what the skill adds). A case's `allowed_tools` cannot grant
-`Bash`, `Write`, `Edit`, `WebFetch` or `WebSearch`: the run withholds them unless you pass
-`--allow-tools` (put the target first), so a grader that needs one can never pass and a
-`max: 0` check on it can never fail. `fetch-execute-guide` has cases
-(`fetch-execute-asks-first` and `fetch-execute-runs-with-permission`); each records
-its exact `--allow-tools` command in a comment at the top of its `case.yaml`, and the
-run needs that grant ([#442](https://github.com/dfadler/agent-config/issues/442)).
-`plugins/vitest` also has five cases that need no Bash (Skill tool only), with the run
-command, the regex-vs-`llm` rationale and a sabotage map in a comment at the top of
-each; current results are in [#447](https://github.com/dfadler/agent-config/pull/447);
-results land in `<plugin>/evals/results/<timestamp>/` (gitignored via `**/evals/results/`).
-`fetch-execute-guide` keeps its plugin wrapper (with `SKILL.md` at the plugin root) because bare skills have no eval path.
-`plugins/gha-ci-audit/evals/evals.json` is the separate skill-creator format, which
-`claude plugin eval` does not read. Docs: [plugin evals](https://code.claude.com/docs/en/plugin-evals);
-background in [#387](https://github.com/dfadler/agent-config/issues/387).
+`prompt.md` + `graders/`) and run with `claude plugin eval plugins/<name> --case <case>`
+(Claude Code 2.1.269+). They make real model calls, so they cost money; each case runs
+with and without the plugin so `Δ` shows what the skill adds. Results land in
+`<plugin>/evals/results/<timestamp>/` (gitignored via `**/evals/results/`). Docs:
+[plugin evals](https://code.claude.com/docs/en/plugin-evals); background in
+[#387](https://github.com/dfadler/agent-config/issues/387).
+
+This section is the one home for facts shared by every case. A `case.yaml` header holds
+only its own run command and why its graders are shaped as they are.
+
+- **Grants.** A case's `allowed_tools` cannot grant `Bash`, `Write`, `Edit`, `WebFetch` or
+  `WebSearch`: the run withholds them unless you pass `--allow-tools` (put the target
+  first), so a grader that needs one can never pass and a `max: 0` check on it can never
+  fail ([#442](https://github.com/dfadler/agent-config/issues/442)). A case that needs a
+  grant records its exact command in its header; a case without one needs only `Skill`.
+  Add `--ablation with-without` where the header says to.
+- **Grader deviation.** [#411](https://github.com/dfadler/agent-config/issues/411) asks for
+  one `tool_used` plus one `llm` grader per case. Cases deviate where a regex is reliable
+  (free, no judge variance) and keep a narrow `llm` grader only for a judgment a regex
+  cannot make. Each header says which, so it is not repeated there.
+- **`skill_fired`.** Positive cases carry a `tool_used` grader on `Skill` with
+  `arm: with-only`; negative cases use `min: 0`, `max: 0`, `arm: both`. Copy the block
+  from a sibling case and change only the skill name.
+- **Sabotage maps.** A header may map each grader to the skill text it checks, so you can
+  break that text and confirm the grader fails. Cite a short quoted phrase or the heading
+  name, never `SKILL.md` line numbers, which go wrong silently on any edit. Grep the
+  phrase in the skill when you write it.
+- **Layout.** `fetch-execute-guide` keeps its plugin wrapper (with `SKILL.md` at the
+  plugin root) because bare skills have no eval path.
+  `plugins/gha-ci-audit/evals/evals.json` is the separate skill-creator format, which
+  `claude plugin eval` does not read. Current vitest results are in
+  [#447](https://github.com/dfadler/agent-config/pull/447).
 
 ## GitHub operations
 

@@ -1,9 +1,6 @@
-# Needs no Bash grant (Skill tool only). Run this case with:
-#   claude plugin eval plugins/vitest --case flaky-tests-ignores-deterministic-failure
-# Graders are free regexes over the final message: the required fix and the
-# forbidden flake tooling are literal strings, so no judge is needed. This
-# deviates from #411's "one tool_used + one llm" rule to avoid judge cost and
-# judge variance where a pattern is sufficient.
+# Shared run/grant/deviation facts: docs/contributing.md, "Plugin evals".
+# Run: claude plugin eval plugins/vitest --case flaky-tests-ignores-deterministic-failure
+# Why these graders: the required fix and the forbidden flake tooling are literal strings.
 schema_version: "1.1"
 name: flaky-tests-ignores-deterministic-failure
 description: >
