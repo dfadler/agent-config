@@ -10,6 +10,14 @@ metadata:
 
 # Maintaining Vite Plugin peerDependencies
 
+## Contract
+
+- **Input:** a repo containing Vite plugin `package.json` manifests and the new Vite
+  major version that just shipped.
+- **Output:** an updated `"vite"` peer range per plugin, or a note that the existing
+  range already covers the new major.
+- **Does not:** change plugin code, or publish a release.
+
 When a new Vite major ships (e.g., Vite 7 → Vite 8), check whether each plugin's
 declared `"vite"` peer range already includes the new major. A range like
 `>=7.0.0` already satisfies Vite 8 and later — no range update is needed unless

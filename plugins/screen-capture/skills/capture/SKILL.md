@@ -14,6 +14,14 @@ metadata:
 
 # Screen capture
 
+## Contract
+
+- **Input:** a URL to render, with engine, viewport, output type, and output directory
+  resolved from config (see "Config resolution").
+- **Output:** an image or video file on disk, at a path the caller can hand to
+  `screen-capture:attach`.
+- **Does not:** decide what happens to the file afterwards, or start a dev server.
+
 A generic page-capture primitive: given a URL, produce an image or video file
 on disk. Two engines are supported; which one runs is config, not a per-call
 choice you make in prose.

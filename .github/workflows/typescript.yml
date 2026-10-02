@@ -50,6 +50,9 @@ jobs:
       - name: Typecheck (tsc --noEmit)
         run: make typecheck-ts
 
+      - name: Skill contracts
+        run: make check-skills
+
       - name: Test (node:test)
         run: make test-ts
 

@@ -16,6 +16,15 @@ metadata:
 
 # screen-capture:lighthouse
 
+## Contract
+
+- **Input:** a URL, plus the `lighthouse_enabled`, `lighthouse_form_factors`, and
+  `lighthouse_output_dir` config keys (see "Config keys").
+- **Output:** Lighthouse JSON results for each configured form factor, stored under
+  `knowledge/lighthouse/<project>/` in the second-brain vault.
+- **Does not:** replace the manual resize-and-look pass, or run when
+  `lighthouse_enabled` is off.
+
 Runs `npx lighthouse` for one or both form factors and stores the JSON
 results in second-brain so scores are queryable/comparable across runs
 instead of living only in a PR comment or a throwaway temp file. The CLI

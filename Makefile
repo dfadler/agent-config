@@ -182,7 +182,7 @@ CLAUDE_MD_MAX_LINES := 350
 .PHONY: help check lint lint-sh lint-shellcheck lint-shfmt lint-set-flags lint-claude-md \
         lint-py lint-ts lint-actions fmt fmt-py test test-sh test-py test-ts \
         structure typecheck typecheck-ts venv node-modules coverage coverage-py \
-        coverage-ts check-links
+        coverage-ts check-links check-skills
 
 help: ## Show available targets
 	@grep -E '^[a-z-]+:.*?## ' $(MAKEFILE_LIST) | awk -F':.*?## ' '{printf "  \033[36m%-14s\033[0m %s\n", $$1, $$2}'
@@ -199,7 +199,7 @@ help: ## Show available targets
 # Each workflow calls its own subset rather than `make check` — shell.yml has
 # no Python installed, and pointing it at an aggregate target that had grown a
 # pytest dependency is exactly how this broke once already.
-check: lint structure typecheck test lint-actions coverage coverage-py lint-ts typecheck-ts test-ts coverage-ts ## Everything CI runs
+check: lint structure typecheck test lint-actions coverage coverage-py lint-ts typecheck-ts check-skills test-ts coverage-ts ## Everything CI runs
 
 venv: $(VENV_STAMP) ## Create/refresh .venv from requirements-dev.txt
 
@@ -228,6 +228,11 @@ lint-ts: node-modules ## eslint over scripts/ts
 
 typecheck-ts: node-modules ## tsc --noEmit over the TypeScript sources
 	@pnpm run --silent typecheck
+
+# Lives with the TypeScript targets, not `structure`, because it needs the
+# .nvmrc Node and `structure`'s CI job (sh-structure.yml) sets none up.
+check-skills: node-modules ## Skills that other skills reference must document a contract
+	@pnpm run --silent check-skills
 
 test-ts: node-modules ## Run the node:test suite
 	@pnpm test --silent

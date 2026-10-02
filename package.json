@@ -10,6 +10,7 @@
   "scripts": {
     "lint": "eslint scripts/ts",
     "typecheck": "tsc --noEmit",
+    "check-skills": "node scripts/ts/check-skill-contracts.ts .",
     "test": "node --test 'scripts/ts/**/*.test.ts'",
     "coverage": "node --test --experimental-test-coverage --test-coverage-include='scripts/ts/**/*.ts' --test-coverage-exclude='**/*.test.ts' --test-coverage-lines=90 'scripts/ts/**/*.test.ts'"
   },

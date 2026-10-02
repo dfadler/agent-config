@@ -4,7 +4,8 @@
 
 1. Put it in the right place:
    - A **skill** → a new directory under `plugins/dfadler-agent-config/skills/`,
-     containing a `SKILL.md`.
+     containing a `SKILL.md`. A skill that another skill will call needs a
+     `## Contract` section; see [`docs/skill-composition.md`](./skill-composition.md).
    - An **agent** → a new `.md` file under `plugins/dfadler-agent-config/agents/`.
    - A **slash command** → a new `.md` file under `claude/commands/`.
    - A **convention** (global guidance for `CLAUDE.md`) → first check
@@ -130,6 +131,7 @@ make check          # lint + structure + typecheck + test + actionlint + coverag
 | `make test-py` | `pytest` suite under `scripts/tests/` |
 | `make coverage` | Re-runs the `bats` suites under `kcov` and enforces the coverage floor (Linux only) |
 | `make lint-ts` / `typecheck-ts` / `test-ts` / `coverage-ts` | `eslint`, `tsc --noEmit`, `node:test`, and its coverage floor over `scripts/ts/` |
+| `make check-skills` | A skill another skill references must have a `## Contract` (Input/Output), and references must resolve ([`docs/skill-composition.md`](./skill-composition.md)) |
 | `make fmt` | Rewrites sources to the repo's `shfmt` / `ruff` style |
 | `make lint-actions` | `actionlint` over `.github/workflows/` |
 
@@ -177,8 +179,9 @@ Code 2.1.269+; real model calls, so they cost money; each case runs with and wit
 the plugin so `Δ` shows what the skill adds). A case's `allowed_tools` cannot grant
 `Bash`, `Write`, `Edit`, `WebFetch` or `WebSearch`: the run withholds them unless you pass
 `--allow-tools` (put the target first), so a grader that needs one can never pass and a
-`max: 0` check on it can never fail. Only `fetch-execute-guide` has cases
-today (`fetch-execute-asks-first` and `fetch-execute-runs-with-permission`); each records
+`max: 0` check on it can never fail. Cases exist for `fetch-execute-guide`
+(`fetch-execute-asks-first` and `fetch-execute-runs-with-permission`) and, as a
+skill-composition check, `dfadler-agent-config`'s `pr-checks-uses-prefetched-snapshot`; each records
 its exact `--allow-tools` command in a comment at the top of its `case.yaml`, and the
 run needs that grant ([#442](https://github.com/dfadler/agent-config/issues/442));
 results land in `<plugin>/evals/results/<timestamp>/` (gitignored via `**/evals/results/`).
