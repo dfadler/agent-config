@@ -235,6 +235,19 @@ typecheck-ts: node-modules ## tsc --noEmit over the TypeScript sources
 check-skills: node-modules ## Skills that other skills reference must document a contract
 	@pnpm run --silent check-skills
 
+# Ported check: how a shell lint moved to TypeScript is wired. The entrypoint
+# is a plain node call (Node 22.18+ strips types, no build step), the target
+# depends on node-modules so a fresh checkout works, and CI calls the target,
+# never the node command (see docs/testing.md for the script shape):
+#
+#   lint-foo: node-modules ## <what it checks>
+#   	@node scripts/ts/check-foo.ts [ARGS]
+#
+# Add the target to `.PHONY`, to `check`, and to the workflow that runs it (that
+# workflow adds the ./.github/actions/setup-node-pnpm step); the lint, typecheck
+# and coverage targets already cover the new file. A plugin-owned check uses
+# plugins/<plugin>/scripts/ts/check-foo.ts instead.
+
 test-ts: node-modules ## Run the Vitest suite
 	@pnpm test --silent
 
