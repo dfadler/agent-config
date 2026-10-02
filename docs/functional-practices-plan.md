@@ -70,7 +70,8 @@ and effect split, idempotence tests), not through TypeScript.
 
 ## Phases
 
-Each phase is one PR. Phases 1 to 3 are independent; 4 and 5 depend on 1.
+Each phase is one PR. Phases 1, 2, and 4 are independent; 3 stacks on 2 (it
+refactors the script 2 tests); 5 needs 1 and 4; 6 comes last.
 
 1. **Skill contract type-compatibility.** Extend the contract lint (see
    Dependencies) so a caller's expected output is checked against the callee's
@@ -92,8 +93,11 @@ Each phase is one PR. Phases 1 to 3 are independent; 4 and 5 depend on 1.
    element.
 6. **Skill and convention.** Write `functional-design` and the opt-in
    convention, after the patterns exist and have been used once.
-7. **Generated-output check.** CI step that regenerates derived files and fails
-   on any diff.
+7. **Generated-output check. Deferred.** The repo has no committed generated
+   files for a drift check to guard (the managed block in `~/.claude/CLAUDE.md`
+   is host-local, and `pnpm-lock.yaml` drift already fails under
+   `--frozen-lockfile`). Tracked in
+   [#492](https://github.com/dfadler/agent-config/issues/492).
 
 ## Verification
 
@@ -109,7 +113,7 @@ Each phase is one PR. Phases 1 to 3 are independent; 4 and 5 depend on 1.
 - **Skill-composition-contracts work is unmerged.** The `## Contract` lint,
   `scripts/ts/skill-contracts.ts`, and `make check-skills` live uncommitted on
   branch `worktree-skill-composition-contracts`. Phases 1 and 5 build on them,
-  so they wait for that work to merge. Phases 2, 3, 4, and 7 do not.
+  so they wait for that work to merge. Phases 2, 3, and 4 do not.
 - **Type notation for contracts.** Plain prose types cannot be compared. Options:
   a small inline notation (`**Output:** `{ failed: Run[] }``) or a fenced
   schema block. Decide in phase 1.
