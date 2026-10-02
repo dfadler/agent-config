@@ -158,7 +158,7 @@ measured baseline (see the `coverage` target in the `Makefile` for the number, h
 it was taken, and what is and isn't in the denominator) — a regression gate, not a
 target to design tests around.
 
-Two checks exist because a linter can't express them. `check-shell-set-flags.sh`
+Two checks exist because a linter can't express them. `scripts/ts/check-shell-set-flags.ts`
 enforces the `set -uo pipefail` opener from the global `CLAUDE.md`, which shellcheck
 has no rule for. `check-plugin-structure.sh` is the closest thing to a typechecker a
 shell-and-Markdown repo can have: this repo's *product* is declarative metadata, and a

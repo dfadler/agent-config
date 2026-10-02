@@ -265,8 +265,8 @@ lint-shellcheck: ## shellcheck
 lint-shfmt: ## shfmt (check only)
 	@$(SH_FIND) | xargs -0 shfmt -i 2 -ci -d
 
-lint-set-flags: ## set-flags convention
-	@bash scripts/check-shell-set-flags.sh
+lint-set-flags: node-modules ## set-flags convention
+	@node scripts/ts/check-shell-set-flags.ts
 
 lint-claude-md: node-modules ## CLAUDE.md size
 	@node scripts/ts/check-claude-md-lines.ts claude/CLAUDE.md $(CLAUDE_MD_MAX_LINES)
