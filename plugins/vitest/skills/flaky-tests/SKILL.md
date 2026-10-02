@@ -31,14 +31,17 @@ Work down the ladder; stop at the first rung that reproduces the failure.
    order dependency: shared module state, a leaked mock/timer/env var, a fixture
    written by an earlier test.
 3. **Stress the single file.** `vitest run path/to/file.test.ts --repeats=100`.
-   `--repeats=N` runs each test 1+N times. Fails here but not in step 2: timing,
-   randomness, or a real race inside the test itself.
+   `--repeats=N` runs each test 1+N times; add `--bail=1` to stop at the first
+   failure, and `--logHeapUsage` to watch heap growth across repeats. Fails here but
+   not in step 2: timing, randomness, or a real race inside the test itself.
 4. **Shuffle across seeds.** Enable shuffling first (`--sequence.shuffle.tests` if the
    config does not already shuffle), then run a few fresh `--sequence.seed` values;
    without shuffle a seed changes nothing.
-5. **Constrain concurrency.** `--maxWorkers=2` (or `--maxWorkers=1
-   --no-file-parallelism`) to mimic a small CI runner. Fails only constrained: a
-   timeout too tight, or tests contending for a port, directory, or temp file.
+5. **Constrain concurrency.** `--maxWorkers=2` or `VITEST_MAX_WORKERS=2` (or
+   `--maxWorkers=1 --no-file-parallelism`) to mimic a small CI runner. Fails only
+   constrained: a timeout too tight, or tests contending for a port, directory, or
+   temp file. If `isolate: false` or `--no-isolate` is set in config or CI, treat it
+   as a leading suspect and re-run with isolation on.
 6. **Constrain memory.** `NODE_OPTIONS=--max-old-space-size=512 vitest run`.
    `NODE_OPTIONS` is read as if given on the `node` command line
    ([Node CLI docs](https://nodejs.org/docs/latest-v22.x/api/cli.html)), and child
@@ -47,9 +50,16 @@ Work down the ladder; stop at the first rung that reproduces the failure.
    get a copy of the parent's environment by default, so the cap reaches Vitest's
    workers; passing the flag to the outer `node` alone would not.
 
-`poolOptions.threads.maxThreads` / `poolOptions.forks.maxForks` are not in the
-Vitest 5 CLI docs; use `--maxWorkers`. Check any other flag with `vitest --help` for
-the installed version before relying on it.
+In Vitest 4+, `poolOptions` was removed, `maxThreads`/`maxForks` became `maxWorkers`,
+and `VITEST_MAX_THREADS`/`VITEST_MAX_FORKS` became `VITEST_MAX_WORKERS`
+([migration guide](https://v4.vitest.dev/guide/migration.html)). `--maxWorkers` needs
+Vitest 4+; check `vitest --version`. Check any other flag with `vitest --help` for the
+installed version before relying on it.
+
+`--detectAsyncLeaks` finds leaked async resources but makes tests much slower; use it
+only for debugging ([docs](https://vitest.dev/config/detectasyncleaks)). `retry` hides
+flakes; if you must use it, `retry.condition` (CLI `--retry.count`/`--retry.delay`)
+limits it to matching errors ([docs](https://vitest.dev/config/retry)).
 
 ## Fixing
 

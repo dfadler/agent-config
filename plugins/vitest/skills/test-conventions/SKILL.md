@@ -29,6 +29,9 @@ file order is a flaky suite waiting for CI.
 - **Spot-check new tests by sabotage.** Temporarily break the code under test,
   confirm the test fails, then revert.
 - **Config:** keep `sequence.shuffle` on so order bugs surface early.
+  Keep `isolate` at its default (true); do not set `isolate: false` or `--no-isolate`
+  to speed a run, because unisolated files share module state and tests then must not
+  depend on it ([Vitest performance guide](https://vitest.dev/guide/improving-performance)).
 - **Coverage below the threshold:** first read the coverage report and add tests for
   the uncovered lines. Touch coverage scope (`coverage.include`/`exclude`) only after
   verifying the files contain no logic (generated code, type-only `.d.ts`, barrel
