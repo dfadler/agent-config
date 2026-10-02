@@ -1,7 +1,6 @@
 # Needs no Bash grant (Skill tool only). Run this case with:
 #   claude plugin eval plugins/vitest --case flaky-tests-repro-ladder --ablation with-without
-# Plain Claude already knows --repeats, --sequence.seed and --maxWorkers (a first
-# version graded only those and scored 1.00 with a flag removed from the skill), so
+# Plain Claude already knows --repeats, --sequence.seed and --maxWorkers, so
 # these graders check content specific to the flaky-tests skill: the
 # --sequence.shuffle.tests replay form, the "seed does nothing unless shuffle is on"
 # point, replay-before-repeats ordering, NODE_OPTIONS for the memory cap, and pnpm's

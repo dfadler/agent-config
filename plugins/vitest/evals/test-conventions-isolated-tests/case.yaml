@@ -1,35 +1,37 @@
 # Needs no Bash grant (Skill tool only). Run this case with:
-#   claude plugin eval plugins/vitest --case test-conventions-isolated-tests
-# The required API names are literal strings, so they are free regex graders.
-# One short llm grader remains only for the absence conditions (no real sleep,
-# no shared fixed path), which a regex cannot judge. This deviates from #411's
-# "one tool_used + one llm" rule: cheap regexes plus one narrow judge are more
-# stable than one judge checking everything.
+#   claude plugin eval plugins/vitest --case test-conventions-isolated-tests --ablation with-without
+# Graders check rules specific to the test-conventions skill that plain Claude does
+# not reliably apply (ephemeral port 0, vi.unstubAllEnvs / config unstubEnvs for env
+# vars, no direct process.env assignment, no hard-coded port), as free regexes; no
+# judge needed. Deviates from #411's "one tool_used + one llm" rule for that reason.
+# Sabotage map (test-conventions/SKILL.md lines): uses_ephemeral_port 24-25,
+# no_hardcoded_port 24-25, unstubs_env 19-20, no_direct_env_assignment 20-21.
 schema_version: "1.1"
 name: test-conventions-isolated-tests
 description: >
-  test-conventions should fire when asked to write Vitest tests for time- and
-  filesystem-dependent code, and the tests should be isolation-safe under shuffled,
-  parallel execution.
+  test-conventions should fire when asked to write Vitest tests for code that reads
+  environment variables and listens on a port, and the tests should be safe under
+  shuffled, parallel execution.
 tags: [vitest, test-conventions]
 
 execution:
   prompt: |
-    Write Vitest tests for this function. Show me the full test file.
+    Write Vitest tests for this module and show me the full test file. Our CI
+    runs the suite in random order across several parallel workers, and we have
+    been burned by tests interfering with each other.
 
-        import { readFileSync, writeFileSync } from "node:fs";
+        import { createServer, type Server } from "node:http";
 
-        export function cacheValue(path: string, compute: () => string): string {
-          try {
-            const entry = JSON.parse(readFileSync(path, "utf8"));
-            if (Date.now() - entry.at < 60_000) return entry.value;
-          } catch {}
-          const value = compute();
-          writeFileSync(path, JSON.stringify({ value, at: Date.now() }));
-          return value;
+        export function startGreeter(port = 3000): Promise<Server> {
+          const prefix = process.env.GREETING_PREFIX ?? "Hello";
+          const server = createServer((_req, res) => {
+            res.end(`${prefix}, world`);
+          });
+          return new Promise((resolve) => server.listen(port, () => resolve(server)));
         }
 
-    Cover a cache hit, a miss, and expiry after 60 seconds.
+    Cover the default prefix, a custom GREETING_PREFIX, and that a request to the
+    server returns the greeting.
   max_turns: 6
   allowed_tools:
     - Skill
@@ -42,32 +44,26 @@ graders:
     min: 1
     arm: with-only
 
-  - name: uses_fake_time
+  - name: uses_ephemeral_port
     type: regex
     target: last_message
-    pattern: "useFakeTimers|setSystemTime|spyOn\\(Date"
+    pattern: "startGreeter\\(\\s*0\\s*\\)|listen\\(\\s*0\\b"
     match: contains
 
-  - name: uses_per_test_temp_path
+  - name: no_hardcoded_port
     type: regex
     target: last_message
-    pattern: "mkdtemp"
-    match: contains
+    pattern: "startGreeter\\(\\s*[1-9]\\d{3,4}\\s*\\)|:3000"
+    match: not_contains
 
-  - name: restores_time_and_mocks
+  - name: unstubs_env
     type: regex
     target: last_message
-    pattern: "useRealTimers|restoreAllMocks"
+    pattern: "unstubAllEnvs|unstubEnvs"
     match: contains
 
-  - name: no_real_sleep_or_shared_path
-    type: llm
-    criteria: |
-      PASS if the test file in the response tests expiry without really
-      sleeping or waiting 60 seconds, and its tests do not share one fixed
-      file path.
-
-      FAIL if any of these hold:
-      - The response shows no test file.
-      - Expiry is tested by a real sleep or a real 60 second wait.
-      - Several tests read or write the same fixed file path.
+  - name: no_direct_env_assignment
+    type: regex
+    target: last_message
+    pattern: "process\\.env\\.\\w+\\s*=[^=]|delete process\\.env"
+    match: not_contains
