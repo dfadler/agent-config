@@ -71,8 +71,9 @@ a CI failure here.
   silently satisfy the required check. The sentinel itself fails on any
   dependency result other than `success`, so a skipped job cannot pass it.
   **Here the required branch-protection context is the job name `all-checks`**
-  (defined only in `all-checks.yml`); the workflow name "All checks" is just a
-  UI prefix. To add a new gating check, call its reusable workflow from a job in
+  (defined only in `all-checks.yml`); the workflow name "CI" is just a
+  UI prefix, kept different from the job name so the UI does not show two
+  `all-checks` rows. To add a new gating check, call its reusable workflow from a job in
   `all-checks.yml` and add that job to the sentinel's `needs:`. Gating therefore
   covers shell, TypeScript and Python checks; a failing Python check blocks merge.
 - **GitHub check names for reusable workflow callers** take the form
