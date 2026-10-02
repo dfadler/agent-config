@@ -12,9 +12,9 @@ import {
   normalizeSections,
   renderSections,
   type Normalized,
-} from "../src/normalize.ts";
-import { applyPlan, planFile, type Applied, type Plan, type RemoteOp } from "../src/plan.ts";
-import { snapshotFile, type FileEntry } from "../src/manifest.ts";
+} from "./normalize.ts";
+import { applyPlan, planFile, type Applied, type Plan, type RemoteOp } from "./plan.ts";
+import { snapshotFile, type FileEntry } from "./manifest.ts";
 
 interface Section {
   id: string;
