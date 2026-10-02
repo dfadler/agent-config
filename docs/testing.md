@@ -19,6 +19,6 @@ for using them, and package-manager forwarding, is the `vitest:flaky-tests` skil
 | `--maxWorkers=N` / `--no-file-parallelism` | Limit worker count / run files serially |
 | `NODE_OPTIONS=--max-old-space-size=512` | Cap the V8 heap of the run and its workers |
 
-Sharding splits test files, not test cases; merge blob reports (`--reporter=blob`,
-`--merge-reports`) before applying the coverage floor ([Vitest performance
+Sharding splits test files, not test cases; combine `--reporter=blob` with
+`--shard`, then `--merge-reports` ([Vitest performance
 guide](https://vitest.dev/guide/improving-performance)).
