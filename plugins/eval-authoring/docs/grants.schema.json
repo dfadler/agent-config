@@ -1,0 +1,23 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/dfadler/agent-config/plugins/eval-authoring/docs/grants.schema.json",
+  "title": "eval-authoring grants file (evals/grants.yaml)",
+  "description": "Per-case --allow-tools entries. Case-name existence is checked by the shared parser, not by this schema.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schema_version", "grants"],
+  "properties": {
+    "schema_version": { "const": "1" },
+    "grants": {
+      "type": "object",
+      "additionalProperties": {
+        "type": "array",
+        "uniqueItems": true,
+        "items": {
+          "type": "string",
+          "pattern": "^(Bash|Write|Edit|WebFetch|WebSearch)(\\(.+\\))?$"
+        }
+      }
+    }
+  }
+}
