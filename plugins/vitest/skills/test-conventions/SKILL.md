@@ -28,8 +28,8 @@ file order is a flaky suite waiting for CI.
   configured proves nothing. Prefer a real implementation where it is cheap.
 - **Spot-check new tests by sabotage.** Temporarily break the code under test,
   confirm the test fails, then revert.
-- **Config:** keep `sequence.shuffle` on so order bugs surface early. Do not add
-  `retry` to hide a flake; use `flaky-tests` to find the cause.
+- **Config:** keep `sequence.shuffle` on so order bugs surface early. For a flaky
+  failure, use `flaky-tests`.
 - **Coverage below the threshold:** first read the coverage report and add tests for
   the uncovered lines. Touch coverage scope (`coverage.include`/`exclude`) only after
   verifying the files contain no logic (generated code, type-only `.d.ts`, barrel
