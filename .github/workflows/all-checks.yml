@@ -1,11 +1,12 @@
-name: All checks
+name: CI
 
 # The single top-level CI workflow. It owns the triggers, the concurrency group
 # and the permissions, calls each language's checks as reusable workflows, and
 # gates on the all-checks sentinel below.
 #
 # Branch protection requires only the job named `all-checks` (the workflow name
-# above is just a UI prefix). To add a gating check: write a reusable workflow
+# above is just a UI prefix, kept different from the job name so the UI does not
+# show two `all-checks` rows). To add a gating check: write a reusable workflow
 # (`on: workflow_call:`), call it from a job here, and add that job to the
 # sentinel's needs: — no branch-protection settings change.
 #
