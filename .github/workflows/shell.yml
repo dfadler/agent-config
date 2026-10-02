@@ -1,33 +1,27 @@
 name: Shell
 
-# Orchestrates all shell CI checks. Each check lives in its own
+# Runs all shell CI checks. Each check lives in its own
 # .github/workflows/sh-*.yml reusable workflow; this file calls them in
-# parallel and gates on the all-checks sentinel.
+# parallel. It is itself called from all-checks.yml, which owns the triggers,
+# concurrency and the required all-checks sentinel.
 #
-# Branch protection requires only "Shell / all-checks". To add a check:
+# To add a shell check:
 #   1. Create .github/workflows/sh-<name>.yml with `on: workflow_call:`
 #   2. Add a job here that calls it
-#   3. Add the job name to all-checks needs: — no settings change required.
+# To add a whole new language: write a new reusable workflow, call it from
+# all-checks.yml and add it to that sentinel's needs:.
 #
 # Checks and the make targets they invoke:
-#   shellcheck    make lint-shellcheck
-#   shfmt         make lint-shfmt
-#   set-flags     make lint-set-flags
+#   shellcheck     make lint-shellcheck
+#   shfmt          make lint-shfmt
+#   set-flags      make lint-set-flags
 #   claude-md-size make lint-claude-md
-#   structure     make structure
-#   test-sh       make test-sh
-#   coverage      make coverage   (needs test-sh: guards the kcov build)
+#   structure      make structure
+#   test-sh        make test-sh
+#   coverage       make coverage   (needs test-sh: guards the kcov build)
 
 on:
-  pull_request:
-  push:
-    branches: [main]
-
-# One live run per target: a new push to the same PR (or to main) supersedes
-# the in-flight run for the old commit.
-concurrency:
-  group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
-  cancel-in-progress: true
+  workflow_call:
 
 permissions:
   contents: read
@@ -70,18 +64,3 @@ jobs:
     uses: ./.github/workflows/sh-coverage.yml
     permissions:
       contents: read
-
-  # Sentinel required by branch protection. Requiring each job name
-  # individually would need a settings update on every rename or addition;
-  # this job's name is the only one that ever needs to be required.
-  # if: always() prevents a skipped dependency from skipping this job too.
-  all-checks:
-    name: all-checks
-    runs-on: ubuntu-latest
-    if: always()
-    needs: [shellcheck, shfmt, set-flags, claude-md-size, structure, test-sh, coverage]
-    steps:
-      - name: All checks passed
-        run: |
-          results="${{ join(needs.*.result, ' ') }}"
-          [[ "$results" =~ failure|cancelled ]] && exit 1 || exit 0

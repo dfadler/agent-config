@@ -17,5 +17,11 @@
     "noEmit": true,
     "skipLibCheck": true
   },
-  "include": ["scripts/ts/**/*.ts", "plugins/*/src/**/*.ts", "plugins/*/test/**/*.ts", "eslint.config.js"]
+  "include": [
+    "scripts/ts/**/*.ts",
+    "plugins/*/src/**/*.ts",
+    "plugins/*/test/**/*.ts",
+    "eslint.config.js",
+    "vitest.config.ts"
+  ]
 }

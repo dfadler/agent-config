@@ -1,0 +1,71 @@
+---
+name: flaky-tests
+description: |
+  Reproduce and diagnose a flaky Vitest test: one that fails intermittently, only in
+  CI, or only in a certain order. Use when a test passes locally but fails in CI, when
+  asked to "stress-run", "repeat", "shuffle", or "replay the seed" for tests, or to
+  simulate CI CPU/memory limits for Vitest. Not for deterministic failures.
+metadata:
+  version: "1.0.0"
+---
+
+# Hunting a flaky Vitest test
+
+Invoke Vitest through the project's package manager, and forward flags the way that
+manager requires. pnpm: flags directly after the script, no separator
+(`pnpm test --repeats=100`), per the [pnpm run docs](https://pnpm.io/cli/run) (arguments
+after the script name are appended to it). npm: the `--` separator is required (`npm test -- --repeats=100`), per the
+[npm run-script docs](https://docs.npmjs.com/cli/v10/commands/npm-run-script).
+Running the installed binary (`pnpm vitest run ...`) needs no separator. Examples below show bare flags.
+
+Work down the ladder; stop at the first rung that reproduces the failure.
+
+1. **Get the failing run's facts.** Note the test file, the error, and the shuffle
+   seed (Vitest prints `Running tests with seed "<n>"`). Compare the CI job's core
+   count and Node version with local.
+2. **Replay the order.** The seed only takes effect while shuffling is on, so replay
+   both: `vitest run --sequence.shuffle.tests --sequence.seed=<n>` (add
+   `--sequence.shuffle.files` if CI shuffled files too; check the CI command and
+   config for which). If the local config already shuffles, the seed alone is enough.
+   A reproduction means an
+   order dependency: shared module state, a leaked mock/timer/env var, a fixture
+   written by an earlier test.
+3. **Stress the single file.** `vitest run path/to/file.test.ts --repeats=100`.
+   `--repeats=N` runs each test 1+N times; add `--bail=1` to stop at the first
+   failure, and `--logHeapUsage` to watch heap growth across repeats. Fails here but
+   not in step 2: timing, randomness, or a real race inside the test itself.
+4. **Shuffle across seeds.** Enable shuffling first (`--sequence.shuffle.tests` if the
+   config does not already shuffle), then run a few fresh `--sequence.seed` values;
+   without shuffle a seed changes nothing.
+5. **Constrain concurrency.** `--maxWorkers=2` or `VITEST_MAX_WORKERS=2` (or
+   `--maxWorkers=1 --no-file-parallelism`) to mimic a small CI runner. Fails only
+   constrained: a timeout too tight, or tests contending for a port, directory, or
+   temp file. If `isolate: false` or `--no-isolate` is set in config or CI, treat it
+   as a leading suspect and re-run with isolation on.
+6. **Constrain memory.** `NODE_OPTIONS=--max-old-space-size=512 vitest run`.
+   `NODE_OPTIONS` is read as if given on the `node` command line
+   ([Node CLI docs](https://nodejs.org/docs/latest-v22.x/api/cli.html)), and child
+   processes ([`child_process`](https://nodejs.org/docs/latest-v22.x/api/child_process.html))
+   and worker threads ([`worker_threads`](https://nodejs.org/docs/latest-v22.x/api/worker_threads.html))
+   get a copy of the parent's environment by default, so the cap reaches Vitest's
+   workers; passing the flag to the outer `node` alone would not.
+
+In Vitest 4+, `poolOptions` was removed, `maxThreads`/`maxForks` became `maxWorkers`,
+and `VITEST_MAX_THREADS`/`VITEST_MAX_FORKS` became `VITEST_MAX_WORKERS`
+([migration guide](https://v4.vitest.dev/guide/migration.html)). `--maxWorkers` needs
+Vitest 4+; check `vitest --version`. Check any other flag with `vitest --help` for the
+installed version before relying on it.
+
+`--detectAsyncLeaks` finds leaked async resources but makes tests much slower; use it
+only for debugging ([docs](https://vitest.dev/config/detectasyncleaks)). `retry` hides
+flakes; if you must use it, `retry.condition` (CLI `--retry.count`/`--retry.delay`)
+limits it to matching errors ([docs](https://vitest.dev/config/retry)).
+
+## Fixing
+
+Fix the cause, not the symptom. Common causes and fixes: state not reset (reset in
+`beforeEach`, `vi.restoreAllMocks`, `vi.useRealTimers`), wall-clock or `Math.random`
+dependence (fake timers, seeded input), shared temp paths (per-test unique dirs),
+unawaited promises (await or assert on them). Do not "fix" with `retry` or a longer
+timeout unless you can say why that is the actual cause. After the fix, re-run the
+command from the rung that failed and confirm it passes.

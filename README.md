@@ -21,8 +21,8 @@ automatically, with no per-project copy to keep in sync.
 - `plugins/` — one directory per plugin. Each plugin's directory name matches its
   manifest `name`, which is what makes skills resolve as `<plugin-name>:<skill>`.
   - `dfadler-agent-config/` — the main plugin: cross-project agents and skills
-    (PR shepherding, PR review rubric, adversarial code reviewer). Requires
-    `worktree-core` for git-worktree-usage.
+    (PR shepherding, PR review rubric, adversarial code reviewer). Pairs with
+    `worktree-core` for git-worktree-usage (a companion, not a declared dependency).
   - `accessibility-skills/` — WCAG 2.2 code review for web markup and CSS, graded
     with an evidence-basis/severity system.
   - `detached-terminal/` — run and drive an interactive terminal (TUI, REPL,
@@ -36,6 +36,18 @@ automatically, with no per-project copy to keep in sync.
   - `screen-capture/` — screenshot (PNG) and walkthrough video (MP4) capture,
     before/after comparison, Lighthouse, and attach skills for PR/issue visual
     verification. Uses `gh-attach-image` to upload results.
+  - `second-brain/` — vault-path-agnostic Obsidian skills (capture, query, config,
+    sync). Vault path resolves from `SECOND_BRAIN_VAULT_PATH` env var or
+    `secondBrain.vaultPath` in `~/.claude/settings.json`. The config skill degrades
+    gracefully when the Obsidian MCP is disconnected; capture, query, and sync
+    require it.
+  - `typescript-gotchas/` — TypeScript/JS patterns that compile but cause runtime
+    bugs or are better expressed with a safer API (e.g. `.at()` over indexed reads).
+  - `vite/` — skills and agents for authoring, reviewing, testing, and maintaining
+    Vite plugins: lifecycle, hook selection, deprecation guards, testing patterns,
+    and peer-dependency maintenance.
+  - `vitest/` — skills (`test-conventions`, `flaky-tests`) and a report-only
+    `flaky-test-investigator` agent for writing Vitest tests and reproducing flaky ones.
   - `worktree-core/` — `git-worktree-usage` skill plus hooks that enforce worktree
     isolation and auto-prune merged worktrees.
 - `docs/` — reference material for this repo's own tooling and CI.

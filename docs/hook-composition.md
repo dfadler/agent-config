@@ -144,21 +144,30 @@ another tool's own append) is preserved verbatim on every re-run, and to the
 symlink directories: a real file or a symlink pointing outside this repo is
 left alone with a warning rather than replaced.
 
-## `dfadler-agent-config` and `worktree-core`: a required dependency, not a duplicate
+## `dfadler-agent-config` and `worktree-core`: companion plugins, not a declared dependency
 
 `plugins/worktree-core/` is a minimal, standalone plugin that ships the
 git-worktree-usage skill plus these three hooks — no other skills or agents. It is the
 single source for both: `dfadler-agent-config` no longer carries its own copy of the
 skill or `hooks/hooks.json` (it did until [#334](https://github.com/dfadler/agent-config/issues/334),
-when the duplicate was removed). `dfadler-agent-config`'s manifest now declares
-`"requires": ["worktree-core"]` to record that dependency, though Claude Code does not
-enforce `requires` at load time (see `claude plugin validate`'s warning) — installing
-both plugins together (e.g. `./setup.sh --include=dfadler-agent-config,worktree-core`)
-is still the user's responsibility.
+when the duplicate was removed). The two are meant to be installed together (a plain
+`./setup.sh` installs everything; to pick, use
+`./setup.sh --include=dfadler-agent-config,worktree-core`). Nothing in
+`dfadler-agent-config` calls `worktree-core` at runtime, so a machine that enables one
+without the other still works; it just lacks the worktree hooks and skill.
+
+`dfadler-agent-config`'s manifest does **not** declare `worktree-core` under
+`"dependencies"`. It did briefly ([#438](https://github.com/dfadler/agent-config/pull/438);
+before that it said `"requires"`, which isn't a Claude Code field). Per the
+[plugin dependencies docs](https://code.claude.com/docs/en/plugins/dependencies), a
+declared dependency is enforced at load time: a plugin whose dependency is disabled or
+absent doesn't load. It is also not resolved inside a `claude plugin eval` run, where the
+plugin under test is silently dropped ([#450](https://github.com/dfadler/agent-config/issues/450)).
+With nothing in the plugin needing `worktree-core`, enforcing it protected nothing and
+blocked evals for its skills (#409, #410).
 
 Since only `worktree-core` registers these hooks now, there is no double-firing to
-guard against. A machine that enables `dfadler-agent-config` without also enabling
-`worktree-core` simply won't get the worktree hooks (or the skill) at all.
+guard against.
 
 ## Guidance for authors of other plugins
 

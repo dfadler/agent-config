@@ -9,21 +9,17 @@ name: TypeScript
 # package.json, and dependencies are pinned by pnpm-lock.yaml
 # (`--frozen-lockfile` fails on any drift).
 
+# Called from all-checks.yml, whose all-checks sentinel is the only required
+# check for it. Concurrency is inherited from the caller.
 on:
-  pull_request:
-  push:
-    branches: [main]
-
-concurrency:
-  group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
-  cancel-in-progress: true
+  workflow_call:
 
 permissions:
   contents: read
 
 jobs:
-  typescript:
-    name: eslint + tsc + node:test
+  run:
+    name: run
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
@@ -50,8 +46,11 @@ jobs:
       - name: Typecheck (tsc --noEmit)
         run: make typecheck-ts
 
-      - name: Test (node:test)
+      - name: Skill contracts
+        run: make check-skills
+
+      - name: Test (vitest)
         run: make test-ts
 
-      - name: Coverage (node:test, floor)
+      - name: Coverage (vitest, floor)
         run: make coverage-ts

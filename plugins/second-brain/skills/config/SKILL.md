@@ -16,6 +16,13 @@ metadata:
 
 # Vault config primitive
 
+## Contract
+
+- **Input:** `$ARGUMENTS` as `<skill-name> [project-name]` (see "Inputs").
+- **Output:** the global and per-project vault config merged into one set of key-value
+  pairs, empty (never an error) when the vault or file is unavailable.
+- **Does not:** infer the project name, or write to the vault.
+
 Reads a skill's config from an Obsidian vault as plain key-value data, so
 other skills don't each reimplement "read frontmatter, merge global with
 per-project, don't blow up if Obsidian isn't connected."

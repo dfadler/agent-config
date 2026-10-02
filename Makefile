@@ -182,13 +182,14 @@ CLAUDE_MD_MAX_LINES := 350
 .PHONY: help check lint lint-sh lint-shellcheck lint-shfmt lint-set-flags lint-claude-md \
         lint-py lint-ts lint-actions fmt fmt-py test test-sh test-py test-ts \
         structure typecheck typecheck-ts venv node-modules coverage coverage-py \
-        coverage-ts check-links
+        coverage-ts check-links check-skills
 
 help: ## Show available targets
 	@grep -E '^[a-z-]+:.*?## ' $(MAKEFILE_LIST) | awk -F':.*?## ' '{printf "  \033[36m%-14s\033[0m %s\n", $$1, $$2}'
 
 # `check` must be the UNION of what every workflow runs, because that is the
-# promise the README makes. The split, so a new target lands in both places:
+# promise the README makes (all-checks.yml calls the first three below, plus
+# actionlint.yml runs standalone). The split, so a new target lands in both places:
 #
 #   shell.yml      lint-shellcheck, lint-shfmt, lint-set-flags, lint-claude-md,
 #                  structure, test-sh, coverage
@@ -199,7 +200,7 @@ help: ## Show available targets
 # Each workflow calls its own subset rather than `make check` — shell.yml has
 # no Python installed, and pointing it at an aggregate target that had grown a
 # pytest dependency is exactly how this broke once already.
-check: lint structure typecheck test lint-actions coverage coverage-py lint-ts typecheck-ts test-ts coverage-ts ## Everything CI runs
+check: lint structure typecheck test lint-actions coverage coverage-py lint-ts typecheck-ts check-skills test-ts coverage-ts ## Everything CI runs
 
 venv: $(VENV_STAMP) ## Create/refresh .venv from requirements-dev.txt
 
@@ -229,13 +230,18 @@ lint-ts: node-modules ## eslint over scripts/ts
 typecheck-ts: node-modules ## tsc --noEmit over the TypeScript sources
 	@pnpm run --silent typecheck
 
-test-ts: node-modules ## Run the node:test suite
+# Lives with the TypeScript targets, not `structure`, because it needs the
+# .nvmrc Node and `structure`'s CI job (sh-structure.yml) sets none up.
+check-skills: node-modules ## Skills that other skills reference must document a contract
+	@pnpm run --silent check-skills
+
+test-ts: node-modules ## Run the Vitest suite
 	@pnpm test --silent
 
 # Floor is a MEASURED baseline, same discipline as COVERAGE_MIN: the only
-# source today is the hash helper at 100%, and package.json holds the 90
+# source today is the hash helper at 100%, and vitest.config.ts owns the
 # floor so a future untested file can't quietly drag the number down.
-coverage-ts: node-modules ## Measure node:test coverage and enforce the floor
+coverage-ts: node-modules ## Measure Vitest (v8) coverage and enforce the floor
 	@pnpm run --silent coverage
 
 lint: lint-sh lint-py ## Lint shell and Python

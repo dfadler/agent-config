@@ -6,9 +6,14 @@
  * docs (https://docs.slack.dev/surfaces/canvases/).
  */
 
-import { isTableSeparator } from "./normalize.ts";
+import { closesFence, isTableSeparator, startsOtherBlock } from "./normalize.ts";
 
-export const MAX_CONTENT_CHARS = 1_048_576;
+/**
+ * Slack documents the limit as "1 MiB (1,048,576 characters)". It is measured
+ * here in UTF-8 bytes, which is never smaller than the character count, so
+ * content passing this check is within the limit under either reading.
+ */
+export const MAX_CONTENT_BYTES = 1_048_576;
 export const MAX_TABLE_CELLS = 300;
 
 export type IssueCode =
@@ -53,12 +58,13 @@ function countCells(row: string): number {
 /** Return every canvas-rule violation in `markdown`, in line order. */
 export function validate(markdown: string): Issue[] {
   const issues: Issue[] = [];
-  if (markdown.length > MAX_CONTENT_CHARS) {
+  const size = Buffer.byteLength(markdown, "utf8");
+  if (size > MAX_CONTENT_BYTES) {
     issues.push({
       code: "content-too-large",
       severity: "error",
       line: 0,
-      message: `content is ${String(markdown.length)} characters; the limit is ${String(MAX_CONTENT_CHARS)}`,
+      message: `content is ${String(size)} bytes; the limit is ${String(MAX_CONTENT_BYTES)}`,
     });
   }
 
@@ -75,7 +81,7 @@ export function validate(markdown: string): Issue[] {
     const inListContext = listStack.length > 0 && indentOf(line) > 0;
 
     if (fence !== null) {
-      if (trimmed.startsWith(fence) && /^[`~]+$/.test(trimmed)) fence = null;
+      if (closesFence(trimmed, fence)) fence = null;
       continue;
     }
 
@@ -219,7 +225,11 @@ export function validate(markdown: string): Issue[] {
       }
       let cells = 0;
       let j = i;
-      while (j < lines.length && (lines[j] ?? "").trim().includes("|")) {
+      while (
+        j < lines.length &&
+        (lines[j] ?? "").trim().includes("|") &&
+        (j - i < 2 || !startsOtherBlock(lines[j] ?? "", lines[j + 1]))
+      ) {
         if (j !== i + 1) cells += countCells(lines[j] ?? "");
         j += 1;
       }

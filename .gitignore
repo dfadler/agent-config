@@ -10,8 +10,9 @@ coverage-py/
 node_modules/
 
 # `claude plugin eval` run output (report.html, aggregate-result.json, traces)
-# — local-only, regenerated on every run.
-evals/results/
+# — local-only, regenerated on every run. Run against a plugin path it lands in
+# plugins/<name>/evals/results/; `**/` also covers ./evals/results/ in the CWD.
+**/evals/results/
 
 # Host-local Claude Code state. Excluding this in the repo's own .gitignore
 # (rather than relying on a personal global gitignore) matters here more than

@@ -1,5 +1,5 @@
 import assert from "node:assert/strict";
-import { test } from "node:test";
+import { test } from "vitest";
 import { isSyncEnabled, parseFrontmatter, renderLocalFile } from "./frontmatter.ts";
 
 test("parseFrontmatter reads flat fields and returns the body", () => {
