@@ -52,7 +52,7 @@ silently mangling it: headings or code blocks inside list items, mixed list
 nesting, tables over 300 cells, content over 1 MiB, and tables or callouts inside
 layouts. h4+ headings are reported as warnings because Slack clamps them to h3.
 
-## `src/diff3.ts`, `src/plan.ts`, `src/manifest.ts`
+## `scripts/ts/diff3.ts`, `plan.ts`, `manifest.ts`
 
 The three-way sync engine. For one file it compares **base** (what the last sync
 recorded), **local**, and **remote** (the canvas now), section by section:
@@ -73,14 +73,14 @@ recorded), **local**, and **remote** (the canvas now), section by section:
 Pulling rewrites the local file in normalized form, so formatting the user chose
 (for example `-` bullets) is replaced by the canonical form on a pull.
 
-## `src/cli.ts` / `src/bin.ts`
+## `scripts/ts/cli.ts` / `bin.ts`
 
 JSON in, JSON out, so skills call this instead of reimplementing it:
 
 ```bash
-node plugins/slack-canvas-sync/src/bin.ts normalize --side local < note.md
-node plugins/slack-canvas-sync/src/bin.ts validate < note.md
-node plugins/slack-canvas-sync/src/bin.ts plan < plan-input.json
+node plugins/slack-canvas-sync/scripts/ts/bin.ts normalize --side local < note.md
+node plugins/slack-canvas-sync/scripts/ts/bin.ts validate < note.md
+node plugins/slack-canvas-sync/scripts/ts/bin.ts plan < plan-input.json
 ```
 
 The skills use the sync-root commands (`scan`, `plan-push`, `record`, `pull`,
@@ -101,7 +101,7 @@ observed there (h4 clamped to h3, a UI-added paragraph, section anchor links).
 Fixtures use dummy content only: no real workspace host, team ID, canvas ID,
 user, or channel.
 
-`test/fake-canvas.ts` is an in-memory canvas (read, atomic section edits, and
+`scripts/ts/fake-canvas.ts` is an in-memory canvas (read, atomic section edits, and
 UI-style edits) used to drive end-to-end sync scenarios and a seeded fuzz test
 that checks both sides converge. No network.
 

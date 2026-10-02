@@ -7,7 +7,7 @@
  * found something wrong, 2 usage error.
  */
 
-import { hashText } from "../../../scripts/ts/hash.ts";
+import { hashText } from "./hash.ts";
 import { ManifestError, parseEntry, snapshotFile, bodyHash } from "./manifest.ts";
 import { normalizeLocal, normalizeRemote } from "./normalize.ts";
 import { applyPlan, planFile } from "./plan.ts";

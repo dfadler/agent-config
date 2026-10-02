@@ -3,7 +3,7 @@
  * the new local content, and any conflicts left for a human.
  */
 
-import { hashText } from "../../../scripts/ts/hash.ts";
+import { hashText } from "./hash.ts";
 import { diff3, diff3Scalar, type Chunk, type ChunkKind } from "./diff3.ts";
 import { bodyHashOfHashes, type FileEntry } from "./manifest.ts";
 import { renderSections, type Normalized } from "./normalize.ts";

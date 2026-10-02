@@ -17,7 +17,7 @@ import {
   writeFileSync,
 } from "node:fs";
 import { dirname, join, resolve, sep } from "node:path";
-import { hashText } from "../../../scripts/ts/hash.ts";
+import { hashText } from "./hash.ts";
 import { isSyncEnabled, parseFrontmatter, renderLocalFile } from "./frontmatter.ts";
 import {
   bodyHash,
