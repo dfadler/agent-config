@@ -123,7 +123,7 @@ make check          # lint + structure + typecheck + test + actionlint + coverag
 
 | Target | What it does |
 | --- | --- |
-| `make lint-sh` | `shellcheck`, `shfmt -i 2 -ci -d`, the `set -uo pipefail` convention, and the `claude/CLAUDE.md` line-count ceiling (`scripts/check-claude-md-lines.sh`) |
+| `make lint-sh` | `shellcheck`, `shfmt -i 2 -ci -d`, the `set -uo pipefail` convention, and the `claude/CLAUDE.md` line-count ceiling (`scripts/ts/check-claude-md-lines.ts`) |
 | `make lint-py` | `ruff check` and `ruff format --check` |
 | `make typecheck` | `mypy --strict` over the Python sources |
 | `make structure` | Plugin manifests and skill/agent frontmatter agree with their directories |
@@ -158,7 +158,7 @@ measured baseline (see the `coverage` target in the `Makefile` for the number, h
 it was taken, and what is and isn't in the denominator) — a regression gate, not a
 target to design tests around.
 
-Two checks exist because a linter can't express them. `check-shell-set-flags.sh`
+Two checks exist because a linter can't express them. `scripts/ts/check-shell-set-flags.ts`
 enforces the `set -uo pipefail` opener from the global `CLAUDE.md`, which shellcheck
 has no rule for. `check-plugin-structure.sh` is the closest thing to a typechecker a
 shell-and-Markdown repo can have: this repo's *product* is declarative metadata, and a
