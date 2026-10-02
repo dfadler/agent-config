@@ -9,8 +9,8 @@ name: TypeScript
 # package.json, and dependencies are pinned by pnpm-lock.yaml
 # (`--frozen-lockfile` fails on any drift).
 
-# Called from shell.yml, whose all-checks sentinel is the only required check
-# for it. Concurrency is inherited from the caller.
+# Called from all-checks.yml, whose all-checks sentinel is the only required
+# check for it. Concurrency is inherited from the caller.
 on:
   workflow_call:
 

@@ -188,7 +188,8 @@ help: ## Show available targets
 	@grep -E '^[a-z-]+:.*?## ' $(MAKEFILE_LIST) | awk -F':.*?## ' '{printf "  \033[36m%-14s\033[0m %s\n", $$1, $$2}'
 
 # `check` must be the UNION of what every workflow runs, because that is the
-# promise the README makes. The split, so a new target lands in both places:
+# promise the README makes (all-checks.yml calls the first three below, plus
+# actionlint.yml runs standalone). The split, so a new target lands in both places:
 #
 #   shell.yml      lint-shellcheck, lint-shfmt, lint-set-flags, lint-claude-md,
 #                  structure, test-sh, coverage

@@ -18,9 +18,10 @@ a CI failure here.
   a few shared lines at the top of otherwise-unrelated jobs. It is also valid
   for *file organisation*: when one workflow has grown to a size where splitting
   each check into its own `sh-*.yml` file aids readability, `workflow_call`
-  lets a thin orchestrator (`shell.yml`) call them in parallel and still wire a
-  `needs:`-based sentinel — something cross-file triggers (`workflow_run`)
-  cannot do reliably on PRs. In that case, env vars and tool pins live in each
+  lets a thin orchestrator (`all-checks.yml`, which calls `shell.yml`,
+  `typescript.yml` and `python.yml`; `shell.yml` in turn calls the `sh-*.yml`
+  files) call them in parallel and still wire a `needs:`-based sentinel —
+  something cross-file triggers (`workflow_run`) cannot do reliably on PRs. In that case, env vars and tool pins live in each
   called file rather than in the orchestrator, since `env:` does not propagate
   across `workflow_call` boundaries.
   **Cache-backed installs remove the performance argument.** When an install
@@ -44,8 +45,15 @@ a CI failure here.
   what is defined inside *it*. Consequence: every called workflow that pins a
   tool version must declare its own `env:` block. See `sh-shfmt.yml` — it
   defines `SHFMT_VERSION` and `SHFMT_SHA256` inside the called file, not in
-  `shell.yml`, because a top-level `env:` in the orchestrator would be silently
-  ignored across the call boundary.
+  `all-checks.yml` or `shell.yml`, because a top-level `env:` in the orchestrator
+  would be silently ignored across the call boundary.
+- **Called workflows are `workflow_call` only and declare no `concurrency`.**
+  `all-checks.yml` owns `on: pull_request` / `push: branches: [main]`, the
+  `cancel-in-progress` concurrency group and `permissions: contents: read`.
+  A concurrency group inside a called workflow conflicts with the caller's, so
+  `shell.yml`, `typescript.yml`, `python.yml` and the `sh-*.yml` files declare
+  none. `actionlint.yml` (a `paths:` filter would leave a required check Pending
+  on PRs that don't match) and `issue-bot.yml` stay standalone.
 - **Sentinel job for branch protection.** When a thin orchestrator dispatches
   several reusable workflows in parallel, adding a dedicated `all-checks` job
   (with `if: always()` and `needs:` listing every other job) gives branch
@@ -54,10 +62,17 @@ a CI failure here.
   update. The `if: always()` guard is load-bearing: a skipped dependency would
   otherwise skip the sentinel too, letting a cancelled or never-run job
   silently satisfy the required check.
+  **Here the required branch-protection context is the job name `all-checks`**
+  (defined only in `all-checks.yml`); the workflow name "All checks" is just a
+  UI prefix. To add a new gating check, call its reusable workflow from a job in
+  `all-checks.yml` and add that job to the sentinel's `needs:`. Gating therefore
+  covers shell, TypeScript and Python checks; a failing Python check blocks merge.
 - **GitHub check names for reusable workflow callers** take the form
-  `<caller-job-id> / <called-job-name>`. Name the inner job `run` (or another
-  short neutral word) rather than repeating the check subject — that produces
-  clean names like `shellcheck / run` instead of `shellcheck / shellcheck`.
+  `<caller-job-id> / <called-job-name>`, nesting one level per call. Name the
+  inner job `run` (or another short neutral word) rather than repeating the check
+  subject. Expected names here: `all-checks`, `typescript / run`, `python / run`,
+  `shell / shellcheck / run`, `shell / coverage / run` and so on (a UI may add the
+  workflow name as a prefix). Only `all-checks` is required.
 - **Every CI check should call the same command a human runs locally**
   (a `make` target, a script) rather than reimplementing the check inline in
   YAML. That's what keeps "CI is green" and "the local check is green" from
