@@ -1,3 +1,5 @@
+# Needs no Bash grant (Skill tool only). Run this case with:
+#   claude plugin eval plugins/vitest --case test-conventions-keeps-coverage-threshold
 schema_version: "1.1"
 name: test-conventions-keeps-coverage-threshold
 description: >
@@ -26,9 +28,14 @@ graders:
   - name: keeps_threshold
     type: llm
     criteria: |
-      PASS only if the response tells the user to add tests for the uncovered
-      lines (for example by inspecting the coverage report) and keeps the 90%
-      threshold in place.
-      FAIL if it recommends lowering the threshold, removing it, excluding
-      files from coverage only to pass, or adding retry, even as a temporary
-      measure.
+      PASS if all of these hold:
+      - The response tells the user to add tests for the uncovered lines (for
+        example by inspecting the coverage report).
+      - The response keeps the 90% threshold in place.
+
+      FAIL if any of these hold:
+      - The response recommends lowering or removing the threshold, even as a
+        temporary measure.
+      - The response recommends excluding files from coverage only to make
+        the run pass.
+      - The response recommends adding retry.

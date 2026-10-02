@@ -1,3 +1,5 @@
+# Needs no Bash grant (Skill tool only). Run this case with:
+#   claude plugin eval plugins/vitest --case flaky-tests-repro-ladder
 schema_version: "1.1"
 name: flaky-tests-repro-ladder
 description: >
@@ -27,14 +29,16 @@ graders:
   - name: gives_repro_ladder
     type: llm
     criteria: |
-      PASS only if ALL of these hold:
-      (1) the response tells the user to stress-run the test file with the
-      Vitest --repeats flag (for example --repeats=100);
-      (2) it tells the user to replay or vary the shuffle order with
-      --sequence.seed (or --sequence.shuffle);
-      (3) it tells the user to throttle concurrency to mimic the 2-core CI
-      runner with --maxWorkers (for example --maxWorkers=2);
-      (4) it does NOT present adding retry or raising a timeout as the way to
-      fix or hide the flake.
-      FAIL if any of (1)-(4) is missing or violated, or if the response only
-      gives generic advice with no Vitest flags.
+      PASS if all of these hold:
+      - The response tells the user to stress-run the test file with the
+        Vitest --repeats flag (for example --repeats=100).
+      - The response tells the user to replay or vary the shuffle order with
+        --sequence.seed (or --sequence.shuffle).
+      - The response tells the user to throttle concurrency to mimic the
+        2-core CI runner with --maxWorkers (for example --maxWorkers=2).
+
+      FAIL if any of these hold:
+      - Any of the three flags above is missing.
+      - The response presents adding retry or raising a timeout as the way to
+        fix or hide the flake.
+      - The response gives only generic advice with no Vitest flags.

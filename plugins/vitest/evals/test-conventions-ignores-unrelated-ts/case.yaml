@@ -1,3 +1,5 @@
+# Needs no Bash grant (Skill tool only). Run this case with:
+#   claude plugin eval plugins/vitest --case test-conventions-ignores-unrelated-ts
 schema_version: "1.1"
 name: test-conventions-ignores-unrelated-ts
 description: >
@@ -25,8 +27,11 @@ graders:
   - name: answers_directly
     type: llm
     criteria: |
-      PASS only if the response explains that flatMap maps and then flattens
-      one level, with a short example of each method, and does not mention
-      Vitest, tests, or flaky behavior.
-      FAIL if the example for either method is missing or the response drifts
-      into testing advice.
+      PASS if all of these hold:
+      - The response explains that flatMap maps and then flattens one level.
+      - The response gives a short example of each method.
+      - The response does not mention Vitest, tests, or flaky behavior.
+
+      FAIL if any of these hold:
+      - The example for either method is missing.
+      - The response drifts into testing advice.

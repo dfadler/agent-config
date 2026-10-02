@@ -1,3 +1,5 @@
+# Needs no Bash grant (Skill tool only). Run this case with:
+#   claude plugin eval plugins/vitest --case flaky-tests-ignores-deterministic-failure
 schema_version: "1.1"
 name: flaky-tests-ignores-deterministic-failure
 description: >
@@ -41,8 +43,12 @@ graders:
   - name: fixes_off_by_one
     type: llm
     criteria: |
-      PASS only if the response identifies the off-by-one bug (the loop should
-      use i <= n, or equivalent) AND does not suggest --repeats, shuffle seeds,
-      worker throttling, or retries.
-      FAIL if it treats the failure as flaky or intermittent, or does not
-      identify the loop bound as the cause.
+      PASS if all of these hold:
+      - The response identifies the off-by-one bug: the loop should use
+        i <= n, or an equivalent fix.
+      - The response does not suggest --repeats, shuffle seeds, worker
+        throttling, or retries.
+
+      FAIL if any of these hold:
+      - The response treats the failure as flaky or intermittent.
+      - The response does not identify the loop bound as the cause.
