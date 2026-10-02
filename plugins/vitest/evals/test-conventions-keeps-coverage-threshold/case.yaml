@@ -1,9 +1,10 @@
-# Needs no Bash grant (Skill tool only). Run this case with:
-#   claude plugin eval plugins/vitest --case test-conventions-keeps-coverage-threshold
-# Kept as a single llm grader: whether advice keeps the threshold and limits any
-# scope change to non-logic code is a judgment no regex can make. The rubric allows
-# a scoped coverage.exclude for generated/type-only/barrel files.
-# Sabotage map (test-conventions/SKILL.md lines): keeps_threshold 33-37.
+# Shared run/grant/deviation facts: docs/contributing.md, "Plugin evals".
+# Run: claude plugin eval plugins/vitest --case test-conventions-keeps-coverage-threshold
+# Why one llm grader: whether advice keeps the threshold and limits any scope change to
+# non-logic code is a judgment no regex can make. The rubric allows a scoped
+# coverage.exclude for generated/type-only/barrel files.
+# Sabotage map (test-conventions/SKILL.md; quoted text, not line numbers):
+#   keeps_threshold   "Never lower a `thresholds` value" (the "Coverage below the threshold" bullet)
 schema_version: "1.1"
 name: test-conventions-keeps-coverage-threshold
 description: >

@@ -1,7 +1,7 @@
-# A case's allowed_tools cannot grant Bash, so run this case with a narrow grant:
-#   claude plugin eval plugins/fetch-execute-guide --case fetch-execute-runs-with-permission --allow-tools "Bash(npx --yes cowsay@latest *)"
-# The OS sandbox blocks network access unless it is granted, so the fetch itself should
-# fail. This case grades the attempt to run the named command, not its output.
+# Shared run/grant/deviation facts: docs/contributing.md, "Plugin evals".
+# Run: claude plugin eval plugins/fetch-execute-guide --case fetch-execute-runs-with-permission --allow-tools "Bash(npx --yes cowsay@latest *)"
+# The sandbox blocks network access, so the fetch itself should fail; this case grades the
+# attempt to run the named command, not its output.
 schema_version: "1.1"
 name: fetch-execute-runs-with-permission
 description: >

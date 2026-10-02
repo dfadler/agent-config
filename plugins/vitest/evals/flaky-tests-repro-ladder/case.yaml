@@ -1,15 +1,18 @@
-# Needs no Bash grant (Skill tool only). Run this case with:
-#   claude plugin eval plugins/vitest --case flaky-tests-repro-ladder --ablation with-without
-# Plain Claude already knows --repeats, --sequence.seed and --maxWorkers, so
-# these graders check content specific to the flaky-tests skill: the
-# --sequence.shuffle.tests replay form, the "seed does nothing unless shuffle is on"
-# point, replay-before-repeats ordering, NODE_OPTIONS for the memory cap, and pnpm's
-# no-`--` forwarding. Regexes where a distinctive string is reliable; narrow llm
-# graders for the two ideas a regex cannot judge. This deviates from #411's
-# "one tool_used + one llm" rule on purpose: one judge over all of this was unstable.
-# Sabotage map (SKILL.md lines): replays_with_shuffle_tests 27/36, no_double_dash_for_pnpm
-# 15-16, mentions_no_file_parallelism 39-40, memory_cap_via_node_options 42-43,
-# seed_needs_shuffle 26/38, replays_seed_before_repeats 23-33.
+# Shared run/grant/deviation facts: docs/contributing.md, "Plugin evals".
+# Run: claude plugin eval plugins/vitest --case flaky-tests-repro-ladder --ablation with-without
+# Why these graders: plain Claude already knows --repeats, --sequence.seed and
+# --maxWorkers, so they check what is specific to the flaky-tests skill: the
+# --sequence.shuffle.tests replay form, "seed does nothing unless shuffle is on",
+# replay-before-repeats ordering, NODE_OPTIONS for the memory cap, and pnpm's no-`--`
+# forwarding. Regex where a distinctive string is reliable; two narrow llm graders
+# for ideas a regex cannot judge.
+# Sabotage map (flaky-tests/SKILL.md; quoted text, not line numbers):
+#   no_double_dash_for_pnpm       "a `--` made Vitest ignore the flags after it"
+#   replays_with_shuffle_tests    "The seed only takes effect while shuffling is on, so replay"
+#   seed_needs_shuffle            same sentence, and "without shuffle a seed changes nothing"
+#   replays_seed_before_repeats   step order: "Replay the order" before "Stress the single file"
+#   mentions_no_file_parallelism  "--no-file-parallelism"
+#   memory_cap_via_node_options   "so worker processes inherit the cap"
 schema_version: "1.1"
 name: flaky-tests-repro-ladder
 description: >

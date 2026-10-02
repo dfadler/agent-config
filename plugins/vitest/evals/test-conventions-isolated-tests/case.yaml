@@ -1,11 +1,11 @@
-# Needs no Bash grant (Skill tool only). Run this case with:
-#   claude plugin eval plugins/vitest --case test-conventions-isolated-tests --ablation with-without
-# Graders check rules specific to the test-conventions skill that plain Claude does
-# not reliably apply (ephemeral port 0, vi.unstubAllEnvs / config unstubEnvs for env
-# vars, no direct process.env assignment, no hard-coded port), as free regexes; no
-# judge needed. Deviates from #411's "one tool_used + one llm" rule for that reason.
-# Sabotage map (test-conventions/SKILL.md lines): uses_ephemeral_port 24-25,
-# no_hardcoded_port 24-25, unstubs_env 19-20, no_direct_env_assignment 20-21.
+# Shared run/grant/deviation facts: docs/contributing.md, "Plugin evals".
+# Run: claude plugin eval plugins/vitest --case test-conventions-isolated-tests --ablation with-without
+# Why these graders: they check rules plain Claude does not reliably apply (ephemeral
+# port 0, unstubAllEnvs / unstubEnvs, no direct process.env assignment, no hard-coded port).
+# Sabotage map (test-conventions/SKILL.md; quoted text, not line numbers):
+#   uses_ephemeral_port, no_hardcoded_port   "port 0 for servers"
+#   unstubs_env                              "vi.unstubAllEnvs()" and "unstubEnvs"
+#   no_direct_env_assignment                 "Prefer scoped helpers over mutating"
 schema_version: "1.1"
 name: test-conventions-isolated-tests
 description: >
