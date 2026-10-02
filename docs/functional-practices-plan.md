@@ -1,6 +1,6 @@
 # Plan: functional practices across agent-config
 
-Status: draft, not started. Owner: dfadler.
+Status: in progress (updated 2026-10-02). Owner: dfadler.
 
 ## Goal
 
@@ -77,16 +77,16 @@ refactors the script 2 tests); 5 needs 1 and 4; 6 comes last.
    Dependencies) so a caller's expected output is checked against the callee's
    declared `**Output:**`, not just that the section exists. Needs a small
    machine-readable type notation in `## Contract`.
-2. **Idempotence tests for `setup.sh` and `teardown.sh`.** bats tests, hermetic
+2. **Idempotence tests for `setup.sh` and `teardown.sh`. Done (#494).** bats tests, hermetic
    per the shell-hygiene convention: run twice in a throwaway `HOME`, assert the
    second run changes nothing.
-3. **Pure plan, thin shell for setup (bash).** Extract the install-plan
+3. **Pure plan, thin shell for setup (bash). Done (#497).** Extract the install-plan
    derivation (from `DEFAULT_ENABLED`, flags, and current state) into a pure
    bash function that prints plan lines as data, with tests; a thin applier
    executes them. Bash, not TypeScript, because `setup.sh` bootstraps a fresh
    machine before Node exists. Stacks on phase 2. If the phase 8 migration
    reaches `setup.sh`, this layer is replaced, so keep the line format simple.
-4. **TypeScript `lib/`.** `Result`, `pipe`, `collect`, with `fast-check`
+4. **TypeScript `lib/`. Done (#493).** `Result`, `pipe`, `collect`, with `fast-check`
    property tests. Add `eslint-plugin-functional` (immutability, no `let`) and
    `switch-exhaustiveness-check` for core directories. Verify rule names
    against plugin docs first.
@@ -103,9 +103,13 @@ refactors the script 2 tests); 5 needs 1 and 4; 6 comes last.
    [#492](https://github.com/dfadler/agent-config/issues/492).
 8. **Repo-wide TypeScript migration (fast follow).** Move the repo's scripts to
    TypeScript on the phase 4 library, building on #419 (Python scripts) and
-   extending to shell where it makes sense. Scope, ordering, and which scripts
-   must stay shell (bootstrap, pre-Node hooks) come from an inventory in
-   progress; this phase is a stub until that lands.
+   extending to shell where it makes sense. Done so far: Batch 0 (the
+   `setup-node-pnpm` action and CLI helpers, #495) and the Batch 1 lint ports
+   (`check-claude-md-lines`, `check-markdown-links`, `check-shell-set-flags`,
+   #498 and #496). Next: `check-plugin-structure`, then `gha-ci-audit`, then the
+   small plugin scripts. Still undecided: whether the bootstrap scripts
+   (`setup.sh`, `teardown.sh`, `doctor.sh`), the hooks, and `agent_term.py`
+   move at all, and whether plugins require Node.
 
 ## Verification
 
