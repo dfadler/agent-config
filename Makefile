@@ -147,7 +147,7 @@ COVERAGE_PY_MIN := 52
 #     see the PR that introduced this comment for why.
 COVERAGE_PY_JSON := $(COVERAGE_PY_DIR)/py-coverage.json
 
-# Ceiling for claude/CLAUDE.md (see scripts/check-claude-md-lines.sh). The
+# Ceiling for claude/CLAUDE.md (see scripts/ts/check-claude-md-lines.ts). The
 # global CLAUDE.md loads into every session on this machine regardless of
 # project, so unrelated content belongs in a skill/doc instead of growing this
 # file — #137 trimmed it from 352 to 302 lines by relocating the TypeScript
@@ -235,6 +235,19 @@ typecheck-ts: node-modules ## tsc --noEmit over the TypeScript sources
 check-skills: node-modules ## Skills that other skills reference must document a contract
 	@pnpm run --silent check-skills
 
+# Ported check: how a shell lint moved to TypeScript is wired. The entrypoint
+# is a plain node call (Node 22.18+ strips types, no build step), the target
+# depends on node-modules so a fresh checkout works, and CI calls the target,
+# never the node command (see docs/testing.md for the script shape):
+#
+#   lint-foo: node-modules ## <what it checks>
+#   	@node scripts/ts/check-foo.ts [ARGS]
+#
+# Add the target to `.PHONY`, to `check`, and to the workflow that runs it (that
+# workflow adds the ./.github/actions/setup-node-pnpm step); the lint, typecheck
+# and coverage targets already cover the new file. A plugin-owned check uses
+# plugins/<plugin>/scripts/ts/check-foo.ts instead.
+
 test-ts: node-modules ## Run the Vitest suite
 	@pnpm test --silent
 
@@ -252,12 +265,13 @@ lint-shellcheck: ## shellcheck
 lint-shfmt: ## shfmt (check only)
 	@$(SH_FIND) | xargs -0 shfmt -i 2 -ci -d
 
-lint-set-flags: ## set-flags convention
-	@bash scripts/check-shell-set-flags.sh
+lint-set-flags: node-modules ## set-flags convention
+	@node scripts/ts/check-shell-set-flags.ts
 
-lint-claude-md: ## CLAUDE.md size
-	@bash scripts/check-claude-md-lines.sh claude/CLAUDE.md $(CLAUDE_MD_MAX_LINES)
+lint-claude-md: node-modules ## CLAUDE.md size
+	@node scripts/ts/check-claude-md-lines.ts claude/CLAUDE.md $(CLAUDE_MD_MAX_LINES)
 
+# lint-claude-md is TypeScript now, so lint-sh needs Node (node-modules).
 lint-sh: lint-shellcheck lint-shfmt lint-set-flags lint-claude-md ## shellcheck + shfmt + set-flags + CLAUDE.md size
 
 lint-py: venv ## ruff check + ruff format --check
@@ -331,5 +345,5 @@ lint-actions: ## Lint .github/workflows with actionlint
 # this repo's real tree when added (#96), but it hasn't been proven against
 # CI's own checkout, and a broken-link false positive there would go straight
 # to a red default branch. Fold it into `check`/`lint` once that's confirmed.
-check-links: ## Verify relative markdown links resolve to real files
-	@bash scripts/check-markdown-links.sh --path .
+check-links: node-modules ## Verify relative markdown links resolve to real files
+	@node scripts/ts/check-markdown-links.ts --path .
