@@ -60,6 +60,11 @@ jobs:
     needs: [shell, typescript, python]
     steps:
       - name: All checks passed
+        env:
+          RESULTS: ${{ join(needs.*.result, ' ') }}
         run: |
-          results="${{ join(needs.*.result, ' ') }}"
-          [[ "$results" =~ failure|cancelled ]] && exit 1 || exit 0
+          # Every gating job must report success; a skipped or cancelled job
+          # must not let the sentinel pass.
+          for result in $RESULTS; do
+            [[ "$result" == success ]] || { echo "gating job result: $result"; exit 1; }
+          done

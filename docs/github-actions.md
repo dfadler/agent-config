@@ -61,7 +61,8 @@ a CI failure here.
   addition to the dispatched job list requires a branch-protection settings
   update. The `if: always()` guard is load-bearing: a skipped dependency would
   otherwise skip the sentinel too, letting a cancelled or never-run job
-  silently satisfy the required check.
+  silently satisfy the required check. The sentinel itself fails on any
+  dependency result other than `success`, so a skipped job cannot pass it.
   **Here the required branch-protection context is the job name `all-checks`**
   (defined only in `all-checks.yml`); the workflow name "All checks" is just a
   UI prefix. To add a new gating check, call its reusable workflow from a job in
