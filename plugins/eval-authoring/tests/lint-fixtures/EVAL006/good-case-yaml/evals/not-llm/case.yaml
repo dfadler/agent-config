@@ -1,0 +1,7 @@
+schema_version: "1.1"
+name: not-llm
+execution:
+  prompt: Do the thing.
+graders:
+  - type: "regex"
+    pattern: "done"
