@@ -1,0 +1,7 @@
+schema_version: "1.1"
+name: case1
+execution:
+  prompt: File an issue.
+graders:
+  - type: regex
+    pattern: issue
