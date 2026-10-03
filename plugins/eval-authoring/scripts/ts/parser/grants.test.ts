@@ -4,6 +4,7 @@ import { join } from "node:path";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import {
   checkGrantCaseNames,
+  grantEntryPattern,
   grantSet,
   grantsForCase,
   readGrantsFile,
@@ -177,6 +178,20 @@ describe("readGrantsFile", () => {
       write('schema_version: "1"\ngrants:\n  c:\n    - Bash\n    - Bash\n'),
     );
     expect(grantsForCase(g, "c")).toHaveLength(1);
+  });
+});
+
+describe("grantEntryPattern", () => {
+  it("matches tool names literally, not as regex syntax", () => {
+    const p = grantEntryPattern(["Bash", "a.b", "c|d", "(x"]);
+    expect(p.test("Bash")).toBe(true);
+    expect(p.test("Bash(npx *)")).toBe(true);
+    expect(p.test("a.b")).toBe(true);
+    expect(p.test("aXb")).toBe(false);
+    expect(p.test("c")).toBe(false);
+    expect(p.test("c|d")).toBe(true);
+    expect(p.test("(x")).toBe(true);
+    expect(p.test("Bashful")).toBe(false);
   });
 });
 

@@ -17,6 +17,13 @@ import { parseYaml, type YNode } from "./yaml.ts";
 /** The `schema_version` the grants format supports. */
 export const GRANTS_SCHEMA_VERSION = "1";
 
+const escapeRegExp = (s: string): string =>
+  s.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+
+/** The shape of a grant entry: one of `tools`, optionally `(specifier)`. Tool names are matched literally. */
+export const grantEntryPattern = (tools: readonly string[]): RegExp =>
+  new RegExp(`^(${tools.map(escapeRegExp).join("|")})(\\(.+\\))?$`);
+
 const emptyGrants: GrantsFile = { file: undefined, entries: [], issues: [] };
 
 const errnoCode = (e: unknown): string | undefined =>
@@ -123,9 +130,7 @@ export const readGrantsFile = (file: string): GrantsFile => {
     return { file, entries: [], issues };
   }
 
-  const shape = new RegExp(
-    `^(${getSchema().toolsNeedingGrant.join("|")})(\\(.+\\))?$`,
-  );
+  const shape = grantEntryPattern(getSchema().toolsNeedingGrant);
   const entries: readonly GrantEntry[] = grantsNode.entries.map((e) => {
     const caseNameLoc = loc({ line: e.keyLine, column: e.keyColumn });
     if (e.value.kind !== "seq") {
