@@ -1,0 +1,6 @@
+{
+  "name": "main-plugin",
+  "dependencies": [
+    "helper"
+  ]
+}

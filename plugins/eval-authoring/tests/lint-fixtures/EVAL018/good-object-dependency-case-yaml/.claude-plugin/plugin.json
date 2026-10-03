@@ -1,0 +1,10 @@
+{
+  "name": "main-plugin",
+  "dependencies": [
+    {
+      "name": "helper",
+      "version": "^1.0.0",
+      "marketplace": "m"
+    }
+  ]
+}
