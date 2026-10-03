@@ -147,12 +147,41 @@ const listDir = (
   }
 };
 
-const dedupeKeys =(specs: readonly FieldSpec[]): ReadonlySet<string> =>
+const dedupeKeys = (specs: readonly FieldSpec[]): ReadonlySet<string> =>
   new Set(specs.map((s) => s.name));
 
+// Defaults come from the schema table, the single place they live. A key
+// missing from the table (a table edit that dropped it) gets a neutral value.
 const specDefault = (specs: readonly FieldSpec[], name: string): number => {
   const d = specs.find((s) => s.name === name)?.default;
   return typeof d === "number" ? d : 0;
+};
+const specDefaultString = (specs: readonly FieldSpec[], name: string): string => {
+  const d = specs.find((s) => s.name === name)?.default;
+  return typeof d === "string" ? d : "";
+};
+const specDefaultBoolean = (
+  specs: readonly FieldSpec[],
+  name: string,
+): boolean => {
+  const d = specs.find((s) => s.name === name)?.default;
+  return typeof d === "boolean" ? d : false;
+};
+
+/** A `target` / `focus` keyword as a target; an unlisted word is `unknown`. */
+const keywordTarget = (text: string): GraderTarget => {
+  switch (text) {
+    case "last_message":
+      return { kind: "last_message" };
+    case "trace":
+      return { kind: "trace" };
+    case "files":
+      return { kind: "files" };
+    case "mock_calls":
+      return { kind: "mock_calls" };
+    default:
+      return { kind: "unknown", raw: text };
+  }
 };
 
 const lookupIn = (entries: readonly Entry[]): Lookup => {
@@ -306,20 +335,7 @@ const makeFieldReaders = (ctx: Ctx, lookup: Lookup, defaultLoc: SourceLoc) => {
   };
   const asTarget = (e: Entry): GraderTarget => {
     const n = e.node;
-    if (n.kind === "scalar" && n.value !== null) {
-      switch (n.text) {
-        case "last_message":
-          return { kind: "last_message" };
-        case "trace":
-          return { kind: "trace" };
-        case "files":
-          return { kind: "files" };
-        case "mock_calls":
-          return { kind: "mock_calls" };
-        default:
-          return { kind: "unknown", raw: n.text };
-      }
-    }
+    if (n.kind === "scalar" && n.value !== null) return keywordTarget(n.text);
     if (n.kind === "map") {
       const source = n.entries.find((x) => x.key === "source")?.value;
       const path = n.entries.find((x) => x.key === "path")?.value;
@@ -392,9 +408,10 @@ const buildGrader = (
     stem !== undefined && lookup("name") === undefined
       ? { value: stem, explicit: false, loc: origin.loc }
       : r.field<string | undefined>("name", r.asString, undefined);
+  const common = schema.graderCommonKeys;
   const base = {
     name: nameField,
-    weight: r.field("weight", r.asNumber, 1),
+    weight: r.field("weight", r.asNumber, specDefault(common, "weight")),
     arm: r.field<string | undefined>("arm", r.asString, undefined),
     origin,
   };
@@ -412,7 +429,11 @@ const buildGrader = (
   const target = (name: string): Field<GraderTarget> => {
     const e = lookup(name);
     return e === undefined
-      ? { value: { kind: "last_message" }, explicit: false, loc: origin.loc }
+      ? {
+          value: keywordTarget(specDefaultString(typeKeys, name)),
+          explicit: false,
+          loc: origin.loc,
+        }
       : { value: r.asTarget(e), explicit: true, loc: e.loc };
   };
 
@@ -423,7 +444,11 @@ const buildGrader = (
         type,
         pattern: r.field("pattern", r.asString, ""),
         flags: r.field<string | undefined>("flags", r.asString, undefined),
-        match: r.field("match", r.asString, "contains"),
+        match: r.field(
+          "match",
+          r.asString,
+          specDefaultString(typeKeys, "match"),
+        ),
         target: target("target"),
       };
     case "tool_used":
@@ -432,7 +457,7 @@ const buildGrader = (
         type,
         tool: r.field("tool", r.asString, ""),
         inputMatch: r.field<string | undefined>("input_match", r.asString, undefined),
-        min: r.field("min", r.asNumber, 1),
+        min: r.field("min", r.asNumber, specDefault(typeKeys, "min")),
         max: r.field<number | undefined>("max", r.asNumber, undefined),
       };
     case "tool_order":
@@ -447,7 +472,11 @@ const buildGrader = (
         ...base,
         type,
         path: r.field("path", r.asString, ""),
-        exists: r.field("exists", r.asBoolean, true),
+        exists: r.field(
+          "exists",
+          r.asBoolean,
+          specDefaultBoolean(typeKeys, "exists"),
+        ),
       };
     case "llm": {
       const c = criteria();
