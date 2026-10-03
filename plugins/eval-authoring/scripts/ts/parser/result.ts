@@ -38,12 +38,18 @@ const readGrader = (g: Rec): GraderResult => {
   const passed = optBool(g["passed"]);
   const score = optNum(g["score"]);
   const scored = optBool(g["scored"]);
+  const weight = optNum(g["weight"]);
+  const explanation = optStr(g["explanation"]);
+  const withOnly = optBool(g["withOnly"]);
   return {
     ...(name === undefined ? {} : { name }),
     ...(type === undefined ? {} : { type }),
     ...(passed === undefined ? {} : { passed }),
     ...(score === undefined ? {} : { score }),
     ...(scored === undefined ? {} : { scored }),
+    ...(weight === undefined ? {} : { weight }),
+    ...(explanation === undefined ? {} : { explanation }),
+    ...(withOnly === undefined ? {} : { withOnly }),
   };
 };
 
@@ -68,8 +74,17 @@ const readCaseResult = (c: Rec): CaseResult => {
   const aggregates = isRec(c["aggregates"]) ? c["aggregates"] : {};
   const delta = optNum(aggregates["delta"]);
   const arms = isRec(c["arms"]) ? c["arms"] : {};
-  const outAggregates: CaseAggregates =
-    delta === undefined ? {} : { delta };
+  const score = optNum(aggregates["score"]);
+  const passRate = optNum(aggregates["passRate"]);
+  const scoreWithout = optNum(aggregates["scoreWithout"]);
+  const passRateWithout = optNum(aggregates["passRateWithout"]);
+  const outAggregates: CaseAggregates = {
+    ...(delta === undefined ? {} : { delta }),
+    ...(score === undefined ? {} : { score }),
+    ...(passRate === undefined ? {} : { passRate }),
+    ...(scoreWithout === undefined ? {} : { scoreWithout }),
+    ...(passRateWithout === undefined ? {} : { passRateWithout }),
+  };
   return {
     name: optStr(c["name"]) ?? "",
     aggregates: outAggregates,

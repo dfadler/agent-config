@@ -448,6 +448,12 @@ export interface GraderResult {
   readonly score?: number;
   /** False when the grader was excluded from the score in a two-arm run. */
   readonly scored?: boolean;
+  /** Grader weight in the run score. */
+  readonly weight?: number;
+  /** The grader's explanation; for a judge it carries the votes. */
+  readonly explanation?: string;
+  /** True for an `arm: with-only` grader. */
+  readonly withOnly?: boolean;
 }
 
 /** One run of a case in one arm. */
@@ -465,6 +471,14 @@ export interface RunResult {
 /** Aggregates for a case. `delta` is omitted when a case ran one arm or the arms are not comparable. */
 export interface CaseAggregates {
   readonly delta?: number;
+  /** Mean score with the plugin. */
+  readonly score?: number;
+  /** Share of runs that passed with the plugin. */
+  readonly passRate?: number;
+  /** Mean score without the plugin; omitted for a one-arm run. */
+  readonly scoreWithout?: number;
+  /** Share of runs that passed without the plugin; omitted for a one-arm run. */
+  readonly passRateWithout?: number;
 }
 
 /** One case in the result document (`cases[]`). */

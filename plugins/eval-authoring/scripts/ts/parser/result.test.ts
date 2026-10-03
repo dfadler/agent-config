@@ -35,7 +35,13 @@ const doc = (extra: Record<string, unknown> = {}): string =>
           ],
           without: [{ score: 0, error: "rate limited", aborted: true }],
         },
-        aggregates: { score: 1, delta: 0.5 },
+        aggregates: {
+          score: 1,
+          passRate: 1,
+          scoreWithout: 0.5,
+          passRateWithout: 0,
+          delta: 0.5,
+        },
       },
       {
         name: "c2",
@@ -55,13 +61,28 @@ describe("readAggregateResult", () => {
     const [c1, c2] = out.result.cases;
     expect(out.result).toMatchObject({ schemaVersion: 1, partial: false });
     expect(out.result.partialReason).toBeUndefined();
-    expect(c1?.aggregates).toEqual({ delta: 0.5 });
+    expect(c1?.aggregates).toEqual({
+      delta: 0.5,
+      score: 1,
+      passRate: 1,
+      scoreWithout: 0.5,
+      passRateWithout: 0,
+    });
     expect(c1?.withRuns).toEqual([
       {
         score: 1,
         error: null,
         skippedPaidGraders: false,
-        graders: [{ name: "g", passed: true, scored: true }],
+        graders: [
+          {
+            name: "g",
+            passed: true,
+            scored: true,
+            weight: 1,
+            explanation: "e",
+            withOnly: false,
+          },
+        ],
       },
     ]);
     expect(c1?.withoutRuns).toEqual([
