@@ -96,6 +96,38 @@ describe("parseYaml", () => {
     expect(v?.kind === "scalar" && [v.line, v.column]).toEqual([10, 4]);
   });
 
+  it("handles a doubled quote inside a single-quoted scalar", () => {
+    expect(read("a: 'it''s # x' # real comment\nb: 'x'")).toEqual({
+      a: "it's # x",
+      b: "x",
+    });
+    expect(read("a: ['it''s', 'b']")).toEqual({ a: ["it's", "b"] });
+  });
+
+  it("does not overflow the stack on very long lines", () => {
+    const long = "x".repeat(50_000);
+    expect(read(`plain: ${long}\ndq: "${long}"\nsq: '${long}'\ncm: ${long} # c`)).toEqual({
+      plain: long,
+      dq: long,
+      sq: long,
+      cm: long,
+    });
+    expect(read(`a: [${" ".repeat(50_000)}1${" ".repeat(50_000)}]`)).toEqual({
+      a: [1],
+    });
+    expect(parseYaml(`a: "${long}`).ok).toBe(false);
+    expect(parseYaml(`a: '${long}`).ok).toBe(false);
+  });
+
+  it("returns an error, never throws, for huge or deeply nested input", () => {
+    const items = Array.from({ length: 200_000 }, () => "1").join(",");
+    expect(() => parseYaml(`a: [${items}]`)).not.toThrow();
+    expect(() => parseYaml(`a: ${"[".repeat(200_000)}`)).not.toThrow();
+    const many = Array.from({ length: 200_000 }, (_, i) => `k${String(i)}: 1`);
+    expect(() => parseYaml(many.join("\n"))).not.toThrow();
+    expect(parseYaml(`a: ${"[".repeat(200_000)}`).ok).toBe(false);
+  });
+
   it.each([
     ["tab indent", "a:\n\tb: 1"],
     ["duplicate key", "a: 1\na: 2"],

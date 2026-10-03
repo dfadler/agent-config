@@ -122,27 +122,35 @@ const isSpace = (c: string | undefined): boolean => c === " " || c === "\t";
 
 /** Cut a trailing ` # comment`, ignoring `#` inside quotes. */
 const stripComment = (s: string): string => {
-  const scan = (
-    i: number,
-    quote: "'" | '"' | undefined,
-    prev: string | undefined,
-  ): number => {
-    if (i >= s.length) return s.length;
+  // A loop, not recursion: a very long line must not overflow the stack.
+  let quote: "'" | '"' | undefined;
+  let prev: string | undefined;
+  for (let i = 0; i < s.length; i += 1) {
     const c = s.charAt(i);
     if (quote === '"') {
-      if (c === "\\") return scan(i + 2, quote, undefined);
-      return scan(i + 1, c === '"' ? undefined : quote, c);
-    }
-    if (quote === "'") {
-      return scan(i + 1, c === "'" ? undefined : quote, c);
-    }
-    if (c === "#" && (prev === undefined || isSpace(prev))) return i;
-    const opens =
+      if (c === "\\") {
+        i += 1;
+        prev = undefined;
+        continue;
+      }
+      if (c === '"') quote = undefined;
+    } else if (quote === "'") {
+      if (c === "'") {
+        // A doubled quote is an escaped quote, not the end of the string.
+        if (s.charAt(i + 1) === "'") i += 1;
+        else quote = undefined;
+      }
+    } else if (c === "#" && (prev === undefined || isSpace(prev))) {
+      return s.slice(0, i).trimEnd();
+    } else if (
       (c === '"' || c === "'") &&
-      (prev === undefined || isSpace(prev) || "[{,".includes(prev));
-    return scan(i + 1, opens ? c : undefined, c);
-  };
-  return s.slice(0, scan(0, undefined, undefined)).trimEnd();
+      (prev === undefined || isSpace(prev) || "[{,".includes(prev))
+    ) {
+      quote = c;
+    }
+    prev = c;
+  }
+  return s.trimEnd();
 };
 
 const TRUE_RE = /^(true|True|TRUE)$/;
@@ -176,11 +184,17 @@ const readDouble = (
   start: number,
   fail: (m: string, at: number) => never,
 ): { readonly text: string; readonly end: number } => {
-  const go = (i: number, acc: string): { text: string; end: number } => {
-    if (i >= s.length) return fail("unterminated double-quoted string", start);
+  // A loop, not recursion: a very long line must not overflow the stack.
+  const parts: string[] = [];
+  let i = start + 1;
+  while (i < s.length) {
     const c = s.charAt(i);
-    if (c === '"') return { text: acc, end: i + 1 };
-    if (c !== "\\") return go(i + 1, acc + c);
+    if (c === '"') return { text: parts.join(""), end: i + 1 };
+    if (c !== "\\") {
+      parts.push(c);
+      i += 1;
+      continue;
+    }
     const e = s.charAt(i + 1);
     if (e === "x" || e === "u") {
       const len = e === "x" ? 2 : 4;
@@ -188,18 +202,18 @@ const readDouble = (
       if (!new RegExp(`^[0-9a-fA-F]{${String(len)}}$`).test(hex)) {
         return fail("invalid escape in double-quoted string", i);
       }
-      return go(
-        i + 2 + len,
-        acc + String.fromCodePoint(Number.parseInt(hex, 16)),
-      );
+      parts.push(String.fromCodePoint(Number.parseInt(hex, 16)));
+      i += 2 + len;
+      continue;
     }
     const mapped = ESCAPES[e];
     if (mapped === undefined) {
       return fail("invalid escape in double-quoted string", i);
     }
-    return go(i + 2, acc + mapped);
-  };
-  return go(start + 1, "");
+    parts.push(mapped);
+    i += 2;
+  }
+  return fail("unterminated double-quoted string", start);
 };
 
 const readSingle = (
@@ -207,14 +221,21 @@ const readSingle = (
   start: number,
   fail: (m: string, at: number) => never,
 ): { readonly text: string; readonly end: number } => {
-  const go = (i: number, acc: string): { text: string; end: number } => {
-    if (i >= s.length) return fail("unterminated single-quoted string", start);
+  const parts: string[] = [];
+  let i = start + 1;
+  while (i < s.length) {
     const c = s.charAt(i);
-    if (c !== "'") return go(i + 1, acc + c);
-    if (s.charAt(i + 1) === "'") return go(i + 2, acc + "'");
-    return { text: acc, end: i + 1 };
-  };
-  return go(start + 1, "");
+    if (c !== "'") {
+      parts.push(c);
+      i += 1;
+    } else if (s.charAt(i + 1) === "'") {
+      parts.push("'");
+      i += 2;
+    } else {
+      return { text: parts.join(""), end: i + 1 };
+    }
+  }
+  return fail("unterminated single-quoted string", start);
 };
 
 /** The key at the start of a line's content, when it is a `key: ...` line. */
@@ -306,7 +327,11 @@ export const parseYaml = (text: string, firstLine = 1): YamlResult => {
     const failIn = (m: string, at: number): never =>
       failAt(m, line, column + at);
     const flow = (i: number): { node: YNode; end: number } => {
-      const ws = (j: number): number => (isSpace(s[j]) ? ws(j + 1) : j);
+      const ws = (from: number): number => {
+        let j = from;
+        while (isSpace(s[j])) j += 1;
+        return j;
+      };
       const start = ws(i);
       const c = s.charAt(start);
       const col = column + start;
@@ -601,6 +626,16 @@ export const parseYaml = (text: string, firstLine = 1): YamlResult => {
   } catch (e) {
     if (e instanceof YamlError) {
       return { ok: false, message: e.message, line: e.line, column: e.column };
+    }
+    // The block and flow parsers recurse per entry and per nesting level; an
+    // enormous or hostile file must come back as an error, not a throw.
+    if (e instanceof RangeError) {
+      return {
+        ok: false,
+        message: "input is too large or too deeply nested to read",
+        line: firstLine,
+        column: 1,
+      };
     }
     throw e;
   }
