@@ -395,6 +395,16 @@ describe("readSuite", () => {
     expect(s.issues).toEqual([]);
   });
 
+  it("reads the suite's mock catalog", () => {
+    put("evals/a/prompt.md", "a");
+    put("evals/mocks/srv/tool.md", "---\ntype: static\n---\nreply");
+    const s = readSuite(root);
+    expect(s.mocks.mocks.map((m) => [m.server, m.tool, m.typeKind])).toEqual([
+      ["srv", "tool", "static"],
+    ]);
+    expect([...s.mocks.declaredServers]).toEqual(["srv"]);
+  });
+
   it("honors --eval-dir and a missing directory", () => {
     put("custom/x/prompt.md", "x");
     expect(readSuite(root, { flag: "custom" }).cases).toHaveLength(1);

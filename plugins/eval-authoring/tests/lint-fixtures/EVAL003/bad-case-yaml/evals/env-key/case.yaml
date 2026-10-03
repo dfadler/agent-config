@@ -1,0 +1,9 @@
+schema_version: "1.1"
+name: env-key
+execution:
+  prompt: Do the thing.
+  env:
+    FOO: bar
+graders:
+  - type: regex
+    pattern: done
