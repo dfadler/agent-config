@@ -248,6 +248,20 @@ describe("readCase: case.yaml layout", () => {
     );
   });
 
+  it("numbers graders by position in the final list, skipping dropped ones", () => {
+    put(
+      "c/case.yaml",
+      'schema_version: "1.1"\nname: c\ngraders:\n  - dropped\n  - name: kept\n    type: regex\n    pattern: x\n',
+    );
+    put("c/graders/a-bad.md", "---\ntype: llm\n");
+    put("c/graders/b-good.md", "---\ntype: file_exists\npath: a\n---\n");
+    const c = readCase(join(root, "c"));
+    expect(c.graders.map((g) => [g.name.value, g.origin.index])).toEqual([
+      ["kept", 0],
+      ["b-good", 1],
+    ]);
+  });
+
   it("flags a missing schema_version as absent", () => {
     put("c/case.yaml", "name: c\n");
     expect(readCase(join(root, "c")).schemaVersion.value).toBeUndefined();

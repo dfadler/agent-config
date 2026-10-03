@@ -705,7 +705,12 @@ export const readCase = (caseDir: string): EvalCase => {
     scaffoldScript: r.field<string | undefined>("scaffold_script", r.asString, undefined),
     historyFile: r.field<string | undefined>("history_file", r.asString, undefined),
     addDirs: r.field<readonly string[]>("add_dirs", r.asStringList, []),
-    graders: [...yamlGraders, ...mdGraders],
+    // `origin.index` is the position in this final list, so number after the
+    // dropped (unreadable or malformed) graders are gone.
+    graders: [...yamlGraders, ...mdGraders].map((g, index) => ({
+      ...g,
+      origin: { ...g.origin, index },
+    })),
     keys: ctx.keys,
     issues: ctx.issues,
   };
