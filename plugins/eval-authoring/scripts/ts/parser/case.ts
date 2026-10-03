@@ -836,20 +836,11 @@ export const readSuite = (
     .sort()
     .map((n) => join(evalDir, n))
     .filter((p) => isDir(p) && looksLikeCase(p));
-  // TODO(#487): drop the fallback once the mock reader is implemented; until
-  // then its stub throws and a suite still has to be readable.
-  const mocks = ((): MockCatalog => {
-    try {
-      return readMocks(pluginRoot, evalDir);
-    } catch {
-      return emptyCatalog;
-    }
-  })();
   return {
     pluginRoot,
     evalDir,
     cases: caseDirs.map(readCase),
-    mocks,
+    mocks: readMocks(pluginRoot, evalDir),
     issues,
   };
 };
