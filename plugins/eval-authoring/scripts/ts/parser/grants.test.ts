@@ -157,6 +157,21 @@ describe("readGrantsFile", () => {
     expect(issues.map((i) => i.message).join("\n")).toContain(message);
   });
 
+  it.each([
+    [
+      "block",
+      'schema_version: "1"\ngrants:\n  c:\n    - Bash\n  c:\n    - WebFetch\n',
+    ],
+    ["flow", 'schema_version: "1"\ngrants: { c: [Bash], c: [WebFetch] }\n'],
+    ["top-level", 'schema_version: "1"\ngrants: {}\ngrants: {}\n'],
+  ])("rejects a repeated case name (%s form) instead of picking one", (_n, text) => {
+    const g = readGrantsFile(write(text));
+    expect(g.issues.map((i) => i.kind)).toContain("yaml-syntax");
+    expect(g.issues.map((i) => i.message).join("\n")).toContain("duplicate key");
+    // Nothing is granted from an ambiguous file.
+    expect(g.entries).toEqual([]);
+  });
+
   it("keeps one copy of a duplicate entry", () => {
     const g = readGrantsFile(
       write('schema_version: "1"\ngrants:\n  c:\n    - Bash\n    - Bash\n'),

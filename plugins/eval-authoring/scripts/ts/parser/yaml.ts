@@ -374,6 +374,10 @@ export const parseYaml = (text: string, firstLine = 1): YamlResult => {
           if (keyNode.node.kind !== "scalar" || s.charAt(e) !== ":") {
             return failIn("expected 'key: value' in flow mapping", k);
           }
+          const keyText = keyNode.node.text;
+          if (entries.some((x) => x.key === keyText)) {
+            return failIn(`duplicate key '${keyText}'`, k);
+          }
           const val = flow(e + 1);
           entries.push({
             key: keyNode.node.text,
@@ -390,6 +394,12 @@ export const parseYaml = (text: string, firstLine = 1): YamlResult => {
         return { node: { kind: "map", entries, line, column: col }, end };
       }
       // Plain scalar inside a flow collection, or the whole value.
+      if (c !== "" && "&*!%@`".includes(c)) {
+        return failIn(
+          "anchors, aliases, tags and reserved indicators are not supported",
+          start,
+        );
+      }
       const stop = /[,\]}]|:(\s|$)/.exec(s.slice(start));
       const endIdx = stop === null ? s.length : start + stop.index;
       const raw = s.slice(start, endIdx).trim();
