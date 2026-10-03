@@ -131,7 +131,23 @@ const isDir = (p: string): boolean => {
   }
 };
 
-const dedupeKeys = (specs: readonly FieldSpec[]): ReadonlySet<string> =>
+/** Directory entries, or a message when the directory cannot be listed. Never throws. */
+const listDir = (
+  dir: string,
+):
+  | { readonly ok: true; readonly names: readonly string[] }
+  | { readonly ok: false; readonly message: string } => {
+  try {
+    return { ok: true, names: readdirSync(dir) };
+  } catch (e) {
+    return {
+      ok: false,
+      message: `cannot read directory: ${e instanceof Error ? e.message : String(e)}`,
+    };
+  }
+};
+
+const dedupeKeys =(specs: readonly FieldSpec[]): ReadonlySet<string> =>
   new Set(specs.map((s) => s.name));
 
 const specDefault = (specs: readonly FieldSpec[], name: string): number => {
@@ -468,12 +484,17 @@ export const readCase = (caseDir: string): EvalCase => {
   const gradersDir = join(caseDir, "graders");
   const promptFile = isFile(promptPath) ? promptPath : undefined;
   const caseYamlFile = isFile(yamlPath) ? yamlPath : undefined;
-  const graderFiles = isDir(gradersDir)
-    ? readdirSync(gradersDir)
-        .filter((f) => f.endsWith(".md") && isFile(join(gradersDir, f)))
-        .sort()
-        .map((f) => join(gradersDir, f))
-    : [];
+  const graderNames = isDir(gradersDir) ? listDir(gradersDir) : undefined;
+  if (graderNames !== undefined && !graderNames.ok) {
+    issueAt(ctx, "unreadable-file", graderNames.message, {
+      file: gradersDir,
+      line: 1,
+    });
+  }
+  const graderFiles = (graderNames?.ok === true ? graderNames.names : [])
+    .filter((f) => f.endsWith(".md") && isFile(join(gradersDir, f)))
+    .sort()
+    .map((f) => join(gradersDir, f));
   const layout: CaseLayout =
     promptFile !== undefined && caseYamlFile !== undefined
       ? "mixed"
@@ -759,13 +780,33 @@ export const readSuite = (
     };
   }
   const evalDir = join(pluginRoot, resolved.dir);
-  const caseDirs = existsSync(evalDir)
-    ? readdirSync(evalDir)
-        .filter((n) => !n.startsWith("."))
-        .sort()
-        .map((n) => join(evalDir, n))
-        .filter((p) => isDir(p) && looksLikeCase(p))
-    : [];
+  const issues: ParseIssue[] = [];
+  const listing = ((): readonly string[] => {
+    if (!existsSync(evalDir)) return [];
+    if (!isDir(evalDir)) {
+      issues.push({
+        kind: "wrong-type",
+        message: `eval directory '${resolved.dir}' is not a directory`,
+        loc: { file: evalDir, line: 1 },
+      });
+      return [];
+    }
+    const l = listDir(evalDir);
+    if (!l.ok) {
+      issues.push({
+        kind: "unreadable-file",
+        message: l.message,
+        loc: { file: evalDir, line: 1 },
+      });
+      return [];
+    }
+    return l.names;
+  })();
+  const caseDirs = listing
+    .filter((n) => !n.startsWith("."))
+    .sort()
+    .map((n) => join(evalDir, n))
+    .filter((p) => isDir(p) && looksLikeCase(p));
   // TODO(#487): drop the fallback once the mock reader is implemented; until
   // then its stub throws and a suite still has to be readable.
   const mocks = ((): MockCatalog => {
@@ -780,6 +821,6 @@ export const readSuite = (
     evalDir,
     cases: caseDirs.map(readCase),
     mocks,
-    issues: [],
+    issues,
   };
 };

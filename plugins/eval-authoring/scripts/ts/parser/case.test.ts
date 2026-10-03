@@ -1,4 +1,10 @@
-import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
+import {
+  chmodSync,
+  mkdirSync,
+  mkdtempSync,
+  rmSync,
+  writeFileSync,
+} from "node:fs";
 import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
@@ -394,6 +400,38 @@ describe("readSuite", () => {
     expect(readSuite(root, { flag: "custom" }).cases).toHaveLength(1);
     expect(readSuite(root).cases).toEqual([]);
   });
+
+  it("reports an eval directory that is a regular file instead of throwing", () => {
+    put("evals", "not a directory");
+    const s = readSuite(root);
+    expect(s.cases).toEqual([]);
+    expect(s.issues.map((i) => i.kind)).toEqual(["wrong-type"]);
+    expect(s.issues[0]?.message).toContain("not a directory");
+  });
+
+  // Permission bits do not restrict root, and Windows ignores them.
+  const canRestrict = process.platform !== "win32" && process.getuid?.() !== 0;
+
+  it.skipIf(!canRestrict)(
+    "reports an unreadable eval directory or graders directory instead of throwing",
+    () => {
+      put("evals/c/prompt.md", "x");
+      put("evals/c/graders/g.md", "---\ntype: llm\n---\nc");
+      try {
+        chmodSync(join(root, "evals", "c", "graders"), 0o000);
+        const c = readCase(join(root, "evals", "c"));
+        expect(c.graders).toEqual([]);
+        expect(c.issues.map((i) => i.kind)).toEqual(["unreadable-file"]);
+        chmodSync(join(root, "evals"), 0o000);
+        const s = readSuite(root);
+        expect(s.cases).toEqual([]);
+        expect(s.issues.map((i) => i.kind)).toEqual(["unreadable-file"]);
+      } finally {
+        chmodSync(join(root, "evals"), 0o755);
+        chmodSync(join(root, "evals", "c", "graders"), 0o755);
+      }
+    },
+  );
 
   it("reports a bad eval directory instead of throwing", () => {
     const s = readSuite(root, { flag: "../x" });
