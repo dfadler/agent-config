@@ -9,6 +9,7 @@
  *   decide what is an error. Limits live only in `SchemaTable`.
  * - Every value is a `Field<T>`: the value, whether the author wrote it, and where.
  */
+import type { YNode } from "./yaml.ts";
 
 // ---------------------------------------------------------------------------
 // Locations and fields
@@ -448,6 +449,12 @@ export interface GraderResult {
   readonly score?: number;
   /** False when the grader was excluded from the score in a two-arm run. */
   readonly scored?: boolean;
+  /** Grader weight in the run score. */
+  readonly weight?: number;
+  /** The grader's explanation; for a judge it carries the votes. */
+  readonly explanation?: string;
+  /** True for an `arm: with-only` grader. */
+  readonly withOnly?: boolean;
 }
 
 /** One run of a case in one arm. */
@@ -465,6 +472,14 @@ export interface RunResult {
 /** Aggregates for a case. `delta` is omitted when a case ran one arm or the arms are not comparable. */
 export interface CaseAggregates {
   readonly delta?: number;
+  /** Mean score with the plugin. */
+  readonly score?: number;
+  /** Share of runs that passed with the plugin. */
+  readonly passRate?: number;
+  /** Mean score without the plugin; omitted for a one-arm run. */
+  readonly scoreWithout?: number;
+  /** Share of runs that passed without the plugin; omitted for a one-arm run. */
+  readonly passRateWithout?: number;
 }
 
 /** One case in the result document (`cases[]`). */
@@ -518,8 +533,12 @@ export interface PluginManifest {
   readonly issues: readonly ParseIssue[];
 }
 
-/** Normalised mock `type`. `unknown` carries any other value. */
-export type MockType = "agent" | "script" | "static" | "unknown";
+/**
+ * Normalised mock `type`. The docs define `fixed` (the default) and `agent`;
+ * `unknown` carries any other value. `script` and `static` are not documented
+ * values and the reader no longer produces them (kept so existing code compiles).
+ */
+export type MockType = "fixed" | "agent" | "script" | "static" | "unknown";
 
 /** One mock file, `evals/mocks/<server>/<tool>.md`. Used by EVAL013. */
 export interface Mock {
@@ -529,9 +548,18 @@ export interface Mock {
   /** Raw `type` frontmatter; undefined when absent. */
   readonly type: string | undefined;
   readonly typeKind: MockType;
-  /** Raw `expect` frontmatter; undefined when absent. Validation is EVAL013's. */
+  /**
+   * `expect` frontmatter as text when it is a scalar, "" when it is a mapping
+   * or list (see `expectNode`); undefined when absent. Validation is EVAL013's.
+   */
   readonly expect: string | undefined;
-  /** True when a sibling `<tool>.replay` exists. */
+  /** The parsed `expect` value (usually a mapping of input paths to checks); omitted when absent. */
+  readonly expectNode?: YNode;
+  /**
+   * True when `mocks/.replay/<server>/` (in the same `mocks/` directory as the
+   * mock) holds at least one file. Per server: the docs name the directory,
+   * not the recording files.
+   */
   readonly hasReplay: boolean;
   /** `case` when a case's own `mocks/` file won the override, else `suite`. */
   readonly scope: "suite" | "case";

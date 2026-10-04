@@ -1,0 +1,12 @@
+schema_version: "1.1"
+name: negative-both
+execution:
+  prompt: Do not use the skill.
+  allowed_tools:
+    - Skill
+graders:
+  - type: tool_used
+    tool: Skill
+    min: 0
+    max: 0
+    arm: both

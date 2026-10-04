@@ -4,7 +4,7 @@
  * lint rules decide what is an error.
  */
 import { existsSync, readdirSync, readFileSync, statSync } from "node:fs";
-import { basename, join } from "node:path";
+import { basename, join, resolve } from "node:path";
 import { getSchema } from "./schema.ts";
 import { parseAllowedTool } from "./tools.ts";
 import { readMocks } from "./mocks.ts";
@@ -840,7 +840,8 @@ export const readSuite = (
     pluginRoot,
     evalDir,
     cases: caseDirs.map(readCase),
-    mocks: readMocks(pluginRoot, evalDir),
+    // Absolute, so a relative plugin root is not applied twice.
+    mocks: readMocks(pluginRoot, resolve(evalDir)),
     issues,
   };
 };

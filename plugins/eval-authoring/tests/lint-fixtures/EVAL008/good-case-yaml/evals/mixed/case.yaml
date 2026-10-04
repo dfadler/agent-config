@@ -1,0 +1,11 @@
+schema_version: "1.1"
+name: mixed
+execution:
+  prompt: Use the skill and say done.
+  allowed_tools:
+    - Skill
+graders:
+  - type: tool_used
+    tool: Skill
+  - type: regex
+    pattern: done

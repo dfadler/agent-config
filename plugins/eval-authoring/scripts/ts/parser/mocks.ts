@@ -1,12 +1,11 @@
 /**
  * Mock reader (#487). Used by EVAL013 and by `ScoringContext.declaredMockServers`.
  *
- * Frontmatter is read with a small flat `key: value` reader rather than a YAML
- * library: a mock only needs the scalar `type` and `expect` keys, and this keeps
- * the helper free of a dependency the parser core (#452) may choose differently.
+ * Frontmatter is read with the parser's own YAML reader, because `expect` is
+ * a nested mapping in real mocks.
  */
-import { existsSync, readdirSync, readFileSync, statSync } from "node:fs";
-import { basename, join, resolve } from "node:path";
+import { readdirSync, readFileSync, statSync } from "node:fs";
+import { basename, isAbsolute, join, normalize, resolve, sep } from "node:path";
 import { isRecord, readJsonFile } from "./json-file.ts";
 import { resolveCasePath } from "./paths.ts";
 import type {
@@ -16,46 +15,78 @@ import type {
   ParseIssue,
   SourceLoc,
 } from "./types.ts";
+import { parseYaml, splitFrontmatter, type YNode } from "./yaml.ts";
 
-interface Frontmatter {
-  readonly values: ReadonlyMap<string, { readonly value: string; readonly line: number }>;
-  readonly issue: string | undefined;
+interface Front {
+  /** Present when the file has a `type` key; `value` is undefined when that key is not a usable scalar. */
+  readonly type:
+    | { readonly value: string | undefined; readonly line: number }
+    | undefined;
+  readonly expect: { readonly node: YNode; readonly line: number } | undefined;
+  readonly issues: readonly ParseIssue[];
 }
 
-const NO_FRONTMATTER: Frontmatter = { values: new Map(), issue: undefined };
+const NO_FRONT: Front = { type: undefined, expect: undefined, issues: [] };
 
-const unquote = (raw: string): string => {
-  const trimmed = raw.trim();
-  const quoted = /^(["'])(.*)\1$/.exec(trimmed);
-  return quoted?.[2] ?? trimmed.replace(/\s+#.*$/, "");
+/** Read the `type` and `expect` keys of a mock's frontmatter. */
+const readFront = (file: string, text: string): Front => {
+  const split = splitFrontmatter(text);
+  if (split.kind === "none") return NO_FRONT;
+  if (split.kind === "unterminated") {
+    return {
+      ...NO_FRONT,
+      issues: [
+        {
+          kind: "malformed-frontmatter",
+          message: "frontmatter has no closing `---`",
+          loc: { file, line: 1 },
+        },
+      ],
+    };
+  }
+  const parsed = parseYaml(split.yaml, split.yamlLine);
+  if (!parsed.ok) {
+    return {
+      ...NO_FRONT,
+      issues: [
+        {
+          kind: "yaml-syntax",
+          message: parsed.message,
+          loc: { file, line: parsed.line, column: parsed.column },
+        },
+      ],
+    };
+  }
+  const entries = parsed.value?.kind === "map" ? parsed.value.entries : [];
+  const typeEntry = entries.find((e) => e.key === "type");
+  const expectEntry = entries.find((e) => e.key === "expect");
+  return {
+    type:
+      typeEntry === undefined
+        ? undefined
+        : {
+            value:
+              typeEntry.value.kind === "scalar" &&
+              typeEntry.value.value !== null
+                ? typeEntry.value.text
+                : undefined,
+            line: typeEntry.keyLine,
+          },
+    expect:
+      expectEntry === undefined
+        ? undefined
+        : { node: expectEntry.value, line: expectEntry.keyLine },
+    issues: [],
+  };
 };
 
-/** Parse a leading `---` block of flat `key: value` lines. */
-const parseFrontmatter = (text: string): Frontmatter => {
-  const lines = text.split(/\r?\n/);
-  if (lines[0]?.trim() !== "---") {
-    return NO_FRONTMATTER;
-  }
-  const end = lines.findIndex((line, i) => i > 0 && line.trim() === "---");
-  if (end === -1) {
-    return { values: new Map(), issue: "frontmatter has no closing `---`" };
-  }
-  const entries = lines.slice(1, end).flatMap((line, i) => {
-    const match = /^([A-Za-z_][\w-]*)\s*:(.*)$/.exec(line);
-    return match?.[1] === undefined
-      ? []
-      : [
-          [
-            match[1],
-            { value: unquote(match[2] ?? ""), line: i + 2 },
-          ] as const,
-        ];
-  });
-  return { values: new Map(entries), issue: undefined };
-};
-
+/** The docs define `fixed` (the default when `type` is absent) and `agent`. */
 const typeKindOf = (type: string | undefined): MockType =>
-  type === "agent" || type === "script" || type === "static" ? type : "unknown";
+  type === undefined || type === "fixed"
+    ? "fixed"
+    : type === "agent"
+      ? "agent"
+      : "unknown";
 
 const listDir = (dir: string): readonly string[] => {
   try {
@@ -64,6 +95,20 @@ const listDir = (dir: string): readonly string[] => {
     return [];
   }
 };
+
+/**
+ * True when `dir` holds at least one regular file (a subdirectory does not
+ * count). Each entry is checked on its own, so one that vanishes between the
+ * listing and the check, or a broken link, is skipped rather than thrown.
+ */
+const hasRecording = (dir: string): boolean =>
+  listDir(dir).some((name) => {
+    try {
+      return statSync(join(dir, name)).isFile();
+    } catch {
+      return false;
+    }
+  });
 
 const isDirectory = (path: string): boolean => {
   try {
@@ -98,21 +143,13 @@ const readMock = (
       };
     }
   })();
-  const fm = typeof text === "string" ? parseFrontmatter(text) : NO_FRONTMATTER;
-  const type = fm.values.get("type");
-  const expectValue = fm.values.get("expect");
+  const fm = typeof text === "string" ? readFront(file, text) : NO_FRONT;
+  const type = fm.type;
+  const expectValue = fm.expect;
   const loc: SourceLoc = { file, line: type?.line ?? expectValue?.line ?? 1 };
   const issues: readonly ParseIssue[] = [
     ...(typeof text === "string" ? [] : [text]),
-    ...(fm.issue === undefined
-      ? []
-      : [
-          {
-            kind: "malformed-frontmatter" as const,
-            message: fm.issue,
-            loc: { file, line: 1 },
-          },
-        ]),
+    ...fm.issues,
   ];
   return {
     mock: {
@@ -120,9 +157,21 @@ const readMock = (
       tool,
       file,
       type: type?.value,
-      typeKind: typeKindOf(type?.value),
-      expect: expectValue?.value,
-      hasReplay: existsSync(join(mocksDir, server, `${tool}.replay`)),
+      // An absent `type` is the default (`fixed`); a `type` key that is present
+      // but empty or not a scalar is invalid, so `unknown`.
+      typeKind:
+        type !== undefined && type.value === undefined
+          ? "unknown"
+          : typeKindOf(type?.value),
+      expect:
+        expectValue === undefined
+          ? undefined
+          : expectValue.node.kind === "scalar"
+            ? expectValue.node.text
+            : "",
+      ...(expectValue === undefined ? {} : { expectNode: expectValue.node }),
+      // Recordings live in `mocks/.replay/<server>/`, beside the server's mocks.
+      hasReplay: hasRecording(join(mocksDir, ".replay", server)),
       scope,
       loc,
     },
@@ -133,7 +182,10 @@ const readMock = (
 /** Every `<server>/<tool>.md` under `mocksDir`, in server then tool order. */
 const scanMocks = (mocksDir: string, scope: "suite" | "case"): Scan => {
   const results = listDir(mocksDir)
-    .filter((server) => isDirectory(join(mocksDir, server)))
+    // A dot directory (`.replay`) holds recordings, not a server's mocks.
+    .filter(
+      (server) => !server.startsWith(".") && isDirectory(join(mocksDir, server)),
+    )
     .flatMap((server) =>
       listDir(join(mocksDir, server))
         .filter((name) => name.endsWith(".md"))
@@ -231,18 +283,34 @@ const merge = (reads: readonly McpRead[]): McpRead => ({
 });
 
 /**
+ * `evalDir` as callers pass it: absolute, relative to `pluginRoot`, or
+ * already joined onto a relative `pluginRoot` (as `EvalSuite.evalDir` is).
+ * The last form is told apart by starting with the plugin root's own path.
+ */
+const resolveEvalDirArg = (pluginRoot: string, evalDir: string): string => {
+  if (isAbsolute(evalDir)) return evalDir;
+  const root = normalize(pluginRoot);
+  const dir = normalize(evalDir);
+  const joined = root !== "." && (dir === root || dir.startsWith(root + sep));
+  return joined ? resolve(dir) : resolve(pluginRoot, evalDir);
+};
+
+/**
  * Discover `<evalDir>/mocks/<server>/<tool>.md` and, when `caseDir` is given,
  * the case's own `mocks/`, which overrides the suite's file by file. Reads the
  * `type` and `expect` frontmatter, `.replay` presence, and the plugin's MCP
- * config server list. `evalDir` may be absolute or relative to `pluginRoot`.
- * A mock with no `type` has `typeKind: "unknown"`. Never throws.
+ * config server list. `evalDir` may be absolute, relative to `pluginRoot`, or `EvalSuite.evalDir`
+ * as returned. A mock with no `type` is `fixed`, the docs' default. Never throws.
  */
 export const readMocks = (
   pluginRoot: string,
   evalDir: string,
   caseDir?: string,
 ): MockCatalog => {
-  const suite = scanMocks(join(resolve(pluginRoot, evalDir), "mocks"), "suite");
+  const suite = scanMocks(
+    join(resolveEvalDirArg(pluginRoot, evalDir), "mocks"),
+    "suite",
+  );
   const own =
     caseDir === undefined
       ? { mocks: [], issues: [] }
