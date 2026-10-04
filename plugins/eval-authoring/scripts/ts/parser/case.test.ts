@@ -397,10 +397,10 @@ describe("readSuite", () => {
 
   it("reads the suite's mock catalog", () => {
     put("evals/a/prompt.md", "a");
-    put("evals/mocks/srv/tool.md", "---\ntype: static\n---\nreply");
+    put("evals/mocks/srv/tool.md", "---\ntype: agent\n---\nreply");
     const s = readSuite(root);
     expect(s.mocks.mocks.map((m) => [m.server, m.tool, m.typeKind])).toEqual([
-      ["srv", "tool", "static"],
+      ["srv", "tool", "agent"],
     ]);
     expect([...s.mocks.declaredServers]).toEqual(["srv"]);
   });

@@ -130,16 +130,16 @@ describe("readMocks", () => {
     `---\ntype: ${type}\n${extra}---\nBody\n`;
 
   it("reads type and expect frontmatter and sorts by server and tool", () => {
-    put("evals/mocks/zeta/b.md", mock("static", "expect: called\n"));
-    put("evals/mocks/alpha/a.md", mock("script"));
+    put("evals/mocks/zeta/b.md", mock("fixed", "expect: called\n"));
+    put("evals/mocks/alpha/a.md", mock("agent"));
     const cat = readMocks(root, "evals");
     expect(cat.mocks.map((m) => `${m.server}/${m.tool}`)).toEqual([
       "alpha/a",
       "zeta/b",
     ]);
     expect(cat.mocks[1]).toMatchObject({
-      type: "static",
-      typeKind: "static",
+      type: "fixed",
+      typeKind: "fixed",
       expect: "called",
       scope: "suite",
     });
@@ -147,24 +147,24 @@ describe("readMocks", () => {
   });
 
   it("passes an invalid expect through for EVAL013 to judge", () => {
-    put("evals/mocks/s/t.md", mock("static", "expect: sometimes\n"));
+    put("evals/mocks/s/t.md", mock("fixed", "expect: sometimes\n"));
     expect(readMocks(root, "evals").mocks[0]?.expect).toBe("sometimes");
   });
 
-  it("flags an unknown or absent type as unknown", () => {
+  it("flags an unknown type as unknown and treats an absent one as fixed", () => {
     put("evals/mocks/s/odd.md", mock("llm"));
     put("evals/mocks/s/bare.md", "no frontmatter\n");
     const cat = readMocks(root, "evals");
     expect(cat.mocks.map((m) => [m.tool, m.typeKind, m.type])).toEqual([
-      ["bare", "unknown", undefined],
+      ["bare", "fixed", undefined],
       ["odd", "unknown", "llm"],
     ]);
   });
 
-  it("detects .replay for a type: agent mock, present and absent", () => {
+  it("detects mocks/.replay/<server>/ for a type: agent mock", () => {
     put("evals/mocks/s/with.md", mock("agent"));
-    put("evals/mocks/s/with.replay", "{}\n");
-    put("evals/mocks/s/without.md", mock("agent"));
+    put("evals/mocks/.replay/s/rec.json", "{}\n");
+    put("evals/mocks/other/without.md", mock("agent"));
     const byTool = new Map(
       readMocks(root, "evals").mocks.map((m) => [m.tool, m]),
     );
@@ -176,22 +176,22 @@ describe("readMocks", () => {
   });
 
   it("lets a case's mocks override the suite's file by file", () => {
-    put("evals/mocks/s/shared.md", mock("static"));
-    put("evals/mocks/s/suite-only.md", mock("static"));
-    put("evals/case1/mocks/s/shared.md", mock("script"));
-    put("evals/case1/mocks/s/case-only.md", mock("script"));
+    put("evals/mocks/s/shared.md", mock("fixed"));
+    put("evals/mocks/s/suite-only.md", mock("fixed"));
+    put("evals/case1/mocks/s/shared.md", mock("agent"));
+    put("evals/case1/mocks/s/case-only.md", mock("agent"));
     const cat = readMocks(root, "evals", join(root, "evals/case1"));
     expect(
       cat.mocks.map((m) => [m.tool, m.typeKind, m.scope]),
     ).toEqual([
-      ["case-only", "script", "case"],
-      ["shared", "script", "case"],
-      ["suite-only", "static", "suite"],
+      ["case-only", "agent", "case"],
+      ["shared", "agent", "case"],
+      ["suite-only", "fixed", "suite"],
     ]);
   });
 
   it("ignores the case's mocks when no case directory is given", () => {
-    put("evals/case1/mocks/s/t.md", mock("script"));
+    put("evals/case1/mocks/s/t.md", mock("agent"));
     expect(readMocks(root, "evals").mocks).toEqual([]);
   });
 
@@ -204,7 +204,7 @@ describe("readMocks", () => {
   });
 
   it("reports an unclosed frontmatter block", () => {
-    put("evals/mocks/s/t.md", "---\ntype: static\n");
+    put("evals/mocks/s/t.md", "---\ntype: fixed\n");
     const cat = readMocks(root, "evals");
     expect(cat.issues[0]?.kind).toBe("malformed-frontmatter");
     expect(cat.mocks[0]?.type).toBeUndefined();
