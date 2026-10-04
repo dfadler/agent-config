@@ -27,7 +27,7 @@ short calls per grader per run) and add variance. There are no custom-code grade
 3. **Keep paid graders narrow:** short output only, at most one per case unless the
    dimensions are independent, and paired with free graders.
 4. **Say why** with a one-line comment beside any paid grader. Comments are not parsed;
-   the case-reviewer checks this.
+   the [case-reviewer](../../../agents/case-reviewer.md) checks this.
 5. **Tag a case `quick`** when all its graders are free, so the wrapper's quick tier can
    run it at no judge cost. EVAL017 keeps the tag honest.
 
