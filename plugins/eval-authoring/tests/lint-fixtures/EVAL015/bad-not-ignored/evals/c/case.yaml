@@ -1,0 +1,7 @@
+schema_version: "1.1"
+name: c
+execution:
+  prompt: Do it.
+graders:
+  - type: regex
+    pattern: done
