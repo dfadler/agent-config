@@ -1,7 +1,9 @@
-import { existsSync, readdirSync, readFileSync } from "node:fs";
-import { dirname, join, resolve } from "node:path";
-import { readMocks, type Mock, type SourceLoc } from "../../parser/index.ts";
-import { parseYaml, splitFrontmatter, type YNode } from "../../parser/yaml.ts";
+import {
+  readMocks,
+  type Mock,
+  type SourceLoc,
+  type YNode,
+} from "../../parser/index.ts";
 import { fromDocs } from "../sources.ts";
 import type { LintContext, Problem, Rule } from "../types.ts";
 
@@ -29,7 +31,7 @@ const LIKELY_TYPE_TYPOS: readonly string[] = [
 ];
 
 /** The docs name `fixed` (default) and `agent`. */
-const MOCK_TYPES: readonly string[] = ["fixed", "agent"];
+const MOCK_TYPE_NAMES = "fixed and agent";
 
 const MOCK_DOCS = fromDocs(
   "the mock file reference: `expect` maps dotted input paths to a type name, a /regex/, a literal, or a list of allowed literals; `type` is `fixed` or `agent`; recordings go under `mocks/.replay/<server>/`",
@@ -88,11 +90,8 @@ const EXPECT_FIX =
   "Write `expect:` as a map from dotted input paths to a type name (string, number, boolean, array, object), a /regex/, a literal, or a list of allowed literals. Quote a literal that looks like a type word.";
 
 /** Everything wrong with `expect:` in a mock's frontmatter. */
-const expectProblems = (
-  mock: Mock,
-  fm: Readonly<Record<string, YNode>>,
-): readonly Problem[] => {
-  const node = fm["expect"];
+const expectProblems = (mock: Mock): readonly Problem[] => {
+  const node = mock.expectNode;
   if (node === undefined) return [];
   const label = `${mock.server}/${mock.tool}`;
   if (node.kind !== "map") {
@@ -115,43 +114,11 @@ const expectProblems = (
   );
 };
 
-/** Top-level nodes of a mock's frontmatter; empty when it has none or cannot be read. */
-const readFrontmatterMap = (file: string): Readonly<Record<string, YNode>> => {
-  try {
-    const split = splitFrontmatter(readFileSync(file, "utf8"));
-    if (split.kind !== "found") return {};
-    const parsed = parseYaml(split.yaml, split.yamlLine);
-    if (!parsed.ok || parsed.value?.kind !== "map") return {};
-    return Object.fromEntries(
-      parsed.value.entries.map((e) => [e.key, e.value]),
-    );
-  } catch {
-    return {};
-  }
-};
-
-/**
- * True when `<mocksDir>/.replay/<server>/` holds at least one file. The
- * parser's `Mock.hasReplay` looks for a sibling `<tool>.replay` instead, which
- * is not the documented layout, so this rule does not use it.
- */
-const hasReplay = (mock: Mock): boolean => {
-  const dir = join(dirname(dirname(mock.file)), ".replay", mock.server);
-  try {
-    return existsSync(dir) && readdirSync(dir).length > 0;
-  } catch {
-    return false;
-  }
-};
-
 const checkMock = (
   mock: Mock,
   mcpServers: readonly string[],
 ): readonly Problem[] => {
   const label = `${mock.server}/${mock.tool}`;
-  const fm = readFrontmatterMap(mock.file);
-  const typeNode = fm["type"];
-  const typeText = typeNode?.kind === "scalar" ? typeNode.text : mock.type;
 
   const serverProblems: readonly Problem[] = mcpServers.includes(mock.server)
     ? []
@@ -164,18 +131,18 @@ const checkMock = (
       ];
 
   const typeProblems: readonly Problem[] =
-    typeText === undefined || MOCK_TYPES.includes(typeText)
+    mock.typeKind === "fixed" || mock.typeKind === "agent"
       ? []
       : [
           {
-            message: `Mock ${label} has type '${typeText}'; the docs list only ${MOCK_TYPES.join(" and ")}.`,
+            message: `Mock ${label} has type '${mock.type ?? ""}'; the docs list only ${MOCK_TYPE_NAMES}.`,
             fix: "Set `type: fixed` (the default) or `type: agent`.",
-            loc: typeNode === undefined ? mock.loc : at(typeNode, mock.file),
+            loc: mock.loc,
           },
         ];
 
   const replayProblems: readonly Problem[] =
-    typeText === "agent" && !hasReplay(mock)
+    mock.typeKind === "agent" && !mock.hasReplay
       ? [
           {
             message: `Mock ${label} is \`type: agent\` with no recording under mocks/.replay/${mock.server}/, so the judge model answers differently on every run and CI is not repeatable.`,
@@ -186,18 +153,14 @@ const checkMock = (
       : [];
 
   // `_server.md` is a type: agent mock for several tools; the docs put `expect:` on tool files only.
-  const expectChecks = mock.tool === "_server" ? [] : expectProblems(mock, fm);
+  const expectChecks = mock.tool === "_server" ? [] : expectProblems(mock);
   return [...serverProblems, ...typeProblems, ...replayProblems, ...expectChecks];
 };
 
-/** Skips the `.replay` recordings directory, which the parser lists as a server when it holds `.md` files. */
 const checkAll = (
   mocks: readonly Mock[],
   mcpServers: readonly string[],
-): readonly Problem[] =>
-  mocks
-    .filter((m) => !m.server.startsWith("."))
-    .flatMap((m) => checkMock(m, mcpServers));
+): readonly Problem[] => mocks.flatMap((m) => checkMock(m, mcpServers));
 
 /**
  * EVAL013: mock files. Suite-level mocks are checked once (`checkSuite`); a
@@ -211,17 +174,13 @@ export const rule: Rule = {
   title:
     "Mock for a server not in the plugin's MCP config, invalid expect or type, or type: agent with no .replay",
   source: MOCK_DOCS,
-  checkSuite: ({ pluginRoot, suite }: LintContext) => {
-    // Re-read with an absolute eval dir: `suite.mocks` is read from `suite.evalDir`
-    // joined onto a relative plugin root a second time, so it is empty for one.
-    const catalog = readMocks(pluginRoot, resolve(suite.evalDir));
-    return checkAll(
-      catalog.mocks.filter((m) => m.scope === "suite"),
-      catalog.mcpServers,
-    );
-  },
+  checkSuite: ({ suite }: LintContext) =>
+    checkAll(
+      suite.mocks.mocks.filter((m) => m.scope === "suite"),
+      suite.mocks.mcpServers,
+    ),
   checkCase: (c, { pluginRoot, suite }) => {
-    const catalog = readMocks(pluginRoot, resolve(suite.evalDir), c.dir);
+    const catalog = readMocks(pluginRoot, suite.evalDir, c.dir);
     return checkAll(
       catalog.mocks.filter((m) => m.scope === "case"),
       catalog.mcpServers,

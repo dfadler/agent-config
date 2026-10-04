@@ -2,7 +2,7 @@
  * The fixture harness only asserts that a bad fixture fires at least once, so
  * this pins each EVAL013 check separately: breaking one check fails here.
  */
-import { join } from "node:path";
+import { join, relative } from "node:path";
 import { describe, expect, it } from "vitest";
 import { lintPlugin } from "../runner.ts";
 import { rule } from "./eval013-mocks.ts";
@@ -24,6 +24,27 @@ describe.each(["bad-case-yaml", "bad-prompt-md", "bad-suite"])("EVAL013 %s", (fi
     ["type: agent with no recording", /triage is .type: agent. with no recording/],
   ])("reports %s", (_what, pattern) => {
     expect(found.some((m) => pattern.test(m))).toBe(true);
+  });
+});
+
+describe("EVAL013 with a relative plugin root", () => {
+  /** Same lint, but the plugin root is a path relative to the working directory. */
+  const relativeMessages = (fixture: string): readonly string[] => {
+    const outcome = lintPlugin(relative(process.cwd(), join(FIXTURES, fixture)), [rule]);
+    if (!outcome.ok) throw new Error(outcome.reason);
+    return outcome.report.findings.map((f) => `${f.ruleId} ${f.message}`);
+  };
+
+  it.each(["bad-suite", "bad-case-yaml", "bad-prompt-md"])(
+    "finds the same mock problems in %s as with an absolute root",
+    (fixture) => {
+      expect(relativeMessages(fixture)).toEqual(messages(fixture));
+      expect(relativeMessages(fixture).length).toBeGreaterThan(0);
+    },
+  );
+
+  it("stays quiet on a good fixture", () => {
+    expect(relativeMessages("good-case-yaml")).toEqual([]);
   });
 });
 
