@@ -28,7 +28,7 @@ checks what a script can; the rest needs a paid run.
 | [`docs/`](docs/) | [Grants file format](docs/grants-format.md), [adding a lint rule](docs/lint-rules.md). |
 | `evals/`, `tests/lint-fixtures/` | The plugin's own model-behavior cases and the lint's free fixtures. |
 
-## Workflow
+## Workflow and quick start
 
 `author-cases` (or `claude plugin eval init --bare <name>`), then the lint (the hook does this
 on every edit), then `case-reviewer`, then `run-evals`, then `diagnose-scores`.
@@ -39,7 +39,12 @@ node plugins/eval-authoring/scripts/ts/run-evals/run-evals.ts --tier quick --dry
 node plugins/eval-authoring/scripts/ts/diagnose/diagnose.ts <results-dir>/aggregate-result.json
 ```
 
-Every script takes `--help` (flags, output, exit codes).
+Every script takes `--help` (flags, output, exit codes). CI today runs only the free lint
+(`make lint-plugin-evals`); a gate on paid runs is an open investigation in
+[#436](https://github.com/dfadler/agent-config/issues/436), not a finished recipe.
+
+Stable-signal checklist: explicit PASS and FAIL conditions in `llm` criteria, free graders
+first, repeated runs agree; split judge votes in `report.html` mean an unstable rubric.
 
 A case cannot grant itself `Bash`, `Write`, `Edit`, `WebFetch` or `WebSearch`; the operator
 passes `--allow-tools`, which applies to the whole run. Record each case's grant in
@@ -52,10 +57,8 @@ grader per run. `quick` runs only cases tagged `quick` (free graders), once, plu
 
 ## Requirements
 
-- Claude Code 2.1.269 or later; git 2.31 or later if git is installed
-  ([docs](https://code.claude.com/docs/en/plugin-evals)).
-- An OS sandbox backend when Bash is granted (Linux needs `bubblewrap` and `socat`; native
-  Windows has none).
+- Claude Code, git and sandbox requirements: see the
+  [plugin-evals docs](https://code.claude.com/docs/en/plugin-evals).
 - Node 22.18 or later: the TypeScript scripts run directly with `node`.
 
 ## What it cannot do
