@@ -1,0 +1,9 @@
+schema_version: "1.1"
+name: free-and-llm
+execution:
+  prompt: Do the thing.
+graders:
+  - type: "regex"
+    pattern: "done"
+  - type: "llm"
+    criteria: "PASS if the reply names the file. FAIL if it names none or a different file."

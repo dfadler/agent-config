@@ -1,0 +1,9 @@
+schema_version: "1.1"
+name: llm-and-baseline
+execution:
+  prompt: Do the thing.
+graders:
+  - type: "llm"
+    criteria: "PASS if the reply names the file. FAIL if it names none or a different file."
+  - type: "baseline"
+    baseline_file: "baseline.md"
