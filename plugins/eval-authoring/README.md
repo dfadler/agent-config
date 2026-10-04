@@ -9,7 +9,8 @@ Planned layout (each component lands with its own issue):
 - `skills/` — `author-cases`, `run-evals`, `diagnose-scores`
 - `agents/` — `case-reviewer`, `score-diagnoser`
 - `hooks/` — lint on `evals/**` edits (report only)
-- `scripts/` — lint, run wrapper, diagnosis, shared parser (TypeScript)
+- `scripts/` — lint, run wrapper, diagnosis, shared parser (TypeScript). The run wrapper is
+  `scripts/ts/run-evals/run-evals.ts`; run it with `--help` for tiers and exit codes.
 - `tests/lint-fixtures/` — good and bad cases for the lint's own tests
 - `evals/` — the plugin's own model-behavior cases
 - `docs/` — [grants file format](docs/grants-format.md) (per-case `--allow-tools` entries),
