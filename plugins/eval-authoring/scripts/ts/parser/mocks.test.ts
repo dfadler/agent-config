@@ -1,4 +1,10 @@
-import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
+import {
+  mkdirSync,
+  mkdtempSync,
+  rmSync,
+  symlinkSync,
+  writeFileSync,
+} from "node:fs";
 import { tmpdir } from "node:os";
 import { dirname, join, relative } from "node:path";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
@@ -75,6 +81,23 @@ describe("Mock.typeKind follows the docs", () => {
     expect(readMocks(root, "evals").mocks[0]?.typeKind).toBe(kind);
   });
 
+  it.each([
+    ["a null value", "type:\n"],
+    ["a list", "type: [agent]\n"],
+    ["a mapping", "type:\n  kind: agent\n"],
+  ])("classifies a present but invalid type (%s) as unknown, not fixed", (_n, front) => {
+    put("evals/mocks/s/t.md", mock(front));
+    const m = readMocks(root, "evals").mocks[0];
+    expect(m?.typeKind).toBe("unknown");
+    expect(m?.type).toBeUndefined();
+    expect(m?.loc.line).toBe(2);
+  });
+
+  it("keeps the fixed default when type is absent from the frontmatter", () => {
+    put("evals/mocks/s/t.md", mock("expect: called\n"));
+    expect(readMocks(root, "evals").mocks[0]?.typeKind).toBe("fixed");
+  });
+
   it("treats a file with no frontmatter as the default type, fixed", () => {
     put("evals/mocks/s/t.md", "just a body\n");
     expect(readMocks(root, "evals").mocks[0]).toMatchObject({
@@ -99,6 +122,33 @@ describe("Mock.hasReplay follows the documented layout", () => {
     expect(byKey.get("with/u")?.hasReplay).toBe(true);
     expect(byKey.get("without/t")?.hasReplay).toBe(false);
     expect(byKey.get("empty/t")?.hasReplay).toBe(false);
+  });
+
+  it("counts only regular files, not subdirectories", () => {
+    put("evals/mocks/dirs/t.md", mock("type: agent\n"));
+    mkdirSync(join(root, "evals/mocks/.replay/dirs/nested"), { recursive: true });
+    put("evals/mocks/files/t.md", mock("type: agent\n"));
+    put("evals/mocks/.replay/files/rec.json", "{}\n");
+    put("evals/mocks/nested/t.md", mock("type: agent\n"));
+    put("evals/mocks/.replay/nested/sub/rec.json", "{}\n");
+    const byServer = new Map(
+      readMocks(root, "evals").mocks.map((m) => [m.server, m.hasReplay]),
+    );
+    expect(byServer.get("dirs")).toBe(false);
+    expect(byServer.get("files")).toBe(true);
+    // A file only inside a subdirectory is not a recording beside the mock.
+    expect(byServer.get("nested")).toBe(false);
+  });
+
+  it("does not throw and is false when a listed entry vanishes or is a broken link", () => {
+    put("evals/mocks/s/t.md", mock("type: agent\n"));
+    mkdirSync(join(root, "evals/mocks/.replay/s"), { recursive: true });
+    symlinkSync(
+      join(root, "does-not-exist"),
+      join(root, "evals/mocks/.replay/s/gone.json"),
+    );
+    expect(() => readMocks(root, "evals")).not.toThrow();
+    expect(readMocks(root, "evals").mocks[0]?.hasReplay).toBe(false);
   });
 
   it("does not count a sibling <tool>.replay file", () => {

@@ -18,7 +18,10 @@ import type {
 import { parseYaml, splitFrontmatter, type YNode } from "./yaml.ts";
 
 interface Front {
-  readonly type: { readonly value: string; readonly line: number } | undefined;
+  /** Present when the file has a `type` key; `value` is undefined when that key is not a usable scalar. */
+  readonly type:
+    | { readonly value: string | undefined; readonly line: number }
+    | undefined;
   readonly expect: { readonly node: YNode; readonly line: number } | undefined;
   readonly issues: readonly ParseIssue[];
 }
@@ -59,9 +62,16 @@ const readFront = (file: string, text: string): Front => {
   const expectEntry = entries.find((e) => e.key === "expect");
   return {
     type:
-      typeEntry?.value.kind === "scalar" && typeEntry.value.value !== null
-        ? { value: typeEntry.value.text, line: typeEntry.keyLine }
-        : undefined,
+      typeEntry === undefined
+        ? undefined
+        : {
+            value:
+              typeEntry.value.kind === "scalar" &&
+              typeEntry.value.value !== null
+                ? typeEntry.value.text
+                : undefined,
+            line: typeEntry.keyLine,
+          },
     expect:
       expectEntry === undefined
         ? undefined
@@ -85,6 +95,20 @@ const listDir = (dir: string): readonly string[] => {
     return [];
   }
 };
+
+/**
+ * True when `dir` holds at least one regular file (a subdirectory does not
+ * count). Each entry is checked on its own, so one that vanishes between the
+ * listing and the check, or a broken link, is skipped rather than thrown.
+ */
+const hasRecording = (dir: string): boolean =>
+  listDir(dir).some((name) => {
+    try {
+      return statSync(join(dir, name)).isFile();
+    } catch {
+      return false;
+    }
+  });
 
 const isDirectory = (path: string): boolean => {
   try {
@@ -133,7 +157,12 @@ const readMock = (
       tool,
       file,
       type: type?.value,
-      typeKind: typeKindOf(type?.value),
+      // An absent `type` is the default (`fixed`); a `type` key that is present
+      // but empty or not a scalar is invalid, so `unknown`.
+      typeKind:
+        type !== undefined && type.value === undefined
+          ? "unknown"
+          : typeKindOf(type?.value),
       expect:
         expectValue === undefined
           ? undefined
@@ -142,7 +171,7 @@ const readMock = (
             : "",
       ...(expectValue === undefined ? {} : { expectNode: expectValue.node }),
       // Recordings live in `mocks/.replay/<server>/`, beside the server's mocks.
-      hasReplay: listDir(join(mocksDir, ".replay", server)).length > 0,
+      hasReplay: hasRecording(join(mocksDir, ".replay", server)),
       scope,
       loc,
     },
