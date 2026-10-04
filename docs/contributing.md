@@ -194,6 +194,14 @@ only its own run command and why its graders are shaped as they are.
   `make lint-plugin-evals` runs the eval-authoring lint over every plugin and CI fails on an
   error finding such as EVAL004, so a case with `Bash` in `allowed_tools` and no recorded grant
   does not merge.
+- **Adding a lint rule.** The lint is `plugins/eval-authoring/scripts/ts/lint/`; a rule is
+  one file in `rules/` plus good and bad fixtures under `tests/lint-fixtures/`, found by
+  auto-discovery with no registry to edit. Steps, the `Rule` interface and the sabotage
+  check are in `plugins/eval-authoring/docs/lint-rules.md`; don't copy them here.
+  `node plugins/eval-authoring/scripts/ts/lint/cli.ts --list-rules` prints the current set.
+- **Repo evals in CI.** `make lint-plugin-evals` (part of `make check`, run by the
+  TypeScript workflow) lints every plugin's `evals/` for free. It never runs a paid
+  eval; those are run by hand with the `run-evals` wrapper.
 - **Grader shape.** Prefer free `regex` graders where a literal string is reliable and
   keep an `llm` grader only for a judgment a regex cannot make; rationale in
   [#411](https://github.com/dfadler/agent-config/issues/411).
