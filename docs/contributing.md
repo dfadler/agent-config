@@ -189,7 +189,11 @@ only its own run command and why its graders are shaped as they are.
   first), so a grader that needs one can never pass and a `max: 0` check on it can never
   fail ([#442](https://github.com/dfadler/agent-config/issues/442)). A case that needs a
   grant records its exact command in its header; a case without one needs only `Skill`.
-  Add `--ablation with-without` where the header says to.
+  Add `--ablation with-without` where the header says to. Record the grant in
+  `plugins/<name>/evals/grants.yaml` too (format: `plugins/eval-authoring/docs/grants-format.md`);
+  `make lint-plugin-evals` runs the eval-authoring lint over every plugin and CI fails on an
+  error finding such as EVAL004, so a case with `Bash` in `allowed_tools` and no recorded grant
+  does not merge.
 - **Grader shape.** Prefer free `regex` graders where a literal string is reliable and
   keep an `llm` grader only for a judgment a regex cannot make; rationale in
   [#411](https://github.com/dfadler/agent-config/issues/411).
