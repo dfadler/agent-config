@@ -1,0 +1,52 @@
+# Run: node plugins/eval-authoring/scripts/ts/run-evals/run-evals.ts --tier quick plugins/eval-authoring
+# (quick tier: one run, plugin arm only, `--ablation none`; no grant needed.)
+# Should-not-fire half of the trigger boundary: a near-miss that shares the words "plugin",
+# "tests" and "test suite" but wants ordinary unit tests, not a `claude plugin eval` case.
+# Can fail: the Skill check scores 0 if the author-cases description over-triggers on "tests
+# for plugin code"; writes_unit_tests scores 0 if the reply never produces tests. A model that
+# invokes the skill and answers about eval cases fails both. This is a regression guard, so a
+# no-skill arm would pass it by default; that is why it runs with --ablation none.
+schema_version: "1.1"
+name: author-cases-stays-quiet-on-unit-tests
+description: >
+  A request for ordinary unit tests of a plugin's helper function must not
+  invoke author-cases, which is for `claude plugin eval` cases. expected_outcome:
+  PASS when the model does not call author-cases and replies with vitest-style
+  tests; FAIL when author-cases is invoked or the reply holds no tests. This
+  is a regression guard: a no-plugin arm is expected to pass it too, so it
+  shows no delta by design.
+tags: [eval-authoring, author-cases, trigger, quick]
+
+execution:
+  prompt: |
+    My Claude Code plugin has a TypeScript helper in scripts/slugify.ts that I
+    want covered by unit tests before I add more plugin features. I run the
+    test suite with `pnpm test` (vitest). Write the test file for it and show
+    it in your reply. Here is the helper:
+
+    ```ts
+    export const slugify = (title: string): string =>
+      title.toLowerCase().trim().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "");
+    ```
+  max_turns: 6
+  allowed_tools:
+    - Skill
+
+graders:
+  # Steps. min 0 is explicit: tool_used defaults min to 1. arm both so the "never called"
+  # check is scored in a two-arm run too.
+  - name: author_cases_not_invoked
+    type: tool_used
+    tool: Skill
+    input_match: '"skill"\s*:\s*"(?:[\w-]+:)?author-cases"'
+    min: 0
+    max: 0
+    arm: both
+
+  # Result: the task was actually done (a task-completion check, not a skill property).
+  - name: writes_unit_tests
+    type: regex
+    target: last_message
+    pattern: "(describe|it|test)\\(.*slugify|expect\\(\\s*slugify"
+    match: contains
+    arm: both
