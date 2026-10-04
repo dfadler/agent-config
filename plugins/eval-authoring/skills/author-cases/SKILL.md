@@ -50,8 +50,9 @@ cannot decide.
    [agents](references/agents.md).
 7. **Lint.** `node ${CLAUDE_SKILL_DIR}/../../scripts/ts/lint/cli.ts <plugin-path>` (Node 22
    or later). Fix every error. Fix each warning or write down why it is intended.
-8. **Review and hand off.** Ask the case-reviewer agent for the judgment pass, if
-   available. Then give the user the run command from the run-evals skill. Do not run paid
+8. **Review and hand off.** Ask the [case-reviewer agent](../../agents/case-reviewer.md)
+   for the judgment pass, if available. Then give the user the run command from the
+   [run-evals](../run-evals/SKILL.md) skill. Do not run paid
    evals yourself: agent sessions usually cannot authenticate, and `--scaffold` is manual
    opt-in only.
 
