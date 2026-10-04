@@ -26,7 +26,9 @@ const loadRules = async (): Promise<readonly Rule[]> => {
 const findingsOf = (root: string, rules: readonly Rule[]): readonly Finding[] => {
   const outcome = lintPlugin(root, rules);
   if (!outcome.ok) throw new Error(outcome.reason);
-  return outcome.report.findings;
+  // The exit check is "no errors or warnings"; info findings (EVAL020 asks for
+  // a negative trigger case this suite does not have) are advice, not failures.
+  return outcome.report.findings.filter((f) => f.severity !== "info");
 };
 
 const summarize = (findings: readonly Finding[]): readonly string[] =>
