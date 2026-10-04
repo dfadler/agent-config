@@ -70,7 +70,12 @@ Run after the lint, on each case. Skip anything the lint already reported.
 6. **Proportionate.** Free graders (`regex`, `tool_used`, `tool_order`,
    `file_exists`) first; `llm` or `baseline` only for a semantic property. Flag an
    `llm` grader whose property a regex or tool check could decide, high `runs` on a
-   case with no judge noise, or a Bash/Write grant the prompt does not need.
+   case with no judge noise, or a Bash/Write grant the prompt does not need. Also
+   check the two things the lint cannot, because it does not read comments (this
+   is judgment, not EVAL016/EVAL017, which cover the mechanical parts): each `llm`
+   or `baseline` grader should have a one-line comment beside it saying why a free
+   grader cannot decide it, so flag a paid grader with no stated reason; and flag a
+   case whose graders are all free but is not tagged `quick`.
 7. **Stable signal.** Could two reasonable judges disagree on the criteria? Flag
    conditions that hinge on wording choices or subjective degree.
 
