@@ -189,6 +189,40 @@ describe("errors and skipped judges", () => {
     expect(kinds(v)).toContain("skipped-paid-graders");
   });
 
+  it("reports no-delta-signal, not judge-skipped, for an arm whose runs only lack scores", () => {
+    const v = diagnoseCase(
+      caseOf([], [], 0.5, {
+        withRuns: [{ error: null }, { error: null }],
+        withoutRuns: [run(0.5)],
+      }),
+    );
+    expect(v.verdict).toBe("no-delta-signal");
+    expect(v.delta).toBeUndefined();
+  });
+
+  it("does not call a mix of skipped and score-less runs judge-skipped", () => {
+    const v = diagnoseCase(
+      caseOf([], [], 0.5, {
+        withRuns: [{ skippedPaidGraders: true }, { error: null }],
+        withoutRuns: [run(0.5)],
+      }),
+    );
+    expect(v.verdict).toBe("no-delta-signal");
+  });
+
+  it("words delta-recomputed as excluding unscored runs, not blaming errors", () => {
+    const v = diagnoseCase(
+      caseOf([], [], 0.1, {
+        withRuns: [run(1), { error: null }],
+        withoutRuns: [run(0.5)],
+      }),
+    );
+    expect(v.delta).toBe(0.5);
+    const f = v.findings.find((x) => x.kind === "delta-recomputed");
+    expect(f?.message).toContain("without a usable score");
+    expect(f?.message).not.toContain("counted errored");
+  });
+
   it("calls an all-skipped arm judge-skipped", () => {
     const v = diagnoseCase(
       caseOf([], [], 0.5, {

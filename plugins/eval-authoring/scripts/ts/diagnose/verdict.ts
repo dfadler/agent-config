@@ -356,15 +356,23 @@ const unusable = (
   arm: string,
 ): Judged | undefined => {
   if (runs.length === 0 || usable(runs).length > 0) return undefined;
-  return runs.some(isErrored)
+  if (runs.some(isErrored)) {
+    return {
+      verdict: "run-error",
+      reason: `no ${arm} run is usable and some errored, so this is a failed run, not a regression`,
+      findings: [],
+    };
+  }
+  // Only an explicit skip means judge-skipped; runs that merely lack a score give no signal.
+  return runs.every((r) => r.skippedPaidGraders === true)
     ? {
-        verdict: "run-error",
-        reason: `every ${arm} run errored, so this is a failed run, not a regression`,
+        verdict: "judge-skipped",
+        reason: `every ${arm} run skipped paid judge graders, so the scores are not comparable`,
         findings: [],
       }
     : {
-        verdict: "judge-skipped",
-        reason: `every ${arm} run skipped paid judge graders, so the scores are not comparable`,
+        verdict: "no-delta-signal",
+        reason: `no ${arm} run has a usable score, so there is no delta signal`,
         findings: [],
       };
 };
@@ -418,7 +426,7 @@ const judgeCase = (c: CaseResult, t: Thresholds): Judged => {
         {
           kind: "delta-recomputed",
           severity: "info",
-          message: `delta recomputed from usable runs (${fmt(delta)}); the file's ${fmt(aggregateDelta)} counted errored or skipped runs`,
+          message: `delta recomputed from usable runs (${fmt(delta)}); the file's ${fmt(aggregateDelta)} may include runs without a usable score (errored, skipped judges or no score), which are excluded`,
         },
       ]
     : [];
