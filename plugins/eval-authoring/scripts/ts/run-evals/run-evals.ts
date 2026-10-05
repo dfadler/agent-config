@@ -45,6 +45,15 @@ grants. Never passes --scaffold.
 Options:
   --tier <name>        quick | standard | thorough (default: ${DEFAULT_TIER})
 ${Object.values(TIERS).map((t) => `                         ${t.name}: ${t.description}`).join("\n")}
+  --max-cost-usd <usd> override the tier's cost ceiling (positive number).
+                       The CLI has no default ceiling; the wrapper's tiers set
+                       one (quick 1, standard 5, thorough 15). The ceiling
+                       bounds the list-price cost estimate and is checked
+                       before each run starts; started runs finish, and the
+                       CLI exits 2 (wrapper exit 7) only if a run is left
+                       unstarted. It applies per CLI invocation, and the
+                       wrapper makes one invocation per grant set, so the
+                       override applies to every group, not to the whole run
   --model <id>         pin the model (default: pinned in the wrapper)
   --judge-model <id>   pin the judge model (default: pinned in the wrapper)
   --eval-dir <dir>     eval directory relative to the plugin
@@ -76,6 +85,7 @@ interface Options {
   readonly tier: Tier;
   readonly model: string | undefined;
   readonly judgeModel: string | undefined;
+  readonly maxCostUsd: number | undefined;
   readonly evalDir: string | undefined;
   readonly reporting: Reporting;
   readonly skipUnavailable: boolean;
@@ -89,6 +99,7 @@ type Parsed =
 
 const VALUE_FLAGS: readonly string[] = [
   "--tier",
+  "--max-cost-usd",
   "--model",
   "--judge-model",
   "--eval-dir",
@@ -102,6 +113,13 @@ const BOOL_FLAGS: readonly string[] = [
   "--skip-unavailable",
   "--dry-run",
 ];
+
+/** A plain decimal greater than zero ("0.5", "2", ".5"); anything else (empty, "abc", "-1", "NaN", "1e3", "0x10", "0") is undefined. */
+export const parseCost = (text: string): number | undefined => {
+  if (!/^(?:\d+(?:\.\d*)?|\.\d+)$/.test(text)) return undefined;
+  const n = Number(text);
+  return Number.isFinite(n) && n > 0 ? n : undefined;
+};
 
 /** Parse argv. `-h`/`--help` anywhere wins before anything else is validated. */
 export const parseArgs = (argv: readonly string[]): Parsed => {
@@ -135,6 +153,14 @@ export const parseArgs = (argv: readonly string[]): Parsed => {
       message: `unknown tier '${tierName}' (expected ${Object.keys(TIERS).join(", ")})`,
     };
   }
+  const costText = values.get("--max-cost-usd");
+  const maxCostUsd = costText === undefined ? undefined : parseCost(costText);
+  if (costText !== undefined && maxCostUsd === undefined) {
+    return {
+      kind: "error",
+      message: `--max-cost-usd must be a positive finite number of US dollars, got '${costText}'`,
+    };
+  }
   const [plugin, ...extra] = positionals;
   if (plugin === undefined) {
     return { kind: "error", message: "missing <plugin-path>" };
@@ -152,6 +178,7 @@ export const parseArgs = (argv: readonly string[]): Parsed => {
       tier: TIERS[tierName],
       model: values.get("--model"),
       judgeModel: values.get("--judge-model"),
+      maxCostUsd,
       evalDir: values.get("--eval-dir"),
       reporting: {
         jsonFile: values.get("--json-file"),
@@ -252,6 +279,7 @@ const runGroup = async (
     grants: group.grants,
     model: options.model,
     judgeModel: options.judgeModel,
+    maxCostUsd: options.maxCostUsd,
     evalDir: options.evalDir,
     trustPlugin: trust,
     reporting: { ...options.reporting, outputDir },
@@ -347,6 +375,7 @@ export const main = async (
         grants: g.grants,
         model: options.model,
         judgeModel: options.judgeModel,
+        maxCostUsd: options.maxCostUsd,
         evalDir: options.evalDir,
         trustPlugin: trust,
         reporting: options.reporting,
