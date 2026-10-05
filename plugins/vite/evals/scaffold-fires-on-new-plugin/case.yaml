@@ -50,6 +50,20 @@ graders:
     pattern: '\)\s*:\s*(?:Plugin|PluginOption|VitePlugin)\b'
     match: contains
 
+  # Behavior: the plugin must resolve and load the virtual module, and read a git hash.
+  - name: serves_virtual_module
+    type: regex
+    target: last_message
+    pattern: '^(?=[\s\S]*resolveId)[\s\S]*\bload\b\s*[(:]'
+    match: contains
+
+  - name: reads_git_hash
+    type: regex
+    target: last_message
+    pattern: 'rev-parse|git\s+log|git\s+show'
+    match: contains
+    weight: 0.5
+
   - name: project_local_placement
     type: regex
     target: last_message

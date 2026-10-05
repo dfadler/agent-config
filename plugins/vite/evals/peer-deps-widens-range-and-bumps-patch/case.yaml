@@ -55,7 +55,7 @@ graders:
   - name: range_includes_both
     type: regex
     target: last_message
-    pattern: '\^7\.0\.0\s*\|\|\s*\^8\.0\.0|>=\s*7\.0\.0'
+    pattern: '\^7\.0\.0\s*\|\|\s*\^8\.0\.0|>=\s*7\.0\.0(?![\d.]|\s*<)'
     match: contains
 
   # Wording regex: a bare "patch" also matches "not a patch", so it needs a verb or noun

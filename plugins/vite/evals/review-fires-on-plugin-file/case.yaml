@@ -68,10 +68,12 @@ graders:
   - name: generate_bundle_return_ignored
     type: regex
     target: last_message
-    pattern: 'generateBundle[\s\S]{0,500}(ignor(?:ed|es)|no effect|never lands?|not mutat|without mutating|mutate)'
+    pattern: 'generateBundle[\s\S]{0,500}(ignor(?:ed|es)|no effect|discard|never lands?|not mutat|without mutating)'
     flags: i
     match: contains
 
+  # Convention check, not a runtime defect: the skill's checklist (skills/review/SKILL.md)
+  # and the repo's vite-plugin convention require an explicit `null` for unhandled files.
   - name: transform_missing_null
     type: regex
     target: last_message

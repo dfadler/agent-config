@@ -74,7 +74,7 @@ graders:
   - name: unwraps_transform_handler
     type: regex
     target: last_message
-    pattern: "typeof[^\\n]{0,60}['\"]function['\"][^\\n]{0,80}\\.handler|\\.handler[^\\n]{0,80}typeof[^\\n]{0,60}['\"]function['\"]"
+    pattern: "typeof[\\s\\S]{0,60}['\"]function['\"][\\s\\S]{0,120}\\.handler|\\.handler[\\s\\S]{0,120}typeof[\\s\\S]{0,60}['\"]function['\"]"
     match: contains
 
   # Behavior regex: a variable assigned from configureServer(...) is later called. Wording

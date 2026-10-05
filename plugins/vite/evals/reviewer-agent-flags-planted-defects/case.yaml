@@ -66,7 +66,7 @@ graders:
   - name: reviewer_dispatched
     type: tool_used
     tool: Agent
-    input_match: "vite-plugin-reviewer"
+    input_match: '"subagent_type"\s*:\s*"(?:[\w-]+:)?vite-plugin-reviewer"'
     min: 1
 
   # Precondition, not an agent property: the setup step wrote the files the reviewer reads.
@@ -92,15 +92,22 @@ graders:
   - name: flags_generate_bundle_return
     type: regex
     target: last_message
-    pattern: 'generateBundle[\s\S]{0,500}(ignor(?:ed|es)|no effect|never lands?|not mutat|without mutating|mutate)'
+    pattern: 'generateBundle[\s\S]{0,500}(ignor(?:ed|es)|no effect|discard|never lands?|not mutat|without mutating)'
     flags: i
     match: contains
 
-  # Wording regex for the agent's output format; half weight because the main model may
-  # reformat the citation when relaying.
-  - name: cites_file_and_line
+  # Each planted defect needs its own path:line citation. Half of a half weight each, since
+  # the main model may reformat the citation when relaying.
+  - name: cites_banner_line
     type: regex
     target: last_message
-    pattern: '(?:banner\.ts|package\.json):\d+'
+    pattern: 'banner\.ts:\d+'
     match: contains
-    weight: 0.5
+    weight: 0.25
+
+  - name: cites_package_line
+    type: regex
+    target: last_message
+    pattern: 'package\.json:\d+'
+    match: contains
+    weight: 0.25

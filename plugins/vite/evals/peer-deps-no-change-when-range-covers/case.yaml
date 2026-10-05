@@ -65,5 +65,5 @@ graders:
   - name: does_not_propose_caret_8
     type: regex
     target: last_message
-    pattern: 'peerDependencies"\s*:\s*\{[^}]*"vite"\s*:\s*"\^8'
+    pattern: 'peerDependencies"\s*:\s*\{[^}]*"vite"\s*:\s*"\^8|\bpeer\w*(?:(?!dev)[^\n]){0,60}(?<!\|\|\s)\^8\.\d'
     match: not_contains

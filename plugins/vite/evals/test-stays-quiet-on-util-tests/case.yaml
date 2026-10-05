@@ -37,7 +37,7 @@ graders:
   - name: no_vite_skill_invoked
     type: tool_used
     tool: Skill
-    input_match: '"skill"\s*:\s*"(?:vite:)?(?:scaffold|review|test|dev-workflow|peer-deps)"'
+    input_match: '"skill"\s*:\s*"(?:[\w-]+:)?(?:scaffold|review|test|dev-workflow|peer-deps)"'
     min: 0
     max: 0
     arm: both
