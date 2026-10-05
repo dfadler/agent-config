@@ -1,0 +1,76 @@
+# Run: node plugins/eval-authoring/scripts/ts/run-evals/run-evals.ts --tier quick plugins/vite
+# Shared run/grant facts: docs/contributing.md, "Plugin evals". No grant needed (Skill only;
+# the manifest is pasted into the prompt because the eval workspace starts empty).
+# Should-fire half of the peer-deps boundary, for a range that excludes the new major. The
+# no-change variant is peer-deps-no-change-when-range-covers and the should-not-fire half is
+# peer-deps-stays-quiet-on-react-peer. Every grader is free, so the case is tagged quick.
+# Can fail: skill_fired fails if the description stops matching. Without the skill a generic
+# answer often calls adding a major a "minor" bump and has no `### Changed` changelog entry,
+# so semver_patch and changelog_entry score 0; range_includes_both scores 0 if the reply
+# proposes a range that drops Vite 7 or leaves `^7.0.0` alone.
+# Skill phrases checked: "Step 3: Decide the range shape" (`^7.0.0 || ^8.0.0`, `>=7.0.0`),
+# "Step 5" table (add new major, keep old min: patch), "Step 6" (`### Changed`).
+schema_version: "1.1"
+name: peer-deps-widens-range-and-bumps-patch
+description: >
+  Told that Vite 8 shipped and the plugin's vite peer range is ^7.0.0, the model invokes
+  peer-deps and proposes a range that keeps Vite 7 and adds Vite 8, calls the plugin's own
+  bump a patch, and drafts a changelog entry. expected_outcome: PASS when the skill is invoked
+  and all three result checks hold; FAIL when the skill is not invoked, the range drops Vite 7
+  or stays ^7.0.0, the bump is not patch, or there is no changelog entry.
+tags: [vite, peer-deps, trigger, quick]
+
+execution:
+  prompt: |
+    Vite 8 just shipped and users of my plugin report peer-dependency conflicts. Our test
+    suite already passes against Vite 8 and we want to keep supporting Vite 7. This is the
+    package.json of the plugin (it only uses the transform and hotUpdate hooks):
+
+    ```json
+    {
+      "name": "vite-plugin-banner",
+      "version": "2.3.1",
+      "peerDependencies": { "vite": "^7.0.0" },
+      "devDependencies": { "vite": "^8.0.0", "vitest": "^4.0.0" }
+    }
+    ```
+
+    What should the peerDependencies line become, which semver bump does the plugin itself
+    need, and what goes in the changelog? Answer in your reply; don't edit files or run
+    commands.
+  max_turns: 6
+  allowed_tools:
+    - Skill
+
+graders:
+  # Steps: the skill fired on a prompt that never names it.
+  - name: skill_fired
+    type: tool_used
+    tool: Skill
+    input_match: '"skill"\s*:\s*"(?:[\w-]+:)?peer-deps"'
+    min: 1
+    arm: with-only
+
+  # Result: the three outputs the skill's contract names.
+  - name: range_includes_both
+    type: regex
+    target: last_message
+    pattern: '\^7\.0\.0\s*\|\|\s*\^8\.0\.0|>=\s*7\.0\.0'
+    match: contains
+
+  # Wording regex: a bare "patch" also matches "not a patch", so it needs a verb or noun
+  # around it. A differently phrased verdict can miss it, hence half weight.
+  - name: semver_patch
+    type: regex
+    target: last_message
+    pattern: '(?:bump|release|publish|needs?|is|as)\s+(?:a\s+)?\*{0,2}patch\b|\bpatch\*{0,2}\s+(?:bump|release|version)'
+    flags: i
+    match: contains
+    weight: 0.5
+
+  - name: changelog_entry
+    type: regex
+    target: last_message
+    pattern: '###\s*Changed'
+    match: contains
+    weight: 0.5

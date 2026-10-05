@@ -1,0 +1,44 @@
+# Run: node plugins/eval-authoring/scripts/ts/run-evals/run-evals.ts --tier quick plugins/vite
+# Shared run/grant facts: docs/contributing.md, "Plugin evals". No grant needed (Skill only).
+# Should-not-fire half of the peer-deps boundary: a near-miss that shares "peerDependencies"
+# and "package.json" with the skill's description but concerns React, not Vite.
+# Can fail: the Skill check scores 0 if peer-deps (or another vite skill) over-triggers on any
+# peerDependencies question; declares_react_range scores 0 if the reply gives no React range.
+# This is a regression guard, so a no-plugin arm passes it by default and shows no delta by
+# design.
+schema_version: "1.1"
+name: peer-deps-stays-quiet-on-react-peer
+description: >
+  A question about declaring react as a peer dependency of a component library must not invoke
+  any vite skill, since no Vite plugin or Vite range is involved. expected_outcome: PASS when
+  no vite skill is invoked and the reply shows a react peer range covering 18 and 19; FAIL
+  when a vite skill is invoked or the reply shows no such range.
+tags: [vite, peer-deps, trigger, quick]
+
+execution:
+  prompt: |
+    I'm publishing a React component library. It works with React 18 and 19. What should
+    the peerDependencies entry for react look like in its package.json? Answer in your
+    reply; don't edit files or run commands.
+  max_turns: 6
+  allowed_tools:
+    - Skill
+
+graders:
+  # Steps. min 0 is explicit: tool_used defaults min to 1. arm both so the "never called"
+  # check is scored in a two-arm run too.
+  - name: no_vite_skill_invoked
+    type: tool_used
+    tool: Skill
+    input_match: '"skill"\s*:\s*"(?:vite:)?(?:scaffold|review|test|dev-workflow|peer-deps)"'
+    min: 0
+    max: 0
+    arm: both
+
+  # Result: the question was actually answered (a completion check, not a skill property).
+  - name: declares_react_range
+    type: regex
+    target: last_message
+    pattern: '"react"\s*:\s*"(?:\^18(?:\.\d+)*\s*\|\|\s*\^19|>=\s*18)'
+    match: contains
+    arm: both

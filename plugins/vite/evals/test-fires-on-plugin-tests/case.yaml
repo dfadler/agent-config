@@ -1,0 +1,95 @@
+# Run: node plugins/eval-authoring/scripts/ts/run-evals/run-evals.ts --tier quick plugins/vite
+# Shared run/grant facts: docs/contributing.md, "Plugin evals". No grant needed (Skill only;
+# the plugin source is pasted into the prompt because the eval workspace starts empty).
+# Should-fire half of the test boundary; the should-not-fire half is
+# test-stays-quiet-on-util-tests. Every grader is free, so the case is tagged quick.
+# Can fail: skill_fired fails if the description stops matching. Without the skill a
+# generic Vitest answer calls plugin.transform(...) directly (the plugin pastes it as an
+# object hook with `handler`, so that call breaks), never unwraps `.handler`, never captures
+# and invokes the function configureServer returns, and does not pass `{ ssr: true }`; those
+# graders score 0.
+# Skill phrases checked: "Key gotchas" under Pattern 1 (`raw?.handler`), Pattern 3
+# (`typeof postHook === 'function'`), Pattern 1 (`ssr: true`), Pattern 2 (`.call(context,`).
+schema_version: "1.1"
+name: test-fires-on-plugin-tests
+description: >
+  Asked for tests of a Vite plugin that has a transform hook in object form, a generateBundle
+  and a configureServer returning a function, the model invokes test and writes Vitest tests
+  that unwrap the hook handler, call generateBundle with a context, invoke the returned
+  post-hook and cover the SSR branch. expected_outcome: PASS when the skill is invoked and all
+  four result checks hold; FAIL when the skill is not invoked or a hook pattern is missing.
+tags: [vite, test, trigger, quick]
+
+execution:
+  prompt: |
+    This Vite plugin has no tests yet. Write the Vitest test file for it and show it
+    in your reply; don't create files or run commands.
+
+    ```ts
+    // src/vite/plugins/banner.ts
+    import type { Plugin } from 'vite'
+
+    export function banner(text: string): Plugin {
+      return {
+        name: 'banner',
+        transform: {
+          order: 'pre',
+          handler(code, id, options) {
+            if (!id.endsWith('.ts') || options?.ssr) return null
+            return { code: `/* ${text} */\n${code}`, map: null }
+          },
+        },
+        generateBundle(_options, bundle) {
+          for (const chunk of Object.values(bundle)) {
+            if (chunk.type === 'chunk') chunk.code = `/* ${text} */\n${chunk.code}`
+          }
+        },
+        configureServer(server) {
+          return () => {
+            server.middlewares.use('/banner', (_req, res) => res.end(text))
+          }
+        },
+      }
+    }
+    ```
+  max_turns: 6
+  allowed_tools:
+    - Skill
+
+graders:
+  # Steps: the skill fired on a prompt that never names it.
+  - name: skill_fired
+    type: tool_used
+    tool: Skill
+    input_match: '"skill"\s*:\s*"(?:[\w-]+:)?test"'
+    min: 1
+    arm: with-only
+
+  # Result: one check per hook pattern the skill teaches.
+  - name: unwraps_transform_handler
+    type: regex
+    target: last_message
+    pattern: '\.handler\b'
+    match: contains
+
+  # Wording regex: the unwrap check also uses typeof === 'function', so the variable name
+  # must say post-hook-ish. A differently named variable misses it, hence half weight.
+  - name: invokes_returned_post_hook
+    type: regex
+    target: last_message
+    pattern: "typeof\\s+(?:post|after|ret|result|hook|cb|callback|cleanup)\\w*\\s*===\\s*['\"]function['\"]"
+    flags: i
+    match: contains
+    weight: 0.5
+
+  - name: covers_ssr_branch
+    type: regex
+    target: last_message
+    pattern: 'ssr\s*:\s*true'
+    match: contains
+
+  - name: calls_generate_bundle_with_context
+    type: regex
+    target: last_message
+    pattern: '\.call\('
+    match: contains

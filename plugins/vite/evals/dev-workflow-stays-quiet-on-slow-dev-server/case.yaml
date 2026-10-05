@@ -1,0 +1,45 @@
+# Run: node plugins/eval-authoring/scripts/ts/run-evals/run-evals.ts --tier quick plugins/vite
+# Shared run/grant facts: docs/contributing.md, "Plugin evals". No grant needed (Skill only).
+# Should-not-fire half of the dev-workflow boundary: a near-miss that shares "Vite", "dev
+# server" and "workflow" with the skill's description but is about an app, not a plugin package.
+# Can fail: the Skill check scores 0 if dev-workflow (or another vite skill) over-triggers on
+# any Vite dev-server talk; answers_with_startup_levers scores 0 if the reply names none of the
+# usual startup levers. This is a regression guard, so a no-plugin arm passes it by default
+# and shows no delta by design.
+schema_version: "1.1"
+name: dev-workflow-stays-quiet-on-slow-dev-server
+description: >
+  A question about a slow Vite app dev server start must not invoke any vite skill, since it
+  is an app performance question and no plugin package. expected_outcome: PASS when no vite
+  skill is invoked and the reply names a dependency pre-bundling or warmup lever; FAIL when a
+  vite skill is invoked or the reply names none.
+tags: [vite, dev-workflow, trigger, quick]
+
+execution:
+  prompt: |
+    The dev server of my Vite React app takes about 40 seconds to start and hot reload
+    feels sluggish. What should I look at to speed it up? Answer in your reply; don't
+    create files or run commands.
+  max_turns: 6
+  allowed_tools:
+    - Skill
+
+graders:
+  # Steps. min 0 is explicit: tool_used defaults min to 1. arm both so the "never called"
+  # check is scored in a two-arm run too.
+  - name: no_vite_skill_invoked
+    type: tool_used
+    tool: Skill
+    input_match: '"skill"\s*:\s*"(?:vite:)?(?:scaffold|review|test|dev-workflow|peer-deps)"'
+    min: 0
+    max: 0
+    arm: both
+
+  # Result: the question was actually answered (a completion check, not a skill property).
+  - name: answers_with_startup_levers
+    type: regex
+    target: last_message
+    pattern: 'optimizeDeps|pre-?bundl|warmup'
+    flags: i
+    match: contains
+    arm: both

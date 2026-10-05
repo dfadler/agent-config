@@ -1,0 +1,88 @@
+# Run: node plugins/eval-authoring/scripts/ts/run-evals/run-evals.ts --tier quick plugins/vite
+# Shared run/grant facts: docs/contributing.md, "Plugin evals". No grant needed (Skill only;
+# the plugin source is pasted into the prompt because the eval workspace starts empty).
+# Should-fire half of the review boundary; the should-not-fire half is
+# review-stays-quiet-on-react-component. Every grader is free, so the case is tagged quick.
+# Can fail: skill_fired fails if the description stops matching. Without the skill the model
+# does not use the "path:line" finding format (cites_file_and_line), usually calls
+# handleHotUpdate "deprecated" instead of a still-working migration candidate
+# (hot_update_is_not_blocking, half weight because wording varies), and has no checklist
+# pushing it to the generateBundle return-value and transform null points.
+# Skill phrases checked: Contract ("each with a file path and line number"), "Migration
+# opportunities" (`handleHotUpdate still works`), "`generateBundle` hook" (return value is
+# ignored), "`transform` hook correctness" (returns `null`).
+schema_version: "1.1"
+name: review-fires-on-plugin-file
+description: >
+  Asked to review a pasted Vite plugin file that plants a generateBundle that only returns
+  a value, a transform that returns undefined, a handleHotUpdate hook, and a non-factory
+  export, the model invokes review and reports findings as file:line, treats handleHotUpdate
+  as a non-blocking migration, and notes the ignored generateBundle return and the missing
+  null. expected_outcome: PASS when the skill is invoked and the four result checks hold;
+  FAIL when the skill is not invoked or a finding is missing or has no file:line.
+tags: [vite, review, trigger, quick]
+
+execution:
+  prompt: |
+    Can you review this Vite plugin before I merge it? It is src/vite/plugins/stamp.ts
+    in a Vite 7 project (line numbers shown on the left). Don't create files or run
+    commands; answer in your reply.
+
+    ```
+     1  export const StampPlugin = {
+     2    name: 'Stamp_Plugin',
+     3    enforce: 'pre',
+     4    handleHotUpdate({ file, modules }) {
+     5      if (file.endsWith('.md')) return []
+     6    },
+     7    transform(code, id) {
+     8      if (id.endsWith('.ts')) return code.replace('__STAMP__', String(Date.now()))
+     9    },
+    10    generateBundle(_options, bundle) {
+    11      return Object.fromEntries(Object.entries(bundle).filter(([k]) => !k.endsWith('.map')))
+    12    },
+    13  }
+    ```
+  max_turns: 6
+  allowed_tools:
+    - Skill
+
+graders:
+  # Steps: the skill fired on a prompt that never names it.
+  - name: skill_fired
+    type: tool_used
+    tool: Skill
+    input_match: '"skill"\s*:\s*"(?:[\w-]+:)?review"'
+    min: 1
+    arm: with-only
+
+  # Result: findings in the skill's format, covering the planted defects.
+  - name: cites_file_and_line
+    type: regex
+    target: last_message
+    pattern: 'stamp\.ts:\d+'
+    match: contains
+
+  - name: generate_bundle_return_ignored
+    type: regex
+    target: last_message
+    pattern: 'generateBundle[\s\S]{0,500}(ignored|never lands?|not mutat|without mutating|mutate)'
+    flags: i
+    match: contains
+
+  - name: transform_missing_null
+    type: regex
+    target: last_message
+    pattern: 'transform[\s\S]{0,400}\bnull\b'
+    flags: i
+    match: contains
+
+  # Wording regex: the skill says handleHotUpdate "still works", a migration and not a
+  # blocking defect. A differently phrased finding can miss it, hence half weight.
+  - name: hot_update_is_not_blocking
+    type: regex
+    target: last_message
+    pattern: 'handleHotUpdate[\s\S]{0,500}(still works|non-?blocking|not (a )?(blocking|required|mandatory))'
+    flags: i
+    match: contains
+    weight: 0.5

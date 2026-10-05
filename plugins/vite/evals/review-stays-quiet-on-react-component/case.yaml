@@ -1,0 +1,57 @@
+# Run: node plugins/eval-authoring/scripts/ts/run-evals/run-evals.ts --tier quick plugins/vite
+# Shared run/grant facts: docs/contributing.md, "Plugin evals". No grant needed (Skill only).
+# Should-not-fire half of the review boundary: a review request that shares "review" and the
+# Vite ecosystem (import.meta.env) with the skill's description but contains no Vite plugin.
+# Can fail: the Skill check scores 0 if review (or another vite skill) over-triggers on any
+# Vite-adjacent code review; finds_env_prefix_bug scores 0 if the reply misses the planted
+# bug (API_KEY has no VITE_ prefix, so it is undefined in client code). This is a regression
+# guard, so a no-plugin arm passes it by default and shows no delta by design.
+schema_version: "1.1"
+name: review-stays-quiet-on-react-component
+description: >
+  A request to review a React component that reads import.meta.env must not invoke any vite
+  skill, since the code is app code and no Vite plugin. expected_outcome: PASS when no vite
+  skill is invoked and the reply flags the missing VITE_ prefix; FAIL when a vite skill is
+  invoked or the reply misses the env prefix bug.
+tags: [vite, review, trigger, quick]
+
+execution:
+  prompt: |
+    Please review this React component from my Vite app. Don't create files or run
+    commands; answer in your reply.
+
+    ```tsx
+    import { useEffect, useState } from 'react'
+
+    export function Weather({ city }: { city: string }) {
+      const [temp, setTemp] = useState<number | null>(null)
+      useEffect(() => {
+        fetch(`https://api.example.com/w?city=${city}&key=${import.meta.env.API_KEY}`)
+          .then((r) => r.json())
+          .then((d) => setTemp(d.temp))
+      }, [city])
+      return <p>{temp ?? '...'}</p>
+    }
+    ```
+  max_turns: 6
+  allowed_tools:
+    - Skill
+
+graders:
+  # Steps. min 0 is explicit: tool_used defaults min to 1. arm both so the "never called"
+  # check is scored in a two-arm run too.
+  - name: no_vite_skill_invoked
+    type: tool_used
+    tool: Skill
+    input_match: '"skill"\s*:\s*"(?:vite:)?(?:scaffold|review|test|dev-workflow|peer-deps)"'
+    min: 0
+    max: 0
+    arm: both
+
+  # Result: the review was actually done (a completion check, not a skill property).
+  - name: finds_env_prefix_bug
+    type: regex
+    target: last_message
+    pattern: 'VITE_'
+    match: contains
+    arm: both

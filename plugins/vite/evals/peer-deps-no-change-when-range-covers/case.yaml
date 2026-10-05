@@ -1,0 +1,67 @@
+# Run: node plugins/eval-authoring/scripts/ts/run-evals/run-evals.ts --tier quick plugins/vite
+# Shared run/grant facts: docs/contributing.md, "Plugin evals". No grant needed (Skill only;
+# the manifest is pasted into the prompt because the eval workspace starts empty).
+# Should-fire half of the peer-deps boundary where the right answer is "change nothing": the
+# skill's core insight is that `>=7.0.0` already satisfies Vite 8. Every grader is free, so the
+# case is tagged quick.
+# Can fail: skill_fired fails if the description stops matching. Without the skill a model
+# asked to "update the peer range for Vite 8" tends to propose a new range and a version bump,
+# so says_no_change scores 0 and does_not_propose_caret_8 scores 0.
+# Skill phrase checked: the Contract output ("a note that the existing range already covers the
+# new major") and "A range like `>=7.0.0` already satisfies Vite 8 and later".
+schema_version: "1.1"
+name: peer-deps-no-change-when-range-covers
+description: >
+  Told that Vite 8 shipped and the plugin's vite peer range is already >=7.0.0, the model
+  invokes peer-deps and says no range change is needed instead of rewriting the range.
+  expected_outcome: PASS when the skill is invoked, the reply says the existing range already
+  covers Vite 8 or no change is needed, and it does not tell the user to replace the range with
+  ^8.0.0; FAIL when the skill is not invoked, the reply proposes a new range, or it never says
+  the range already covers Vite 8.
+tags: [vite, peer-deps, trigger, quick]
+
+execution:
+  prompt: |
+    Vite 8 just shipped. Please update my plugin's peerDependencies for it. This is the
+    package.json (the plugin only uses the transform hook):
+
+    ```json
+    {
+      "name": "vite-plugin-banner",
+      "version": "2.3.1",
+      "peerDependencies": { "vite": ">=7.0.0" },
+      "devDependencies": { "vite": "^7.1.0", "vitest": "^4.0.0" }
+    }
+    ```
+
+    Tell me what the file should say after the update. Answer in your reply; don't edit
+    files or run commands.
+  max_turns: 6
+  allowed_tools:
+    - Skill
+
+graders:
+  # Steps: the skill fired on a prompt that never names it.
+  - name: skill_fired
+    type: tool_used
+    tool: Skill
+    input_match: '"skill"\s*:\s*"(?:[\w-]+:)?peer-deps"'
+    min: 1
+    arm: with-only
+
+  # Result: the reply reports that nothing needs to change. Wording regex, so a differently
+  # phrased "you're already covered" can miss it; half weight for that reason.
+  - name: says_no_change
+    type: regex
+    target: last_message
+    pattern: 'no\s+(?:range\s+)?(?:change|update)s?\s+(?:is\s+|are\s+)?(?:needed|required|necessary)|already\s+(?:includes?|covers?|satisf\w+|supports?|allows?)|nothing\s+(?:to\s+change|needs\s+to\s+change)'
+    flags: i
+    match: contains
+    weight: 0.5
+
+  # Result: the manifest is not rewritten to a caret-8 range that would drop Vite 7.
+  - name: does_not_propose_caret_8
+    type: regex
+    target: last_message
+    pattern: '"vite"\s*:\s*"\^8'
+    match: not_contains
