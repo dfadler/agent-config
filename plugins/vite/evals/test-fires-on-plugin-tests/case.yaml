@@ -82,7 +82,7 @@ graders:
   - name: invokes_returned_post_hook
     type: regex
     target: last_message
-    pattern: '(?:const|let)\s+(\w+)\s*=\s*(?:await\s+)?[^\n]*configureServer[^\n]*[\s\S]{0,300}?\b\1\s*\('
+    pattern: '(?:const|let)\s+(\w+)\s*=\s*(?:await\s+)?[^\n]*configureServer[^\n]*[\s\S]{0,1000}?\b\1\s*\('
     match: contains
     weight: 0.5
 

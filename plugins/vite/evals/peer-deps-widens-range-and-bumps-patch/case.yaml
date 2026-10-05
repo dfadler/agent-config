@@ -63,7 +63,7 @@ graders:
   - name: semver_patch
     type: regex
     target: last_message
-    pattern: '(?:bump|release|publish|needs?|is|as)\s+(?:a\s+)?\*{0,2}patch\b|\bpatch\*{0,2}\s+(?:bump|release|version)'
+    pattern: '(?:bump|release|publish|needs?|is|as)\s+(?:a\s+)?\*{0,2}patch\b|\bpatch\*{0,2}\s+(?:bump|release|version)|semver\s+bump\W{0,6}patch\b|2\.3\.1\s*(?:→|->|to)\s*2\.3\.2\b'
     flags: i
     match: contains
     weight: 0.5

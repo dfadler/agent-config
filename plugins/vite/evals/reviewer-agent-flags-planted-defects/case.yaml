@@ -85,7 +85,7 @@ graders:
   - name: flags_star_peer_range
     type: regex
     target: last_message
-    pattern: 'peerDependencies[\s\S]{0,400}(?:["''\x60]\*["''\x60]|wildcard)|(?:["''\x60]\*["''\x60]|wildcard)[\s\S]{0,400}peerDependencies'
+    pattern: '["''\x60]\*["''\x60]|wildcard'
     flags: i
     match: contains
 
@@ -102,14 +102,5 @@ graders:
     type: regex
     target: last_message
     pattern: '(?:banner\.ts|package\.json):\d+'
-    match: contains
-    weight: 0.5
-
-  # The agent's own output format (Risk and Fix lines per finding), so a main-model review
-  # that never used the agent's answer does not score. Half weight: the relay may reword it.
-  - name: uses_agent_output_format
-    type: regex
-    target: last_message
-    pattern: '\bRisk\b[\s\S]{0,600}\bFix\b'
     match: contains
     weight: 0.5

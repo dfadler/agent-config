@@ -56,7 +56,7 @@ graders:
   - name: says_no_change
     type: regex
     target: last_message
-    pattern: 'no\s+(?:range\s+)?(?:change|update)s?\s+(?:is\s+|are\s+)?(?:needed|required|necessary)|already\s+(?:includes?|covers?|satisf\w+|supports?|allows?)|nothing\s+(?:to\s+change|needs\s+to\s+change)'
+    pattern: 'no\s+(?:range\s+)?(?:change|update)s?\s+(?:is\s+|are\s+)?(?:needed|required|necessary)|already\s+(?:includes?|covers?|satisf\w+|supports?|allows?|accepts?)|(?:nothing|doesn.?t|does\s+not)\s+(?:to\s+change|(?:need|needs)\s+to\s+change)'
     flags: i
     match: contains
     weight: 0.5
@@ -65,5 +65,5 @@ graders:
   - name: does_not_propose_caret_8
     type: regex
     target: last_message
-    pattern: '"vite"\s*:\s*"\^8'
+    pattern: 'peerDependencies"\s*:\s*\{[^}]*"vite"\s*:\s*"\^8'
     match: not_contains

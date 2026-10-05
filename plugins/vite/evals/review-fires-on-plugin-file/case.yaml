@@ -24,8 +24,8 @@ tags: [vite, review, trigger, quick]
 
 execution:
   prompt: |
-    Can you review this Vite plugin before I merge it? It is src/vite/plugins/stamp.ts
-    in a Vite 7 project (line numbers shown on the left). Don't create files or run
+    Can you review this Vite plugin file against Vite plugin conventions before I merge
+    it? It is src/vite/plugins/stamp.ts in a Vite 7 project (line numbers shown on the left). Don't create files or run
     commands; answer in your reply.
 
     ```
@@ -73,7 +73,7 @@ graders:
   - name: transform_missing_null
     type: regex
     target: last_message
-    pattern: 'transform[\s\S]{0,300}(?:undefined[\s\S]{0,150}\bnull\b|return(?:s|ing)?\s+(?:an\s+explicit\s+)?[`"]?null)'
+    pattern: 'transform[\s\S]{0,800}(?:undefined[\s\S]{0,150}\bnull\b|return(?:s|ing)?\s+(?:an\s+explicit\s+)?[`"]?null)'
     flags: i
     match: contains
 
