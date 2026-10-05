@@ -8,7 +8,7 @@ const QUICK_TAG = "quick";
 export const rule: Rule = {
   id: "EVAL017",
   severity: "error",
-  title: "A case tagged quick has no llm or baseline grader",
+  title: "Case tagged quick has an llm or baseline grader",
   source:
     "from #473: the quick tag marks free-only cases so `--tag quick` runs at no judge cost, and the lint keeps the tag accurate",
   checkCase: (c) => {

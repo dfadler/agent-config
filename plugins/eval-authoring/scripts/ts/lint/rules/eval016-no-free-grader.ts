@@ -14,7 +14,7 @@ const PAID: ReadonlySet<string> = new Set(["llm", "baseline"]);
 export const rule: Rule = {
   id: "EVAL016",
   severity: "warn",
-  title: "Case has at least one free grader",
+  title: "Case has no free grader",
   source:
     "from #473: free graders (regex, tool_used, tool_order, file_exists) first, paid graders (llm, baseline) only when the property is semantic",
   checkCase: (c) => {
