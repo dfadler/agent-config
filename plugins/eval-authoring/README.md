@@ -54,6 +54,8 @@ per distinct grant set so a narrow case never inherits a broader grant.
 Cost: a run is cases x runs x arms agent runs plus three judge calls per `llm` or `baseline`
 grader per run. `quick` runs only cases tagged `quick` (free graders), once, plugin arm only;
 `standard` is 3 runs and `thorough` 5, both with the CLI's default arms.
+All tiers pass `--threshold 1` (every grader must pass, so one miss fails a case) and a
+tier-specific `--max-cost-usd`; see [run-evals](skills/run-evals/SKILL.md#what-the-tier-values-mean).
 
 ## Requirements
 
