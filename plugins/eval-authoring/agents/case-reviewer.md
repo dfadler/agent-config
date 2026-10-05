@@ -28,12 +28,31 @@ list. You never change a case.
   `node <plugin>/scripts/ts/lint/cli.ts --format json <PLUGIN_ROOT>`, where
   `<plugin>` is the eval-authoring plugin directory and `<PLUGIN_ROOT>` is the
   plugin whose cases you review. It is free: no model calls, no network. If `node`
-  is older than 22 (the lint runs TypeScript directly) or the lint exits 2, 3 or 20, report that and continue with the
-  judgment pass, marking the mechanical pass as not run.
+  is older than 22.18 (the lint runs TypeScript directly), is missing or broken, or the
+  lint exits 2, 3 or 20, or the Bash call is denied, report the exact failure, say the
+  mechanical pass was **not run**, ask the invoker to put Node 22.18 or later on `PATH`,
+  and continue with the judgment pass. Never guess a Node path or install anything. Say
+  "not run" for any other pass you could not do (for example a skill file you cannot
+  read).
 - **The grants file** (`<evals dir>/grants.yaml`, format in
   `<plugin>/docs/grants-format.md`), when judging whether a granted tool is
   justified.
 - **The case files themselves** (`prompt.md` plus `graders/*.md`, or `case.yaml`).
+
+## Invoking headless
+
+Under `claude -p --agent case-reviewer` the lint call needs an approval nobody can give,
+so pre-allow exactly that command, with Node 22.18 or later first on `PATH`
+([flags](https://code.claude.com/docs/en/cli-reference)):
+
+```bash
+PATH="$HOME/.nvm/versions/node/v22.22.1/bin:$PATH" claude -p --agent case-reviewer \
+  --allowedTools "Bash(node *lint/cli.ts*)" "Read" "Grep" "Glob" \
+  "Review plugins/<name>/evals"
+```
+
+Add `--add-dir plugins/<name>` if the skill under test lives outside the working directory;
+without it the agent cannot read the `SKILL.md` and reports the check as not run.
 
 ## Tool allowlist, and why
 

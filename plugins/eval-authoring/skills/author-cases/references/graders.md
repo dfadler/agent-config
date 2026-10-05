@@ -68,6 +68,58 @@ for example "must not invoke the skill" (`min: 0`, `max: 0`). If every grader wo
 excluded they score normally, and `--ablation none` excludes nothing. A Δ near zero with
 the Skill grader failing means the skill's `description` is not triggering on that phrasing.
 
+## Regex robustness
+
+A regex on `last_message` fails in ways a case author does not see until a run:
+
+- A `not_contains` pattern false-fails on prose that mentions the thing ("instead of
+  `x[x.length-1]`"). Constrain the reply in the prompt ("one code block and no other
+  text") and grade that block.
+- A pattern can match the prompt's own text or any markdown (a loose `|\*` alternative
+  matches every bullet). Anchor it to the exact token, and check the prompt does not
+  contain it.
+- Before trusting a pattern, test it against one reply it must pass and one it must fail.
+- A wording regex that one rephrase can miss fails the case at `--threshold 1` (see
+  [run-evals](../../run-evals/SKILL.md)); give it a `weight` below 1 only if you accept
+  that it still does.
+
+## Examples
+
+A workspace file as the target, in `case.yaml`:
+
+```yaml
+  - name: file_has_guard
+    type: regex
+    target:
+      source: file
+      path: "src/index.ts"
+    pattern: 'noUncheckedIndexedAccess'
+    match: contains
+```
+
+Did the skill fire: `input_match` is a regex over the JSON-encoded tool input, so match
+`"skill": "<name>"`, allowing an optional `plugin:` prefix:
+
+```yaml
+  - name: skill_fired
+    type: tool_used
+    tool: Skill
+    input_match: '"skill"\s*:\s*"(?:[\w-]+:)?dev-workflow"'
+```
+
+For a near-miss that must fire none of the plugin's skills, alternate over all of them and
+cap the calls (the `arm: both` here is correct: it is a "must not fire" check):
+
+```yaml
+  - name: no_plugin_skill_fired
+    type: tool_used
+    tool: Skill
+    input_match: '"skill"\s*:\s*"(?:vite:)?(?:scaffold|review|test|dev-workflow|peer-deps)"'
+    min: 0
+    max: 0
+    arm: both
+```
+
 ## Judge and limits
 
 - Default judge is the background-task model; `--judge-model sonnet` helps hard rubrics.
