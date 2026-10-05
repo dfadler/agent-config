@@ -1,6 +1,5 @@
 # Per-case --allow-tools grants (format: plugins/eval-authoring/docs/grants-format.md).
-# Write lets the run create the one source file that the case reads back. Not yet confirmed
-# in a logged-in run.
+# Write lets the run create the one source file that the case reads back.
 schema_version: "1"
 grants:
   typescript-gotchas-writes-file-with-at:
