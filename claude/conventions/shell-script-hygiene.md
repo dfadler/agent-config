@@ -33,9 +33,13 @@ For any non-trivial bash script:
   EXIT_DEPENDENCY=4    # a required external command isn't on PATH
   EXIT_NETWORK=5       # network failure (reserved — no script needs this yet)
   EXIT_TIMEOUT=6       # operation timed out (reserved — no script needs this yet)
+  EXIT_PARTIAL=7       # partial or untrustworthy run: finished, but results can't be fully trusted
   EXIT_INTERNAL=20     # unexpected/assertion failure — should not happen
+  EXIT_INTERRUPTED=130 # interrupted (SIGINT), the shell convention; pass through
+  EXIT_TERMINATED=143  # terminated (SIGTERM), the shell convention; pass through
   ```
   Declare only the constants a given script actually uses (an unused `readonly`
-  triggers shellcheck's SC2034). The gap between 6 and 20 is deliberate headroom for
-  more specific codes later without renumbering `EXIT_INTERNAL`.
+  triggers shellcheck's SC2034). The gap between 7 and 20 is deliberate headroom for
+  more specific codes later without renumbering `EXIT_INTERNAL`. 130 and 143 are
+  the shell's own signal codes (128 + signal), passed through, not assigned.
 

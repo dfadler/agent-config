@@ -2,9 +2,9 @@
  * Exit codes of the run wrapper. The first block is the repo's shared taxonomy
  * (claude/conventions/shell-script-hygiene.md), copied here because a plugin
  * is installed on its own and must not import from `scripts/ts/lib/`. The
- * second block extends it for what a `claude plugin eval` wrapper needs; the
- * numbers sit in the taxonomy's reserved gap (7 to 19), and the shared list
- * should gain them.
+ * second block is the part of the taxonomy a `claude plugin eval` wrapper adds
+ * (EXIT_PARTIAL in the reserved gap, plus the two signal codes); the shared
+ * list has them too.
  */
 
 /** Success: every run group passed and its results are trustworthy. */
