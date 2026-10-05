@@ -64,6 +64,25 @@ it, do not rebuild any of that.
      as a pass.
    - `20`: internal error. `130` and `143`: interrupted or terminated.
 
+## What the tier values mean
+
+Every tier passes `--threshold 1` (the CLI default is also 1.0). A run's score is the
+fraction of its graders that passed, weighted, and a case's score is the mean over its
+runs; a case passes when that is at least the threshold, and any case below it makes the
+CLI exit 1 ([docs](https://code.claude.com/docs/en/plugin-evals#how-a-case-is-scored)).
+So at threshold 1 every grader of a case must pass in every run. `quick` makes one run,
+so a single miss fails the case, **including a miss on a half-weight wording regex**:
+`weight` changes the score, and any score under 1 fails the case at this threshold.
+
+`--max-cost-usd` is a ceiling on the list-price cost estimate, with no default ceiling
+in the CLI. It is checked before each run starts; once spent, nothing further starts,
+runs already started finish, and if any run is left unstarted the CLI exits 2 (the
+wrapper reports 7, partial). The ceiling applies to one CLI invocation, and the wrapper
+makes one per distinct grant set. The docs give no per-run price; the CLI's `--help`
+says the same, so whether `quick`'s $1 covers your suite is not known before a run. If a
+run reports exit 7 with the ceiling hit, its scores are partial: trim the cases (`--case`)
+rather than reading them as failures.
+
 ## Gotchas
 
 - In worktree-isolated sessions in this repo, a PreToolUse hook blocks Bash commands
