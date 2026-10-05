@@ -21,7 +21,7 @@ execution:
     In src/ui/list.ts of my TypeScript project, write
     `markLastItem(list: HTMLUListElement): void`, which adds the CSS class
     "last" to the last child element of the list (use `list.children`).
-    Show the complete file in your reply.
+    Reply with the complete file in one code block and no other text.
   max_turns: 6
   allowed_tools:
     - Skill
@@ -39,13 +39,13 @@ graders:
   - name: no_at_on_dom_collection
     type: regex
     target: last_message
-    pattern: '\b(children|childNodes)\.at\('
+    pattern: '\b(children|childNodes)\.at\(|querySelectorAll\([^)]*\)\.at\('
     match: not_contains
     arm: both
 
-  - name: writes_the_function
+  - name: adds_the_class
     type: regex
     target: last_message
-    pattern: 'markLastItem'
+    pattern: 'classList\.add\(\s*["'']last["'']\s*\)'
     match: contains
     arm: both

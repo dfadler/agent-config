@@ -1,0 +1,52 @@
+# Run: node plugins/eval-authoring/scripts/ts/run-evals/run-evals.ts --tier quick plugins/typescript-gotchas
+# Boundary case inside the skill's scope: non-test TypeScript that reads the first element.
+# The skill lists "Positive-integer literal access like `arr[0]`" under "What is NOT
+# flagged": leave it alone unless the project opts into `checkAllIndexAccess`.
+# Sabotage map: no_at_zero checks that exception; broaden the rule to all index reads
+# and a run should write `.at(0)` and fail.
+# Can fail: `.at(0)` fails no_at_zero; a reply with no `[0]` read fails keeps_bracket_zero.
+# Models rarely write `.at(0)` unprompted, so this is a regression guard with no expected
+# delta.
+schema_version: "1.1"
+name: typescript-gotchas-leaves-positive-literal-index
+description: >
+  When asked for a TypeScript helper that returns the first word of a sentence,
+  the model keeps the bracket read `parts[0]` and does not rewrite it to `.at(0)`.
+  expected_outcome: PASS when the reply contains `[0]` and no `.at(0)`; FAIL
+  otherwise. A regression guard: a no-plugin arm is expected to pass too.
+tags: [typescript-gotchas, boundary, quick]
+
+execution:
+  prompt: |
+    In src/utils/words.ts of my TypeScript project, write
+    `firstWord(sentence: string): string`, which splits the sentence on single
+    spaces and returns the first part. Use the split array and read its first
+    element by index. Reply with the complete file in one code block and no
+    other text.
+  max_turns: 6
+  allowed_tools:
+    - Skill
+
+graders:
+  # Steps. Indicator only: whether the skill fires here is not the property under test.
+  - name: skill_fired
+    type: tool_used
+    tool: Skill
+    input_match: '"skill"\s*:\s*"(?:[\w-]+:)?typescript-gotchas"'
+    min: 1
+    arm: with-only
+
+  # Result.
+  - name: no_at_zero
+    type: regex
+    target: last_message
+    pattern: '\.at\(\s*0\s*\)'
+    match: not_contains
+    arm: both
+
+  - name: keeps_bracket_zero
+    type: regex
+    target: last_message
+    pattern: '\w\[\s*0\s*\]'
+    match: contains
+    arm: both

@@ -14,13 +14,15 @@ description: >
   three older ways, the model invokes typescript-gotchas and rewrites all three
   reads with `.at(-1)`. expected_outcome: PASS when the rewrite holds at least
   three `.at(-1)` calls and none of lodash, `slice(-1)[0]`, `charAt(` or a
-  length-minus-one bracket read; FAIL otherwise.
+  length-minus-one bracket read; FAIL otherwise. Partly a default-behavior guard:
+  the prompt is leading and models often modernize unprompted, so the delta may
+  be near zero.
 tags: [typescript-gotchas, trigger, quick]
 
 execution:
   prompt: |
     I'm removing lodash from src/paths.ts. Rewrite the file without it and
-    show the complete result in your reply.
+    reply with the complete result in one code block and no other text.
 
     ```ts
     import _ from "lodash";
