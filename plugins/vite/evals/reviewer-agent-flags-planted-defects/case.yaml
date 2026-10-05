@@ -92,7 +92,7 @@ graders:
   - name: flags_generate_bundle_return
     type: regex
     target: last_message
-    pattern: 'generateBundle[\s\S]{0,500}(ignor(?:ed|es)|no effect|discard|never lands?|not mutat|without mutating)'
+    pattern: 'generateBundle[\s\S]{0,500}(ignor\w*|no effect|discard\w*|thrown away|never lands?|not mutat\w*|without mutating)|(ignor\w*|discard\w*)[\s\S]{0,80}generateBundle'
     flags: i
     match: contains
 
