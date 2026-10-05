@@ -1,0 +1,69 @@
+# Run: node plugins/eval-authoring/scripts/ts/run-evals/run-evals.ts --tier quick plugins/typescript-gotchas
+# (grant "Write" is read from evals/grants.yaml; equivalent: claude plugin eval plugins/typescript-gotchas --case typescript-gotchas-writes-file-with-at --allow-tools "Write")
+# Should-fire half of the trigger boundary, through a written file rather than a reply: the
+# skill triggers on "writing or editing" source files, so this checks the file contents.
+# Every grader is free, so the case is tagged `quick`.
+# Why this prompt: a first version asked for the final character. The model writes `.at(-1)`
+# for that unprompted once any skill fires, so the case passed with the skill body emptied
+# (sabotage check, PR #531). A plain variable index into a string is where the default is
+# `s[i]` or `s.charAt(i)` and only the skill's rule changes the output.
+# Sabotage map: file_uses_at and file_no_bracket_idiom check the "Prefer `.at()` for array and
+# string indexed reads" rule and the `str.charAt(...)` row of its table. Empty the body
+# (keep the description) and both should fail.
+# Can fail: a file with `s[i]` or `s.charAt(i)` fails file_no_bracket_idiom and file_uses_at;
+# no file at all fails file_written and the regexes; skill_fired fails if the skill never
+# triggers on a file write. Any Write path other than src/char.ts also fails.
+schema_version: "1.1"
+name: typescript-gotchas-writes-file-with-at
+description: >
+  When asked to create a TypeScript source file that reads the character at an index of
+  a string, the model invokes typescript-gotchas and writes src/char.ts using `s.at(i)`.
+  expected_outcome: PASS when the file exists and uses `s.at(i)` with no `s[i]` or
+  `charAt(`; FAIL otherwise. Without the plugin the default is `s[i]` or `s.charAt(i)`.
+tags: [typescript-gotchas, trigger, quick]
+
+execution:
+  prompt: |
+    Create src/char.ts in this empty project. It should export
+    `charAtIndex(s: string, i: number): string | undefined`, which returns the
+    character at position `i` of the string. Just write the file.
+  max_turns: 8
+  allowed_tools:
+    - Skill
+    - Write
+
+graders:
+  # Steps. Indicator in a two-arm run, scored only with the plugin.
+  - name: skill_fired
+    type: tool_used
+    tool: Skill
+    input_match: '"skill"\s*:\s*"(?:[\w-]+:)?typescript-gotchas"'
+    min: 1
+    arm: with-only
+
+  - name: wrote_the_file
+    type: tool_used
+    tool: Write
+    input_match: 'src/char\.ts'
+    min: 1
+    arm: both
+
+  # Result.
+  - name: file_written
+    type: file_exists
+    path: src/char.ts
+    arm: both
+
+  - name: file_uses_at
+    type: regex
+    target: { source: file, path: src/char.ts }
+    pattern: '\bs\.at\(\s*i\s*\)'
+    match: contains
+    arm: both
+
+  - name: file_no_bracket_idiom
+    type: regex
+    target: { source: file, path: src/char.ts }
+    pattern: '\bs\[\s*i\s*\]|charAt\('
+    match: not_contains
+    arm: both

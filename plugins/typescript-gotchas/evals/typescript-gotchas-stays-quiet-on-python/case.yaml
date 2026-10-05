@@ -1,0 +1,46 @@
+# Run: node plugins/eval-authoring/scripts/ts/run-evals/run-evals.ts --tier quick plugins/typescript-gotchas
+# Should-not-fire half of the trigger boundary: same task as the should-fire cases (last
+# element of a list) in a language the description does not cover.
+# Sabotage map: skill_not_invoked checks the description's scope to "TypeScript or
+# JavaScript source files"; widen it to "any language" and a run should invoke the skill
+# and fail.
+# Can fail: the skill is invoked on a Python request fails skill_not_invoked; a reply with
+# no `def last_visited` fails writes_the_function. A regression guard, so a no-plugin arm
+# passes it by default and shows no delta.
+schema_version: "1.1"
+name: typescript-gotchas-stays-quiet-on-python
+description: >
+  A request for a Python helper that returns the last list element must not invoke
+  typescript-gotchas, which covers TypeScript and JavaScript only. expected_outcome:
+  PASS when the skill is not invoked and the reply defines `last_visited`; FAIL when
+  typescript-gotchas is invoked or the reply holds no such function. A regression
+  guard with no expected delta.
+tags: [typescript-gotchas, trigger, quick]
+
+execution:
+  prompt: |
+    In my Python project, write `last_visited(urls: list[str]) -> str | None` in
+    history.py, returning the final entry of the list or None if it is empty.
+    Reply with the code only.
+  max_turns: 6
+  allowed_tools:
+    - Skill
+
+graders:
+  # Steps. min 0 is explicit: tool_used defaults min to 1. arm both so the "never called"
+  # check is scored in a two-arm run too.
+  - name: skill_not_invoked
+    type: tool_used
+    tool: Skill
+    input_match: '"skill"\s*:\s*"(?:[\w-]+:)?typescript-gotchas"'
+    min: 0
+    max: 0
+    arm: both
+
+  # Result: the task was done (a task-completion check, not a skill property).
+  - name: writes_the_function
+    type: regex
+    target: last_message
+    pattern: 'def\s+last_visited'
+    match: contains
+    arm: both
