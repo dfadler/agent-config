@@ -22,6 +22,7 @@ const spec = (over: Partial<RunSpec> = {}): RunSpec => ({
   grants: [],
   model: undefined,
   judgeModel: undefined,
+  maxCostUsd: undefined,
   evalDir: undefined,
   trustPlugin: false,
   reporting,
@@ -81,6 +82,19 @@ describe("buildCliArgs", () => {
     expect(at("--max-cost-usd")).toBe("5");
     expect(at("--model")).toBe(DEFAULT_MODEL);
     expect(at("--judge-model")).toBe(DEFAULT_JUDGE_MODEL);
+  });
+
+  it("uses the tier's cost ceiling unless overridden, for each tier", () => {
+    const at = (s: RunSpec): string | undefined => {
+      const a = buildCliArgs(s);
+      return a[a.indexOf("--max-cost-usd") + 1];
+    };
+    expect(at(spec({ tier: TIERS.quick }))).toBe("1");
+    expect(at(spec({ tier: TIERS.standard }))).toBe("5");
+    expect(at(spec({ tier: TIERS.thorough }))).toBe("15");
+    for (const tier of Object.values(TIERS)) {
+      expect(at(spec({ tier, maxCostUsd: 2.5 }))).toBe("2.5");
+    }
   });
 
   it("lets the caller override the models", () => {

@@ -62,6 +62,8 @@ export interface RunSpec {
   readonly grants: readonly string[];
   readonly model: string | undefined;
   readonly judgeModel: string | undefined;
+  /** Overrides the tier's cost ceiling; undefined keeps the tier's. Applies to this one CLI invocation. */
+  readonly maxCostUsd: number | undefined;
   /** `--eval-dir`, when the caller overrides the plugin's own eval directory. */
   readonly evalDir: string | undefined;
   /** Pass `--trust-plugin`: only for this repo's plugins (see `isRepoPlugin`). */
@@ -92,7 +94,7 @@ export const buildCliArgs = (
     "--runs",
     String(tier.runs),
     "--max-cost-usd",
-    String(tier.maxCostUsd),
+    String(spec.maxCostUsd ?? tier.maxCostUsd),
     "--threshold",
     String(tier.threshold),
     "--model",

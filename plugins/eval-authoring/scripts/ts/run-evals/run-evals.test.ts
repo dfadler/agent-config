@@ -61,6 +61,78 @@ describe("parseArgs", () => {
   });
 });
 
+describe("--max-cost-usd", () => {
+  const err = (v: string[]): string => {
+    const p = parseArgs(["p", ...v]);
+    return p.kind === "error" ? p.message : "";
+  };
+  it("rejects zero, negative, NaN, empty, text, infinity and non-decimal forms", () => {
+    for (const bad of ["0", "0.0", "-1", "NaN", "", "abc", "Infinity", "1e3", "0x10", "1,5"]) {
+      expect(err(["--max-cost-usd", bad])).toContain("positive finite number");
+    }
+  });
+  it("accepts positive decimals", () => {
+    for (const [text, n] of [["2", 2], ["0.5", 0.5], [".5", 0.5], ["10.", 10]] as const) {
+      const p = parseArgs(["p", "--max-cost-usd", text]);
+      expect(p.kind === "options" && p.options.maxCostUsd).toBe(n);
+    }
+  });
+  it("is absent by default", () => {
+    const p = parseArgs(["p"]);
+    expect(p.kind === "options" && p.options.maxCostUsd).toBeUndefined();
+  });
+  it("needs a value", () => {
+    expect(err(["--max-cost-usd"])).toContain("needs a value");
+  });
+  it("is documented in --help with its per-invocation semantics", async () => {
+    const { io, out } = setup();
+    await main(["-h"], { io, pluginsDir: "/p" });
+    const help = out.join("");
+    expect(help).toContain("--max-cost-usd <usd>");
+    expect(help).toContain("per CLI invocation");
+    expect(help).toContain("no default ceiling");
+  });
+
+  const costs = (calls: ReturnType<typeof cliCalls>): (string | undefined)[] =>
+    calls.map((c) => c.args[c.args.indexOf("--max-cost-usd") + 1]);
+
+  it("exits with the usage code and runs nothing on a bad value", async () => {
+    const s = setup({ grants: GRANTS });
+    expect(await main([s.root, "--max-cost-usd", "0"], { io: s.io, pluginsDir: "/p" })).toBe(EXIT_USAGE);
+    expect(s.err.join()).toContain("positive finite number");
+    expect(s.calls).toEqual([]);
+  });
+  it("applies the override to every group", async () => {
+    const s = setup({ grants: GRANTS });
+    await main([s.root, "--max-cost-usd", "4.5"], { io: s.io, pluginsDir: "/p" });
+    expect(costs(cliCalls(s.calls))).toEqual(["4.5", "4.5"]);
+  });
+  it("keeps each tier's ceiling when the option is absent", async () => {
+    const expected = { quick: "1", standard: "5", thorough: "15" };
+    for (const [tier, cost] of Object.entries(expected)) {
+      const s = setup({ grants: GRANTS, cases: [{ name: "a", tags: ["quick"] }, { name: "b", tags: ["quick"] }] });
+      await main([s.root, "--tier", tier], { io: s.io, pluginsDir: "/p" });
+      expect(costs(cliCalls(s.calls))).toEqual([cost, cost]);
+    }
+  });
+  it("overrides the quick tier's $1 ceiling and keeps its tag and ablation", async () => {
+    const s = setup({ cases: [{ name: "a", tags: ["quick"] }] });
+    await main([s.root, "--tier", "quick", "--max-cost-usd", "3"], { io: s.io, pluginsDir: "/p" });
+    const args = cliCalls(s.calls)[0]?.args.join(" ") ?? "";
+    expect(args).toContain("--max-cost-usd 3");
+    expect(args).toContain("--tag quick");
+    expect(args).toContain("--ablation none");
+  });
+  it("shows in --dry-run output, and the tier value otherwise", async () => {
+    const s = setup({ grants: GRANTS });
+    await main([s.root, "--dry-run", "--max-cost-usd", "7"], { io: s.io, pluginsDir: "/p" });
+    expect(s.out.every((l) => l.includes("--max-cost-usd 7"))).toBe(true);
+    const d = setup({ grants: GRANTS });
+    await main([d.root, "--dry-run"], { io: d.io, pluginsDir: "/p" });
+    expect(d.out.every((l) => l.includes("--max-cost-usd 5"))).toBe(true);
+  });
+});
+
 describe("isRepoPlugin", () => {
   it("accepts only direct children of the plugins directory", () => {
     const id = (p: string): string => p;
