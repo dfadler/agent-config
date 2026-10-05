@@ -1,0 +1,51 @@
+# Run: node plugins/eval-authoring/scripts/ts/run-evals/run-evals.ts --tier quick plugins/vite
+# Shared run/grant facts: docs/contributing.md, "Plugin evals". No grant needed (Skill only).
+# Should-not-fire half of the test boundary: a near-miss that shares "Vitest", "tests" and the
+# Vite ecosystem with the skill's description but wants tests for a plain utility.
+# Can fail: the Skill check scores 0 if test (or another vite skill) over-triggers on any
+# Vitest request; writes_unit_tests scores 0 if the reply produces no tests for the util.
+# This is a regression guard, so a no-plugin arm passes it by default and shows no delta by
+# design.
+schema_version: "1.1"
+name: test-stays-quiet-on-util-tests
+description: >
+  A request for Vitest tests of a plain formatBytes utility must not invoke any vite skill,
+  since there is no Vite plugin. expected_outcome: PASS when no vite skill is invoked and the
+  reply holds tests that call formatBytes; FAIL when a vite skill is invoked or the reply has
+  no tests.
+tags: [vite, test, trigger, quick]
+
+execution:
+  prompt: |
+    My Vite app has a small utility with no tests. I use Vitest. Write the test file
+    and show it in your reply; don't create files or run commands.
+
+    ```ts
+    export function formatBytes(n: number): string {
+      if (n < 1024) return `${n} B`
+      if (n < 1024 ** 2) return `${(n / 1024).toFixed(1)} KB`
+      return `${(n / 1024 ** 2).toFixed(1)} MB`
+    }
+    ```
+  max_turns: 6
+  allowed_tools:
+    - Skill
+
+graders:
+  # Steps. min 0 is explicit: tool_used defaults min to 1. arm both so the "never called"
+  # check is scored in a two-arm run too.
+  - name: no_vite_skill_invoked
+    type: tool_used
+    tool: Skill
+    input_match: '"skill"\s*:\s*"(?:[\w-]+:)?(?:scaffold|review|test|dev-workflow|peer-deps)"'
+    min: 0
+    max: 0
+    arm: both
+
+  # Result: the task was actually done (a completion check, not a skill property).
+  - name: writes_unit_tests
+    type: regex
+    target: last_message
+    pattern: '(describe|it|test)\(.*formatBytes|expect\(\s*formatBytes'
+    match: contains
+    arm: both

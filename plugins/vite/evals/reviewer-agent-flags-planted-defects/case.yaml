@@ -1,0 +1,113 @@
+# Run: node plugins/eval-authoring/scripts/ts/run-evals/run-evals.ts --tier quick plugins/vite
+# (quick tier: one run, plugin arm only, `--ablation none`, which this case needs because the
+# no-plugin arm cannot dispatch a plugin agent: "Agent type ... not found".)
+# Grant: Write, recorded in grants.yaml. The run needs it to create the two files the reviewer
+# then reads, since the eval workspace starts empty. Bash is not granted; the agent's Read,
+# Grep and Glob tools are enough to read the files. Not yet confirmed in a logged-in run that a
+# plugin agent dispatched inside an eval run gets those tools.
+# Agent coverage: the plugin's one agent, vite-plugin-reviewer, has no skill to cover it.
+# Can fail: reviewer_dispatched fails if the main model reviews the files itself instead of
+# dispatching the agent; files_created fails if the setup step did not happen; the two finding
+# regexes fail if the agent misses a planted defect (peer range "*", generateBundle that only
+# returns) or answers "no findings"; cites_file_and_line fails if the reply drops the agent's
+# `path:line` format.
+schema_version: "1.1"
+name: reviewer-agent-flags-planted-defects
+description: >
+  Asked to create two files with planted defects and have the Vite plugin reviewer agent review
+  them, the model dispatches vite-plugin-reviewer and relays a finding for the "*" vite peer
+  range and one for the generateBundle that only returns a value, each cited as path:line.
+  expected_outcome: PASS when the agent is dispatched, the files exist, and the reply names
+  both defects with a path:line citation; FAIL when the agent is not dispatched, a defect is
+  missed, or the reply is a generic review with no path:line.
+tags: [vite, reviewer, agent, quick]
+
+execution:
+  prompt: |
+    Please create these two files exactly as written, then have the Vite plugin reviewer
+    agent review them for correctness and tell me what it found.
+
+    File package.json:
+
+    ```json
+    {
+      "name": "vite-plugin-banner",
+      "version": "1.0.0",
+      "peerDependencies": { "vite": "*" }
+    }
+    ```
+
+    File src/vite/plugins/banner.ts:
+
+    ```ts
+    import type { Plugin } from 'vite'
+
+    export function banner(text: string): Plugin {
+      return {
+        name: 'banner',
+        generateBundle(_options, bundle) {
+          return Object.fromEntries(
+            Object.entries(bundle).filter(([name]) => !name.endsWith('.map')),
+          )
+        },
+      }
+    }
+    ```
+  max_turns: 12
+  allowed_tools:
+    - Agent
+    - Write
+    - Read
+    - Glob
+    - Grep
+
+graders:
+  # Steps: the plugin's agent was dispatched, not imitated.
+  - name: reviewer_dispatched
+    type: tool_used
+    tool: Agent
+    input_match: '"subagent_type"\s*:\s*"(?:[\w-]+:)?vite-plugin-reviewer"'
+    min: 1
+
+  # Precondition, not an agent property: the setup step wrote the files the reviewer reads.
+  # Without it a failed result grader could be a setup failure.
+  - name: files_created
+    type: file_exists
+    path: "src/vite/plugins/banner.ts"
+    exists: true
+
+  - name: package_json_created
+    type: file_exists
+    path: "package.json"
+    exists: true
+
+  # Result: the agent's findings reached the reply, in its path:line format.
+  - name: flags_star_peer_range
+    type: regex
+    target: last_message
+    pattern: '["''\x60]\*["''\x60]|wildcard'
+    flags: i
+    match: contains
+
+  - name: flags_generate_bundle_return
+    type: regex
+    target: last_message
+    pattern: 'generateBundle[\s\S]{0,500}(ignor\w*|no effect|discard\w*|thrown away|never lands?|not mutat\w*|without mutating)|(ignor\w*|discard\w*)[\s\S]{0,80}generateBundle'
+    flags: i
+    match: contains
+
+  # Each planted defect needs its own path:line citation. Half of a half weight each, since
+  # the main model may reformat the citation when relaying.
+  - name: cites_banner_line
+    type: regex
+    target: last_message
+    pattern: 'banner\.ts:\d+'
+    match: contains
+    weight: 0.25
+
+  - name: cites_package_line
+    type: regex
+    target: last_message
+    pattern: 'package\.json:\d+'
+    match: contains
+    weight: 0.25
