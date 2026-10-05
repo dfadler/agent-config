@@ -57,16 +57,18 @@ graders:
     arm: with-only
 
   # Result: findings in the skill's format, covering the planted defects.
+  # The skill's Contract asks for a file path and line number; the model often writes
+  # `L10-12` or `(lines 10-12)` instead of `stamp.ts:10`, so those forms count.
   - name: cites_file_and_line
     type: regex
     target: last_message
-    pattern: 'stamp\.ts:\d+'
+    pattern: 'stamp\.ts:\d+|\bL\d+|\b[Ll]ines?\s+\d+'
     match: contains
 
   - name: generate_bundle_return_ignored
     type: regex
     target: last_message
-    pattern: 'generateBundle[\s\S]{0,500}(ignored|never lands?|not mutat|without mutating|mutate)'
+    pattern: 'generateBundle[\s\S]{0,500}(ignor(?:ed|es)|no effect|never lands?|not mutat|without mutating|mutate)'
     flags: i
     match: contains
 
