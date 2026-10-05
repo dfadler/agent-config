@@ -2,8 +2,10 @@
 # Boundary case inside the skill's scope: non-test TypeScript that writes to the last
 # element. The skill lists "Assignment" under "What is NOT flagged" because `.at()` is
 # read-only. The model must not write `.at(-1) = value`, which is a syntax error.
-# Sabotage map: no_at_assignment checks that "Assignment" exception; remove it and a run
-# that applies the rule blindly may write `arr.at(-1) = v` and fail.
+# Sabotage map: no_at_assignment checks that "Assignment" exception. Measured 2026-10-05
+# (PR #531): with the exception removed the case still passes 3 of 3, because the model never
+# writes `.at(-1) = v`. It cannot catch a regression in that rule; it only fails against a much
+# worse model.
 # Can fail: `.at(-1) = v` fails no_at_assignment; a reply with neither a bracket
 # assignment nor `splice(-1` fails replaces_in_place. A regression guard against
 # over-application, so a no-plugin arm passes it by default and shows no delta.

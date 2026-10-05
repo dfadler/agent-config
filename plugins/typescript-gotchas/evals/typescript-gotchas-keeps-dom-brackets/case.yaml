@@ -2,8 +2,10 @@
 # Boundary case inside the skill's own scope: the prompt is non-test TypeScript (so the skill
 # may fire) but reads from a DOM collection, which the skill lists under "What is NOT flagged"
 # because `.children` lacks `.at()`. The skill must not push the model into `children.at(-1)`.
-# Sabotage map: no_at_on_dom_collection checks the "DOM collections" exception; remove it and
-# a run that applies the rule blindly should write `list.children.at(-1)` and fail.
+# Sabotage map: no_at_on_dom_collection checks the "DOM collections" exception. Measured
+# 2026-10-05 (PR #531): with that exception removed the case still passes 3 of 3, because the
+# model already avoids `.at()` on `children` (and the prompt says "use `list.children`"). It
+# cannot catch a regression in that rule; it only guards against a gross over-application.
 # Can fail: `list.children.at(-1)` (a type error, since HTMLCollection has no `.at`) fails
 # no_at_on_dom_collection. Indexing with a bracket or `lastElementChild` passes. A
 # regression guard against over-application, so a no-plugin arm passes it by default.

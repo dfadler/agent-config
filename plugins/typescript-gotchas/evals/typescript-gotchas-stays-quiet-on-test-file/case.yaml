@@ -2,8 +2,10 @@
 # Should-not-fire half of the trigger boundary: a near-miss that shares the vocabulary
 # (TypeScript, array, last element) but asks for a `*.test.ts` file, which the description
 # excludes ("NOT test files (i.e. not `*.test.*`...").
-# Sabotage map: skill_not_invoked checks that description exclusion; delete "NOT test files"
-# from it and a run should invoke the skill and fail.
+# Sabotage map: skill_not_invoked checks that description exclusion. Measured 2026-10-05
+# (PR #531): deleting "NOT test files" from the description still passes (the skill stayed
+# uninvoked), so this case cannot catch that regression. skill_not_invoked is also vacuous in
+# the no-plugin arm, where the skill does not exist; it can only fail with the plugin.
 # Can fail: the skill is invoked (description over-triggers on a test file) fails
 # skill_not_invoked; a reply with no vitest assertions fails writes_the_test. This is a
 # regression guard, so a no-plugin arm passes it by default and shows no delta by design.

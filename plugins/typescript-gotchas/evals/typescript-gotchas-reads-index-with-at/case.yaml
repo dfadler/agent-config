@@ -11,9 +11,11 @@
 # the body alone does NOT fail them: the description's "any time you would write `[i]`" hint
 # is enough for the model to write `.at(i)`. Empty the body and drop that description
 # sentence and both fail (3 of 3 runs), so the case depends on the skill's text as a whole,
-# not on the body specifically.
+# not on the body specifically. Regressions in the body rule are caught by
+# typescript-gotchas-writes-file-with-at, not by this case.
 # Can fail: `urls[i]` fails both result checks; skill_fired fails if the description stops
-# matching the prompt. Expect a large with/without delta, since the no-plugin default is `urls[i]`.
+# matching the prompt. Measured 2026-10-05: 1.00 with the plugin, 0.00 without (+1.00), since
+# the no-plugin default is `urls[i]`.
 schema_version: "1.1"
 name: typescript-gotchas-reads-index-with-at
 description: >
@@ -21,7 +23,7 @@ description: >
   of an array, the model invokes typescript-gotchas and reads it with `.at(i)` instead of
   `urls[i]`. expected_outcome: PASS when the skill is invoked and the code reads the entry
   with `.at(` and has no `urls[i]` bracket read; FAIL otherwise. Without the plugin the
-  default is `urls[i]`, so the with/without delta should be large.
+  default is `urls[i]`, so the with/without delta is large.
 tags: [typescript-gotchas, trigger, quick]
 
 execution:
@@ -54,6 +56,6 @@ graders:
   - name: no_bracket_index_read
     type: regex
     target: last_message
-    pattern: '\burls\[\s*i\s*\]|\.charAt\('
+    pattern: '\burls\[\s*i\s*\]'
     match: not_contains
     arm: both
