@@ -28,7 +28,7 @@ automatically, with no per-project copy to keep in sync.
   - `detached-terminal/` — run and drive an interactive terminal (TUI, REPL,
     alternate-screen app) on a headless PTY without stealing focus. Requires `pyte`.
   - `eval-authoring/` — author, lint, run and diagnose `claude plugin eval` cases: a
-    free lint (EVAL001-EVAL020) with an edit hook, three skills, two read-only agents,
+    free lint (EVAL001-EVAL021) with an edit hook, three skills, two read-only agents,
     and a cost-tier run wrapper. Needs Node 22.18+.
   - `fetch-execute-guide/` — skill with the scope and procedure for asking permission
     before fetch-and-execute installs (`npx <pkg>@latest`, `curl | sh`).

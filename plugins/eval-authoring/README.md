@@ -17,7 +17,7 @@ checks what a script can; the rest needs a paid run.
 
 | Component | Role |
 |---|---|
-| [`scripts/ts/lint/`](scripts/ts/lint/cli.ts) | The single source of the rules (EVAL001 to EVAL020, `--list-rules`). Free, no model calls. Everything else calls it. |
+| [`scripts/ts/lint/`](scripts/ts/lint/cli.ts) | The single source of the rules (EVAL001 to EVAL021, `--list-rules`). Free, no model calls. Everything else calls it. |
 | [`hooks/`](hooks/hooks.json) | PostToolUse hook on `Write\|Edit`: lints after Claude edits a file under a plugin's eval directory and reports findings back as context. Report only, always exits 0, no-ops elsewhere and under `tests/`. |
 | [`skills/author-cases`](skills/author-cases/SKILL.md) | Writing cases: graders (free first), mocks, fixtures, should-fire and should-not-fire prompts. |
 | [`skills/run-evals`](skills/run-evals/SKILL.md) | Slash command only (paid). Lints, shows the planned commands, then runs the wrapper. |
