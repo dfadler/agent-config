@@ -73,7 +73,7 @@ graders:
   - name: transform_missing_null
     type: regex
     target: last_message
-    pattern: 'transform[\s\S]{0,400}\bnull\b'
+    pattern: 'transform[\s\S]{0,300}(?:undefined[\s\S]{0,150}\bnull\b|return(?:s|ing)?\s+(?:an\s+explicit\s+)?[`"]?null)'
     flags: i
     match: contains
 

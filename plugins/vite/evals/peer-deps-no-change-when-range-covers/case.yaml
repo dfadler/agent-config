@@ -4,9 +4,11 @@
 # Should-fire half of the peer-deps boundary where the right answer is "change nothing": the
 # skill's core insight is that `>=7.0.0` already satisfies Vite 8. Every grader is free, so the
 # case is tagged quick.
+# Unverified: a strong model may already know `>=7.0.0` covers Vite 8, in which case this
+# shows a delta near zero and acts as a default-behavior guard; a run decides.
 # Can fail: skill_fired fails if the description stops matching. Without the skill a model
-# asked to "update the peer range for Vite 8" tends to propose a new range and a version bump,
-# so says_no_change scores 0 and does_not_propose_caret_8 scores 0.
+# asked to "update the peer range for Vite 8" may propose a new range and a version bump: then
+# says_no_change scores 0, and does_not_propose_caret_8 scores 0 if the new range is ^8.
 # Skill phrase checked: the Contract output ("a note that the existing range already covers the
 # new major") and "A range like `>=7.0.0` already satisfies Vite 8 and later".
 schema_version: "1.1"
