@@ -1,0 +1,60 @@
+# Run (one case at a time): claude plugin eval plugins/slack-canvas-sync --case pull-plans-dry-run-first --trust-plugin --no-publish
+# Shared run/grant facts: docs/contributing.md, "Plugin evals". No grant needed (no tools).
+# canvas-pull is slash-command only (disable-model-invocation). The model cannot call it through
+# the Skill tool; a leading "/slack-canvas-sync:canvas-pull" in the prompt expands the skill
+# body inline, so there is NO Skill tool call to grade (verified in a kept trace). The signal
+# is instead details only the skill supplies (CLI verbs, flags, the quoted-heredoc rule). The
+# no-plugin arm has no such slash command, so it cannot produce them.
+# The Slack server is not declared by this plugin, so it cannot be mocked: the case asks for
+# the procedure as a plan instead of running it.
+# Sabotage map: scans_first / dry_run_before_apply quote Steps 1-3 ("scan --root", "pull --root
+# ... --apply"); saves_read_verbatim quotes Step 2 ("<<'JSON'", "verbatim"); asks_confirmation
+# quotes "ask for confirmation".
+schema_version: "1.1"
+name: pull-plans-dry-run-first
+description: >
+  Invoked as a slash command, canvas-pull plans a scan, a verbatim slack_read_canvas dry run and
+  an --apply only after confirmation. expected_outcome: PASS when the plan names the CLI verbs,
+  the read tool, the verbatim save and the confirmation gate; FAIL otherwise.
+tags: [slack-canvas-sync, pull, trigger, quick]
+
+execution:
+  prompt: |
+    /slack-canvas-sync:canvas-pull /notes/team
+
+    Don't call any tools. Reply with a numbered plan of at most 10 one-line
+    steps, naming the exact commands and tools you would use.
+  max_turns: 6
+
+graders:
+  - name: scans_first
+    type: regex
+    target: last_message
+    pattern: 'scan --root'
+    match: contains
+
+  - name: reads_canvas_tool
+    type: regex
+    target: last_message
+    pattern: 'slack_read_canvas'
+    match: contains
+
+  - name: saves_read_verbatim
+    type: regex
+    target: last_message
+    pattern: "verbatim|<<\\s*'JSON'"
+    flags: i
+    match: contains
+
+  - name: dry_run_before_apply
+    type: regex
+    target: last_message
+    pattern: 'pull --root[\s\S]*--apply'
+    match: contains
+
+  - name: asks_confirmation
+    type: regex
+    target: last_message
+    pattern: 'confirm'
+    flags: i
+    match: contains

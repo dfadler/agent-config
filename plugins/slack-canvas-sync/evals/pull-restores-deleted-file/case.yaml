@@ -1,0 +1,53 @@
+# Run (one case at a time): claude plugin eval plugins/slack-canvas-sync --case pull-restores-deleted-file --trust-plugin --no-publish
+# Shared run/grant facts: docs/contributing.md, "Plugin evals". No grant needed (no tools).
+# Slash-invoked (see pull-plans-dry-run-first for why there is no Skill grader). The prompt hands
+# over a scan result so the case needs no CLI: scan lists the deleted file as `missing` with a
+# canvas_id, and the skill says pulling restores it, after a dry run and confirmation.
+# Sabotage map: quotes "missing entries (path and canvas_id; deleted locally, and pulling
+# restores them from the canvas)" and `status: "restore"`.
+schema_version: "1.1"
+name: pull-restores-deleted-file
+description: >
+  Asked via slash command to restore a deleted synced file, canvas-pull treats it as a missing
+  entry, reads its canvas and restores only after a dry run and confirmation. expected_outcome:
+  PASS when the reply names missing, restore, slack_read_canvas and a confirmation; FAIL otherwise.
+tags: [slack-canvas-sync, pull, trigger, quick]
+
+execution:
+  prompt: |
+    /slack-canvas-sync:canvas-pull /notes/team standup.md
+
+    I deleted /notes/team/standup.md by accident. The scan shows it as a
+    `missing` entry with path "standup.md" and canvas_id "F000".
+
+    Don't call any tools. Reply with at most 6 numbered one-line steps: what
+    you would do next, naming the exact tool, the CLI verb and the status you
+    expect from the dry run.
+  max_turns: 6
+
+graders:
+  - name: reads_canvas
+    type: regex
+    target: last_message
+    pattern: 'slack_read_canvas'
+    match: contains
+
+  - name: expects_restore_status
+    type: regex
+    target: last_message
+    pattern: 'restore'
+    flags: i
+    match: contains
+
+  - name: dry_run_then_apply
+    type: regex
+    target: last_message
+    pattern: 'pull --root[\s\S]*--apply'
+    match: contains
+
+  - name: asks_confirmation
+    type: regex
+    target: last_message
+    pattern: 'confirm'
+    flags: i
+    match: contains
