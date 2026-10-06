@@ -1,0 +1,44 @@
+# Run: claude plugin eval plugins/gha-ci-audit --case audit-stays-quiet-on-workflow-authoring
+# Shared run/grant facts: docs/contributing.md, "Plugin evals". No grant needed (Skill only).
+# Should-not-fire half of the gha-ci-audit boundary: a near-miss that shares "GitHub Actions"
+# and "CI" with the skill's description but asks to write a workflow, not audit usage.
+# Can fail: the Skill check scores 0 if gha-ci-audit over-triggers on any GitHub Actions
+# mention; writes_the_workflow scores 0 if the reply has no workflow YAML. This is a
+# regression guard, so a no-plugin arm passes it by default and shows no delta by design.
+schema_version: "1.1"
+name: audit-stays-quiet-on-workflow-authoring
+description: >
+  A request to write a new GitHub Actions workflow must not invoke gha-ci-audit, since it is
+  authoring, not an audit of CI cost or speed. expected_outcome: PASS when the skill is not
+  invoked and the reply contains workflow YAML with actions/checkout; FAIL when the skill is
+  invoked or the reply has no workflow. Regression guard: a no-plugin run is expected to
+  pass, so the Delta is zero by design.
+tags: [gha-ci-audit, trigger, quick]
+
+execution:
+  prompt: |
+    Write a GitHub Actions workflow that runs `pnpm test` on every pull request using
+    Node 22. Reply with the YAML in one code block and nothing else; don't create files
+    or run commands.
+  max_turns: 6
+  allowed_tools:
+    - Skill
+
+graders:
+  # Steps. min 0 is explicit: tool_used defaults min to 1. arm both so the "never called"
+  # check is scored in a two-arm run too.
+  - name: gha_ci_audit_not_invoked
+    type: tool_used
+    tool: Skill
+    input_match: '"skill"\s*:\s*"(?:[\w-]+:)?gha-ci-audit"'
+    min: 0
+    max: 0
+    arm: both
+
+  # Result: the request was actually answered (a completion check, not a skill property).
+  - name: writes_the_workflow
+    type: regex
+    target: last_message
+    pattern: 'actions/checkout'
+    match: contains
+    arm: both

@@ -1,0 +1,52 @@
+# Run: claude plugin eval plugins/detached-terminal --case detached-terminal-stays-quiet-on-background-job --runs 3 --trust-plugin --no-publish
+# Shared run/grant facts: docs/contributing.md, "Plugin evals". No grant; reply-only.
+# Should-not-fire near-miss: a long-running command whose output is collected later, which
+# the description routes to `Bash` with `run_in_background`. It shares the "terminal-ish
+# long process" vocabulary. Regression guard, delta 0 by design. All free, quick.
+# Can fail: no_terminal_skill_fired fails if the skill over-triggers on a long job;
+# no_agent_term fails on a PTY answer; names_background fails if the reply does not choose a
+# background run. Skill text checked: "long-running commands whose output you only need to
+# collect later (`Bash` with `run_in_background`)".
+schema_version: "1.1"
+name: detached-terminal-stays-quiet-on-background-job
+description: >
+  A 25-minute test suite to be started now and checked later is a background job, so
+  detached-terminal must not fire; the reply picks a background run. expected_outcome: PASS
+  when the skill is not invoked and the reply names a background run; FAIL when the skill is
+  invoked, agent_term.py appears, or the reply does not name run_in_background. Regression
+  guard: Delta 0 by design.
+tags: [detached-terminal, trigger, quick]
+
+execution:
+  prompt: |
+    My full test suite takes about 25 minutes (`pnpm test:all`). Start it now and keep
+    working on other things; I'll ask you for the results later. Don't run anything; answer
+    in one or two sentences naming the tool and the option you would use to start it.
+  max_turns: 6
+  allowed_tools:
+    - Skill
+
+graders:
+  - name: no_terminal_skill_fired
+    type: tool_used
+    tool: Skill
+    input_match: '"skill"\s*:\s*"(?:[\w-]+:)?detached-terminal"'
+    min: 0
+    max: 0
+    arm: both
+
+  - name: no_agent_term
+    type: regex
+    target: last_message
+    pattern: 'agent_term'
+    match: not_contains
+    arm: both
+
+  # Completion check that names the exact Bash option the skill's description points to.
+  # A baseline may also say it, so this is a guard, not a delta.
+  - name: names_background
+    type: regex
+    target: last_message
+    pattern: 'run_in_background'
+    match: contains
+    arm: both

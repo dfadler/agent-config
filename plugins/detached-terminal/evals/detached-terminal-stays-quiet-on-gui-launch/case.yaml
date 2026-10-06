@@ -1,0 +1,54 @@
+# Run: claude plugin eval plugins/detached-terminal --case detached-terminal-stays-quiet-on-gui-launch --runs 3 --trust-plugin --no-publish
+# Shared run/grant facts: docs/contributing.md, "Plugin evals". No grant; reply-only, and the
+# command is only written, never run, so no GUI app is launched (hermetic).
+# Should-not-fire near-miss that shares the focus-stealing vocabulary: opening a GUI app
+# (Preview) without foregrounding it. The skill's own table says `open -g`/`open -j` for this,
+# not a terminal session. All free, quick.
+# Can fail: no_agent_term fails if the reply drives a PTY for a GUI launch; background_flag
+# fails when the reply has no open -g/-j (a plain `open -a Preview` answer). The skill check is
+# half weight because the skill may legitimately load to read its table and still answer
+# `open -g`.
+# Skill text checked: the "Before reaching for this" table row "Launch a GUI app as a side effect".
+schema_version: "1.1"
+name: detached-terminal-stays-quiet-on-gui-launch
+description: >
+  Opening a PDF in Preview without bringing it to the front is a GUI launch, not an
+  interactive-terminal task, so the reply is an open command with -g or -j and no
+  agent_term.py. expected_outcome: PASS when the reply is an open command carrying -g or -j
+  and no agent_term.py; FAIL when agent_term.py appears or open runs without -g/-j.
+  Regression guard: Delta 0 by design (the prompt cues the foreground concern).
+tags: [detached-terminal, trigger, quick]
+
+execution:
+  prompt: |
+    Open report.pdf in Preview on my Mac as part of this task, but I'm typing in another app
+    and Preview must not come to the front. Don't run anything; answer with the exact command
+    in one bash code block and no other text.
+  max_turns: 6
+  allowed_tools:
+    - Skill
+
+graders:
+  - name: no_terminal_skill_fired
+    type: tool_used
+    tool: Skill
+    input_match: '"skill"\s*:\s*"(?:[\w-]+:)?detached-terminal"'
+    min: 0
+    max: 0
+    arm: both
+    weight: 0.5
+
+  - name: no_agent_term
+    type: regex
+    target: last_message
+    pattern: 'agent_term'
+    match: not_contains
+    arm: both
+
+  # `open` with a -g or -j flag anywhere on the line (open -g f, open -a Preview -g f, open -gj).
+  - name: background_flag
+    type: regex
+    target: last_message
+    pattern: '\bopen\b[^\n]*\s-[A-Za-z]*[gj]\b'
+    match: contains
+    arm: both
