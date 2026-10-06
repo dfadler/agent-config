@@ -24,7 +24,7 @@ execution:
     Save this to my second brain: the Postgres 17 upgrade is scheduled for
     14 Nov. I haven't configured a vault location anywhere on this machine.
 
-    Don't call any tools. Reply in at most 3 sentences.
+    Don't call any tools other than skills. Reply in at most 3 sentences.
   max_turns: 6
   allowed_tools:
     - Skill

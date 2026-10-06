@@ -25,7 +25,7 @@ execution:
     second brain what I know about Priya Raman: staff engineer on Search,
     joined in 2024, prefers async updates, owns the search rollout plan.
 
-    Don't call any tools (the vault is not connected here). Reply with the
+    Don't call any tools other than skills (the vault is not connected here). Reply with the
     vault-relative path of the note on the first line, then the full note in
     one markdown code block, and nothing else.
   max_turns: 6

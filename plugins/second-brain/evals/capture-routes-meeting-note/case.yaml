@@ -33,7 +33,7 @@ execution:
     Attendees: Priya Raman, Tom Beck. We decided to ship the new search
     behind a flag on 10 Nov. Priya will write the rollout plan by 16 Oct.
 
-    Don't call any tools (the vault is not connected here). Reply with the
+    Don't call any tools other than skills (the vault is not connected here). Reply with the
     vault-relative path of the note on the first line, then the full note in
     one markdown code block, and nothing else.
   max_turns: 6

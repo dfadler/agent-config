@@ -26,7 +26,7 @@ execution:
     SECOND_BRAIN_VAULT_PATH is set to /vault. Check my second brain: what did
     we decide about the search relaunch rollout?
 
-    Don't call any tools (the vault is not connected here). Instead list, one
+    Don't call any tools other than skills (the vault is not connected here). Instead list, one
     per line and in order, the exact tool names you would call to find and
     read the notes. No commentary.
   max_turns: 6
