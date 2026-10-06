@@ -5,7 +5,7 @@
 
 import { hashText } from "./hash.ts";
 import { diff3, diff3Scalar, type Chunk, type ChunkKind } from "./diff3.ts";
-import { bodyHashOfHashes, type FileEntry } from "./manifest.ts";
+import { bodyHashOfHashes, carriedFields, type FileEntry } from "./manifest.ts";
 import { renderSections, type Normalized } from "./normalize.ts";
 
 export type PlanStatus = "in-sync" | "push" | "pull" | "mixed" | "conflict";
@@ -146,6 +146,7 @@ export function nextEntry(args: {
     body_hash: bodyHashOfHashes(sections.map((section) => section.hash)),
     sections,
     last_synced_at: args.now,
+    ...carriedFields(base),
   };
 }
 

@@ -8,16 +8,29 @@
  */
 
 import { hashText } from "./hash.ts";
-import { ManifestError, parseEntry, snapshotFile, bodyHash } from "./manifest.ts";
+import {
+  ManifestError,
+  bodyHash,
+  parseEntry,
+  snapshotFile,
+  type DeletionReason,
+} from "./manifest.ts";
 import { normalizeLocal, normalizeRemote } from "./normalize.ts";
+import { PendingError } from "./pending.ts";
 import { applyPlan, planFile } from "./plan.ts";
 import { ReadError } from "./slack-read.ts";
 import {
   SyncError,
+  pendingAdd,
+  pendingList,
+  loadManifest,
+  loadNav,
+  pendingResolve,
   planPush,
   pullStep,
   readFingerprint,
   recordStep,
+  retirePath,
   scan,
 } from "./sync-fs.ts";
 import { validate } from "./validate.ts";
@@ -47,13 +60,28 @@ result unless noted):
   scan --root DIR                 files, their state, missing files, pending deletions
   plan-push --root DIR --path P   plan pushing one file; empty stdin = no canvas yet.
                                   Never writes.
-  record --root DIR --path P --after push|pull
-                                  record a finished step from a fresh read
+  record --root DIR --path P --after push|pull [--canvas-url URL] [--nav-hash H]
+                                  record a finished step from a fresh read; the
+                                  URL (from slack_create_canvas) is kept locally;
+                                  H is the plan's nav.record_value
+  nav --root DIR                  the generated navigation block for every file
   pull --root DIR --path P [--apply]
                                   take canvas-only changes into the file; without
                                   --apply it only reports
 
-  -h, --help                      show this message
+Pending manual deletion (the connector cannot delete canvases; no stdin):
+  pending list --root DIR         canvases awaiting deletion, delete steps, and any
+                                  sync state that git tracks
+  pending add --root DIR --canvas-id ID --reason test|local-file-removed|superseded
+              [--title T] [--canvas-url URL]
+  pending resolve --root DIR --canvas-id ID
+                                  clear an entry once the canvas is deleted
+  retire --root DIR --path P --reason local-file-removed|superseded
+                                  stop tracking a file that is gone from disk and
+                                  flag its canvas for deletion; refuses if the file
+                                  still exists
+
+  -h, --help                     show this message
 `;
 
 function fail(message: string, code = EXIT_USAGE): CliResult {
@@ -154,20 +182,87 @@ function runPlan(stdin: string, now: string): CliResult {
   });
 }
 
-function runRootCommand(command: string, rest: string[], stdin: string, now: string): CliResult {
-  const parsed = parseFlags(
-    rest,
-    ["root", "path", "after"],
-    command === "pull" ? ["apply"] : [],
+const VALUED_FLAGS = [
+  "root",
+  "path",
+  "after",
+  "canvas-id",
+  "title",
+  "reason",
+  "canvas-url",
+  "nav-hash",
+];
+
+function deletionReason(
+  value: string | undefined,
+  allowed: readonly DeletionReason[],
+): DeletionReason | null {
+  return allowed.find((reason) => reason === value) ?? null;
+}
+
+function runPending(rest: string[], now: string): CliResult {
+  const [sub, ...args] = rest;
+  if (sub !== "list" && sub !== "add" && sub !== "resolve") {
+    return fail("pending: expected list, add, or resolve");
+  }
+  const parsed = parseFlags(args, VALUED_FLAGS, []);
+  if (typeof parsed === "string") return fail(`pending: ${parsed}`);
+  const root = flag(parsed, "root");
+  if (root === undefined) return fail("pending: --root is required");
+
+  if (sub === "list") return ok(pendingList(root));
+
+  const canvasId = flag(parsed, "canvas-id");
+  if (canvasId === undefined) return fail(`pending ${sub}: --canvas-id is required`);
+  if (sub === "resolve") return ok(pendingResolve(root, canvasId));
+
+  const reason = deletionReason(flag(parsed, "reason"), [
+    "test",
+    "local-file-removed",
+    "superseded",
+  ]);
+  if (reason === null) {
+    return fail("pending add: --reason test|local-file-removed|superseded is required");
+  }
+  return ok(
+    pendingAdd(
+      root,
+      {
+        canvasId,
+        title: flag(parsed, "title") ?? null,
+        reason,
+        canvasUrl: flag(parsed, "canvas-url"),
+      },
+      now,
+    ),
   );
+}
+
+function runRootCommand(command: string, rest: string[], stdin: string, now: string): CliResult {
+  const parsed = parseFlags(rest, VALUED_FLAGS, command === "pull" ? ["apply"] : []);
   if (typeof parsed === "string") return fail(`${command}: ${parsed}`);
   const root = flag(parsed, "root");
   if (root === undefined) return fail(`${command}: --root is required`);
 
   if (command === "scan") return ok(scan(root));
+  if (command === "nav") {
+    const nav = loadNav(root, loadManifest(root));
+    return ok({
+      blocks: Object.fromEntries(nav.blocks),
+      warnings: Object.fromEntries(nav.warnings),
+    });
+  }
 
   const path = flag(parsed, "path");
   if (path === undefined) return fail(`${command}: --path is required`);
+
+  if (command === "retire") {
+    const reason = deletionReason(flag(parsed, "reason"), ["local-file-removed", "superseded"]);
+    if (reason !== "local-file-removed" && reason !== "superseded") {
+      return fail("retire: --reason local-file-removed|superseded is required");
+    }
+    return ok({ retired: retirePath(root, path, reason, now) });
+  }
 
   const read = stdin.trim() === "" ? null : parseJson(stdin);
   if (stdin.trim() !== "" && read === null) return fail(`${command}: stdin is not valid JSON`);
@@ -183,7 +278,15 @@ function runRootCommand(command: string, rest: string[], stdin: string, now: str
   if (command === "record") {
     const after = flag(parsed, "after");
     if (after !== "push" && after !== "pull") return fail("record: --after push|pull is required");
-    const result = recordStep(root, path, readValue, after, now);
+    const result = recordStep(
+      root,
+      path,
+      readValue,
+      after,
+      now,
+      flag(parsed, "canvas-url"),
+      flag(parsed, "nav-hash"),
+    );
     return ok(result, result.recorded ? EXIT_OK : EXIT_FAILURE);
   }
 
@@ -223,17 +326,21 @@ export function run(argv: string[], stdin: string, now: string): CliResult {
       if (parsed === null) return fail("fingerprint: stdin is not valid JSON");
       return ok({ fingerprint: readFingerprint(parsed.value) });
     }
+    if (command === "pending") return runPending(rest, now);
     if (
       command === "scan" ||
+      command === "nav" ||
       command === "plan-push" ||
       command === "record" ||
-      command === "pull"
+      command === "pull" ||
+      command === "retire"
     ) {
       return runRootCommand(command, rest, stdin, now);
     }
   } catch (error) {
     if (
       error instanceof SyncError ||
+      error instanceof PendingError ||
       error instanceof ReadError ||
       error instanceof ManifestError ||
       error instanceof TypeError

@@ -56,13 +56,29 @@ Never reimplement its logic, and never edit `.canvas-sync/manifest.json` by hand
 CANVAS scan --root "$ROOT"
 ```
 
-Show the user the files that would be pushed: `state: "new"` (needs a canvas) and
-`state: "tracked"` with `local_changed: true`. Skip `sync: false` files. Mention any
+Show the user the files that would be pushed: `state: "new"` (needs a canvas),
+`state: "tracked"` with `local_changed: true`, and `state: "tracked"` with
+`nav_stale: true` (its navigation block is out of date, for example because a
+sibling was added or renamed). Skip `sync: false` files. Mention any
 `missing` entries (in the manifest but gone from disk; pushing never touches them,
 `canvas-pull` restores them) and print `pending_manual_deletion` so the user
 remembers what they still need to delete in Slack.
 
 If the user named files, push only those. Otherwise ask before pushing everything.
+
+## Two passes
+
+Navigation blocks link canvases to each other, so a link can only be written once
+the canvas it points to exists. Work in two passes:
+
+1. **Create** every `state: "new"` file (steps 2 to 4 below, create path). The new
+   canvases hold only their own content.
+2. **Update** every tracked file that has local changes or a stale navigation block,
+   including the files just created (steps 2 to 4, update path). This is where the
+   navigation blocks are written, because the links now resolve.
+
+A single file with no relatives needs only the first pass. Plan pass 2 only after
+pass 1 has been applied and recorded (re-run `scan`), never from a prediction.
 
 ## Step 2: Plan each file (dry run)
 
@@ -94,6 +110,12 @@ Read the JSON result:
   `status: "in-sync"` needs nothing.
 - `status: "mixed"`: the canvas also has changes the file lacks. Push sends only
   the local ones; tell the user to run `canvas-pull` afterwards.
+- `nav.action` (`insert`, `replace`, `delete`, or `none`): what happens to the
+  generated navigation block. Mention it briefly ("links will be updated"). If
+  `nav.edited_in_slack` is true, warn that someone edited the block in Slack and
+  applying will overwrite that edit; the block is generated, so changes belong in
+  the folder layout and each file's `related:` list. Show any `nav.warnings` (for
+  example a `related:` path that is not a synced file).
 
 Present one summary for all files and **ask for confirmation** before writing.
 
@@ -120,8 +142,17 @@ Call `slack_read_canvas` once more (the canvas you just wrote), save it verbatim
 and run:
 
 ```bash
-CANVAS record --root "$ROOT" --path "$REL" --after push < "$READ_FILE"
+CANVAS record --root "$ROOT" --path "$REL" --after push \
+  --nav-hash "$NAV_RECORD_VALUE" < "$READ_FILE"
 ```
+
+For an **update**, `NAV_RECORD_VALUE` is the plan's `nav.record_value` (a hash, or
+`none`); it records what the navigation block was meant to say. Leave `--nav-hash`
+off for a freshly created canvas, which has no block yet.
+
+For a file whose canvas was just created, add `--canvas-url "$URL"` with the
+`canvas_url` from the `slack_create_canvas` result, so the cleanup list can link to
+it later. The URL is kept in the local manifest only.
 
 - `recorded: true`: done. `remaining.pull > 0` only means the canvas has changes
   to pull.
@@ -131,12 +162,22 @@ CANVAS record --root "$ROOT" --path "$REL" --after push < "$READ_FILE"
 ## Step 5: Report
 
 Per file: created, updated, in sync, skipped (and why). For created canvases give
-the user the link from the tool result. End with the pending-deletion list again if
-it is not empty.
+the user the link from the tool result.
+
+Then run `CANVAS pending list --root "$ROOT"` and, if `pending` is not empty, show
+each canvas (title, reason, link) with the `delete_steps`, so nothing the sync left
+behind is forgotten. A canvas created from a file titled `[agent-sync-scratch] ...`
+is listed automatically. If `tracked_in_git` is not empty, warn that those files
+hold canvas IDs and must not be committed (see `canvas-status`). Never offer to
+delete anything.
 
 ## Known limits
 
-- No navigation blocks yet (parent/child/related links): agent-config#424.
+- Navigation blocks have a breadcrumb, children, and related links, but no
+  backlinks section yet.
+- Moving or renaming a file makes a new canvas for the new path; retire the old
+  path with `canvas-status` so its canvas lands on the cleanup list. Parents'
+  links update on the next push.
 - Section edits assume each Slack section is one markdown block; a canvas that
   breaks this is reported as an unusable read rather than guessed at.
 - Re-running `canvas-push` after a partial failure is safe: the plan is recomputed

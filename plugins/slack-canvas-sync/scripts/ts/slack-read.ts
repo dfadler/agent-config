@@ -26,6 +26,8 @@ export interface RemoteRead {
   titleId: string;
   /** Section ID of the generated navigation callout, when present. */
   navId: string | null;
+  /** The navigation callout's normalized text, when present. */
+  navText: string | null;
 }
 
 function isRecord(value: unknown): value is Record<string, unknown> {
@@ -72,8 +74,9 @@ export function parseRemoteRead(input: unknown): RemoteRead {
   }
 
   let navId: string | null = null;
+  let navText: string | null = null;
   if (sections[0]?.startsWith(`::: {.callout}\n${NAV_BLOCK_HEADER}`) === true) {
-    sections.shift();
+    navText = sections.shift() ?? null;
     navId = ids.shift() ?? null;
   }
 
@@ -87,6 +90,7 @@ export function parseRemoteRead(input: unknown): RemoteRead {
     sectionIds: ids,
     titleId,
     navId,
+    navText,
   };
 }
 
@@ -143,9 +147,44 @@ export function toUpdateBatches(ops: RemoteOp[], read: RemoteRead): UpdateSectio
         };
     }
   });
+  return chunkEdits(edits);
+}
+
+/** Split edits into calls of at most `MAX_OPS_PER_CALL`. */
+export function chunkEdits(edits: UpdateSection[]): UpdateSection[][] {
   const batches: UpdateSection[][] = [];
   for (let i = 0; i < edits.length; i += MAX_OPS_PER_CALL) {
     batches.push(edits.slice(i, i + MAX_OPS_PER_CALL));
   }
   return batches;
+}
+
+/**
+ * Add the navigation block's edit to a plan's batches. A new block goes right
+ * after the title, which is also where body content inserted at the very top
+ * goes when there is no block yet; two appends to one anchor could land in
+ * either order, so they are merged into one with the block first.
+ */
+export function withNavEdit(
+  batches: UpdateSection[][],
+  nav: UpdateSection | null,
+): UpdateSection[][] {
+  if (nav === null) return batches;
+  const edits = batches.flat();
+  const clash = edits.findIndex(
+    (edit) =>
+      edit.edit_type === "append" &&
+      nav.edit_type === "append" &&
+      edit.section_id === nav.section_id,
+  );
+  const existing = edits[clash];
+  if (existing !== undefined) {
+    edits[clash] = {
+      ...existing,
+      content: `${nav.content ?? ""}\n\n${existing.content ?? ""}`,
+    };
+  } else {
+    edits.push(nav);
+  }
+  return chunkEdits(edits);
 }
