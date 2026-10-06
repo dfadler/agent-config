@@ -1,0 +1,49 @@
+# Run: claude plugin eval plugins/slack-canvas-sync --case canvas-push-not-auto-invoked --trust-plugin --no-publish
+# No grant needed (Skill only).
+# canvas-push has disable-model-invocation: true, so a plain-language request ("push my notes to
+# Slack canvases") cannot make the model call it: the skill is not in the model's skill list
+# (observed in the trace). The honest guard is that the model does not improvise a push: no Skill
+# call, no claimed push. The should-fire check lives in the slash-invocation cases.
+# Regression guard: the no-plugin arm passes it too, so the delta is about 0 by design.
+schema_version: "1.1"
+name: canvas-push-not-auto-invoked
+description: >
+  A plain-language request to push local notes to Slack canvases does not auto-invoke the
+  user-invoked-only canvas-push and the reply claims no push. expected_outcome (regression guard):
+  PASS when no Skill call fires and no push is claimed and the reply mentions Slack; FAIL otherwise.
+tags: [canvas-push, trigger, quick]
+
+execution:
+  prompt: |
+    Push my notes in /notes/team up to Slack canvases.
+
+    Don't call any tools other than skills. If you cannot proceed, say why in
+    at most 3 sentences.
+  max_turns: 6
+  allowed_tools:
+    - Skill
+
+graders:
+  - name: canvas_push_not_auto_invoked
+    type: tool_used
+    tool: Skill
+    input_match: '"skill"\s*:\s*"(?:[\w-]+:)?canvas-push"'
+    min: 0
+    max: 0
+    arm: both
+
+  - name: no_push_claimed
+    type: regex
+    target: last_message
+    pattern: '(created|updated|pushed)\s+\d+\s+canvas|canvases?\s+(was|were|have been)\s+(created|updated|pushed)'
+    flags: i
+    match: not_contains
+    arm: both
+
+  - name: mentions_slack
+    type: regex
+    target: last_message
+    pattern: 'slack'
+    flags: i
+    match: contains
+    arm: both
