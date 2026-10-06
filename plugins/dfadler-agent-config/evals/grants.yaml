@@ -12,3 +12,5 @@ grants:
     - "Bash(gh *)"
   pr-comments-uses-prefetched-threads:
     - "Bash(gh *)"
+  pr-babysit-delegates-to-pr-checks-and-pr-comments:
+    - "Bash(gh *)"

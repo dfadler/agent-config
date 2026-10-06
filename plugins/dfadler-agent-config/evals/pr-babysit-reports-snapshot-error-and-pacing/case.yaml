@@ -3,7 +3,7 @@
 # snapshot is pasted and Bash is not offered.
 # Should-fire case for pr-babysit's routing of skipped entries: a draft PR is "skip" (report
 # only) and a snapshot-error entry is "escalate" and must report skipped.detail because no
-# verdict exists. Delegation to pr-checks/pr-comments is #484 and is not tested here.
+# verdict exists. Delegation to pr-checks/pr-comments is covered by pr-babysit-delegates-to-pr-checks-and-pr-comments (#484).
 # Can fail: skill_fired fails if the description stops matching; reports_error_detail fails if
 # the reply drops the detail text; draft_reported_as_skip (half weight) fails if PR 31 is not
 # reported as skipped; pacing_line fails if the footer is missing (a default reply has no `PACING:`

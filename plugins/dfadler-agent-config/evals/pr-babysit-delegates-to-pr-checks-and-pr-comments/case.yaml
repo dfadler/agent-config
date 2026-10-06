@@ -1,0 +1,173 @@
+# Run: claude plugin eval plugins/dfadler-agent-config --case pr-babysit-delegates-to-pr-checks-and-pr-comments --allow-tools "Bash(gh *)"
+# Shared run/grant facts: docs/contributing.md, "Plugin evals". The grant lets the
+# no-refetch graders fail if the model reaches for gh; the sandbox blocks network access.
+# Fixture decision (#484): the snapshot is pasted into the prompt, as in the sibling
+# pr-babysit cases, instead of shipping a project-local wrapper skill with a canned snapshot
+# command. A wrapper skill would sit in the plugin's skills/ directory and load in real
+# sessions; a pasted snapshot has nothing to leak and still gets past pr-babysit's "stop if no
+# snapshot command" rule because the prompt says the command already ran.
+# Composition check, sibling of pr-checks-uses-prefetched-snapshot and
+# pr-comments-uses-prefetched-threads, but from the caller's side: pr-babysit Step 2 says to
+# delegate `fix-ci` to pr-checks and `address-reviews` to pr-comments and never re-derive
+# snapshot data with ad-hoc gh calls.
+# Can fail: delegates_to_pr_checks / delegates_to_pr_comments fail if the model handles the
+# PR itself instead of loading the sub-skill; no_refetch_* fail if it re-queries GitHub for
+# data the snapshot already holds. Failure-log reads (`gh run view --log-failed`) are allowed
+# by the skill and deliberately not forbidden here.
+# Skill phrases checked: "delegate to the `pr-checks` skill", "delegate to the `pr-comments`
+# skill", "Don't re-derive any of it with ad-hoc `gh` calls".
+schema_version: "1.1"
+name: pr-babysit-delegates-to-pr-checks-and-pr-comments
+description: >
+  Given a babysit snapshot with one PR recommended fix-ci and another recommended
+  address-reviews, the model invokes pr-babysit, which delegates the first to pr-checks and
+  the second to pr-comments, without re-fetching snapshot data. expected_outcome: PASS when
+  all three skills are loaded and no gh pr checks/view/list or reviewThreads query runs;
+  FAIL when a sub-skill is never loaded or the model re-fetches.
+tags: [pr-babysit, pr-checks, pr-comments, composition]
+
+execution:
+  prompt: |
+    Babysit my open PRs. The project's snapshot command already ran and printed the JSON
+    below (selfLogin is dfadler); do not run it again. Act on each PR's recommendation and
+    finish with the report.
+
+    ```json
+    {
+      "generatedAt": "2026-10-05T12:00:00Z",
+      "repo": "dfadler/example-app",
+      "selfLogin": "dfadler",
+      "prs": [
+        {
+          "number": 101,
+          "title": "fix: handle empty config",
+          "url": "https://github.com/dfadler/example-app/pull/101",
+          "author": "dfadler",
+          "headRefName": "fix-empty-config",
+          "baseRefName": "main",
+          "headSha": "1a2b3c4",
+          "isDraft": false,
+          "skipped": null,
+          "recommendation": "fix-ci",
+          "verdict": {
+            "mergeStateStatus": "BLOCKED",
+            "mergeable": true,
+            "headline": "Required check test is failing",
+            "remedy": "Fix the failing check"
+          },
+          "checks": [
+            {"name": "lint", "state": "pass", "conclusion": "SUCCESS", "required": true},
+            {"name": "test", "state": "fail", "conclusion": "FAILURE", "required": true}
+          ],
+          "failedRuns": [
+            {
+              "runId": 9100123,
+              "workflow": "ci",
+              "runAttempt": 1,
+              "conclusion": "FAILURE",
+              "url": "https://github.com/dfadler/example-app/actions/runs/9100123",
+              "rerunBudgetLeft": true
+            }
+          ],
+          "unresolvedThreads": [],
+          "threadsTruncated": false,
+          "generalComments": [],
+          "generalCommentsTruncated": false
+        },
+        {
+          "number": 102,
+          "title": "feat: add retry option",
+          "url": "https://github.com/dfadler/example-app/pull/102",
+          "author": "dfadler",
+          "headRefName": "add-retry-option",
+          "baseRefName": "main",
+          "headSha": "5d6e7f8",
+          "isDraft": false,
+          "skipped": null,
+          "recommendation": "address-reviews",
+          "verdict": {
+            "mergeStateStatus": "BLOCKED",
+            "mergeable": true,
+            "headline": "Unresolved review thread",
+            "remedy": "Address the open thread"
+          },
+          "checks": [
+            {"name": "lint", "state": "pass", "conclusion": "SUCCESS", "required": true},
+            {"name": "test", "state": "pass", "conclusion": "SUCCESS", "required": true}
+          ],
+          "failedRuns": [],
+          "unresolvedThreads": [
+            {
+              "threadId": "PRRT_aaa",
+              "path": "src/retry.ts",
+              "line": 22,
+              "isOutdated": false,
+              "truncated": false,
+              "needsAction": true,
+              "comments": [
+                {"id": 3001, "author": "octo-reviewer", "body": "Should the delay cap at 30 seconds?", "url": "https://github.com/dfadler/example-app/pull/102#discussion_r3001", "createdAt": "2026-10-05T09:00:00Z"}
+              ]
+            }
+          ],
+          "threadsTruncated": false,
+          "generalComments": [],
+          "generalCommentsTruncated": false
+        }
+      ],
+      "pacingHint": "short"
+    }
+    ```
+  max_turns: 12
+  allowed_tools:
+    - Bash
+    - Skill
+
+graders:
+  - name: skill_fired
+    type: tool_used
+    tool: Skill
+    input_match: '"skill"\s*:\s*"(?:[\w-]+:)?pr-babysit"'
+    min: 1
+    arm: with-only
+
+  # Delegation: fix-ci goes to pr-checks.
+  - name: delegates_to_pr_checks
+    type: tool_used
+    tool: Skill
+    input_match: '"skill"\s*:\s*"(?:[\w-]+:)?pr-checks"'
+    min: 1
+    arm: with-only
+
+  # Delegation: address-reviews goes to pr-comments.
+  - name: delegates_to_pr_comments
+    type: tool_used
+    tool: Skill
+    input_match: '"skill"\s*:\s*"(?:[\w-]+:)?pr-comments"'
+    min: 1
+    arm: with-only
+
+  # No re-derivation of snapshot data: checks, PR state, and review threads are all in it.
+  - name: no_refetch_checks_or_pr_state
+    type: tool_used
+    tool: Bash
+    input_match: 'gh\s+pr\s+(?:checks|view|list|status)'
+    min: 0
+    max: 0
+    arm: with-only
+
+  - name: no_refetch_threads
+    type: tool_used
+    tool: Bash
+    input_match: 'reviewThreads|pulls/\d+/comments'
+    min: 0
+    max: 0
+    arm: with-only
+
+  # Wording: pr-babysit's own footer, which a no-plugin reply lacks. Gives the case a result
+  # grader scored in both arms. Half weight: the skill allows `long` once the pass finishes.
+  - name: pacing_line_present
+    type: regex
+    target: last_message
+    pattern: 'PACING:\s*\*{0,2}\s*(?:short|long)'
+    match: contains
+    weight: 0.5
