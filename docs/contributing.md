@@ -222,7 +222,7 @@ only its own run command and why its graders are shaped as they are.
   cannot do that hermetically (no network, and `Bash` is withheld without a recorded grant).
   So the legacy file stays for end-to-end audits, and `evals/<case>/case.yaml` covers only
   what a Skill-only run can check: the trigger boundary (`audit-fires-on-slow-ci`,
-  `audit-stays-quiet-on-workflow-authoring`). Revisit if `claude plugin eval` gains a way
+  `audit-stays-quiet-on-workflow-authoring`, `audit-stays-quiet-on-failed-run`). Revisit if `claude plugin eval` gains a way
   to mock `gh` without `--scaffold`, or if a recorded-fixture mode is added to the collector
   so a case can feed the scripts canned `runs.json` and `jobs.json`.
 

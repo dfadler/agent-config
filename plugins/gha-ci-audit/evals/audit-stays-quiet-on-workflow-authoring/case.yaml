@@ -11,7 +11,8 @@ description: >
   A request to write a new GitHub Actions workflow must not invoke gha-ci-audit, since it is
   authoring, not an audit of CI cost or speed. expected_outcome: PASS when the skill is not
   invoked and the reply contains workflow YAML with actions/checkout; FAIL when the skill is
-  invoked or the reply has no workflow.
+  invoked or the reply has no workflow. Regression guard: a no-plugin run is expected to
+  pass, so the Delta is zero by design.
 tags: [gha-ci-audit, trigger, quick]
 
 execution:
