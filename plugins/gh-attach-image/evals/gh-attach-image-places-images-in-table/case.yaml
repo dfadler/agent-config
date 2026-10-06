@@ -1,0 +1,59 @@
+# Run: claude plugin eval plugins/gh-attach-image --case gh-attach-image-places-images-in-table --runs 3 --trust-plugin --no-publish
+# Should-fire half, default-mode form. Hermetic: commands requested, not run, no Bash grant.
+# The skill has two modes. `--pr N` appends a "## Screenshots" block to the body, which cannot
+# put an image inside an existing table cell; the default mode only prints markdown, and the
+# body must then be saved with `gh pr edit --body-file` or the URLs 404 forever ("the one
+# gotcha"). This case tests that the model picks the default mode and includes the save step.
+# Every grader is free, so the case is tagged `quick`.
+# Sabotage map: default_mode_not_append checks "Default: upload and print markdown lines —
+# use this when the images need to go in a specific spot in a hand-crafted body (a table...)"
+# in SKILL.md; saves_body_after_upload checks the sentences about saving the body with
+# `gh pr edit N --repo OWNER/NAME --body-file file.md` and "the save step isn't optional". Empty
+# SKILL.md's body and both should fail.
+# Can fail: `upload.sh --pr 42` (append mode) fails default_mode_not_append; no `gh pr edit
+# ... --body-file` after the upload fails saves_body_after_upload; skill_fired fails if the
+# skill never triggers. The order check is on text position, since there are no tool calls.
+schema_version: "1.1"
+name: gh-attach-image-places-images-in-table
+description: >
+  When asked to get two screenshots into the empty cells of a table in an existing PR body, the
+  model invokes gh-attach-image, runs upload.sh without --pr or --issue, then saves the body
+  with `gh pr edit ... --body-file`. expected_outcome: PASS when upload.sh is called in default
+  mode and a `gh pr edit` with `--body-file` follows it; FAIL on append mode or no save step.
+  Without the plugin there is no upload.sh to name, so a delta is expected.
+tags: [gh-attach-image, trigger, quick]
+
+execution:
+  prompt: |
+    The description of PR 42 on acme/widgets has a Before | After table whose cells are
+    empty. Get before.png and after.png, both in the current directory, to show inline in
+    those two cells. Don't run anything. Reply with the commands in order in one code block
+    and no other text; a placeholder for the edited body file is fine.
+  max_turns: 8
+  allowed_tools:
+    - Skill
+
+graders:
+  # Steps. Indicator in a two-arm run, scored only with the plugin.
+  - name: skill_fired
+    type: tool_used
+    tool: Skill
+    input_match: '"skill"\s*:\s*"(?:[\w-]+:)?gh-attach-image"'
+    min: 1
+    arm: with-only
+
+  # Result. `--pr` followed by a word boundary does not match `--project`.
+  - name: default_mode_not_append
+    type: regex
+    target: last_message
+    pattern: 'upload\.sh[\s\S]{0,160}?--(?:pr|issue)\b'
+    match: not_contains
+    arm: both
+
+  # A reply with no upload.sh at all fails this too, which is the point.
+  - name: saves_body_after_upload
+    type: regex
+    target: last_message
+    pattern: 'upload\.sh[\s\S]*gh\s+pr\s+edit[\s\S]{0,160}--body-file'
+    match: contains
+    arm: both

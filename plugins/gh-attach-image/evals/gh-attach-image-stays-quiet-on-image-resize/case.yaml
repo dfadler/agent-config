@@ -1,0 +1,53 @@
+# Run: claude plugin eval plugins/gh-attach-image --case gh-attach-image-stays-quiet-on-image-resize --runs 3 --trust-plugin --no-publish
+# Should-not-fire half: shares the skill's object (a local screenshot file) with no GitHub
+# involved. Hermetic: a command is requested, not run, no Bash grant. Every grader is free, so the case is tagged `quick`.
+# Sabotage map: skill_not_invoked checks the description's scope ("Upload local image or video
+# files ... so they render inline in a GitHub PR description, issue description, or PR/issue
+# comment"); change it to "any task involving screenshots" and a run should invoke the skill
+# and fail.
+# Can fail: the skill is invoked fails skill_not_invoked; a reply that uploads or uses gh
+# fails no_github_upload; a reply without an ImageMagick command with 800 fails
+# resizes_to_800. A regression guard: a no-plugin arm passes it by default, so expect no delta.
+schema_version: "1.1"
+name: gh-attach-image-stays-quiet-on-image-resize
+description: >
+  A request to resize a local screenshot with ImageMagick must not invoke gh-attach-image.
+  expected_outcome: PASS when the skill is not invoked and the reply is an ImageMagick command
+  with 800 and no `gh` or upload.sh; FAIL otherwise. A regression guard with no expected delta.
+tags: [gh-attach-image, trigger, quick]
+
+execution:
+  prompt: |
+    Resize screenshot.png in the current directory to 800 pixels wide, keeping its aspect
+    ratio, using ImageMagick. Don't run anything. Reply with the single command in one code
+    block and no other text.
+  max_turns: 6
+  allowed_tools:
+    - Skill
+
+graders:
+  # Steps. min 0 is explicit: tool_used defaults min to 1. arm both so the "never called"
+  # check is scored in a two-arm run too.
+  - name: skill_not_invoked
+    type: tool_used
+    tool: Skill
+    input_match: '"skill"\s*:\s*"(?:[\w-]+:)?gh-attach-image"'
+    min: 0
+    max: 0
+    arm: both
+
+  # Result: task-completion checks, not skill properties.
+  - name: resizes_to_800
+    type: regex
+    target: last_message
+    pattern: '(?:magick|convert|mogrify)[^\n]*800'
+    flags: i
+    match: contains
+    arm: both
+
+  - name: no_github_upload
+    type: regex
+    target: last_message
+    pattern: '\bgh\s|upload\.sh'
+    match: not_contains
+    arm: both
