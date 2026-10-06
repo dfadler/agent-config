@@ -45,6 +45,16 @@ describe("extractLinks", () => {
     ).toEqual([]);
   });
 
+  it("ignores Slack mention syntax, which is not a path", () => {
+    expect(extractLinks("Ping ![](@U123ABC) in ![](#C456DEF).")).toEqual([]);
+  });
+
+  it("still reports a relative link that merely contains an at sign later in the path", () => {
+    expect(extractLinks("[x](docs/@missing.md)")).toEqual([
+      { line: 1, target: "docs/@missing.md" },
+    ]);
+  });
+
   it("ignores an https URL when the link text has its own parenthetical", () => {
     expect(extractLinks("[Prompt injection defenses (research)](https://e.com/research)")).toEqual(
       [],

@@ -294,6 +294,26 @@ function runRootCommand(command: string, rest: string[], stdin: string, now: str
   return ok(result, result.blocked === null ? EXIT_OK : EXIT_FAILURE);
 }
 
+const STDIN_COMMANDS: readonly string[] = [
+  "normalize",
+  "validate",
+  "plan",
+  "fingerprint",
+  "plan-push",
+  "record",
+  "pull",
+];
+
+/**
+ * Whether a command takes input on stdin. The others never touch it, so the
+ * wrapper must not block or fail on a stdin that is closed, non-blocking, or
+ * attached to nothing (reading it raised EAGAIN when `scan` ran in a pipeline).
+ */
+export function readsStdin(argv: string[]): boolean {
+  const [command] = argv;
+  return command !== undefined && STDIN_COMMANDS.includes(command);
+}
+
 /** Run one command. `now` is injected so results stay deterministic. */
 export function run(argv: string[], stdin: string, now: string): CliResult {
   const [command, ...rest] = argv;

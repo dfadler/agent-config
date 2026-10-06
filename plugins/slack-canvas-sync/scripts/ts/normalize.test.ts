@@ -228,6 +228,31 @@ test("hand-edited local text and a remote read of it hash-compare equal", () => 
   assert.equal(local.body, remote.body);
 });
 
+test("mentions read back in message syntax match the canvas syntax they were written in", () => {
+  const written = normalizeBody("Ping ![](@U123ABC) in ![](#C456DEF) now.\n");
+  assert.equal(normalizeBody("Ping <@U123ABC> in <#C456DEF> now.\n"), written);
+  assert.equal(normalizeBody("Ping <@U123ABC|alice> in <#C456DEF|general> now.\n"), written);
+  assert.equal(written, "Ping ![](@U123ABC) in ![](#C456DEF) now.\n");
+});
+
+test("mentions are canonicalized inside lists, tables, and callouts, but not in code fences", () => {
+  assert.equal(normalizeBody("* hi <@UAAA111>\n"), "* hi ![](@UAAA111)\n");
+  assert.equal(normalizeBody("|a|\n|---|\n|<@UAAA111>|\n"), "|a|\n|  ---  |\n|![](@UAAA111)|\n");
+  assert.equal(normalizeBody("::: {.callout}\n<@UAAA111>\n:::\n"), "::: {.callout}\n![](@UAAA111)\n:::\n");
+  const code = "```\n<@UAAA111>\n```";
+  assert.equal(normalizeBody(`${code}\n\n<@UAAA111>\n`), `${code}\n\n![](@UAAA111)\n`);
+});
+
+test("a mention after a line that does not close the fence is still inside the code", () => {
+  // "```~~" and "~~~" do not close a ``` fence, so the mention is still code.
+  const code = "```\n```~~\n~~~\n<@UAAA111>\n```";
+  assert.equal(normalizeBody(`${code}\n\n<@UAAA111>\n`), `${code}\n\n![](@UAAA111)\n`);
+});
+
+test("text that only looks like a mention is left alone", () => {
+  assert.equal(normalizeBody("a <b> and <@not-an-id> c\n"), "a <b> and <@not-an-id> c\n");
+});
+
 test("sections are the top-level blocks, and re-rendering them gives the body", () => {
   const result = normalizeLocal("# T\n\n- a\n- b\n\n```\nx\n\ny\n```\n\ntext\n");
   assert.deepEqual(result.sections, ["* a\n* b", "```\nx\n\ny\n```", "text"]);

@@ -136,8 +136,39 @@ user, or channel.
 UI-style edits) used to drive end-to-end sync scenarios and a seeded fuzz test
 that checks both sides converge. No network.
 
-Known assumptions to re-verify against a live canvas (#426): ordered lists are
-renumbered from 1, table column alignment is dropped, and the layout/column
-read format is unrecorded.
+`mention.md` is a recording from a live canvas: Slack accepts `![](@U…)` but reads
+it back as `<@U…>`, so the normalizer rewrites both sides to the canvas form.
+
+Verified against a live Pro workspace (#426), details in the issue:
+
+- Section IDs (`temp:C:…`) were unchanged on every read of a canvas over the whole
+  working session, including UI edits and `replace`/`append` (replace keeps the ID).
+- Several `append` edits to one section in a single call land in **reverse** order;
+  one `append` with several blocks keeps their order. This is why inserts are merged
+  into one edit per anchor.
+- A canvas link inside a callout reads back as a plain link (no unfurl rewriting);
+  `[` `]` escaped in link text come back unescaped; a single line break inside a
+  paragraph comes back as a space, so the breadcrumb is its own paragraph. None of it
+  causes churn, because the navigation block is compared by hash.
+- Column layouts round-trip as one section; ordered lists and tables are stored as
+  sent (the normalizer already renumbers lists and drops table alignment before
+  sending).
+
+- Comment threads: a comment added in the Slack UI is reported by `slack_read_canvas`
+  as `comment_threads`. The thread stays listed, unchanged, after its section is
+  replaced and after the section is deleted. But a thread's `section_id` is never one
+  of the IDs in `section_id_mapping`, so a comment cannot be matched to a section and
+  the sync cannot warn per section. It can only tell that the canvas has open
+  threads. In the Slack UI the comment also stayed visible after its section was
+  replaced and after the section was deleted (one comment, one canvas).
+- Deleted canvases: after a canvas is deleted in Slack, `slack_read_canvas` **still
+  returns its content** (Slack allows restoring a deleted canvas for 24 hours), but
+  `slack_update_canvas` fails with `file_not_found`; reading an ID that never existed
+  fails with `file_not_found` too. A push to a deleted canvas therefore fails loudly,
+  and `canvas-status` detects a deleted canvas with a no-op title write rather than
+  a read.
+
+Not verified live: whether a read starts failing once Slack purges a deleted canvas,
+and rate limits on a large first sync (docs only: create is Tier 2, update Tier 3).
 
 Run with `make test-ts` (needs the Node from `.nvmrc`).
