@@ -16,6 +16,7 @@ description: >
   interactive-terminal task, so the reply is an open command with -g or -j and no
   agent_term.py. expected_outcome: PASS when the reply is an open command carrying -g or -j
   and no agent_term.py; FAIL when agent_term.py appears or open runs without -g/-j.
+  Regression guard: Delta 0 by design (the prompt cues the foreground concern).
 tags: [detached-terminal, trigger, quick]
 
 execution:

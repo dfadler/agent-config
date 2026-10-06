@@ -28,7 +28,8 @@ execution:
     start it, look at what is on the screen, send keystrokes, look again, then save and
     quit. I'm typing in another app right now, so nothing may pop up in front of me. Don't
     run anything; answer with the exact shell commands you would run, in order, in one bash
-    code block and no other text.
+    code block and no other text. Write any script path out in full in every command, not
+    through a variable.
   max_turns: 6
   allowed_tools:
     - Skill
@@ -69,6 +70,7 @@ graders:
     pattern: 'open\s+-a\b|osascript|tell application'
     flags: i
     match: not_contains
+    weight: 0.5
 
   # Half weight: the model may rely on :wq and leave the session to its TTL.
   - name: stops_session

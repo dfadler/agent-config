@@ -13,7 +13,8 @@ description: >
   A 25-minute test suite to be started now and checked later is a background job, so
   detached-terminal must not fire; the reply picks a background run. expected_outcome: PASS
   when the skill is not invoked and the reply names a background run; FAIL when the skill is
-  invoked, agent_term.py appears, or the reply does not mention running in the background.
+  invoked, agent_term.py appears, or the reply does not name run_in_background. Regression
+  guard: Delta 0 by design.
 tags: [detached-terminal, trigger, quick]
 
 execution:
@@ -41,11 +42,11 @@ graders:
     match: not_contains
     arm: both
 
-  # Completion check: baselines also pick a background run.
+  # Completion check that names the exact Bash option the skill's description points to.
+  # A baseline may also say it, so this is a guard, not a delta.
   - name: names_background
     type: regex
     target: last_message
-    pattern: 'run_in_background|in the background|background'
-    flags: i
+    pattern: 'run_in_background'
     match: contains
     arm: both

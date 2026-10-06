@@ -24,7 +24,8 @@ execution:
   prompt: |
     Run htop and tell me which process is using the most CPU right now. I'm in the middle of
     typing in another app, so don't take my focus. Don't run anything; answer with the exact
-    shell commands you would run, in order, in one bash code block and no other text.
+    shell commands you would run, in order, in one bash code block and no other text. Write
+    any script path out in full in every command, not through a variable.
   max_turns: 6
   allowed_tools:
     - Skill
@@ -55,3 +56,4 @@ graders:
     pattern: 'open\s+-a\b|osascript|tell application'
     flags: i
     match: not_contains
+    weight: 0.5

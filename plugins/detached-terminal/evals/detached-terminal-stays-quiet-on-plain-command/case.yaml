@@ -12,7 +12,7 @@ description: >
   A request to count lines in markdown files is a plain non-interactive command, so
   detached-terminal must not fire and the reply must not use agent_term.py. expected_outcome:
   PASS when the skill is not invoked and the reply is a plain wc/awk style command; FAIL when
-  the skill is invoked or agent_term.py appears.
+  the skill is invoked or agent_term.py appears. Regression guard: Delta 0 by design.
 tags: [detached-terminal, trigger, quick]
 
 execution:
@@ -46,3 +46,4 @@ graders:
     pattern: 'wc\s+-l|awk|grep\s+-c|cloc'
     match: contains
     arm: both
+    weight: 0.5
