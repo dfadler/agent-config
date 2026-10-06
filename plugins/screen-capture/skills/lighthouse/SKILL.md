@@ -48,7 +48,8 @@ Resolved in this order — first source that defines the key wins:
 1. **`second-brain:config`** (vault, if connected) — reads
    `config/global/lighthouse.md` then `config/projects/<project>/lighthouse.md`
    frontmatter (per-project overrides global). Degrades gracefully (skips
-   to the next source) if the Obsidian MCP is disconnected — see
+   to the next source) if the Obsidian MCP is disconnected or the
+   `second-brain` plugin isn't installed — see
    `second-brain:config`'s own SKILL.md (issue #328) for that resolution
    contract.
 2. **`.claude/settings.json`** (project) → **`~/.claude/settings.json`**

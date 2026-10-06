@@ -38,10 +38,14 @@ skills.
 - [ ] **References siblings by name**, not by hoping the model notices them: a
       relative link (`[pr-checks](../pr-checks/SKILL.md)`) or `plugin:skill`.
       Reference the skill's contract, not its internals.
-- [ ] **Cross-plugin references degrade.** If the other plugin may not be
-      installed, say what to do without it (see `screen-capture:capture`
-      reading `second-brain:config`). Whether to declare a plugin dependency is
-      covered in [contributing.md](./contributing.md#adding-something-new).
+- [ ] **Cross-plugin references degrade.** A reference to a skill in another
+      plugin must say what to do when that plugin isn't installed: skip the
+      step (`screen-capture:capture` skips `second-brain:config`) or stop and
+      tell the user what to install (`screen-capture:attach` and
+      `gh-attach-image`). A pointer-only mention in a `description`
+      (`vitest:test-conventions` -> `vite:test`) needs no fallback. Whether to
+      declare a plugin dependency is covered in
+      [contributing.md](./contributing.md#adding-something-new).
 
 ## What is enforced
 
