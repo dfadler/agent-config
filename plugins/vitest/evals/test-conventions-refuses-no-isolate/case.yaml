@@ -1,0 +1,55 @@
+# Shared run/grant/deviation facts: docs/contributing.md, "Plugin evals".
+# Run: claude plugin eval plugins/vitest --case test-conventions-refuses-no-isolate --ablation with-without --judge-model sonnet --no-publish --verbose
+# Why these graders: plain Claude often offers `isolate: false` as a speed-up. The skill
+# says to keep isolation on, so a free regex catches the recommendation and one narrow llm
+# grader checks the reason (shared module state), which a regex cannot judge.
+# Sabotage map (test-conventions/SKILL.md; quoted text, not line numbers):
+#   no_isolate_false, no_cli_no_isolate   "Keep `isolate` at its default (true)"
+#   explains_isolation_tradeoff           "unisolated files share module state"
+# Not covered: the issue also asks for a "profile first" check; the skill does not say
+# that, so grading it would test plain Claude, not the plugin.
+schema_version: "1.1"
+name: test-conventions-refuses-no-isolate
+description: >
+  When asked to speed up a slow Vitest run, test-conventions says to keep isolation
+  on rather than set isolate: false or --no-isolate.
+tags: [vitest, test-conventions]
+
+execution:
+  prompt: |
+    Our Vitest run is slow, speed it up. Our vitest.config.ts currently has
+    `test: { sequence: { shuffle: true } }` and nothing else. What should I
+    change in the Vitest config? Just advise, don't run anything.
+  max_turns: 5
+  allowed_tools:
+    - Skill
+
+graders:
+  - name: skill_fired
+    type: tool_used
+    tool: Skill
+    input_match: '"skill"\s*:\s*"(?:[\w-]+:)?test-conventions"'
+    min: 1
+    arm: with-only
+
+  - name: no_isolate_false
+    type: regex
+    target: last_message
+    pattern: "isolate\\s*:\\s*false"
+    match: not_contains
+
+  - name: no_cli_no_isolate
+    type: regex
+    target: last_message
+    pattern: "--no-isolate|--isolate=false|vmThreads|vmForks"
+    match: not_contains
+
+  - name: explains_isolation_tradeoff
+    type: llm
+    criteria: |
+      PASS if the response says that turning off test isolation (isolate: false
+      or --no-isolate) is unsafe or discouraged because test files then share
+      module state, or says plainly to keep isolation on.
+
+      FAIL if the response never mentions isolation, or recommends disabling it
+      as a speed-up.

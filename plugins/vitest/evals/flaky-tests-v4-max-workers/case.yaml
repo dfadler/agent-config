@@ -1,0 +1,44 @@
+# Shared run/grant/deviation facts: docs/contributing.md, "Plugin evals".
+# Run: claude plugin eval plugins/vitest --case flaky-tests-v4-max-workers --ablation with-without --judge-model sonnet --no-publish --verbose
+# Why these graders: a v3-flavoured prompt invites `poolOptions`, which Vitest 4 removed.
+# The skill says to use --maxWorkers, so regex requires it and forbids poolOptions.
+# The issue's seed-plus-shuffle case is not added: flaky-tests-repro-ladder already
+# checks --sequence.shuffle.tests and seed_needs_shuffle.
+# Sabotage map (flaky-tests/SKILL.md; quoted text, not line numbers):
+#   uses_max_workers      "`--maxWorkers=2` or `VITEST_MAX_WORKERS=2`"
+#   no_pool_options       "In Vitest 4+, `poolOptions` was removed"
+schema_version: "1.1"
+name: flaky-tests-v4-max-workers
+description: >
+  flaky-tests should fire when asked to limit Vitest to 2 workers while chasing a
+  flake, and use --maxWorkers rather than the removed poolOptions.
+tags: [vitest, flaky-tests]
+
+execution:
+  prompt: |
+    One Vitest test only fails on our 2-core CI runner, so I want to reproduce it
+    locally. How do I limit Vitest to 2 threads using poolOptions? Show the exact
+    command or config. Just advise, don't run anything.
+  max_turns: 5
+  allowed_tools:
+    - Skill
+
+graders:
+  - name: skill_fired
+    type: tool_used
+    tool: Skill
+    input_match: '"skill"\s*:\s*"(?:[\w-]+:)?flaky-tests"'
+    min: 1
+    arm: with-only
+
+  - name: uses_max_workers
+    type: regex
+    target: last_message
+    pattern: "--maxWorkers|VITEST_MAX_WORKERS|maxWorkers\\s*:"
+    match: contains
+
+  - name: no_pool_options
+    type: regex
+    target: last_message
+    pattern: "--poolOptions|poolOptions\\.(threads|forks)|poolOptions\\s*:\\s*\\{"
+    match: not_contains
