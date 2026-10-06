@@ -5,18 +5,20 @@
 # spent must be escalated, not rerun, and never "fixed" by editing CI config. Complements
 # pr-checks-uses-prefetched-snapshot (cancelled run) with the rerunBudgetLeft gate.
 # Can fail: skill_fired fails if the description stops matching; escalates fails if the reply
-# does not report a blocker; no_rerun_reported fails if the reply says it reran the run. A
-# regex for "edits CI config to fix the flake" was left out: it false-fails on "not editing".
-# A baseline that reads rerunBudgetLeft:false from the data will pass the
-# first two result checks, so expect a small Delta; the case guards the skill's hard limit.
+# does not report a blocker; classified_flaky_or_infra (half weight) fails if the line uses
+# neither of the skill's words. Rerun and config-edit regexes were left out: Bash is not
+# offered so a rerun cannot happen, and "edits CI config" false-fails on "not editing". A
+# baseline that reads rerunBudgetLeft:false from the data will pass `escalates`, so expect a
+# small Delta; this is mostly a guard on the skill's hard limit.
 # Skill phrases checked: "otherwise report the blocker", "At most 2 reruns".
 schema_version: "1.1"
 name: pr-checks-escalates-when-rerun-budget-spent
 description: >
   Given pre-fetched checks where an infra timeout has already used its rerun budget, the
   model invokes pr-checks and escalates instead of rerunning or editing CI config.
-  expected_outcome: PASS when the skill fires and the reply reports a blocker without a rerun
-  or config edit; FAIL when it reruns, edits config, or never fires the skill.
+  expected_outcome: PASS when the skill fires and the reply reports a blocker for
+  integration-tests; FAIL when the skill never fires or the reply reports no blocker. Small
+  Delta expected (guard on the rerun-budget limit).
 tags: [pr-checks, trigger, quick]
 
 execution:
@@ -71,11 +73,11 @@ graders:
     flags: i
     match: contains
 
-  # "reran via" / "rerun triggered" are the skill's report phrases for an action taken;
-  # "no rerun" or "not rerun" do not match.
-  - name: no_rerun_reported
+  # The skill's classification word for a timeout; a default reply may say "transient".
+  - name: classified_flaky_or_infra
     type: regex
     target: last_message
-    pattern: 'reran\b|rerun triggered|re-ran\b'
+    pattern: 'integration-tests[^\n]*(?:flaky|infra)'
     flags: i
-    match: not_contains
+    match: contains
+    weight: 0.5

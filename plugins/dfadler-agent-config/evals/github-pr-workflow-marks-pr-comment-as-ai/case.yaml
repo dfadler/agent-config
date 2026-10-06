@@ -37,7 +37,7 @@ graders:
   - name: marker_in_command
     type: regex
     target: last_message
-    pattern: 'gh pr comment\s+12[\s\S]*--body\s+["''][^"'']*🤖 \*\*Claude:\*\*'
+    pattern: '(?=[\s\S]*gh pr comment\s+12)[\s\S]*🤖 \*\*Claude:\*\*'
     match: contains
 
   # Completion check: the authorized text is posted, not a rewrite of it.

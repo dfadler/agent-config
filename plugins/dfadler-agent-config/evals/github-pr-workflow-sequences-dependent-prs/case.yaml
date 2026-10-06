@@ -42,11 +42,12 @@ graders:
     pattern: '(?:^|\n)##\s*Sequencing'
     match: contains
 
-  # Positive form so "not squash" prose cannot fail it; the method has to be a merge commit.
+  # The prompt asks for the method as the final line, so anchor to the last line: "I'd squash,
+  # not a merge commit" earlier in the body cannot satisfy it.
   - name: merge_commit_method
     type: regex
     target: last_message
-    pattern: '(?:merge commit|ordinary merge|regular merge|--merge\b)'
+    pattern: '(?:^|\n)[^\n]*(?:merge commit|ordinary merge|regular merge|--merge\b)[^\n]*\s*$'
     flags: i
     match: contains
 

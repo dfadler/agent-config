@@ -93,5 +93,5 @@ graders:
   - name: pacing_line
     type: regex
     target: last_message
-    pattern: 'PACING:\s*\*{0,2}\s*(?:short|long)'
+    pattern: 'PACING:\s*\*{0,2}\s*long'
     match: contains

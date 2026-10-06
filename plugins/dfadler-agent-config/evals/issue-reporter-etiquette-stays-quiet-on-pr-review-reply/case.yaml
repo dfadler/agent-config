@@ -11,8 +11,9 @@ schema_version: "1.1"
 name: issue-reporter-etiquette-stays-quiet-on-pr-review-reply
 description: >
   A request to draft a reply to an inline PR review comment must not invoke
-  issue-reporter-etiquette. expected_outcome: PASS when that skill does not fire and the reply
-  addresses the reviewer's Map question; FAIL when it fires.
+  issue-reporter-etiquette. expected_outcome: regression guard, Delta about 0 by design.
+  PASS when that skill does not fire and the reply addresses the reviewer's Map question;
+  FAIL when it fires.
 tags: [issue-reporter-etiquette, trigger, quick]
 
 execution:
@@ -41,3 +42,4 @@ graders:
     flags: i
     match: contains
     arm: both
+    weight: 0.5

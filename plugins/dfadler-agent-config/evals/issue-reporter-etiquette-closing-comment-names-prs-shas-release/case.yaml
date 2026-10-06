@@ -54,22 +54,26 @@ graders:
     pattern: '🤖 \*\*Claude:\*\*'
     match: contains
 
+  # Completion checks: the pasted PR numbers and SHAs are copied through. Half weight, a
+  # default reply passes them too; the marker and the unreleased wording carry the score.
   - name: both_prs
     type: regex
     target: last_message
     pattern: '#101[\s\S]*#104|#104[\s\S]*#101'
     match: contains
+    weight: 0.5
 
   - name: both_shas
     type: regex
     target: last_message
     pattern: '3fa9c21[\s\S]*b82d4e7|b82d4e7[\s\S]*3fa9c21'
     match: contains
+    weight: 0.5
 
   - name: unreleased
     type: regex
     target: last_message
-    pattern: 'unreleased|not yet (?:released|tagged)|next release'
+    pattern: 'unreleased|not yet (?:released|tagged)'
     flags: i
     match: contains
 
@@ -79,3 +83,4 @@ graders:
     pattern: 'gh issue close'
     flags: i
     match: not_contains
+    weight: 0.5

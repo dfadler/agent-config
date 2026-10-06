@@ -10,8 +10,9 @@ schema_version: "1.1"
 name: pr-checks-stays-quiet-on-workflow-authoring
 description: >
   A request to write a GitHub Actions workflow that runs lint on pull requests must not
-  invoke pr-checks, pr-babysit or pr-comments. expected_outcome: PASS when none of those
-  skills fires and the reply contains a workflow; FAIL when one fires.
+  invoke pr-checks, pr-babysit or pr-comments. expected_outcome: regression guard, Delta
+  about 0 by design. PASS when none of those skills fires and the reply contains a workflow;
+  FAIL when one fires.
 tags: [pr-checks, trigger, quick]
 
 execution:

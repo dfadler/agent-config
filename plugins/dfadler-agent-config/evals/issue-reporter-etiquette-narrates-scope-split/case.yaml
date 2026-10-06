@@ -49,16 +49,18 @@ graders:
   - name: names_deferred
     type: regex
     target: last_message
-    pattern: '(?:defer|hold off|not (?:taking|doing)|leav)[^\n]*(?:TOML|config)|(?:TOML|config)[^\n]*(?:defer|hold off|later|separately|decision)'
+    pattern: '(?=[\s\S]*TOML)(?=[\s\S]*(?:defer|hold off|on hold|later|separately|not (?:taking|doing)))'
     flags: i
     match: contains
 
+  # Completion check: the reason words come from the prompt, so a default reply passes too.
   - name: gives_reason
     type: regex
     target: last_message
     pattern: 'product decision|migrat'
     flags: i
     match: contains
+    weight: 0.5
 
   # Wording check: a date or "by <day>" promise. Half weight: phrasing varies.
   - name: no_timeline

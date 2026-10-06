@@ -11,8 +11,9 @@ schema_version: "1.1"
 name: pr-skills-stay-quiet-on-commit-message
 description: >
   A request for a commit subject line for a local diff, mentioning that a PR will follow
-  later, must not invoke any of the six PR-side skills. expected_outcome: PASS when none of
-  them fires and the reply is a conventional-commit subject; FAIL when one fires.
+  later, must not invoke any of the six PR-side skills. expected_outcome: regression guard,
+  Delta about 0 by design. PASS when none of them fires and the reply is a
+  conventional-commit subject; FAIL when one fires.
 tags: [pr-babysit, pr-checks, pr-comments, pr-review-rubric, github-pr-workflow, issue-reporter-etiquette, trigger, quick]
 
 execution:

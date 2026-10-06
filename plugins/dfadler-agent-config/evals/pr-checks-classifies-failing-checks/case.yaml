@@ -74,21 +74,21 @@ graders:
   - name: lint_branch_related
     type: regex
     target: last_message
-    pattern: 'lint[^\n]*branch-related'
+    pattern: 'lint[^\n]*(?:branch-related|caused by|this PR|your (?:change|edit))'
     flags: i
     match: contains
 
   - name: integration_flaky
     type: regex
     target: last_message
-    pattern: 'integration-tests[^\n]*(?:flaky|infra)'
+    pattern: 'integration-tests[^\n]*(?:flaky|infra|transient|network)'
     flags: i
     match: contains
 
   - name: coverage_superseded
     type: regex
     target: last_message
-    pattern: 'coverage[^\n]*(?:superseded|cancel)'
+    pattern: 'coverage[^\n]*(?:superseded|newer push)'
     flags: i
     match: contains
 
