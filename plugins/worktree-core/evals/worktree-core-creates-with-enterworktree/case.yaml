@@ -1,0 +1,49 @@
+# Run: claude plugin eval plugins/worktree-core --case worktree-core-creates-with-enterworktree --runs 3 --trust-plugin --no-publish
+# Shared run/grant facts: docs/contributing.md, "Plugin evals". No grant and no tool beyond
+# Skill: EnterWorktree is not one of the tools a case can allow (the docs list only read-only
+# tools plus --allow-tools grants), so the model's choice is graded from its reply. The
+# workspace is empty and never becomes a git repo; nothing runs, so nothing is created.
+# The plugin's hooks (SessionStart symlink check and prune, PreToolUse require-worktree) are
+# off by default and do nothing in this run; they are not what these cases test.
+# Should-fire case for the skill's first rule; the near-misses are
+# worktree-core-stays-quiet-on-*. Every grader is free, so the case is tagged quick.
+# Can fail: # uses_enterworktree and no_raw_worktree_add fail when the reply gives `git worktree add`
+# instead of the EnterWorktree tool, which is what a no-plugin model usually writes.
+# The prompt never names EnterWorktree, so the check is not cued.
+# Skill phrase checked: "Create worktrees with the `EnterWorktree` tool, never raw `git worktree add`".
+# No skill_fired grader: a 2026-10-05 measurement showed the skill rarely fires on this reply-only
+# prompt, yet the plugin's description still shapes the reply. The case measures that with the
+# with/without delta (run with --ablation with-without), not whether the skill was invoked.
+schema_version: "1.1"
+name: worktree-core-creates-with-enterworktree
+description: >
+  Asked how to create an isolated worktree for a multi-file feature, the model
+  names the EnterWorktree tool, not raw git worktree add.
+  expected_outcome: PASS when the reply names EnterWorktree with no
+  git worktree add; FAIL when the reply gives a raw git worktree
+  command.
+tags: [worktree-core, trigger, quick]
+
+execution:
+  prompt: |
+    I'm about to start a multi-file feature in this repo and want to work in a git worktree
+    so my main checkout stays clean. Set one up for me. Nothing is available to run here, so
+    your final message must be only the single tool call or command you would use to create
+    it, in one code block and no other text.
+  max_turns: 6
+  allowed_tools:
+    - Skill
+
+graders:
+  - name: uses_enterworktree
+    type: regex
+    target: last_message
+    pattern: '\bEnterWorktree\b'
+    match: contains
+
+  # One code block and no other text, so a mention like "not git worktree add" cannot trip this.
+  - name: no_raw_worktree_add
+    type: regex
+    target: last_message
+    pattern: 'git\s+worktree\s+add'
+    match: not_contains

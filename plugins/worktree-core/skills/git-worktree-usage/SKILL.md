@@ -13,7 +13,9 @@ description: |
   git worktree; deciding how to parallelize agent sessions across a repo;
   hitting a `git stash` collision between sessions; resolving a merge/rebase
   conflict; splitting an already-written diff into multiple PRs; or a stale
-  or wrongly-linked worktree directory needs diagnosing.
+  or wrongly-linked worktree directory needs diagnosing. Do not use for a
+  plain `git stash` in a single clone with no other worktrees or sessions,
+  or for rewriting an unpushed branch's history.
 license: MIT
 metadata:
   version: "1.0.0"
