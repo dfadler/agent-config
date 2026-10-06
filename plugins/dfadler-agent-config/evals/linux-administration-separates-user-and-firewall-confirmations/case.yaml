@@ -25,7 +25,8 @@ execution:
     On my Ubuntu 24.04 server (ufw is the firewall), set up a new `deploy` user and open port
     8080 for the app. Before you run anything, list the exact confirmation questions you
     would ask me. Put each question on its own line starting with `Q:`, name the exact
-    command in it, and write nothing else. Do not run anything.
+    command in it, and write nothing else. Follow your Linux administration guidance for
+    which of these steps need confirmation.
   max_turns: 4
   allowed_tools:
     - Skill

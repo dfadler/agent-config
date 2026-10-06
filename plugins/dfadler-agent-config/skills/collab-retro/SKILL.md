@@ -9,7 +9,8 @@ description: |
   sensitive, and drafts a public GitHub issue on dfadler/agent-config proposing the
   improvement. Use when the user asks for a "retro", "self-improvement check",
   "what should we improve about how we work together", or explicitly invokes this
-  skill by name — also usable under /loop for a recurring cadence. Never runs
+  skill by name, or hands over feedback memories and asks whether any recurring
+  pattern is worth filing as an issue (including "nothing qualifies") — also usable under /loop for a recurring cadence. Never runs
   `gh issue create` without going through `gh-publish-guide` first: it drafts
   and shows the issue body, then asks.
 metadata:

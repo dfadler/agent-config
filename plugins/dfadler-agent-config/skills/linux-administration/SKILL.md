@@ -16,9 +16,11 @@ description: |
   Use before running, or advising the user to run, any Linux administration
   command — installing/removing packages, starting/stopping/enabling
   services, changing file ownership or permissions, managing users or
-  groups, partitioning or formatting disks, or changing firewall/network
+  groups, partitioning or formatting disks (including `dd` to a block
+  device), disabling SSH password auth, or changing firewall/network
   configuration — on a systemd-based Linux host (local, remote/SSH, or a
-  container). Does not cover non-systemd init systems (sysvinit, OpenRC,
+  container). Also applies when asked only to plan, list or answer with the
+  commands without running them. Does not cover non-systemd init systems (sysvinit, OpenRC,
   runit) or Windows/macOS administration.
 license: MIT
 metadata:

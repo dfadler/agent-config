@@ -21,8 +21,8 @@ tags: [url-to-audio, trigger, quick]
 execution:
   prompt: |
     Make an audio version of https://example.com/posts/launch-notes using the OpenAI voice
-    backend (TTS_BACKEND=openai). On this Mac `OPENAI_API_KEY` is not set. Do not run
-    anything. In one sentence, say what you will do about the backend.
+    backend (TTS_BACKEND=openai). On this Mac `OPENAI_API_KEY` is not set. Follow your
+    article-to-audio guidance. In one sentence, say what you will do about the backend.
   max_turns: 4
   allowed_tools:
     - Skill

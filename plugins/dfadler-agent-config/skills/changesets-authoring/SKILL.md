@@ -11,8 +11,10 @@ description: |
   CLI as an agent, and where the changeset commit belongs relative to the
   code change. Use whenever a fix, feature, or dependency bump lands in a
   repo with a `.changeset/` directory — before opening the PR, not after —
-  or when asked to "add a changeset", "bump the package version", or "will
-  this show up in the changelog".
+  or when asked to "add a changeset", "bump the package version", "will
+  this show up in the changelog", or whether a change (including a docs-only
+  one) needs a changeset. Applies even when the repo's files are only described
+  in the conversation and nothing can be run.
 license: MIT
 metadata:
   version: "1.0.0"

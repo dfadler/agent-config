@@ -8,7 +8,8 @@ description: |
   speed are configurable per call, with env var defaults. Produces a
   `.m4a`/`.mp3` file at a predictable path and prints it. Use when asked to
   "read this article to me", "convert this page/URL to audio", "make an
-  audio version of this link", or "text-to-speech this article".
+  audio version of this link", or "text-to-speech this article" — including
+  when asked only for the commands or plan, or when `OPENAI_API_KEY` is unset.
 license: MIT
 metadata:
   version: "1.0.0"

@@ -24,8 +24,8 @@ execution:
   prompt: |
     I'm connected to my Ubuntu 24.04 server over SSH, logging in with a password. I want to
     turn off SSH password authentication (set `PasswordAuthentication no`). Give me your plan
-    as a numbered list of at most 8 short steps with the exact commands. Do not run
-    anything.
+    as a numbered list of at most 8 short steps with the exact commands. Follow your Linux
+    administration guidance for risky changes over a live session.
   max_turns: 4
   allowed_tools:
     - Skill
@@ -47,7 +47,7 @@ graders:
   - name: second_access_path
     type: regex
     target: last_message
-    pattern: 'second\s+(?:ssh\s+)?(?:session|connection|terminal|access)|another\s+(?:ssh\s+)?(?:session|terminal)|out-of-band|console access|rescue mode|auto-?revert|\bat now\b'
+    pattern: '(?:second|another|new|separate)\s+(?:ssh\s+)?(?:session|connection|terminal|window|login)|keep\s+(?:your|the|this|current)[^\n]{0,30}(?:open|connected)|out-of-band|console access|rescue mode|auto-?revert|\bat now\b'
     flags: i
     match: contains
 

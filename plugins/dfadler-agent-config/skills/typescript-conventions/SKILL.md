@@ -6,7 +6,8 @@ description: |
   narrowing, boundary validation, or fixing the source type; and which
   comment form (`//`, inline `/* … */`, a starred multi-line `/* … */`
   block, or JSDoc `/** … */`) fits a given comment's role. Use when writing,
-  reviewing, or editing TypeScript or JavaScript code — a `.ts`/`.tsx`/
+  rewriting, refactoring, reviewing, or editing TypeScript or JavaScript code,
+  including pasted snippets and requests to add or rewrite a comment — a `.ts`/`.tsx`/
   `.js`/`.jsx` file, a type assertion or `@typescript-eslint/
   consistent-type-assertions`/`no-non-null-assertion` question, or a
   question about which comment syntax to use in JS/TS.
