@@ -1,0 +1,84 @@
+# Run (one case at a time, #536/#538): claude plugin eval plugins/screen-capture --case capture-cdp-plan-for-client-rendered-page --trust-plugin --no-publish
+# Shared run/grant facts: docs/contributing.md, "Plugin evals". No grant needed (Skill only);
+# the model writes a plan and never launches Chrome (hermetic, no GUI).
+# Should-fire half of the capture boundary for the Chrome CDP fallback engine.
+# Why a plan and no code: the CDP recipe is eight prose steps, and a numbered one-line-per-step
+# reply lets free regexes check the skill-specific details a generic answer skips: the
+# `DevToolsActivePort` poll, `Emulation.setDeviceMetricsOverride` (CDP tabs ignore
+# --window-size), an ephemeral `--remote-debugging-port=0`, a throwaway `--user-data-dir`, and
+# the unconditional teardown. `Page.captureScreenshot` and `--headless` are known without the skill.
+# Sabotage map: grader names quote "Chrome + CDP (fallback)", the client-rendered (SPA) steps 1
+# to 8: "DevToolsActivePort", "Emulation.setDeviceMetricsOverride", "Teardown, unconditionally".
+# Can fail: a plan that uses plain `--screenshot` (blank SPA), skips the metrics override or
+# leaves Chrome and the profile dir running scores 0 on that grader; skill_fired fails if the
+# description stops matching an engine-configured capture request.
+schema_version: "1.1"
+name: capture-cdp-plan-for-client-rendered-page
+description: >
+  With settings.json choosing the chrome-cdp engine and a client-rendered SPA target, the model
+  invokes capture and plans a CDP capture: headless Chrome with an ephemeral debug port and
+  throwaway profile, a DevToolsActivePort poll, a device-metrics override, a screenshot and an
+  unconditional teardown. expected_outcome: PASS when the skill fires and every detail is
+  named; FAIL when any is missing.
+tags: [screen-capture, capture, trigger, quick]
+
+execution:
+  prompt: |
+    My .claude/settings.json has {"screenCapture": {"engine": "chrome-cdp"}}.
+    Chrome is installed at its default macOS path and there is no Playwright.
+    http://localhost:5173/dashboard is a client-rendered React SPA that paints
+    blank until its JavaScript runs. I need a 1280x900 PNG of it.
+
+    Don't run anything. Reply with a numbered plan of at most 9 one-line
+    steps, naming the exact Chrome flags and CDP methods you would use, and
+    no code blocks.
+  max_turns: 6
+  allowed_tools:
+    - Skill
+
+graders:
+  # Steps. Indicator in a two-arm run, scored only with the plugin.
+  - name: skill_fired
+    type: tool_used
+    tool: Skill
+    input_match: '"skill"\s*:\s*"(?:[\w-]+:)?capture"'
+    min: 1
+    arm: with-only
+
+  # Result: details only the skill's CDP recipe supplies.
+  - name: headless_ephemeral_port
+    type: regex
+    target: last_message
+    pattern: '--headless(?:=new)?[\s\S]*--remote-debugging-port=0|--remote-debugging-port=0[\s\S]*--headless'
+    match: contains
+
+  - name: throwaway_profile
+    type: regex
+    target: last_message
+    pattern: '--user-data-dir'
+    match: contains
+
+  - name: reads_devtools_port_file
+    type: regex
+    target: last_message
+    pattern: 'DevToolsActivePort'
+    match: contains
+
+  - name: sets_device_metrics
+    type: regex
+    target: last_message
+    pattern: 'Emulation\.setDeviceMetricsOverride'
+    match: contains
+
+  - name: captures_via_cdp
+    type: regex
+    target: last_message
+    pattern: 'Page\.captureScreenshot'
+    match: contains
+
+  - name: tears_down_browser_and_profile
+    type: regex
+    target: last_message
+    pattern: '(?:(?:p?kill|terminat|shut\s*down)\w*|(?:stop|quit|close)\w*\s+(?:the\s+)?chrome|SIGTERM)[\s\S]*(?:rm\s+-\w+[^\n]{0,60}(?:profile|user-data)|(?:delet|remov)\w*[^\n]{0,40}(?:profile|user-data))|(?:rm\s+-\w+[^\n]{0,60}(?:profile|user-data)|(?:delet|remov)\w*[^\n]{0,40}(?:profile|user-data))[\s\S]*(?:(?:p?kill|terminat|shut\s*down)\w*|(?:stop|quit|close)\w*\s+(?:the\s+)?chrome|SIGTERM)'
+    flags: i
+    match: contains

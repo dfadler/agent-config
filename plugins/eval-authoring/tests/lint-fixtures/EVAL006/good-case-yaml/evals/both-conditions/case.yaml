@@ -1,0 +1,7 @@
+schema_version: "1.1"
+name: both-conditions
+execution:
+  prompt: Do the thing.
+graders:
+  - type: "llm"
+    criteria: "PASS if the reply names the file. FAIL if it names none or a different file."

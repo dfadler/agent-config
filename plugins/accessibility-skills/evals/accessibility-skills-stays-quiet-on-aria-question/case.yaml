@@ -1,0 +1,56 @@
+# Run: claude plugin eval plugins/accessibility-skills --case accessibility-skills-stays-quiet-on-aria-question --runs 3 --trust-plugin --no-publish
+# Should-not-fire half, conceptual form: heavy accessibility vocabulary (aria-label,
+# aria-labelledby, WCAG) but no source to review. The skill reviews and grades source; it is
+# not an ARIA tutor. Every grader is free, so the case is tagged `quick`.
+# Sabotage map: skill_not_invoked checks the description's trigger list ("review this
+# component for accessibility", "check this page/PR for a11y issues", "is this markup WCAG
+# compliant"); replace it with "any accessibility question" and a run should invoke the skill
+# and fail.
+# Can fail: the skill is invoked fails skill_not_invoked; a report-format reply fails
+# no_a11y_report; a reply that never says labelledby points at another element's `id` fails
+# mentions_id. A regression guard: a no-plugin arm passes it by default, so expect no delta.
+schema_version: "1.1"
+name: accessibility-skills-stays-quiet-on-aria-question
+description: >
+  A conceptual question about aria-label versus aria-labelledby, with no code to review,
+  must not invoke accessibility-skills. expected_outcome: PASS when the skill is not invoked,
+  the reply has no "Accessibility review" report and it mentions an `id`; FAIL otherwise. A
+  regression guard with no expected delta.
+tags: [accessibility-skills, trigger, quick]
+
+execution:
+  prompt: |
+    In two or three sentences, what is the difference between aria-label and
+    aria-labelledby, and when would I pick one over the other?
+  max_turns: 6
+  allowed_tools:
+    - Skill
+
+graders:
+  # Steps. min 0 is explicit: tool_used defaults min to 1. arm both so the "never called"
+  # check is scored in a two-arm run too.
+  - name: skill_not_invoked
+    type: tool_used
+    tool: Skill
+    input_match: '"skill"\s*:\s*"(?:[\w-]+:)?accessibility-skills"'
+    min: 0
+    max: 0
+    arm: both
+
+  # Result.
+  - name: no_a11y_report
+    type: regex
+    target: last_message
+    pattern: '^#+\s*Accessibility review'
+    flags: im
+    match: not_contains
+    arm: both
+
+  # Task-completion check, not a skill property: labelledby references another element by id.
+  - name: mentions_id
+    type: regex
+    target: last_message
+    pattern: '\bids?\b'
+    flags: i
+    match: contains
+    arm: both

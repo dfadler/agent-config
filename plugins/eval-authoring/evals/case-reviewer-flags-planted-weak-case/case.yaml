@@ -1,0 +1,91 @@
+# Run: node plugins/eval-authoring/scripts/ts/run-evals/run-evals.ts --tier quick plugins/eval-authoring
+# (quick tier: one run, plugin arm only, `--ablation none`, which this case needs because the
+# no-plugin arm cannot dispatch a plugin agent: "Agent type ... not found".)
+# Grant: Write, recorded in grants.yaml. The run needs it to create the two case files that
+# the reviewer then reads. Bash is not granted, so the reviewer cannot run the lint; the
+# planted defects are ones the lint cannot see (EVAL006 only checks that PASS and FAIL
+# appear, and the weak criteria contain both words).
+# Can fail: a reviewer that answers "Clean", a main model that reviews the files itself
+# instead of dispatching the agent, or a relay that drops the finding fails reviewer_dispatched
+# or flags_vague_criterion. The words "polished" and "on-brand" are in the prompt too, so
+# flags_vague_criterion requires them next to a vagueness word, which echoing the file or
+# generic advice does not produce.
+schema_version: "1.1"
+name: case-reviewer-flags-planted-weak-case
+description: >
+  The case-reviewer agent reports a concrete finding on a deliberately weak
+  case: an llm criterion with PASS and FAIL words but no checkable condition,
+  and a suite with only a positive prompt. expected_outcome: PASS when the
+  agent is dispatched and the reply quotes the vague criterion, calls it
+  vague or subjective, and mentions the missing non-firing prompt; FAIL when
+  the reviewer is not dispatched, answers Clean, or relays only generic advice.
+tags: [eval-authoring, case-reviewer, agent, quick]
+
+execution:
+  prompt: |
+    I drafted one eval case for my `release-notes` skill. Please create these
+    two files exactly as written, then run the eval-authoring case-reviewer
+    agent on the evals directory and tell me what it found.
+
+    File evals/release-notes-basic/prompt.md:
+
+    ```
+    ---
+    max_turns: 5
+    allowed_tools: [Skill]
+    ---
+
+    Turn this changelog into release notes: fixed login bug, renamed export to download.
+    ```
+
+    File evals/release-notes-basic/graders/quality.md:
+
+    ```
+    ---
+    type: llm
+    ---
+
+    PASS if the release notes feel polished and on-brand.
+    FAIL if the release notes feel off.
+    ```
+  max_turns: 12
+  allowed_tools:
+    - Agent
+    - Write
+    - Read
+    - Glob
+    - Grep
+
+graders:
+  # Steps: the plugin's agent was dispatched, not imitated.
+  - name: reviewer_dispatched
+    type: tool_used
+    tool: Agent
+    input_match: "case-reviewer"
+    min: 1
+
+  # Precondition, not a skill property: the model followed the prompt and wrote the files the
+  # reviewer needs. Without it a failed result grader could be a setup failure.
+  - name: files_created
+    type: file_exists
+    path: "evals/release-notes-basic/graders/*.md"
+    exists: true
+
+  # Result: a finding that ties the planted phrase to a vagueness word, in either order
+  # within 300 characters, so echoing the file or generic advice alone does not pass.
+  - name: flags_vague_criterion
+    type: regex
+    target: last_message
+    pattern: "(polished|on-brand)[\\s\\S]{0,300}(vague|subjective|impression|not (concrete|observable|checkable))|(vague|subjective|impression|not (concrete|observable|checkable))[\\s\\S]{0,300}(polished|on-brand)"
+    flags: i
+    match: contains
+
+  # Wording regex for the second planted defect (one positive prompt, no non-firing one);
+  # half weight because a differently worded finding can miss it.
+  - name: notes_missing_boundary
+    type: regex
+    target: last_message
+    pattern: "no (negative|non-firing|non-triggering|should-not)[\\s\\w-]{0,20}prompt|(only|single|one)( positive| should-fire)? prompt|never (shows|tests|checks)[\\s\\S]{0,60}(not fire|should not|not trigger)"
+    flags: i
+    match: contains
+    weight: 0.5

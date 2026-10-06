@@ -1,0 +1,42 @@
+# Run (one case at a time, #536/#538): claude plugin eval plugins/second-brain --case query-stays-quiet-on-python-gil-history --trust-plugin --no-publish
+# Shared run/grant facts: docs/contributing.md, "Plugin evals". No grant needed (Skill only).
+# Should-not-fire half of the query boundary: "what's the history of" is one of query's literal
+# trigger phrases, but a question about general public knowledge is not something past notes
+# could answer. The Skill check names all four second-brain skills.
+# Sabotage map: skill_not_invoked checks query's description ("or any question that past notes
+# could answer"); widen it to "any question" and a run should fail.
+# Can fail: any second-brain skill invoked fails skill_not_invoked; a reply that never mentions
+# the global interpreter lock fails answers_about_the_gil. Regression guard: a no-plugin arm
+# passes it, so no delta by design.
+schema_version: "1.1"
+name: query-stays-quiet-on-python-gil-history
+description: >
+  A general-knowledge question phrased as "what's the history of" must not invoke any
+  second-brain skill. expected_outcome (regression guard: the no-plugin arm also passes): PASS when no second-brain skill is invoked and the reply
+  explains the Python global interpreter lock; FAIL otherwise.
+tags: [second-brain, query, trigger, quick]
+
+execution:
+  prompt: |
+    What's the history of the Python GIL? Answer in at most 3 sentences; don't
+    run anything.
+  max_turns: 6
+  allowed_tools:
+    - Skill
+
+graders:
+  - name: skill_not_invoked
+    type: tool_used
+    tool: Skill
+    input_match: '"skill"\s*:\s*"(?:second-brain:)?(?:capture|query|sync|config)"'
+    min: 0
+    max: 0
+    arm: both
+
+  - name: answers_about_the_gil
+    type: regex
+    target: last_message
+    pattern: 'global interpreter lock'
+    flags: i
+    match: contains
+    arm: both

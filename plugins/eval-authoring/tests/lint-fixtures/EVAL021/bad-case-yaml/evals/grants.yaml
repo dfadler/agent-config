@@ -1,0 +1,6 @@
+schema_version: "1"
+grants:
+  no-tools:
+    - "Bash(npx *)"
+  wrong-tool:
+    - "Bash(npx *)"

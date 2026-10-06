@@ -1,0 +1,52 @@
+# Run: claude plugin eval plugins/gh-attach-image --case gh-attach-image-explains-404-before-save --runs 3 --trust-plugin --no-publish
+# Should-fire half, knowledge form: "the one gotcha that looks like a bug but isn't". The
+# returned URL 404s until a saved body references it. Hermetic: a question, no tools. Every
+# grader is free, so the case is tagged `quick`.
+# Why no skill_fired grader: this is a plain question the model answers correctly without
+# loading the skill (3 of 3 runs with the 404 symptom in the description and the skill never
+# fired, also with a gh/PR-flavoured prompt), so a Skill-use check only measured that, not
+# the skill. The case guards the answer; trigger coverage lives in the other should-fire cases.
+# Sabotage map: says_save_the_body and no_workaround_advice check "The one gotcha that looks
+# like a bug but isn't" and "What NOT to do" in SKILL.md. Empty SKILL.md's body and
+# says_save_the_body may still pass, because models partly know the claim-on-save behavior.
+# Can fail: an answer that calls the upload broken or does not say to save a body that
+# references the URL fails says_save_the_body; advising a gist or raw URL fails
+# no_workaround_advice. Expect a small or zero delta: the drag-and-drop behavior is partly known
+# by default.
+schema_version: "1.1"
+name: gh-attach-image-explains-404-before-save
+description: >
+  When told an uploaded user-attachments URL returns 404, the model answers that the upload
+  did not fail: save a body or comment that references the URL.
+  expected_outcome: PASS when the reply says to save a body, comment or description that
+  references the URL and recommends no gist or raw URL; FAIL otherwise. A guard on the answer: the
+  claim-on-save behavior is partly known by default, so the delta may be small.
+tags: [gh-attach-image, quick]
+
+execution:
+  prompt: |
+    I uploaded a PNG with curl to GitHub's uploads.github.com user-attachments endpoint and it
+    returned a github.com/user-attachments/assets/... URL, but opening that URL gives a 404.
+    Did the upload fail? Answer in at most three sentences.
+  max_turns: 6
+  allowed_tools:
+    - Skill
+
+graders:
+  # Result. Needs "save", a place it is saved (body, comment or description) and the idea that
+  # the saved text references the URL (reference, include, contain or embed).
+  - name: says_save_the_body
+    type: regex
+    target: last_message
+    pattern: '(?=[\s\S]*\bsav(?:e|ed|ing)\b)(?=[\s\S]*\b(?:body|comment|description)\b)(?=[\s\S]*\b(?:referenc\w+|includ\w+|contain\w*|embed\w*)\b)'
+    flags: i
+    match: contains
+    arm: both
+
+  - name: no_workaround_advice
+    type: regex
+    target: last_message
+    pattern: '\bgist\b|raw\.githubusercontent'
+    flags: i
+    match: not_contains
+    arm: both
