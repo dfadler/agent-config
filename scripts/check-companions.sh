@@ -39,7 +39,9 @@ can also run it directly (also reachable as ./doctor.sh from the repo root).
                    detects, instead of only reporting it (currently: adding
                    "git" to rtk's own exclude_commands config when rtk's
                    PreToolUse hook would otherwise break git commands inside
-                   a worktree-isolated session — see docs/companion-plugins.md).
+                   a worktree-isolated session; merging the require-worktree
+                   PreToolUse hook back into ~/.claude/settings.json when
+                   another tool has displaced it — see docs/companion-plugins.md).
                    Never runs as a side effect of a bare invocation.
   -h, --help       Show this message and exit.
 USAGE
@@ -638,6 +640,304 @@ check_rtk_git_exclusion() {
   } >&2
 }
 
+# Python script: reads ~/.claude/settings.json and reports whether the
+# require-worktree PreToolUse hook is registered. Prints one of:
+#   present       — hook found in an Edit|Write group
+#   group-missing — no Edit|Write PreToolUse group exists at all
+#   hook-missing  — group exists but our hook command is absent
+#   file-missing  — settings.json absent or unreadable
+# Called from check_require_worktree_hook below.
+WORKTREE_HOOK_STATE_SCRIPT=$(
+  cat <<'PYEOF'
+import json, os, sys
+
+hook_path = os.path.expanduser(
+    "~/.claude/skills/worktree-core/skills/git-worktree-usage/scripts/require-worktree-hook.sh"
+)
+settings_path = os.path.expanduser("~/.claude/settings.json")
+
+if not os.path.isfile(settings_path):
+    print("file-missing")
+    sys.exit(0)
+
+try:
+    with open(settings_path) as f:
+        data = json.load(f)
+except Exception:
+    print("file-missing")
+    sys.exit(0)
+
+pre_tool_use = data.get("hooks", {}).get("PreToolUse", [])
+
+group = None
+for entry in pre_tool_use:
+    if isinstance(entry, dict) and entry.get("matcher") == "Edit|Write":
+        group = entry
+        break
+
+if group is None:
+    print("group-missing")
+    sys.exit(0)
+
+for h in group.get("hooks", []):
+    cmd = h.get("command", "") if isinstance(h, dict) else str(h)
+    if hook_path in cmd:
+        print("present")
+        sys.exit(0)
+
+print("hook-missing")
+PYEOF
+)
+
+# Python script: merges the require-worktree hook into ~/.claude/settings.json.
+# Finds or creates the Edit|Write PreToolUse group and ADDs the hook entry to
+# its hooks array without disturbing any other PreToolUse entries or matchers.
+# Prints "fixed" on success, "noop" if already present. Exits 1 on error.
+# Called from fix_require_worktree_hook below.
+WORKTREE_HOOK_FIX_SCRIPT=$(
+  cat <<'PYEOF'
+import json, os, sys
+
+hook_path = os.path.expanduser(
+    "~/.claude/skills/worktree-core/skills/git-worktree-usage/scripts/require-worktree-hook.sh"
+)
+settings_path = os.path.expanduser("~/.claude/settings.json")
+
+with open(settings_path) as f:
+    data = json.load(f)
+
+hooks = data.setdefault("hooks", {})
+pre_tool_use = hooks.setdefault("PreToolUse", [])
+
+# Find or create the Edit|Write group
+group = None
+for entry in pre_tool_use:
+    if isinstance(entry, dict) and entry.get("matcher") == "Edit|Write":
+        group = entry
+        break
+
+if group is None:
+    group = {"matcher": "Edit|Write", "hooks": []}
+    pre_tool_use.append(group)
+
+hook_list = group.setdefault("hooks", [])
+
+# No-op if already present
+for h in hook_list:
+    cmd = h.get("command", "") if isinstance(h, dict) else str(h)
+    if hook_path in cmd:
+        print("noop")
+        sys.exit(0)
+
+# Add the hook, preserving all existing entries in this group
+hook_list.append({"type": "command", "command": hook_path})
+
+with open(settings_path, "w") as f:
+    json.dump(data, f, indent=2)
+    f.write("\n")
+
+print("fixed")
+PYEOF
+)
+
+# Applies the fix check_require_worktree_hook reports: merges the require-worktree
+# hook entry back into the Edit|Write PreToolUse group in ~/.claude/settings.json.
+# Uses WORKTREE_HOOK_FIX_SCRIPT above. Only reached behind an explicit --fix.
+fix_require_worktree_hook() {
+  local settings="$HOME/.claude/settings.json"
+  if [[ ! -f "$settings" ]]; then
+    {
+      echo "Cannot apply fix: $settings does not exist."
+      echo "  Run 'claude' once to initialize it, then re-run with --fix."
+    } >&2
+    return 1
+  fi
+
+  local result
+  if ! result="$(python3 -c "$WORKTREE_HOOK_FIX_SCRIPT" 2>&1)"; then
+    echo "Could not edit $settings: $result" >&2
+    return 1
+  fi
+  [[ "$result" == "noop" ]] && return 0
+
+  echo "✓ Added require-worktree hook to $settings"
+  echo "  (Edit|Write PreToolUse group updated; existing hooks preserved)"
+  check_worktree_enforce
+}
+
+# Checks whether require-worktree-hook.sh is registered in ~/.claude/settings.json
+# under a PreToolUse entry with matcher "Edit|Write". This hook can be displaced
+# when another tool (e.g. rtk init --global) rewrites the PreToolUse array.
+# Detects: present / group-missing / hook-missing / file-missing states.
+# --fix: merges the hook back without replacing or disturbing other hook entries.
+# Skips entirely when the worktree-core plugin is not linked (check_convention_deps
+# will flag that separately).
+check_require_worktree_hook() {
+  local hook_script="$HOME/.claude/skills/worktree-core/skills/git-worktree-usage/scripts/require-worktree-hook.sh"
+  # Plugin not linked — check_convention_deps will surface that
+  [[ -f "$hook_script" ]] || return 0
+
+  local state
+  state="$(python3 -c "$WORKTREE_HOOK_STATE_SCRIPT" 2>/dev/null)" || state="file-missing"
+
+  case "$state" in
+    present)
+      echo "✓ require-worktree hook is registered in ~/.claude/settings.json"
+      check_worktree_enforce
+      ;;
+    file-missing)
+      {
+        echo
+        echo "⚠ ~/.claude/settings.json is absent or unreadable — cannot verify"
+        echo "  the require-worktree PreToolUse hook registration."
+        echo
+      } >&2
+      ;;
+    group-missing)
+      if [[ "$FIX" == "1" ]]; then
+        fix_require_worktree_hook
+        return
+      fi
+      {
+        echo
+        echo "⚠ The Edit|Write PreToolUse group is missing from ~/.claude/settings.json."
+        echo "  Another tool (e.g. 'rtk init --global') may have rewritten the"
+        echo "  PreToolUse array and displaced the require-worktree hook entirely."
+        echo "  Hook path: $hook_script"
+        echo "  Re-run with --fix to merge it back without disturbing other hooks."
+        echo
+      } >&2
+      ;;
+    hook-missing)
+      if [[ "$FIX" == "1" ]]; then
+        fix_require_worktree_hook
+        return
+      fi
+      {
+        echo
+        echo "⚠ An Edit|Write PreToolUse group exists in ~/.claude/settings.json but"
+        echo "  the require-worktree hook is not in it. Another tool may have displaced"
+        echo "  it while rewriting that hook group."
+        echo "  Hook path: $hook_script"
+        echo "  Re-run with --fix to merge it back without disturbing other hooks."
+        echo
+      } >&2
+      ;;
+  esac
+}
+
+# Advisory only — no --fix (per-project config is a deliberate opt-in choice).
+# Checks whether worktree.enforce is set (and not "off") in the current
+# project's .claude/settings.json. Called from check_require_worktree_hook
+# when the hook is present or just fixed, so the user sees at a glance whether
+# enforcement is actually active for this project.
+check_worktree_enforce() {
+  local project_settings="${PWD}/.claude/settings.json"
+
+  local enforce_val=""
+  if [[ -f "$project_settings" ]]; then
+    if command -v jq >/dev/null 2>&1; then
+      enforce_val="$(jq -r '.worktree.enforce // empty' "$project_settings" 2>/dev/null)"
+    else
+      enforce_val="$(python3 -c "
+import json, sys
+try:
+    with open(sys.argv[1]) as f:
+        d = json.load(f)
+    v = d.get('worktree', {}).get('enforce', '')
+    print(v if v else '', end='')
+except Exception:
+    pass
+" "$project_settings" 2>/dev/null)"
+    fi
+  fi
+
+  if [[ -n "$enforce_val" && "$enforce_val" != "off" ]]; then
+    echo "✓ worktree.enforce = \"$enforce_val\" in ${PWD}/.claude/settings.json"
+    return 0
+  fi
+
+  {
+    echo
+    echo "ℹ require-worktree hook is wired but inactive for this project."
+    echo "  The hook reads 'worktree.enforce' from each project's .claude/settings.json."
+    echo "  Add it to any project you want protected:"
+    echo "    {\"worktree\": {\"enforce\": \"block\"}}"
+    echo "  Or set WORKTREE_ENFORCE=block as a session-level env override."
+    echo
+  } >&2
+}
+
+# Advisory only — no --fix. Lists conventions in claude/conventions/ that are
+# opt-in (not in DEFAULT_ENABLED) and not yet @-included in either CLAUDE.md
+# file. Gives the user a quick inventory of what's available to enable.
+check_available_conventions() {
+  local conventions_dir="$REPO_ROOT/claude/conventions"
+  local default_enabled_file="$conventions_dir/DEFAULT_ENABLED"
+
+  [[ -d "$conventions_dir" ]] || return 0
+  [[ -f "$default_enabled_file" ]] || return 0
+
+  # Collect default-enabled convention filenames
+  local -a default_enabled=()
+  local line
+  while IFS= read -r line || [[ -n "$line" ]]; do
+    line="${line%%#*}"
+    line="${line## }"
+    line="${line%% }"
+    [[ -n "$line" ]] && default_enabled+=("$line")
+  done <"$default_enabled_file"
+
+  # Collect currently @-included conventions from both CLAUDE.md files
+  local -a included=()
+  local f
+  for f in "$HOME/.claude/CLAUDE.md" "$HOME/.claude/CLAUDE.personal.md"; do
+    [[ -f "$f" ]] || continue
+    while IFS= read -r line || [[ -n "$line" ]]; do
+      if [[ "$line" =~ ^@${conventions_dir}/([^/]+\.md)$ ]]; then
+        included+=("${BASH_REMATCH[1]}")
+      fi
+    done <"$f"
+  done
+
+  # Find opt-in conventions (all .md files not in DEFAULT_ENABLED, not README.md)
+  # that are not already included
+  local -a available=()
+  local fname is_default is_included
+  for fname in "$conventions_dir"/*.md; do
+    [[ -f "$fname" ]] || continue
+    fname="$(basename "$fname")"
+    [[ "$fname" == "README.md" ]] && continue
+
+    is_default=0
+    [[ ${#default_enabled[@]} -gt 0 ]] && for d in "${default_enabled[@]}"; do
+      [[ "$d" == "$fname" ]] && is_default=1 && break
+    done
+    [[ "$is_default" == 1 ]] && continue
+
+    is_included=0
+    [[ ${#included[@]} -gt 0 ]] && for i in "${included[@]}"; do
+      [[ "$i" == "$fname" ]] && is_included=1 && break
+    done
+    [[ "$is_included" == 1 ]] && continue
+
+    available+=("$fname")
+  done
+
+  [[ ${#available[@]} -eq 0 ]] && return 0
+
+  {
+    echo
+    echo "ℹ ${#available[@]} opt-in convention(s) available but not enabled:"
+    for fname in "${available[@]}"; do
+      echo "    $fname"
+    done
+    echo "  Add any to your ~/.claude/CLAUDE.personal.md with:"
+    echo "    @$conventions_dir/<name>"
+    echo
+  } >&2
+}
+
 # Check that every convention the user has opted into (via DEFAULT_ENABLED or
 # CLAUDE.personal.md) has its required plugin(s) linked under ~/.claude/skills/.
 # The dep map lives in claude/conventions/CONVENTION_DEPS: one line per
@@ -711,6 +1011,7 @@ check_convention_deps() {
 }
 
 check_convention_deps
+check_available_conventions
 check_git_identity
 check_python_deps
 
@@ -747,6 +1048,7 @@ check_companion_plugin "aws-core@" "aws-core" "aws-core" "aws-core" \
   "claude plugin install aws-core@claude-plugins-official"
 
 check_rtk
+check_require_worktree_hook
 
 # ponytail: DietrichGebert/ponytail isn't in the official marketplace; its own
 # .claude-plugin/marketplace.json names both the marketplace and the plugin
