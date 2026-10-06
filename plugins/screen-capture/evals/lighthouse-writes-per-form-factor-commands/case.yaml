@@ -1,0 +1,70 @@
+# Run (one case at a time, #536/#538): claude plugin eval plugins/screen-capture --case lighthouse-writes-per-form-factor-commands --trust-plugin --no-publish
+# Shared run/grant facts: docs/contributing.md, "Plugin evals". No grant needed (Skill only);
+# the model writes the commands and never runs Lighthouse or Chrome (hermetic, headless flag only
+# in the text).
+# Should-fire half of the lighthouse boundary (near-miss: lighthouse-stays-quiet-on-lcp-advice).
+# Why useful: a generic Lighthouse answer runs one command; the skill runs two (mobile, and
+# `--preset=desktop`), keeps Chrome headless with `--chrome-flags="--headless=new"` and writes
+# JSON to `knowledge/lighthouse/<project>/<timestamp>-<form-factor>.json` with one shared
+# timestamp. The prompt supplies the project and timestamp, so the path shape is the
+# skill-specific check.
+# Sabotage map: grader names quote "Running the pass" (the two `npx lighthouse` invocations,
+# `--preset=desktop`, `--headless=new`) and "Output storage path and naming" (`knowledge/
+# lighthouse/<project>/<timestamp>-<form-factor>.json`).
+# Can fail: a single command, a path outside knowledge/lighthouse/agent-config/, or a headed
+# Chrome scores 0 on the matching grader; skill_fired fails if the description stops matching.
+schema_version: "1.1"
+name: lighthouse-writes-per-form-factor-commands
+description: >
+  Asked for a Lighthouse pass on a local URL with default settings, the model invokes lighthouse
+  and writes a mobile and a desktop command, headless, saving JSON under
+  knowledge/lighthouse/agent-config/ with a shared timestamp. expected_outcome: PASS when the
+  skill fires and both commands, the desktop preset, the headless flag and both output paths are
+  present; FAIL otherwise.
+tags: [screen-capture, lighthouse, trigger, quick]
+
+execution:
+  prompt: |
+    Run my repeatable Lighthouse pass on http://localhost:5173 for the repo
+    agent-config, with default settings and the default output location.
+    Use 2026-10-05T143022 as the timestamp.
+
+    Don't run anything. Reply with exactly one bash code block holding the
+    commands and no other text.
+  max_turns: 6
+  allowed_tools:
+    - Skill
+
+graders:
+  # Steps. Indicator in a two-arm run, scored only with the plugin.
+  - name: skill_fired
+    type: tool_used
+    tool: Skill
+    input_match: '"skill"\s*:\s*"(?:[\w-]+:)?lighthouse"'
+    min: 1
+    arm: with-only
+
+  # Result.
+  - name: both_output_paths
+    type: regex
+    target: last_message
+    pattern: '^(?=[\s\S]*knowledge/lighthouse/agent-config/2026-10-05T143022-mobile\.json)[\s\S]*knowledge/lighthouse/agent-config/2026-10-05T143022-desktop\.json'
+    match: contains
+
+  - name: desktop_preset
+    type: regex
+    target: last_message
+    pattern: '--preset[= ]desktop'
+    match: contains
+
+  - name: headless_new
+    type: regex
+    target: last_message
+    pattern: '--chrome-flags=.{0,3}--headless=new'
+    match: contains
+
+  - name: two_lighthouse_commands
+    type: regex
+    target: last_message
+    pattern: 'npx\s+lighthouse'
+    match: "count:2"
