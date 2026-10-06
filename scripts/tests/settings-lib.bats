@@ -48,7 +48,7 @@ assert any(h['command'] == '/path/to/hook.sh' for e in hooks for h in e['hooks']
   printf '{}' >"$SETTINGS"
   run bash -c "source '$SETTINGS_LIB'; ensure_hook_registered PreToolUse 'Edit|Write' /path/to/hook.sh '$SETTINGS'"
   [ "$status" -eq 0 ]
-  [[ "$output" == *"Registered"* ]]
+  assert_glob "$output" '*Registered*'
 }
 
 @test "registered: idempotent — no duplicate on re-run" {
@@ -146,7 +146,7 @@ assert len(entries) == 1, entries
     "$bash_bin" -c "source '$SETTINGS_LIB'; ensure_hook_registered PreToolUse 'Edit|Write' /hook.sh '$SETTINGS' 2>&1"
   [ "$status" -eq 0 ]
   [ ! -f "$SETTINGS" ]
-  [[ "$output" == *"Warning"* ]]
+  assert_glob "$output" '*Warning*'
 }
 
 # ---------------------------------------------------------------------------
@@ -182,7 +182,7 @@ assert '/hook.sh' not in cmds, 'hook still present'
   ensure_hook_registered "PreToolUse" "Edit|Write" "/hook.sh" "$SETTINGS"
   run bash -c "source '$SETTINGS_LIB'; ensure_hook_deregistered PreToolUse /hook.sh '$SETTINGS'"
   [ "$status" -eq 0 ]
-  [[ "$output" == *"Deregistered"* ]]
+  assert_glob "$output" '*Deregistered*'
 }
 
 @test "deregistered: removes empty PreToolUse key when last entry gone" {

@@ -748,3 +748,26 @@ refute_output_contains() {
     return 1
   fi
 }
+
+# Glob-pattern assertions on an arbitrary value (e.g. "$stderr", or "$output"
+# against a pattern like '*[Ww]arning*'). Use these, never a bare `[[ ]]`: a
+# false `[[ ]]` does not abort a bats test unless it is the last command
+# (bash's `set -e` ignores it), so a mid-test one passes vacuously. These
+# return non-zero, which bats does catch anywhere. Args: <value> <glob>.
+assert_glob() {
+  # shellcheck disable=SC2053 # RHS is deliberately an unquoted glob pattern
+  if [[ "$1" != $2 ]]; then
+    echo "expected value to match glob: $2" >&2
+    echo "value was: $1" >&2
+    return 1
+  fi
+}
+
+refute_glob() {
+  # shellcheck disable=SC2053 # RHS is deliberately an unquoted glob pattern
+  if [[ "$1" == $2 ]]; then
+    echo "expected value NOT to match glob: $2" >&2
+    echo "value was: $1" >&2
+    return 1
+  fi
+}

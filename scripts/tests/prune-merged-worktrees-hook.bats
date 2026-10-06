@@ -13,6 +13,8 @@
 REAL_HOOK="$BATS_TEST_DIRNAME/../../plugins/worktree-core/skills/git-worktree-usage/scripts/prune-merged-worktrees-hook.sh"
 HOOK_LIB="$BATS_TEST_DIRNAME/../../plugins/worktree-core/skills/git-worktree-usage/scripts/worktree-hook-lib.sh"
 
+load helpers
+
 setup() {
   TMP="$(mktemp -d)"
   cp "$REAL_HOOK" "$TMP/prune-merged-worktrees-hook.sh"
@@ -121,14 +123,14 @@ run_hook() {
   _install_fake_prune
   run_hook WORKTREE_AUTO_PRUNE=on FAKE_STDOUT="removed 2 merged worktrees"
   [ "$status" -eq 0 ]
-  [[ "$output" == *"removed 2 merged worktrees"* ]]
+  assert_glob "$output" '*removed 2 merged worktrees*'
 }
 
 @test "opted in, prune script's stderr is suppressed" {
   _install_fake_prune
   run_hook WORKTREE_AUTO_PRUNE=on FAKE_STDERR="a warning nobody should see"
   [ "$status" -eq 0 ]
-  [[ "$output" != *"a warning nobody should see"* ]]
+  refute_glob "$output" '*a warning nobody should see*'
 }
 
 @test "opted in, a failing prune script is swallowed — the hook still exits 0" {

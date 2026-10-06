@@ -14,6 +14,8 @@ bats_require_minimum_version 1.5.0 # for `run --separate-stderr`
 REAL_HOOK="$BATS_TEST_DIRNAME/../../plugins/worktree-core/skills/git-worktree-usage/scripts/require-worktree-hook.sh"
 HOOK_LIB="$BATS_TEST_DIRNAME/../../plugins/worktree-core/skills/git-worktree-usage/scripts/worktree-hook-lib.sh"
 
+load helpers
+
 setup() {
   TMP="$(mktemp -d)"
   cp "$REAL_HOOK" "$TMP/require-worktree-hook.sh"
@@ -173,7 +175,7 @@ run_hook() {
     PATH="$GIT_SHIM:$PATH" FAKE_GIT_TOPLEVEL="$FAKE_TOPLEVEL" \
     WORKTREE_ENFORCE=warn /bin/bash "$SCRIPT_UNDER_TEST"
   [ "$status" -eq 0 ]
-  [[ "$output" == *"Warning"* ]] || [[ "$output" == *"warning"* ]]
+  assert_glob "$output" '*[Ww]arning*'
 }
 
 @test "WORKTREE_ENFORCE=warn overrides settings enforce=block" {
@@ -191,7 +193,7 @@ run_hook() {
   # Only exit 2 (not 1) reliably blocks a PreToolUse hook per the Claude Code
   # hooks docs: https://code.claude.com/docs/en/hooks#exit-code-2
   [ "$status" -eq 2 ]
-  [[ "$stderr" == *"main git checkout"* ]]
+  assert_glob "$stderr" '*main git checkout*'
   [ -z "$output" ]
 }
 
@@ -214,7 +216,7 @@ run_hook() {
   # Claude Code only treats exit 2 as a blocking PreToolUse error; exit 1
   # with plain-text stdout is a non-blocking error and the tool proceeds.
   [ "$status" -eq 2 ]
-  [[ "$stderr" == *"main git checkout"* ]]
+  assert_glob "$stderr" '*main git checkout*'
   [ -z "$output" ]
 }
 
@@ -223,7 +225,7 @@ run_hook() {
   _write_settings_enforce "warn"
   run_hook
   [ "$status" -eq 0 ]
-  [[ "$output" == *"Warning"* ]] || [[ "$output" == *"warning"* ]]
+  assert_glob "$output" '*[Ww]arning*'
 }
 
 @test "settings enforce=off: exits 0, no output" {
