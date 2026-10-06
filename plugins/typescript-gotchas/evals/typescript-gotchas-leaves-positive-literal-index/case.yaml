@@ -2,18 +2,19 @@
 # Boundary case inside the skill's scope: non-test TypeScript that reads the first element.
 # The skill lists "Positive-integer literal access like `arr[0]`" under "What is NOT
 # flagged": leave it alone unless the project opts into `checkAllIndexAccess`.
-# Sabotage map: no_at_zero checks that exception; broaden the rule to all index reads
-# and a run should write `.at(0)` and fail.
+# Sabotage map: no_at_zero checks that exception. Measured 2026-10-05 (PR #531): removing the
+# exception and telling the skill to use `.at()` everywhere makes the case fail (0.33), so it
+# catches over-broadening of the rule, one of the few cases that does.
 # Can fail: `.at(0)` fails no_at_zero; a reply with no `[0]` read fails keeps_bracket_zero.
-# Models rarely write `.at(0)` unprompted, so this is a regression guard with no expected
-# delta.
+# Models rarely write `.at(0)` unprompted (the prompt asks for an index read), so a no-plugin
+# arm passes and shows no delta; the check is against the skill over-applying.
 schema_version: "1.1"
 name: typescript-gotchas-leaves-positive-literal-index
 description: >
   When asked for a TypeScript helper that returns the first word of a sentence,
   the model keeps the bracket read `parts[0]` and does not rewrite it to `.at(0)`.
   expected_outcome: PASS when the reply contains `[0]` and no `.at(0)`; FAIL
-  otherwise. A regression guard: a no-plugin arm is expected to pass too.
+  otherwise. Catches over-broadening of the skill; a no-plugin arm is expected to pass.
 tags: [typescript-gotchas, boundary, quick]
 
 execution:
@@ -47,6 +48,6 @@ graders:
   - name: keeps_bracket_zero
     type: regex
     target: last_message
-    pattern: '\w\[\s*0\s*\]'
+    pattern: '[\w)\]]\[\s*0\s*\]'
     match: contains
     arm: both

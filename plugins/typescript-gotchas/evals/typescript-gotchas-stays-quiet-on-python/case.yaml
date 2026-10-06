@@ -2,9 +2,9 @@
 # Should-not-fire half of the trigger boundary: same task as the should-fire cases (last
 # element of a list) in a language the description does not cover.
 # Sabotage map: skill_not_invoked checks the description's scope to "TypeScript or
-# JavaScript source files"; widen it to "any language" and a run should invoke the skill
-# and fail.
-# Can fail: the skill is invoked on a Python request fails skill_not_invoked; a reply with
+# JavaScript source files". Measured 2026-10-05 (PR #531): widening it to "any language"
+# still passes (the skill stayed uninvoked), so this case cannot catch a scope regression.
+# Can fail: invoking the skill on a Python request fails skill_not_invoked; a reply with
 # no `def last_visited` fails writes_the_function. A regression guard, so a no-plugin arm
 # passes it by default and shows no delta.
 schema_version: "1.1"

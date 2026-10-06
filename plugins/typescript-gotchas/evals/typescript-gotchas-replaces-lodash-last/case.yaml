@@ -3,10 +3,14 @@
 # avoid" table and the user asks for a lodash-free rewrite. Tests the replacement table, not
 # just the headline rule. Every grader is free, so the case is tagged `quick`.
 # Sabotage map: uses_at_three_times and no_old_idioms check the table rows for `_.last(arr)`,
-# `arr.slice(-1)[0]` and `str.charAt(str.length - 5)`; remove them and a run keeps the old forms.
+# `arr.slice(-1)[0]` and `str.charAt(str.length - 5)`. Unmeasured: a run with those rows
+# removed scored 0.67 but was already flaky on the old description (#537). The case is also
+# the regression test for the description's "rewriting" and "removing a utility library" text:
+# on the original description the skill fired in 16 of 19 runs, with the fix 20 of 20.
 # Can fail: a reply that keeps `slice(-1)[0]`, `charAt(`, or `_.last`/lodash, or that swaps
 # in `[x.length - 1]`, fails no_old_idioms; fewer than three `.at(-1)` calls fails
-# uses_at_three_times. Models often modernize this unprompted, so the delta may be small.
+# uses_at_three_times. Measured 2026-10-05: 0.00 without the plugin and 1.00 with it (+1.00),
+# so models do not modernize this unprompted.
 schema_version: "1.1"
 name: typescript-gotchas-replaces-lodash-last
 description: >
@@ -14,9 +18,8 @@ description: >
   three older ways, the model invokes typescript-gotchas and rewrites all three
   reads with `.at(-1)`. expected_outcome: PASS when the rewrite holds at least
   three `.at(-1)` calls and none of lodash, `slice(-1)[0]`, `charAt(` or a
-  length-minus-one bracket read; FAIL otherwise. Partly a default-behavior guard:
-  the prompt is leading and models often modernize unprompted, so the delta may
-  be near zero.
+  length-minus-one bracket read; FAIL otherwise. Measured without the plugin: the
+  model keeps the old forms, so the delta is large.
 tags: [typescript-gotchas, trigger, quick]
 
 execution:
@@ -32,7 +35,7 @@ execution:
     export const lastSegment = (path: string): string | undefined =>
       path.split("/").slice(-1)[0];
 
-    export const lastChar = (s: string): string => s.charAt(s.length - 1);
+    export const lastChar = (s: string): string | undefined => s.charAt(s.length - 1);
     ```
   max_turns: 6
   allowed_tools:

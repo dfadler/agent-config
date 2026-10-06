@@ -7,11 +7,11 @@
 # for that unprompted once any skill fires, so the case passed with the skill body emptied
 # (sabotage check, PR #531). A plain variable index into a string is where the default is
 # `s[i]` or `s.charAt(i)` and only the skill's rule changes the output.
-# Sabotage map: file_uses_at and file_no_bracket_idiom check the "Prefer `.at()` for array and
-# string indexed reads" rule and the `str.charAt(...)` row of its table. Empty the body
-# (keep the description) and both should fail.
+# Sabotage map: file_uses_at and file_no_bracket_idiom check the headline "Prefer `.at()` for
+# array and string indexed reads" rule. Measured 2026-10-05 (PR #531): with the body emptied
+# (description kept) both fail in 3 of 3 runs, so this case catches body regressions.
 # Can fail: a file with `s[i]` or `s.charAt(i)` fails file_no_bracket_idiom and file_uses_at;
-# no file at all fails file_written and the regexes; skill_fired fails if the skill never
+# no file at all fails wrote_the_file and the regexes; skill_fired fails if the skill never
 # triggers on a file write. Any Write path other than src/char.ts also fails.
 schema_version: "1.1"
 name: typescript-gotchas-writes-file-with-at
@@ -49,11 +49,6 @@ graders:
     arm: both
 
   # Result.
-  - name: file_written
-    type: file_exists
-    path: src/char.ts
-    arm: both
-
   - name: file_uses_at
     type: regex
     target: { source: file, path: src/char.ts }
