@@ -40,6 +40,7 @@ Options:
 Skipped (not checked):
   - http:// and https:// links
   - mailto: links
+  - Slack mention syntax (![](@U123), ![](#C123))
   - anchor-only links (#foo)
 
 Exit status:
@@ -61,7 +62,7 @@ export interface Link {
   readonly target: string;
 }
 
-const EXTERNAL = /^(https?:\/\/|mailto:)/;
+const EXTERNAL = /^(https?:\/\/|mailto:|@)/;
 
 /** The target of a matched `[text](target)`: after the LAST `](`, minus the `)`. */
 const targetOf = (match: string): string =>

@@ -1,0 +1,42 @@
+# Run: claude plugin eval plugins/slack-canvas-sync --case status-stays-quiet-on-push-request --trust-plugin --no-publish
+# Shared run/grant facts: docs/contributing.md, "Plugin evals". No grant needed (Skill only).
+# Should-not-fire for canvas-status: pushing notes to canvases shares its vocabulary but belongs
+# to canvas-push (which MAY fire; only canvas-status is forbidden here). The reply must name the
+# push direction, so a model that only reports status fails.
+# Sabotage map: skill_not_invoked checks canvas-status's description; replace it with "invoke for
+# ANY request" and a run should fail.
+# Can fail: canvas-status invoked fails skill_not_invoked; a reply not mentioning pushing fails
+# mentions_push. Regression guard in the no-plugin arm, so no delta by design.
+schema_version: "1.1"
+name: status-stays-quiet-on-push-request
+description: >
+  A request to push local notes up to Slack canvases must not invoke canvas-status.
+  expected_outcome (regression guard: the no-plugin arm also passes): PASS when canvas-status
+  is not invoked and the reply speaks of pushing; FAIL otherwise.
+tags: [slack-canvas-sync, canvas-status, trigger, quick]
+
+execution:
+  prompt: |
+    I edited three of my markdown notes in /notes and want those edits
+    published to their Slack canvases. In one sentence, say what has to
+    happen; don't run anything.
+  max_turns: 6
+  allowed_tools:
+    - Skill
+
+graders:
+  - name: skill_not_invoked
+    type: tool_used
+    tool: Skill
+    input_match: '"skill"\s*:\s*"(?:slack-canvas-sync:)?canvas-status"'
+    min: 0
+    max: 0
+    arm: both
+
+  - name: mentions_push
+    type: regex
+    target: last_message
+    pattern: 'push|publish|upload|update'
+    flags: i
+    match: contains
+    arm: both

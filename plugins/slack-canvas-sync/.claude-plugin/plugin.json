@@ -2,7 +2,7 @@
   "$schema": "https://json.schemastore.org/claude-code-plugin-manifest.json",
   "name": "slack-canvas-sync",
   "version": "0.1.0",
-  "description": "Two-way sync between a local markdown directory and Slack canvases via the Slack connector. Scaffold: normalizer and validator first; skills land in follow-up issues (see #416).",
+  "description": "Two-way sync between a local markdown directory and Slack canvases via the Slack connector. Push and pull skills with a TypeScript normalizer, validator, and three-way section diff (see #416).",
   "author": {
     "name": "Dustin Fadler",
     "url": "https://github.com/dfadler"

@@ -1,0 +1,40 @@
+# Run: claude plugin eval plugins/slack-canvas-sync --case canvas-push-stays-quiet-on-pull-request --trust-plugin --no-publish
+# No grant needed (Skill only).
+# Near-miss for the push/pull boundary: pulling canvas edits into files shares "canvas", "notes" and
+# "sync" with canvas-push but is the opposite direction (canvas-pull). The skill is user-invoked
+# only, so a natural-language prompt can never fire it; this is a regression guard that also
+# fails if the description or flag changes and it starts firing for a pull request.
+# Regression guard: the no-plugin arm passes it, so the delta is about 0 by design.
+schema_version: "1.1"
+name: canvas-push-stays-quiet-on-pull-request
+description: >
+  A request to bring canvas edits down into local files must not invoke canvas-push.
+  expected_outcome (regression guard): PASS when canvas-push is not invoked and the reply
+  does not claim anything was pushed to Slack; FAIL when canvas-push fires.
+tags: [canvas-push, trigger, quick]
+
+execution:
+  prompt: |
+    My teammates edited some Slack canvases. Pull their changes down into the
+    markdown files in /notes/team. If you cannot do it, say why in at most 2
+    sentences.
+  max_turns: 4
+  allowed_tools:
+    - Skill
+
+graders:
+  - name: canvas_push_not_invoked
+    type: tool_used
+    tool: Skill
+    input_match: '"skill"\s*:\s*"(?:[\w-]+:)?canvas-push"'
+    min: 0
+    max: 0
+    arm: both
+
+  - name: no_push_claimed
+    type: regex
+    target: last_message
+    pattern: '(created|updated|pushed)\s+\d+\s+canvas|canvases?\s+(was|were|have been)\s+(created|updated|pushed)'
+    flags: i
+    match: not_contains
+    arm: both

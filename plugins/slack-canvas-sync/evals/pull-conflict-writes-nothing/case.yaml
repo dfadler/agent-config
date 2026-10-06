@@ -1,0 +1,55 @@
+# Run (one case at a time): claude plugin eval plugins/slack-canvas-sync --case pull-conflict-writes-nothing --trust-plugin --no-publish
+# Shared run/grant facts: docs/contributing.md, "Plugin evals". No grant needed (no tools).
+# Slash-invoked (see pull-plans-dry-run-first). The prompt supplies a dry-run result with
+# `blocked: "conflict"`, so the case needs neither the CLI nor the Slack server. The skill says
+# applying a conflict saves the canvas version under .canvas-sync/conflicts/ and changes nothing
+# else, and that the user must confirm before any write.
+# Sabotage map: quotes "`blocked: \"conflict\"`: ... Applying saves the canvas's full version
+# under `.canvas-sync/conflicts/` for comparison and changes nothing else."
+schema_version: "1.1"
+name: pull-conflict-writes-nothing
+description: >
+  Given a conflicting dry run, canvas-pull shows the pair, says applying only saves the canvas
+  copy under .canvas-sync/conflicts/ and leaves the file untouched, and asks to confirm.
+  expected_outcome: PASS when the reply names the conflicts path, says the file is left
+  unchanged and asks for confirmation; FAIL otherwise.
+tags: [slack-canvas-sync, pull, safety, quick]
+
+execution:
+  prompt: |
+    /slack-canvas-sync:canvas-pull /notes/team plan.md
+
+    The dry run for plan.md returned:
+    {"path":"plan.md","status":"mixed","blocked":"conflict","chunks":{"pull":1,"push":0},
+     "conflicts":[{"local":"Ship on Friday","remote":"Ship on Monday"}]}
+
+    Don't call any tools. In at most 5 short lines, tell me what you would
+    report and what would happen to plan.md if I confirm.
+  max_turns: 6
+
+graders:
+  - name: names_conflicts_dir
+    type: regex
+    target: last_message
+    pattern: '\.canvas-sync/conflicts'
+    match: contains
+
+  - name: file_left_unchanged
+    type: regex
+    target: last_message
+    pattern: 'unchanged|untouched|as is|stays|remains|left alone|leaves? (it|the file|plan\.md) (alone|be)|keeps? (your|the local)|preserv|(not|never|nothing|no|n''t)[^.\n]{0,60}(overwrit|chang|modif|written|touch|edit|alter)|(overwrit|chang|modif|written|touch|edit|alter)[^.\n]{0,40}(not|never|nothing|n''t)|kept|retain|intact|safe|unmodified|unaltered|unaffected|as-is|nothing else|only (save|stor|writ|cop)'
+    flags: i
+    match: contains
+
+  - name: shows_both_sides
+    type: regex
+    target: last_message
+    pattern: 'Friday[\s\S]*Monday|Monday[\s\S]*Friday'
+    match: contains
+
+  - name: asks_confirmation
+    type: regex
+    target: last_message
+    pattern: 'confirm'
+    flags: i
+    match: contains

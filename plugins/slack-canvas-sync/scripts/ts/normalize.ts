@@ -19,6 +19,8 @@ export interface Normalized {
   title: string | null;
   /** Canonical body markdown: one trailing newline, or "" when empty. */
   body: string;
+  /** The body as top-level blocks, one per Slack canvas section. */
+  sections: string[];
 }
 
 const FENCE = /^(`{3,}|~{3,})/;
@@ -158,9 +160,50 @@ export function startsOtherBlock(line: string, next: string | undefined): boolea
 
 /** Normalize a markdown body (no title handling). */
 export function normalizeBody(markdown: string): string {
+  return renderSections(normalizeSections(markdown));
+}
+
+/**
+ * Normalize a markdown body and return it as top-level blocks. Slack stores
+ * each block (paragraph, heading, list, table, code block, quote, divider,
+ * callout) as its own canvas section, so this is the unit the sync diffs.
+ */
+export function normalizeSections(markdown: string): string[] {
   const lines = markdown.replace(/\r\n?/g, "\n").split("\n");
-  const blocks = parseBlocks(lines);
-  return blocks.length === 0 ? "" : `${blocks.join("\n\n")}\n`;
+  return parseBlocks(canonicalMentions(lines));
+}
+
+const USER_MENTION = /<@([UW][A-Z0-9]+)(?:\|[^>]*)?>/g;
+const CHANNEL_MENTION = /<#(C[A-Z0-9]+)(?:\|[^>]*)?>/g;
+
+/**
+ * Slack takes mentions in canvas syntax (`![](@U123)`, `![](#C123)`) but reads
+ * them back in message syntax (`<@U123>`, `<#C123>`), verified live for user
+ * mentions. Both sides are rewritten to the canvas form so a mention is never
+ * a difference. Fenced code is left alone.
+ */
+function canonicalMentions(lines: string[]): string[] {
+  let fence: string | null = null;
+  return lines.map((line) => {
+    const trimmed = line.trim();
+    if (fence !== null) {
+      if (closesFence(trimmed, fence)) fence = null;
+      return line;
+    }
+    const open = FENCE.exec(trimmed);
+    if (open !== null) {
+      fence = open[1] ?? null;
+      return line;
+    }
+    return line
+      .replace(USER_MENTION, "![](@$1)")
+      .replace(CHANNEL_MENTION, "![](#$1)");
+  });
+}
+
+/** Join sections back into canonical body text. */
+export function renderSections(sections: string[]): string {
+  return sections.length === 0 ? "" : `${sections.join("\n\n")}\n`;
 }
 
 function parseBlocks(lines: string[]): string[] {
@@ -300,11 +343,21 @@ function parseBlocks(lines: string[]): string[] {
 
 /** Remove the generated navigation callout if it is the first block. */
 export function stripNavBlock(body: string): string {
-  const open = "::: {.callout}\n";
-  if (!body.startsWith(`${open}${NAV_BLOCK_HEADER}`)) return body;
-  const end = body.indexOf("\n:::\n");
-  if (end === -1) return body;
-  return body.slice(end + "\n:::\n".length).replace(/^\n+/, "");
+  return renderSections(stripNavSection(normalizeSections(body)));
+}
+
+/** Drop the generated navigation callout when it is the first section. */
+export function stripNavSection(sections: string[]): string[] {
+  const first = sections[0];
+  if (first?.startsWith(`::: {.callout}\n${NAV_BLOCK_HEADER}`) === true) {
+    return sections.slice(1);
+  }
+  return sections;
+}
+
+function finish(title: string | null, rest: string): Normalized {
+  const sections = stripNavSection(normalizeSections(rest));
+  return { title, body: renderSections(sections), sections };
 }
 
 function splitFrontmatter(markdown: string): {
@@ -339,15 +392,13 @@ function takeLeadingTitle(body: string): { title: string | null; rest: string } 
  */
 export function normalizeLocal(markdown: string): Normalized {
   const { title: fmTitle, rest } = splitFrontmatter(markdown);
-  if (fmTitle !== null) {
-    return { title: fmTitle, body: stripNavBlock(normalizeBody(rest)) };
-  }
+  if (fmTitle !== null) return finish(fmTitle, rest);
   const { title, rest: afterTitle } = takeLeadingTitle(rest);
-  return { title, body: stripNavBlock(normalizeBody(afterTitle)) };
+  return finish(title, afterTitle);
 }
 
 /** Normalize `slack_read_canvas` output: the first `# line` is the title. */
 export function normalizeRemote(markdown: string): Normalized {
   const { title, rest } = takeLeadingTitle(markdown.replace(/\r\n?/g, "\n"));
-  return { title, body: stripNavBlock(normalizeBody(rest)) };
+  return finish(title, rest);
 }

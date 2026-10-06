@@ -1,0 +1,55 @@
+# Run: claude plugin eval plugins/slack-canvas-sync --case status-warns-on-tracked-sync-state --trust-plugin --no-publish
+# Shared run/grant facts: docs/contributing.md, "Plugin evals". No grant needed (Skill only).
+# Reply-only: the scan output is pasted into the prompt (fake IDs), so no CLI or workspace needed.
+# Behavior: "Step 2: Warn if sync state is in git" requires a warning, `git rm --cached` for the
+# user to run, and treating already-pushed IDs as exposed. A baseline knows none of that.
+# Sabotage map: graders quote that step: `git rm --cached`, "exposed", and "the user runs it; do
+# not do it for them".
+# Can fail: dropping Step 2 loses all three; a reply claiming it ran the command trips
+# does_not_claim_to_run.
+schema_version: "1.1"
+name: status-warns-on-tracked-sync-state
+description: >
+  Given scan output where git tracks the sync manifest, the model invokes canvas-status and
+  warns, suggests git rm --cached for the user to run, and treats pushed IDs as exposed.
+  expected_outcome: PASS when the skill fires and all three details appear; FAIL otherwise.
+tags: [slack-canvas-sync, canvas-status, behavior, quick]
+
+execution:
+  prompt: |
+    I ran the canvas sync scan for /notes and this is the relevant part of its
+    JSON output: {"tracked_in_git": [".canvas-sync/manifest.json"], "files": []}.
+    Give me the canvas sync status report from this.
+
+    Don't call any tools other than skills. Reply with at most 6 short lines.
+  max_turns: 6
+  allowed_tools:
+    - Skill
+
+graders:
+  - name: skill_fired
+    type: tool_used
+    tool: Skill
+    input_match: '"skill"\s*:\s*"(?:[\w-]+:)?canvas-status"'
+    min: 1
+    arm: with-only
+
+  - name: suggests_git_rm_cached
+    type: regex
+    target: last_message
+    pattern: 'git\s+rm\s+--cached'
+    match: contains
+
+  - name: treats_ids_as_exposed
+    type: regex
+    target: last_message
+    pattern: 'exposed|compromised|leaked|shared'
+    flags: i
+    match: contains
+
+  - name: does_not_claim_to_run
+    type: regex
+    target: last_message
+    pattern: '(I.ve|I have|I.ll|I will) (run|ran|removed|untracked)[^.\n]{0,30}git rm'
+    flags: i
+    match: not_contains
