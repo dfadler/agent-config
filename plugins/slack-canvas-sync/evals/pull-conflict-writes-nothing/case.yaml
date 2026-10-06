@@ -37,7 +37,7 @@ graders:
   - name: file_left_unchanged
     type: regex
     target: last_message
-    pattern: 'unchanged|untouched|as is|stays|remains|(not|never|nothing|no|n''t)[^.\n]{0,60}(overwrit|chang|modif|written|touch|edit|alter)|(overwrit|chang|modif|written|touch|edit|alter)[^.\n]{0,40}(not|never|nothing|n''t)'
+    pattern: 'unchanged|untouched|as is|stays|remains|left alone|leaves? (it|the file|plan\.md) (alone|be)|keeps? (your|the local)|preserv|(not|never|nothing|no|n''t)[^.\n]{0,60}(overwrit|chang|modif|written|touch|edit|alter)|(overwrit|chang|modif|written|touch|edit|alter)[^.\n]{0,40}(not|never|nothing|n''t)|kept|retain|intact|safe|unmodified|unaltered|unaffected|as-is|nothing else|only (save|stor|writ|cop)'
     flags: i
     match: contains
 
