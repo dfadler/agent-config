@@ -6,7 +6,8 @@
 # All free, quick.
 # Can fail: no_worktree_skill_fired fails if the skill over-triggers on a plain local history
 # cleanup; rewrites_history fails if the reply refuses to rebase/squash (the skill over-applied
-# in the with-plugin arm).
+# in the with-plugin arm). The prompt asks for a squash, so rewrites_history is cheap for a
+# baseline; the Skill check carries the signal.
 schema_version: "1.1"
 name: worktree-core-stays-quiet-on-prerequisite-rebase
 description: >

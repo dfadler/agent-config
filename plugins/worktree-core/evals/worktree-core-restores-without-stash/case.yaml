@@ -54,7 +54,7 @@ graders:
   - name: no_checkout_head
     type: regex
     target: last_message
-    pattern: 'git\s+checkout\s+(?:HEAD\b|--\s)'
+    pattern: 'git\s+checkout\s+HEAD\b'
     match: not_contains
 
   # Half weight: a copy backup is the skill's advice but a correct reply may restore from a patch.

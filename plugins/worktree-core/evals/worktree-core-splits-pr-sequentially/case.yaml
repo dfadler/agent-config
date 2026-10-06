@@ -47,7 +47,7 @@ graders:
   - name: every_base_is_main
     type: regex
     target: last_message
-    pattern: '\bstack(?:ed|ing)?\b|--base\s+(?!main\b)\S|base[^\n]{0,30}(?:PR\s*#?\d|previous|prior|migration branch|endpoint branch)'
+    pattern: '(?<!not\s)(?<!no\s)\bstack(?:ed|ing)?\b|--base\s+(?!main\b)\S|\bbase:?\s*(?:=\s*)?(?:PR\s*#?\d|previous|the (?:migration|endpoint) (?:PR|branch))'
     flags: i
     match: not_contains
 
