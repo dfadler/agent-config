@@ -1,6 +1,10 @@
 ---
 name: pr-checks
 description: |
+  Load this whenever the user asks about the CI checks of one specific PR — even
+  when they paste the check output or logs themselves — before answering. It
+  defines how to classify each check (branch-related, flaky/infra, cancelled =
+  superseded), when to rerun or escalate, and the closing "in flight" summary.
   Review and respond to a single PR's CI checks: snapshot status, diagnose a
   failing run, classify it as branch-related or flaky/infra, and either fix,
   rerun, or escalate. Use when asked "why is CI failing on PR N", "check the

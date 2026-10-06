@@ -1,6 +1,14 @@
 ---
 name: github-pr-workflow
 description: |
+  ALWAYS invoke this skill first when asked to merge, approve or auto-merge a
+  PR — never run or suggest `gh pr merge` before loading it, because a PR that
+  edits `.github/workflows/` must be handed to a human. Also load it before
+  drafting a PR body, a PR comment or a `gh pr` command — even for a one-off
+  request ("merge PR 55", "post this comment on the PR") with the details
+  already given. It defines the AI-authorship marker on anything posted to a PR, the
+  `## Sequencing` section for dependent PRs, the merge-commit rule, and the
+  hand-off of security-critical merges (workflow edits) to a human.
   Conventions and guardrails for working with GitHub PRs: permissions, opening
   and sizing PRs, checking CI, responding to review comments, and the
   security-critical merge rule. Load whenever doing PR work in any repo —
