@@ -1,0 +1,75 @@
+# Run: node plugins/eval-authoring/scripts/ts/run-evals/run-evals.ts --tier quick plugins/eval-authoring
+# (the quick tier runs this case once, plugin arm only, `--ablation none`; no grant needed.)
+# Should-fire half of the trigger boundary for author-cases; the should-not-fire half is
+# author-cases-stays-quiet-on-unit-tests.
+# Every grader is free, so the case is tagged `quick`. The task has one semantic property
+# (tone), which is why the reply is expected to hold an llm grader with PASS and FAIL wording.
+# Can fail: with no author-cases skill the model does not know schema_version "1.1", the
+# `PASS if`/`FAIL if` form or that free graders go first, so schema_1_1,
+# llm_grader_has_pass_fail and has_free_grader fail on a generic answer; skill_fired fails if the description
+# stops matching the prompt. A reply that only talks about evals fails all four.
+schema_version: "1.1"
+name: author-cases-fires-on-authoring-request
+description: >
+  Given a natural request to write an eval case for a skill, without naming
+  author-cases, the model invokes author-cases and drafts a case.yaml that
+  follows its guidance: schema_version "1.1", a free grader beside the llm
+  grader, explicit PASS if and FAIL if wording, and a prompt that should not
+  fire the skill. expected_outcome: PASS when all four result checks and the
+  skill call hold; FAIL when the skill is not invoked or the draft misses the
+  schema version, the PASS/FAIL form, a free grader, or a negative prompt.
+tags: [eval-authoring, author-cases, trigger, quick]
+
+execution:
+  prompt: |
+    I'm adding tests to my plugin with `claude plugin eval`. The plugin has one
+    skill, `release-notes`, described as: "Turn a git changelog into release
+    notes. Use when asked to write release notes from commits or a CHANGELOG."
+    The notes should name every breaking change and read in a friendly tone.
+    Write me an eval case for it in the single-file case.yaml format, and show
+    the whole file in your reply. Don't create files or run any commands.
+  max_turns: 8
+  allowed_tools:
+    - Skill
+    - Read
+    - Glob
+    - Grep
+
+graders:
+  # Steps: the skill fired on a prompt that never names it.
+  - name: skill_fired
+    type: tool_used
+    tool: Skill
+    input_match: '"skill"\s*:\s*"(?:[\w-]+:)?author-cases"'
+    min: 1
+    arm: both
+
+  # Result: the draft carries what only the skill's guidance teaches.
+  - name: schema_1_1
+    type: regex
+    target: last_message
+    pattern: 'schema_version:\s*["'']?1\.1'
+    match: contains
+
+  - name: llm_grader_has_pass_fail
+    type: regex
+    target: last_message
+    pattern: 'type:\s*llm[\s\S]*PASS if[\s\S]*FAIL if'
+    match: contains
+
+  - name: has_free_grader
+    type: regex
+    target: last_message
+    pattern: 'type:\s*(regex|tool_used|tool_order|file_exists)'
+    match: contains
+
+  # Indicator of the boundary guidance: a prompt marked as one that should not fire the skill.
+  # A wording regex, so it can miss a differently phrased negative; half weight for that
+  # reason. The reviewer and a human read the reply for the real check.
+  - name: has_negative_prompt
+    type: regex
+    target: last_message
+    pattern: "(should[\\s_-]*not|shouldn'?t|must[\\s_-]*not|does(?:n'?t| not)|not)[\\s_-]*(fire|trigger|activate)|near[\\s_-]?miss|should_trigger:\\s*false"
+    flags: i
+    match: contains
+    weight: 0.5

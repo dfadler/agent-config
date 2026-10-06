@@ -1,0 +1,57 @@
+# Run: node plugins/eval-authoring/scripts/ts/run-evals/run-evals.ts --tier quick plugins/vite
+# Shared run/grant facts: docs/contributing.md, "Plugin evals". No grant needed (Skill only).
+# Should-fire half of the dev-workflow boundary; the should-not-fire half is
+# dev-workflow-stays-quiet-on-slow-dev-server. Every grader is free, so the case is tagged quick.
+# Can fail: skill_fired fails if the description stops matching. Without the skill a generic
+# answer says `vitest run` and `npm link` or nothing about the workspace, so the three result
+# regexes score 0: `test:nowatch` (or `--watch=false`) is the skill's one-shot script name,
+# `tsc --noEmit` is its pre-commit type check, `workspace:*` is its monorepo consumer link.
+# Skill phrases checked: "Running tests" (`pnpm test:nowatch`), "Type checking"
+# (`npx tsc --noEmit`), "Testing against your app" (`"workspace:*"`).
+schema_version: "1.1"
+name: dev-workflow-fires-on-plugin-package
+description: >
+  Asked how to work day to day on a Vite plugin package in a pnpm monorepo, without naming the
+  skill, the model invokes dev-workflow and answers with a one-shot test script, the tsc
+  --noEmit type check and the workspace:* link for the consumer app. expected_outcome: PASS
+  when the skill is invoked and all three result checks hold; FAIL when the skill is not
+  invoked or the reply lacks the one-shot script, the type check or the workspace link.
+tags: [vite, dev-workflow, trigger, quick]
+
+execution:
+  prompt: |
+    I just inherited @acme/vite-plugin-banner, a Vite plugin package in our pnpm
+    monorepo, and I'm not sure how to work on it day to day. How do I run its tests
+    once without watch mode, type-check it, and try my changes in the consumer app
+    (apps/web)? Answer in your reply; don't create files or run commands.
+  max_turns: 6
+  allowed_tools:
+    - Skill
+
+graders:
+  # Steps: the skill fired on a prompt that never names it.
+  - name: skill_fired
+    type: tool_used
+    tool: Skill
+    input_match: '"skill"\s*:\s*"(?:[\w-]+:)?dev-workflow"'
+    min: 1
+    arm: with-only
+
+  # Result: three workflow facts the skill supplies.
+  - name: one_shot_test_script
+    type: regex
+    target: last_message
+    pattern: 'test:nowatch|--watch=false'
+    match: contains
+
+  - name: type_check_command
+    type: regex
+    target: last_message
+    pattern: 'tsc\s+--noEmit'
+    match: contains
+
+  - name: workspace_protocol_link
+    type: regex
+    target: last_message
+    pattern: 'workspace:\*'
+    match: contains

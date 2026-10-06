@@ -1,0 +1,59 @@
+# Run: node plugins/eval-authoring/scripts/ts/run-evals/run-evals.ts --tier quick plugins/typescript-gotchas
+# Should-fire half of the trigger boundary: new non-test TypeScript that reads an array by a
+# variable index. The should-not-fire halves are typescript-gotchas-stays-quiet-on-test-file
+# and typescript-gotchas-keeps-dom-brackets. Every grader is free, so the case is tagged `quick`.
+# Why this prompt: a first version asked for the last element. The model writes `.at(-1)` for
+# that on its own once any skill fires, so the case passed with the skill body emptied
+# (sabotage check, PR #531). A plain variable index is where the default is `urls[i]` and
+# only the rule "use `.at(i)` instead of `[i]` for indexed reads" changes the output.
+# Sabotage map: uses_at_with_index checks the skill's "Prefer `.at()` for array and string
+# indexed reads" rule; no_bracket_index_read checks the same rule from the other side. Emptying
+# the body alone does NOT fail them: the description's "any time you would write `[i]`" hint
+# is enough for the model to write `.at(i)`. Empty the body and drop that description
+# sentence and both fail (3 of 3 runs), so the case depends on the skill's text as a whole,
+# not on the body specifically.
+# Can fail: `urls[i]` fails both result checks; skill_fired fails if the description stops
+# matching the prompt. Expect a large with/without delta, since the no-plugin default is `urls[i]`.
+schema_version: "1.1"
+name: typescript-gotchas-reads-index-with-at
+description: >
+  When asked to write a new TypeScript helper that returns the entry at a given index
+  of an array, the model invokes typescript-gotchas and reads it with `.at(i)` instead of
+  `urls[i]`. expected_outcome: PASS when the skill is invoked and the code reads the entry
+  with `.at(` and has no `urls[i]` bracket read; FAIL otherwise. Without the plugin the
+  default is `urls[i]`, so the with/without delta should be large.
+tags: [typescript-gotchas, trigger, quick]
+
+execution:
+  prompt: |
+    I'm adding a helper to src/utils/history.ts in my TypeScript project. Write
+    `visitedAt(urls: string[], i: number): string | undefined`, which returns the
+    URL at position `i` in the history list. Reply with the complete file in one
+    code block and no other text.
+  max_turns: 6
+  allowed_tools:
+    - Skill
+
+graders:
+  # Steps. Indicator in a two-arm run, scored only with the plugin.
+  - name: skill_fired
+    type: tool_used
+    tool: Skill
+    input_match: '"skill"\s*:\s*"(?:[\w-]+:)?typescript-gotchas"'
+    min: 1
+    arm: with-only
+
+  # Result.
+  - name: uses_at_with_index
+    type: regex
+    target: last_message
+    pattern: '\burls\.at\(\s*i\s*\)'
+    match: contains
+    arm: both
+
+  - name: no_bracket_index_read
+    type: regex
+    target: last_message
+    pattern: '\burls\[\s*i\s*\]|\.charAt\('
+    match: not_contains
+    arm: both

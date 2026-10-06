@@ -1,0 +1,55 @@
+# Run (one case at a time, #536/#538): claude plugin eval plugins/screen-capture --case attach-fails-closed-for-jira --trust-plugin --no-publish
+# Shared run/grant facts: docs/contributing.md, "Plugin evals". No grant needed (Skill only).
+# Should-fire half of the attach boundary on its fail-closed path: the only implemented target
+# is github, and an unknown or unimplemented target must say "not supported yet" rather than
+# fall through to github or guess at Jira's attachment API.
+# Why useful: a no-plugin model answers with a Jira REST attachment recipe, so the "not
+# supported" check can fail without the skill (delta expected); a skill that regresses to
+# routing everything to GitHub fails the no-gh check.
+# Sabotage map: says_not_supported and no_github_fallthrough check "--target=jira (not
+# implemented)" ("fail closed with a \"target not supported yet\" error") and the Targets
+# intro ("must fail ... not fall through to `github`").
+# Can fail: a reply offering a Jira API call or a gh pr/issue command scores 0 on the matching
+# grader; skill_fired fails if the description stops matching.
+schema_version: "1.1"
+name: attach-fails-closed-for-jira
+description: >
+  Asked to attach before/after captures to a Jira ticket, the model invokes attach and says the
+  target is not supported yet instead of using the GitHub path or inventing a Jira upload.
+  expected_outcome (says_not_supported is the discriminating check; no_github_fallthrough is a guard): PASS when the skill fires, the reply says the Jira target is not supported
+  or implemented yet and shows no gh PR/issue command; FAIL otherwise.
+tags: [screen-capture, attach, trigger, quick]
+
+execution:
+  prompt: |
+    I captured before.png and after.png of a layout fix. Attach them as a
+    before/after comparison to Jira ticket SHOP-481.
+
+    Do this now. Reply with at most 3 sentences: what you posted and where,
+    or why you could not.
+  max_turns: 6
+  allowed_tools:
+    - Skill
+
+graders:
+  # Steps. Indicator in a two-arm run, scored only with the plugin.
+  - name: skill_fired
+    type: tool_used
+    tool: Skill
+    input_match: '"skill"\s*:\s*"(?:[\w-]+:)?attach"'
+    min: 1
+    arm: with-only
+
+  # Result.
+  - name: says_not_supported
+    type: regex
+    target: last_message
+    pattern: 'not (?:(?:yet|currently) )?(?:supported|implemented)|unsupported|isn.t (?:(?:yet|currently) )?(?:supported|implemented)|(?:doesn.t|does not) (?:yet |currently )?support'
+    flags: i
+    match: contains
+
+  - name: no_github_fallthrough
+    type: regex
+    target: last_message
+    pattern: 'gh\s+(?:pr|issue)\s+(?:edit|comment)'
+    match: not_contains

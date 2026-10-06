@@ -1,0 +1,6 @@
+schema_version: "1"
+grants:
+  needed:
+    - "Bash(npx *)"
+  other-specifier:
+    - "Bash(npx *)"

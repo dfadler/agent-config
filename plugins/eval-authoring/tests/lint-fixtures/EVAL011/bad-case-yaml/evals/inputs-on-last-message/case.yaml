@@ -1,0 +1,7 @@
+schema_version: "1.1"
+name: inputs-on-last-message
+execution:
+  prompt: Do the thing.
+graders:
+  - type: "llm"
+    criteria: "PASS if the Bash tool was called with the argument npx cowsay. FAIL if it was called with anything else."

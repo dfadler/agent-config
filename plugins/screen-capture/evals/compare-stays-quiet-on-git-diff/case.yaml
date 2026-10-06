@@ -1,0 +1,41 @@
+# Run (one case at a time, #536/#538): claude plugin eval plugins/screen-capture --case compare-stays-quiet-on-git-diff --trust-plugin --no-publish
+# Shared run/grant facts: docs/contributing.md, "Plugin evals". No grant needed (Skill only).
+# Should-not-fire half of the compare boundary: "compare ... main and my branch" is compare's
+# vocabulary, but this asks for a textual git diff, not a rendered comparison.
+# Sabotage map: skill_not_invoked checks compare's description ("compare rendered output
+# between two branches"); drop "rendered" and a run should fail it.
+# Can fail: any screen-capture skill invoked fails skill_not_invoked; a reply without a
+# `git diff` against main fails answers_with_git_diff. Regression guard: a no-plugin arm passes
+# it, so no delta by design.
+schema_version: "1.1"
+name: compare-stays-quiet-on-git-diff
+description: >
+  A request to compare two branches' source with git must not invoke any screen-capture skill.
+  expected_outcome: PASS when no screen-capture skill is invoked and the reply shows a git diff
+  between main and feature/header; FAIL when a skill is invoked or the diff command is missing.
+tags: [screen-capture, compare, trigger, quick]
+
+execution:
+  prompt: |
+    I want to compare src/Header.tsx on main against my branch feature/header
+    and see which lines differ. Do it now and reply with the one bash command
+    you ran, in a bash code block and no other text.
+  max_turns: 6
+  allowed_tools:
+    - Skill
+
+graders:
+  - name: skill_not_invoked
+    type: tool_used
+    tool: Skill
+    input_match: '"skill"\s*:\s*"(?:screen-capture:)?(?:capture|compare|attach|lighthouse)"'
+    min: 0
+    max: 0
+    arm: both
+
+  - name: answers_with_git_diff
+    type: regex
+    target: last_message
+    pattern: 'git\s+diff\s[^\n]*(?:main(?:\.\.\.?|\s+)feature/header|feature/header(?:\.\.\.?|\s+)main)'
+    match: contains
+    arm: both

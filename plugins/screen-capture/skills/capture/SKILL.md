@@ -4,9 +4,13 @@ description: >
   Generic primitive for capturing a screenshot (image) or short walkthrough
   (video) of a URL, on either Playwright (primary) or system Chrome via CDP
   (config-driven fallback). Use whenever something needs a page rendered to a
-  file on disk — not just previewed in an in-app browser tool. Engine,
-  browser, viewport, output type, and output directory are all config-driven
-  (see Config resolution below), not hardcoded per call.
+  file on disk — not just previewed in an in-app browser tool. ALWAYS invoke
+  this skill first when asked to "capture", "screenshot", "take a screenshot
+  of", or "record" a URL or page, including pages that only render
+  client-side, before writing any command: it supplies the configured
+  viewport, output directory and file name, and the headless CDP recipe.
+  Engine, browser, viewport, output type, and output directory are all
+  config-driven (see Config resolution below), not hardcoded per call.
 license: MIT
 metadata:
   version: "0.1.0"
