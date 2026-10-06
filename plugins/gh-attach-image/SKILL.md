@@ -13,6 +13,9 @@ description: |
   raw.githubusercontent.com URL in a PR description, or about to create a
   gist for the same purpose — this skill is the correct, lighter-weight
   alternative to both of those workarounds.
+  Also use this when an uploaded github.com/user-attachments URL returns 404
+  or looks broken: the upload usually did not fail, the URL only resolves once
+  a saved PR/issue body or comment references it.
 license: MIT
 metadata:
   version: "1.1.0"
