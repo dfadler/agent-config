@@ -3,12 +3,14 @@ name: lighthouse
 description: >
   Run a Lighthouse CLI pass (mobile + desktop) against a URL and store the
   results in the second-brain vault under knowledge/lighthouse/<project>/.
-  Use whenever a change needs a repeatable, scriptable performance/
-  accessibility/best-practices check — complementing, not replacing, a
-  manual responsive resize-and-look pass. Config-driven: which form factors
-  run, whether the skill runs at all, and where results land are all
-  controlled by lighthouse_enabled, lighthouse_form_factors, and
-  lighthouse_output_dir.
+  ALWAYS invoke this skill first when asked to run, repeat or script a
+  Lighthouse pass or performance/accessibility audit against a URL, before
+  writing any `lighthouse` command, including when the config disables it
+  (it defines the no-op behaviour). Complements, not replaces, a manual
+  responsive resize-and-look pass. Not for advice about fixing a Lighthouse
+  finding. Config-driven: which form factors run, whether the skill runs at
+  all, and where results land are all controlled by lighthouse_enabled,
+  lighthouse_form_factors, and lighthouse_output_dir.
 license: MIT
 metadata:
   version: "0.1.0"

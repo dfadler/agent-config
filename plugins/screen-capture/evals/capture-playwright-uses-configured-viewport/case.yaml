@@ -1,0 +1,77 @@
+# Run (one case at a time, #536/#538): claude plugin eval plugins/screen-capture --case capture-playwright-uses-configured-viewport --trust-plugin --no-publish
+# Shared run/grant facts: docs/contributing.md, "Plugin evals". No grant needed (Skill only);
+# the model writes the command and never runs it, so no browser starts (hermetic, headless).
+# Should-fire half of the capture boundary (near-miss: capture-stays-quiet-on-playwright-test-api).
+# Why a reply: capture drives Playwright/Chrome, which an eval run cannot do, so the case grades
+# the command the model writes. The prompt supplies the viewport and output dir as settings.json
+# config; only the skill knows the `capture.png` filename and the `npx --yes playwright
+# screenshot` form with `--viewport-size=W,H` converted from `WxH`.
+# Sabotage map: skill_fired checks the description; command_form checks "Engine: Playwright
+# (default)"; viewport_converted and output_name check the `output_type: image` snippet
+# ("--viewport-size", "capture.png"); no_headed_launch checks that the skill never opens a GUI
+# (claude/conventions/focus-stealing.md).
+# Can fail: a reply with `--viewport-size=1280,900`, a different filename, no `--full-page`, or a
+# headed launch scores 0 on that grader; skill_fired fails if the description stops matching.
+# Without the plugin the model typically writes `playwright screenshot` with some viewport and
+# `screenshot.png`, so output_name is the check most likely to show a delta.
+schema_version: "1.1"
+name: capture-playwright-uses-configured-viewport
+description: >
+  Asked for a full-page screenshot of a local URL with viewport and output dir given as
+  settings.json config, the model invokes capture and writes one headless Playwright CLI
+  command using the configured 390x844 viewport and ./shots/capture.png. expected_outcome:
+  PASS when the skill fires and the command has the Playwright screenshot form, the converted
+  viewport, --full-page, the capture.png name and no headed launch; FAIL otherwise.
+tags: [screen-capture, capture, trigger, quick]
+
+execution:
+  prompt: |
+    My project's .claude/settings.json contains:
+    {"screenCapture": {"viewport": "390x844", "outputDir": "./shots"}}
+
+    Capture http://localhost:5173/pricing as a full-page screenshot using my
+    configured settings. Don't run anything. Reply with exactly one bash code
+    block holding the command and no other text.
+  max_turns: 6
+  allowed_tools:
+    - Skill
+
+graders:
+  # Steps. Indicator in a two-arm run, scored only with the plugin.
+  - name: skill_fired
+    type: tool_used
+    tool: Skill
+    input_match: '"skill"\s*:\s*"(?:[\w-]+:)?capture"'
+    min: 1
+    arm: with-only
+
+  # Result.
+  - name: command_form
+    type: regex
+    target: last_message
+    pattern: 'npx\s+--yes\s+playwright\s+screenshot'
+    match: contains
+
+  - name: viewport_converted
+    type: regex
+    target: last_message
+    pattern: '--viewport-size[= ]"?390,\s?844"?'
+    match: contains
+
+  - name: full_page
+    type: regex
+    target: last_message
+    pattern: '--full-page'
+    match: contains
+
+  - name: output_name
+    type: regex
+    target: last_message
+    pattern: '(?:\./)?shots/capture\.png'
+    match: contains
+
+  - name: no_headed_launch
+    type: regex
+    target: last_message
+    pattern: '--headed|headless\s*[=:]\s*false|open\s+-a'
+    match: not_contains

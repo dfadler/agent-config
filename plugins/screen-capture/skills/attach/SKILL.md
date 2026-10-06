@@ -6,9 +6,12 @@ description: |
   skill owns destination-specific formatting — for `--target=github` (the
   only implemented target), that means the before/after PR comment table and
   video embed — and delegates the raw upload mechanics to
-  `gh-attach-image`. Use this whenever a task needs captured
-  visual artefacts posted somewhere, rather than re-deriving the comment
-  layout or the upload call by hand each time.
+  `gh-attach-image`. ALWAYS invoke this skill first when asked to "attach",
+  "post", "add" or "embed" before/after screenshots, images or a video in a
+  PR, issue, comment or ticket (including Jira or any non-GitHub target), and
+  before writing any Markdown or `gh` command for them: it owns the layout
+  and knows which targets are supported. Not for repo-local images such as a
+  README embed.
 license: MIT
 metadata:
   version: "0.1.0"

@@ -1,6 +1,6 @@
 /**
  * run-evals: a cost-tier wrapper around the plugin-eval CLI. Callers pick a
- * tier; the wrapper hides the flags, passes each case group's recorded grants,
+ * tier; the wrapper hides the flags, passes each case's recorded grants,
  * checks the preconditions, and turns the run into one named exit code.
  *
  * Usage: see USAGE below, or run with --help.
@@ -13,6 +13,7 @@ import {
   EXIT_DEPENDENCY,
   EXIT_INTERNAL,
   EXIT_OK,
+  EXIT_PARTIAL,
   EXIT_USAGE,
   worstExit,
   type ExitCode,
@@ -23,14 +24,24 @@ import {
   candidateResultDirs,
   findingsFromText,
   judgeRun,
+  plannedCaseProblem,
+  rawResultFacts,
   type Judgement,
 } from "./outcome.ts";
 import { scanOutput } from "./output.ts";
-import { needsBash, planGroups, type RunGroup } from "./plan.ts";
+import {
+  needsBash,
+  planGroups,
+  planInvocations,
+  type Invocation,
+} from "./plan.ts";
 import { runPreflight } from "./preflight.ts";
 import {
   DEFAULT_TIER,
   TIERS,
+  ceilingFor,
+  QUICK_FLOOR_USD,
+  QUICK_PER_CASE_USD,
   isTierName,
   type AblationMode,
   type Tier,
@@ -38,43 +49,49 @@ import {
 
 export const USAGE = `Usage: run-evals.ts [options] <plugin-path>
 
-Run a plugin's eval cases at a cost tier. Cases with identical grants
-(<eval-dir>/grants.yaml) share one run; each group runs under exactly its own
-grants. Never passes --scaffold.
+Run a plugin's eval cases at a cost tier. The CLI's --case takes one glob, so
+the wrapper makes one CLI invocation per case, each under exactly that case's
+grants (<eval-dir>/grants.yaml). Never passes --scaffold, --json or --report.
 
 Options:
   --tier <name>        quick | standard | thorough (default: ${DEFAULT_TIER})
 ${Object.values(TIERS).map((t) => `                         ${t.name}: ${t.description}`).join("\n")}
   --max-cost-usd <usd> override the tier's cost ceiling (positive number).
                        The CLI has no default ceiling; the wrapper's tiers set
-                       one (quick 1, standard 5, thorough 15). The ceiling
-                       bounds the list-price cost estimate and is checked
-                       before each run starts; started runs finish, and the
-                       CLI exits 2 (wrapper exit 7) only if a run is left
-                       unstarted. It applies per CLI invocation, and the
-                       wrapper makes one invocation per grant set, so the
-                       override applies to every group, not to the whole run
+                       one: quick ${String(QUICK_PER_CASE_USD)} per case with a floor of ${String(QUICK_FLOOR_USD)}, standard
+                       5 and thorough 15 (flat). The override is always a
+                       total for the whole wrapper run, never per case. Each
+                       invocation gets the remaining budget as its own
+                       --max-cost-usd, the wrapper adds up each result's
+                       costUsd (list price, judge calls included), and it
+                       stops launching when nothing is left, listing the
+                       unstarted cases (exit 7). A result with no readable
+                       costUsd is charged its per-case share (ceiling divided
+                       by cases), capped at what is left
   --model <id>         pin the model (default: pinned in the wrapper)
   --judge-model <id>   pin the judge model (default: pinned in the wrapper)
   --eval-dir <dir>     eval directory relative to the plugin
-  --json-file <path>   write the CLI's JSON result to a file
-  --report <path>      write the HTML report to a path
-  --output-dir <dir>   results directory (each group gets <dir>/group-N)
+  --output-dir <dir>   base results directory (default: <eval-dir>/results).
+                       Each wrapper run writes <dir>/run-<time>/<NN>-<case>
   --publish-report     publish the report (default: --no-publish)
   --keep-temp          keep run traces
   --skip-unavailable   exit 0 when plugin eval is in early access or down
   --dry-run            print the commands and exit; runs nothing
   -h, --help           show this help
 
+After each invocation the wrapper checks that the result holds exactly the
+planned case; a missing, extra or zero-case result exits 7 and names the case.
+
 Exit codes:
-  0   every group passed, results trustworthy
+  0   every case passed, results trustworthy
   1   below threshold, load failure, no cases, untrusted directory, invalid option
   2   wrapper usage error
   3   bad cases or grants file, or the CLI says a case cannot pass with its grants
   4   unmet requirement (Claude Code < 2.1.269, git < 2.31, sandbox backend,
       claude missing, or plugin eval unavailable)
   7   partial or untrustworthy run (cost ceiling, rejected credential, a run
-      errored, paid graders skipped)
+      errored, paid graders skipped, a planned case missing from its result,
+      or a result that could not be read)
   20  internal error
   130 interrupted
   143 terminated
@@ -103,8 +120,6 @@ const VALUE_FLAGS: readonly string[] = [
   "--model",
   "--judge-model",
   "--eval-dir",
-  "--json-file",
-  "--report",
   "--output-dir",
 ];
 const BOOL_FLAGS: readonly string[] = [
@@ -181,8 +196,6 @@ export const parseArgs = (argv: readonly string[]): Parsed => {
       maxCostUsd,
       evalDir: values.get("--eval-dir"),
       reporting: {
-        jsonFile: values.get("--json-file"),
-        reportFile: values.get("--report"),
         outputDir: values.get("--output-dir"),
         publishReport: bools.has("--publish-report"),
         keepTemp: bools.has("--keep-temp"),
@@ -210,15 +223,26 @@ export interface RunSummary {
   readonly ablation: AblationMode;
   readonly scoringNote: string;
   readonly plugin: string;
-  readonly groups: readonly GroupSummary[];
+  /** The cost ceiling for the whole run, and what the results charged against it. */
+  readonly ceilingUsd: number;
+  /** How the ceiling was derived (cases x per-case, the floor, flat, or the override). */
+  readonly ceilingBasis: string;
+  readonly spentUsd: number;
+  readonly invocations: readonly InvocationSummary[];
+  /** Cases never launched (budget spent, or an earlier invocation stopped the run). */
+  readonly unstarted: readonly string[];
   readonly exit: ExitCode;
 }
 
-export interface GroupSummary {
-  readonly cases: readonly string[];
+export interface InvocationSummary {
+  readonly caseName: string;
   readonly grants: readonly string[];
   readonly command: readonly string[];
   readonly cliStatus: number | null;
+  /** The budget this invocation was given as its `--max-cost-usd`. */
+  readonly allottedUsd: number;
+  /** What it was charged: the result's costUsd, or the per-case share of the ceiling when that was unreadable. */
+  readonly chargedUsd: number;
   readonly exit: ExitCode;
   readonly reasons: readonly string[];
   readonly resultDir: string | undefined;
@@ -243,53 +267,83 @@ const fail = (io: Io, code: ExitCode, message: string): ExitCode => {
   return code;
 };
 
-/** Locate this run's result file: new entries under `dir` that hold an aggregate-result.json, newest last. */
+/** Round to the 4 decimals a `--max-cost-usd` is given in; also keeps float drift out of the running total. */
+const round4 = (n: number): number => Math.round(n * 10000) / 10000;
+
+/** A directory-name-safe form of a case name. */
+const safeName = (name: string): string => name.replace(/[^\w.-]/g, "_");
+
+const runStamp = (io: Io): string => io.now().toISOString().replace(/[:.]/g, "-");
+
+const invocationSpec = (
+  options: Options,
+  target: string,
+  trust: boolean,
+  inv: Invocation,
+  outputDir: string,
+  budgetUsd: number,
+): RunSpec => ({
+  target,
+  tier: options.tier,
+  caseName: inv.caseName,
+  grants: inv.grants,
+  model: options.model,
+  judgeModel: options.judgeModel,
+  maxCostUsd: budgetUsd,
+  evalDir: options.evalDir,
+  trustPlugin: trust,
+  reporting: { ...options.reporting, outputDir },
+});
+
+/** Where invocation `n` of `total` writes: `<runDir>/<NN>-<case>`. */
+const invocationDir = (
+  runDir: string,
+  n: number,
+  total: number,
+  inv: Invocation,
+): string =>
+  join(
+    runDir,
+    `${String(n).padStart(Math.max(2, String(total).length), "0")}-${safeName(inv.caseName)}`,
+  );
+
+/** Locate this invocation's result: the (fresh) output directory itself, or one of its children. */
 const locateResult = (
   io: Io,
   dir: string,
-  before: ReadonlySet<string>,
 ): { readonly dir: string; readonly text: string } | undefined =>
-  candidateResultDirs(
-    dir,
-    io.listDir(dir).filter((e) => !before.has(e)),
-  )
+  candidateResultDirs(dir, io.listDir(dir))
     .toReversed()
     .flatMap((d) => {
       const text = io.readFile(join(d, AGGREGATE_FILE));
       return text === undefined ? [] : [{ dir: d, text }];
     })[0];
 
-const runGroup = async (
+const runInvocation = async (
   io: Io,
   options: Options,
   target: string,
   trust: boolean,
-  index: number,
-  group: RunGroup,
-  resultsBase: string,
-): Promise<{ readonly summary: GroupSummary; readonly stop: boolean }> => {
-  const outputDir =
-    options.reporting.outputDir === undefined
-      ? undefined
-      : join(resolve(io.cwd, options.reporting.outputDir), `group-${String(index + 1)}`);
-  const spec: RunSpec = {
-    target,
-    tier: options.tier,
-    cases: group.cases,
-    grants: group.grants,
-    model: options.model,
-    judgeModel: options.judgeModel,
-    maxCostUsd: options.maxCostUsd,
-    evalDir: options.evalDir,
-    trustPlugin: trust,
-    reporting: { ...options.reporting, outputDir },
-  };
-  const args = buildCliArgs(spec);
-  const searchDir = outputDir ?? resultsBase;
-  const before = new Set(io.listDir(searchDir));
-  io.err(
-    `run-evals: group ${String(index + 1)}: ${group.cases.join(", ")} (grants: ${group.grants.length === 0 ? "none" : group.grants.join(" ")})\n`,
+  n: number,
+  total: number,
+  inv: Invocation,
+  outputDir: string,
+  budgetUsd: number,
+  shareUsd: number,
+): Promise<{ readonly summary: InvocationSummary; readonly stop: boolean }> => {
+  const args = buildCliArgs(
+    invocationSpec(options, target, trust, inv, outputDir, budgetUsd),
   );
+  const label = `invocation ${String(n)}/${String(total)} (${inv.caseName})`;
+  io.err(
+    `run-evals: ${label}: grants: ${inv.grants.length === 0 ? "none" : inv.grants.join(" ")}; budget $${String(budgetUsd)}\n`,
+  );
+  const base = {
+    caseName: inv.caseName,
+    grants: inv.grants,
+    command: ["claude", ...args],
+    allottedUsd: budgetUsd,
+  };
   const ran = await io.spawn("claude", args, {
     onStdout: io.out,
     onStderr: io.err,
@@ -297,10 +351,9 @@ const runGroup = async (
   if (ran.error !== undefined) {
     return {
       summary: {
-        cases: group.cases,
-        grants: group.grants,
-        command: ["claude", ...args],
+        ...base,
         cliStatus: null,
+        chargedUsd: Math.min(shareUsd, budgetUsd),
         exit: EXIT_DEPENDENCY,
         reasons: [`could not start claude: ${ran.error}`],
         resultDir: undefined,
@@ -308,8 +361,9 @@ const runGroup = async (
       stop: true,
     };
   }
-  const located = locateResult(io, searchDir, before);
-  const read = findingsFromText(located?.text, searchDir);
+  const located = locateResult(io, outputDir);
+  const read = findingsFromText(located?.text, outputDir);
+  const facts = rawResultFacts(located?.text);
   const verdict: Judgement = judgeRun({
     status: ran.status,
     signal: ran.signal,
@@ -318,22 +372,40 @@ const runGroup = async (
     resultProblem: read.problem,
     skipUnavailable: options.skipUnavailable,
   });
-  verdict.reasons.forEach((r) => {
-    io.err(`run-evals: group ${String(index + 1)}: ${r}\n`);
+  const mismatch = plannedCaseProblem(inv.caseName, facts.caseNames);
+  const unreadableCharge = Math.min(shareUsd, budgetUsd);
+  const noCost =
+    facts.costUsd === undefined
+      ? [`no readable costUsd in the result: charged the $${String(unreadableCharge)} per-case share of the ceiling`]
+      : [];
+  const reasons = [
+    ...verdict.reasons,
+    ...(mismatch === undefined ? [] : [mismatch]),
+    ...noCost,
+  ];
+  reasons.forEach((r) => {
+    io.err(`run-evals: ${label}: ${r}\n`);
   });
   return {
     summary: {
-      cases: group.cases,
-      grants: group.grants,
-      command: ["claude", ...args],
+      ...base,
       cliStatus: ran.status,
-      exit: verdict.code,
-      reasons: verdict.reasons,
+      chargedUsd: facts.costUsd ?? unreadableCharge,
+      exit:
+        mismatch === undefined ? verdict.code : worstExit(verdict.code, EXIT_PARTIAL),
+      reasons,
       resultDir: located?.dir,
     },
     stop: verdict.stop,
   };
 };
+
+interface Progress {
+  readonly done: readonly InvocationSummary[];
+  readonly spentUsd: number;
+  readonly stopped: boolean;
+  readonly outOfBudget: boolean;
+}
 
 /** Run the wrapper. Returns the process exit code; writes only through `deps.io`. */
 export const main = async (
@@ -364,31 +436,45 @@ export const main = async (
   if (!plan.ok) return fail(io, EXIT_CONFIG, plan.reason);
 
   const trust = isRepoPlugin(target, deps.pluginsDir, io.realpath);
-  const resultsBase = join(suite.evalDir, "results");
+  const base =
+    options.reporting.outputDir === undefined
+      ? join(suite.evalDir, "results")
+      : resolve(io.cwd, options.reporting.outputDir);
+  const runDir = join(base, `run-${runStamp(io)}`);
+  const invocations = planInvocations(plan.groups);
+  const total = invocations.length;
+  const ceiling = ceilingFor(options.tier, total, options.maxCostUsd);
+  const ceilingUsd = ceiling.usd;
+  const shareUsd = round4(ceilingUsd / total);
 
   if (options.dryRun) {
-    plan.groups.forEach((g, i) => {
-      const spec: RunSpec = {
+    invocations.forEach((inv, i) => {
+      const spec = invocationSpec(
+        options,
         target,
-        tier: options.tier,
-        cases: g.cases,
-        grants: g.grants,
-        model: options.model,
-        judgeModel: options.judgeModel,
-        maxCostUsd: options.maxCostUsd,
-        evalDir: options.evalDir,
-        trustPlugin: trust,
-        reporting: options.reporting,
-      };
+        trust,
+        inv,
+        invocationDir(runDir, i + 1, total, inv),
+        ceilingUsd,
+      );
       io.out(
-        `group ${String(i + 1)}: claude ${buildCliArgs(spec)
+        `invocation ${String(i + 1)}/${String(total)}: claude ${buildCliArgs(spec)
           .map((a) => (/[\s*()]/.test(a) ? JSON.stringify(a) : a))
           .join(" ")}\n`,
       );
     });
+    io.out(
+      `ceiling: $${String(ceilingUsd)} for the whole run (${ceiling.basis}); a result with no costUsd is charged $${String(shareUsd)} (ceiling / ${String(total)} cases)\n`,
+    );
+    io.out(
+      `note: each invocation shows the full ceiling; a real run gives later invocations only the budget left after earlier results\n`,
+    );
     return EXIT_OK;
   }
 
+  io.err(
+    `run-evals: cost ceiling $${String(ceilingUsd)} for ${String(total)} case(s) (${ceiling.basis})\n`,
+  );
   const findings = await runPreflight(io, needsBash(plan.groups));
   findings.forEach((f) => {
     io.err(`run-evals: preflight ${f.level}: ${f.message}\n`);
@@ -398,31 +484,59 @@ export const main = async (
     return blocking.reduce<ExitCode>((c, f) => worstExit(c, f.code), EXIT_OK);
   }
 
-  const summaries = await plan.groups.reduce<
-    Promise<{ readonly done: readonly GroupSummary[]; readonly stopped: boolean }>
-  >(
-    async (accP, group, i) => {
+  const progress = await invocations.reduce<Promise<Progress>>(
+    async (accP, inv, i) => {
       const acc = await accP;
-      if (acc.stopped) return acc;
-      const r = await runGroup(io, options, target, trust, i, group, resultsBase);
-      return { done: [...acc.done, r.summary], stopped: r.stop };
+      if (acc.stopped || acc.outOfBudget) return acc;
+      const remaining = round4(ceilingUsd - acc.spentUsd);
+      if (remaining <= 0) return { ...acc, outOfBudget: true };
+      const r = await runInvocation(
+        io,
+        options,
+        target,
+        trust,
+        i + 1,
+        total,
+        inv,
+        invocationDir(runDir, i + 1, total, inv),
+        remaining,
+        shareUsd,
+      );
+      return {
+        done: [...acc.done, r.summary],
+        spentUsd: round4(acc.spentUsd + r.summary.chargedUsd),
+        stopped: r.stop,
+        outOfBudget: false,
+      };
     },
-    Promise.resolve({ done: [], stopped: false }),
+    Promise.resolve({ done: [], spentUsd: 0, stopped: false, outOfBudget: false }),
   );
-  const exit = summaries.done.reduce<ExitCode>(
+  const unstarted = invocations
+    .slice(progress.done.length)
+    .map((inv) => inv.caseName);
+  if (progress.outOfBudget) {
+    io.err(
+      `run-evals: cost ceiling $${String(ceilingUsd)} spent ($${String(progress.spentUsd)}); not run: ${unstarted.join(", ")}\n`,
+    );
+  }
+  const exit = progress.done.reduce<ExitCode>(
     (c, g) => worstExit(c, g.exit),
-    EXIT_OK,
+    progress.outOfBudget ? EXIT_PARTIAL : EXIT_OK,
   );
   const summary: RunSummary = {
     tier: options.tier.name,
     ablation: options.tier.ablation,
     scoringNote: scoringNote(options.tier.ablation),
     plugin: basename(target),
-    groups: summaries.done,
+    ceilingUsd,
+    ceilingBasis: ceiling.basis,
+    spentUsd: progress.spentUsd,
+    invocations: progress.done,
+    unstarted,
     exit,
   };
   io.writeFile(
-    join(options.reporting.outputDir === undefined ? resultsBase : resolve(io.cwd, options.reporting.outputDir), SUMMARY_FILE),
+    join(runDir, SUMMARY_FILE),
     `${JSON.stringify(summary, null, 2)}\n`,
   );
   io.err(

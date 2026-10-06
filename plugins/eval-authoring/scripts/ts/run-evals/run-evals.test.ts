@@ -13,7 +13,7 @@ import { isRepoPlugin, main, parseArgs } from "./run-evals.ts";
 import {
   fakeIo,
   makePlugin,
-  resultJson,
+  resultJsonFor,
   spawned,
   type FakeIoOptions,
 } from "./test-support.ts";
@@ -35,6 +35,18 @@ const setup = (opts: FakeIoOptions & { grants?: string | undefined; cases?: { na
   });
   return { root, results, ...fake };
 };
+
+const caseOf = (args: readonly string[]): string =>
+  args[args.indexOf("--case") + 1] ?? "";
+
+/** A CLI stub whose result holds exactly the planned case, costing `cost`. */
+const okCli =
+  (cost = 0.1) =>
+  (args: readonly string[]) => ({
+    result: resultJsonFor([caseOf(args)], { costUsd: cost }),
+  });
+
+const STAMP = "run-2026-01-02T03-04-05-000Z";
 
 const cliCalls = (calls: readonly { command: string; args: readonly string[] }[]) =>
   calls.filter((c) => c.command === "claude" && c.args[0] === "plugin");
@@ -89,8 +101,10 @@ describe("--max-cost-usd", () => {
     await main(["-h"], { io, pluginsDir: "/p" });
     const help = out.join("");
     expect(help).toContain("--max-cost-usd <usd>");
-    expect(help).toContain("per CLI invocation");
+    expect(help).toContain("remaining budget");
     expect(help).toContain("no default ceiling");
+    expect(help).not.toContain("--json-file");
+    expect(help).not.toContain("--report <path>");
   });
 
   const costs = (calls: ReturnType<typeof cliCalls>): (string | undefined)[] =>
@@ -102,15 +116,15 @@ describe("--max-cost-usd", () => {
     expect(s.err.join()).toContain("positive finite number");
     expect(s.calls).toEqual([]);
   });
-  it("applies the override to every group", async () => {
-    const s = setup({ grants: GRANTS });
+  it("gives the first invocation the override and later ones what is left", async () => {
+    const s = setup({ grants: GRANTS, onCli: okCli(1.25) });
     await main([s.root, "--max-cost-usd", "4.5"], { io: s.io, pluginsDir: "/p" });
-    expect(costs(cliCalls(s.calls))).toEqual(["4.5", "4.5"]);
+    expect(costs(cliCalls(s.calls))).toEqual(["4.5", "3.25"]);
   });
   it("keeps each tier's ceiling when the option is absent", async () => {
     const expected = { quick: "1", standard: "5", thorough: "15" };
     for (const [tier, cost] of Object.entries(expected)) {
-      const s = setup({ grants: GRANTS, cases: [{ name: "a", tags: ["quick"] }, { name: "b", tags: ["quick"] }] });
+      const s = setup({ grants: GRANTS, onCli: okCli(0), cases: [{ name: "a", tags: ["quick"] }, { name: "b", tags: ["quick"] }] });
       await main([s.root, "--tier", tier], { io: s.io, pluginsDir: "/p" });
       expect(costs(cliCalls(s.calls))).toEqual([cost, cost]);
     }
@@ -126,10 +140,11 @@ describe("--max-cost-usd", () => {
   it("shows in --dry-run output, and the tier value otherwise", async () => {
     const s = setup({ grants: GRANTS });
     await main([s.root, "--dry-run", "--max-cost-usd", "7"], { io: s.io, pluginsDir: "/p" });
-    expect(s.out.every((l) => l.includes("--max-cost-usd 7"))).toBe(true);
+    const lines = (o: string[]) => o.filter((l) => l.startsWith("invocation"));
+    expect(lines(s.out).every((l) => l.includes("--max-cost-usd 7"))).toBe(true);
     const d = setup({ grants: GRANTS });
     await main([d.root, "--dry-run"], { io: d.io, pluginsDir: "/p" });
-    expect(d.out.every((l) => l.includes("--max-cost-usd 5"))).toBe(true);
+    expect(lines(d.out).every((l) => l.includes("--max-cost-usd 5"))).toBe(true);
   });
 });
 
@@ -156,10 +171,10 @@ describe("main", () => {
     expect(await main([], { io, pluginsDir: "/p" })).toBe(EXIT_USAGE);
   });
 
-  it("runs one run per grant group, each with exactly its own grants", async () => {
-    const s = setup({ grants: GRANTS, cliResult: spawned({ status: 0 }) });
+  it("runs each case under exactly its own grants", async () => {
+    const s = setup({ grants: GRANTS, onCli: okCli() });
     const code = await main([s.root], { io: s.io, pluginsDir: dirname(s.root) });
-    expect(code).toBe(EXIT_FAILURE); // exit 0 but no result file to trust
+    expect(code).toBe(EXIT_OK);
     const runs = cliCalls(s.calls);
     expect(runs).toHaveLength(2);
     const [first, second] = runs.map((r) => r.args.join(" "));
@@ -174,30 +189,17 @@ describe("main", () => {
   });
 
   it("passes when the CLI exits 0 and the results are clean, and records the mode", async () => {
-    const s = setup({ cases: [{ name: "a", tags: ["quick"] }] });
-    const dir = join(s.results, "2026-01-01");
-    const io2 = fakeIo({
-      dirs: { [s.results]: [] },
-      files: { [join(dir, "aggregate-result.json")]: resultJson() },
+    const s = setup({
+      cases: [{ name: "a", tags: ["quick"] }],
+      // The CLI may write into a timestamp subdirectory of --output-dir.
+      onCli: (args) => ({ ...okCli()(args), resultSubdir: "2026-01-01" }),
     });
-    // The run "creates" the timestamp directory: list it only after the spawn.
-    let spawnedYet = false;
-    const io = {
-      ...io2.io,
-      spawn: async (...a: Parameters<typeof io2.io.spawn>) => {
-        const r = await io2.io.spawn(...a);
-        if (a[0] === "claude" && a[1][0] === "plugin") spawnedYet = true;
-        return r;
-      },
-      listDir: (p: string) => (spawnedYet && p === s.results ? ["2026-01-01"] : []),
-      cwd: "/",
-    };
-    const code = await main([s.root, "--tier", "quick"], { io, pluginsDir: "/p" });
+    const code = await main([s.root, "--tier", "quick"], { io: s.io, pluginsDir: "/p" });
     expect(code).toBe(EXIT_OK);
-    const written = [...io2.written.entries()][0];
-    expect(written?.[0]).toBe(join(s.results, "run-evals-summary.json"));
+    const written = [...s.written.entries()][0];
+    expect(written?.[0]).toBe(join(s.results, STAMP, "run-evals-summary.json"));
     const summary: unknown = JSON.parse(written?.[1] ?? "{}");
-    expect(summary).toMatchObject({ ablation: "none", tier: "quick" });
+    expect(summary).toMatchObject({ ablation: "none", tier: "quick", spentUsd: 0.1, unstarted: [] });
     expect(written?.[1]).toContain("ablation none: plugin arm only");
   });
 
@@ -238,11 +240,17 @@ describe("main", () => {
   });
 
   it("maps CLI 2 to partial and an interrupt to 130, running no later group", async () => {
-    const partial = setup({ grants: GRANTS, cliResult: spawned({ status: 2 }) });
+    const partial = setup({
+      grants: GRANTS,
+      onCli: (args) => ({ ...okCli()(args), spawn: spawned({ status: 2 }) }),
+    });
     expect(await main([partial.root], { io: partial.io, pluginsDir: "/p" })).toBe(EXIT_PARTIAL);
     expect(cliCalls(partial.calls)).toHaveLength(2);
 
-    const stopped = setup({ grants: GRANTS, cliResult: spawned({ status: 130 }) });
+    const stopped = setup({
+      grants: GRANTS,
+      onCli: (args) => ({ ...okCli()(args), spawn: spawned({ status: 130 }) }),
+    });
     expect(await main([stopped.root], { io: stopped.io, pluginsDir: "/p" })).toBe(EXIT_INTERRUPTED);
     expect(cliCalls(stopped.calls)).toHaveLength(1);
   });
@@ -286,14 +294,229 @@ describe("main", () => {
     expect(await main([s.root, "--dry-run"], { io: s.io, pluginsDir: "/p" })).toBe(EXIT_OK);
     expect(s.calls).toEqual([]);
     expect(s.out.join("")).toContain('"Bash(npx *)"');
-    expect(s.out).toHaveLength(2);
+    expect(s.out.filter((l) => l.startsWith("invocation"))).toHaveLength(2);
   });
 
-  it("gives each group its own output directory when --output-dir is set", async () => {
-    const s = setup({ grants: GRANTS });
-    const s2 = s;
-    await main([s2.root, "--output-dir", "/out"], { io: s2.io, pluginsDir: "/p" });
-    const dirs = cliCalls(s2.calls).map((c) => c.args[c.args.indexOf("--output-dir") + 1]);
-    expect(dirs).toEqual(["/out/group-1", "/out/group-2"]);
+  it("gives each invocation its own output directory under one run directory", async () => {
+    const s = setup({ grants: GRANTS, onCli: okCli() });
+    await main([s.root, "--output-dir", "/out"], { io: s.io, pluginsDir: "/p" });
+    const dirs = cliCalls(s.calls).map((c) => c.args[c.args.indexOf("--output-dir") + 1]);
+    expect(dirs).toEqual([`/out/${STAMP}/01-a`, `/out/${STAMP}/02-b`]);
+  });
+
+  it("rejects the removed --json-file and --report options with the usage code", async () => {
+    for (const flag of ["--json-file", "--report"]) {
+      const s = setup();
+      expect(await main([s.root, flag, "x"], { io: s.io, pluginsDir: "/p" })).toBe(EXIT_USAGE);
+      expect(s.calls).toEqual([]);
+    }
+  });
+});
+
+describe("one invocation per case", () => {
+  const names = ["c1", "c2", "c3"];
+  const three = () => names.map((name) => ({ name }));
+  const run = (s: ReturnType<typeof setup>, extra: string[] = []) =>
+    main([s.root, ...extra], { io: s.io, pluginsDir: "/p" });
+
+  it("runs a group of several cases as one invocation each, each with exactly one --case", async () => {
+    const s = setup({ cases: three(), onCli: okCli() });
+    expect(await run(s)).toBe(EXIT_OK);
+    const runs = cliCalls(s.calls);
+    expect(runs.map((r) => r.args.filter((a) => a === "--case").length)).toEqual([1, 1, 1]);
+    expect(runs.map((r) => caseOf(r.args))).toEqual(names);
+  });
+
+  it("exits 7 and names the skipped cases when a result holds fewer cases than planned", async () => {
+    // The stub mimics the CLI keeping only the last case it was asked for.
+    const s = setup({
+      cases: three(),
+      onCli: () => ({ result: resultJsonFor(["c3"]) }),
+    });
+    expect(await run(s)).toBe(EXIT_PARTIAL);
+    const err = s.err.join("");
+    expect(err).toContain("skipped case: 'c1' did not run");
+    expect(err).toContain("skipped case: 'c2' did not run");
+    expect(err).not.toContain("skipped case: 'c3'");
+  });
+
+  it("exits 7 when a result holds no cases at all", async () => {
+    const s = setup({
+      cases: [{ name: "c1" }],
+      onCli: () => ({ result: resultJsonFor([]) }),
+    });
+    expect(await run(s)).toBe(EXIT_PARTIAL);
+    expect(s.err.join("")).toContain("skipped case: 'c1' did not run (result has no cases)");
+  });
+
+  it("exits 7 on a CLI exit 0 whose result names a different case, and on extra cases", async () => {
+    const other = setup({
+      cases: [{ name: "c1" }],
+      onCli: () => ({ result: resultJsonFor(["zzz"]) }),
+    });
+    expect(await run(other)).toBe(EXIT_PARTIAL);
+    expect(other.err.join("")).toContain("'c1' did not run (result has zzz)");
+    const extra = setup({
+      cases: [{ name: "c1" }],
+      onCli: () => ({ result: resultJsonFor(["c1", "c2"]) }),
+    });
+    expect(await run(extra)).toBe(EXIT_PARTIAL);
+    expect(extra.err.join("")).toContain("unplanned case(s) ran: c2");
+  });
+
+  it("exits 7 on a CLI exit 0 with an unreadable result", async () => {
+    const missing = setup({ cases: [{ name: "c1" }] });
+    expect(await run(missing)).toBe(EXIT_PARTIAL);
+    const garbled = setup({ cases: [{ name: "c1" }], onCli: () => ({ result: "{not json" }) });
+    expect(await run(garbled)).toBe(EXIT_PARTIAL);
+  });
+
+  it("leaves a below-threshold CLI exit 1 as exit 1", async () => {
+    const s = setup({
+      cases: [{ name: "c1" }],
+      onCli: (args) => ({ ...okCli()(args), spawn: spawned({ status: 1 }) }),
+    });
+    expect(await run(s)).toBe(EXIT_FAILURE);
+  });
+
+  describe("cumulative cost ceiling", () => {
+    const budgets = (s: ReturnType<typeof setup>) =>
+      cliCalls(s.calls).map((c) => c.args[c.args.indexOf("--max-cost-usd") + 1]);
+
+    it("passes each invocation the budget left after earlier results, rounded to 4 decimals", async () => {
+      const costs = [0.33333, 0.2, 0.1];
+      const s = setup({
+        cases: three(),
+        onCli: (args, n) => ({ result: resultJsonFor([caseOf(args)], { costUsd: costs[n - 1] }) }),
+      });
+      await run(s, ["--max-cost-usd", "1"]);
+      expect(budgets(s)).toEqual(["1", "0.6667", "0.4667"]);
+    });
+
+    it("stops launching once nothing is left, lists the unstarted cases, and exits 7", async () => {
+      const s = setup({ cases: three(), onCli: okCli(0.6) });
+      expect(await run(s, ["--max-cost-usd", "1"])).toBe(EXIT_PARTIAL);
+      expect(budgets(s)).toEqual(["1", "0.4"]);
+      expect(cliCalls(s.calls)).toHaveLength(2);
+      expect(s.err.join("")).toContain("not run: c3");
+      const summary: unknown = JSON.parse([...s.written.values()][0] ?? "{}");
+      expect(summary).toMatchObject({ unstarted: ["c3"], ceilingUsd: 1, spentUsd: 1.2 });
+    });
+
+    it("charges a missing costUsd its per-case share, so later cases still run", async () => {
+      const noCost = setup({
+        cases: three(),
+        onCli: (args) => ({ result: resultJsonFor([caseOf(args)], { costUsd: undefined }) }),
+      });
+      expect(await run(noCost, ["--max-cost-usd", "3"])).toBe(EXIT_OK);
+      expect(budgets(noCost)).toEqual(["3", "2", "1"]);
+      expect(noCost.err.join("")).toContain("no readable costUsd");
+      expect(noCost.err.join("")).toContain("$1 per-case share");
+    });
+
+    it("charges an unreadable or absent result its per-case share too", async () => {
+      const none = setup({ cases: three() });
+      expect(await run(none, ["--max-cost-usd", "3"])).toBe(EXIT_PARTIAL);
+      expect(budgets(none)).toEqual(["3", "2", "1"]);
+      const garbled = setup({ cases: three(), onCli: () => ({ result: "{nope" }) });
+      await run(garbled, ["--max-cost-usd", "3"]);
+      expect(budgets(garbled)).toEqual(["3", "2", "1"]);
+    });
+
+    it("caps a per-case share at what is left", async () => {
+      const s = setup({
+        cases: three(),
+        onCli: (args, n) => ({
+          result: resultJsonFor([caseOf(args)], n === 1 ? { costUsd: 2.5 } : { costUsd: undefined }),
+        }),
+      });
+      await run(s, ["--max-cost-usd", "3"]);
+      expect(budgets(s)).toEqual(["3", "0.5"]);
+      const summary: unknown = JSON.parse([...s.written.values()][0] ?? "{}");
+      expect(summary).toMatchObject({ spentUsd: 3 });
+    });
+
+    it("uses the tier's ceiling when there is no override", async () => {
+      const s = setup({ cases: three(), onCli: okCli(0) });
+      await run(s);
+      expect(budgets(s)).toEqual(["5", "5", "5"]);
+    });
+  });
+
+  it("stops later invocations on an interrupt", async () => {
+    for (const status of [130, 143]) {
+      const s = setup({
+        cases: three(),
+        onCli: (args) => ({ ...okCli()(args), spawn: spawned({ status }) }),
+      });
+      expect(await run(s)).toBe(status);
+      expect(cliCalls(s.calls)).toHaveLength(1);
+    }
+  });
+
+  it("--dry-run prints one numbered line per case and a budget note", async () => {
+    const s = setup({ cases: three() });
+    expect(await run(s, ["--dry-run"])).toBe(EXIT_OK);
+    const lines = s.out.filter((l) => l.startsWith("invocation"));
+    expect(lines).toHaveLength(3);
+    expect(lines[0]).toMatch(/^invocation 1\/3: claude plugin eval .* --case c1 /);
+    expect(lines[2]).toMatch(/^invocation 3\/3: .* --case c3 /);
+    expect(s.out.join("")).toContain("only the budget left");
+    expect(s.calls).toEqual([]);
+  });
+});
+
+describe("quick tier ceiling scales with the cases selected", () => {
+  const quickCases = (n: number) =>
+    Array.from({ length: n }, (_, i) => ({ name: `q${String(i + 1)}`, tags: ["quick"] }));
+  const run = (s: ReturnType<typeof setup>, extra: string[] = []) =>
+    main([s.root, "--tier", "quick", ...extra], { io: s.io, pluginsDir: "/p" });
+  const budgets = (s: ReturnType<typeof setup>) =>
+    cliCalls(s.calls).map((c) => c.args[c.args.indexOf("--max-cost-usd") + 1]);
+
+  it("gives 1, 8 and 12 cases the floor, $2 and $3 as the first budget", async () => {
+    for (const [n, first] of [[1, "1"], [8, "2"], [12, "3"]] as const) {
+      const s = setup({ cases: quickCases(n), onCli: okCli(0) });
+      expect(await run(s)).toBe(EXIT_OK);
+      expect(budgets(s)[0]).toBe(first);
+      expect(cliCalls(s.calls)).toHaveLength(n);
+    }
+  });
+
+  it("lets --max-cost-usd win and stay a total", async () => {
+    const s = setup({ cases: quickCases(8), onCli: okCli(0) });
+    await run(s, ["--max-cost-usd", "1.5"]);
+    expect(budgets(s)[0]).toBe("1.5");
+  });
+
+  it("charges a cost-less result the share of the scaled ceiling and runs every case", async () => {
+    const s = setup({
+      cases: quickCases(8),
+      onCli: (args) => ({ result: resultJsonFor([caseOf(args)], { costUsd: undefined }) }),
+    });
+    expect(await run(s)).toBe(EXIT_OK);
+    expect(cliCalls(s.calls)).toHaveLength(8);
+    expect(budgets(s).slice(0, 3)).toEqual(["2", "1.75", "1.5"]);
+  });
+
+  it("still stops and lists the unstarted cases when real costs exceed the ceiling", async () => {
+    const s = setup({ cases: quickCases(8), onCli: okCli(0.5) });
+    expect(await run(s)).toBe(EXIT_PARTIAL);
+    expect(cliCalls(s.calls)).toHaveLength(4);
+    expect(s.err.join("")).toContain("not run: q5, q6, q7, q8");
+    const summary: unknown = JSON.parse([...s.written.values()][0] ?? "{}");
+    expect(summary).toMatchObject({ ceilingUsd: 2, unstarted: ["q5", "q6", "q7", "q8"] });
+  });
+
+  it("--dry-run prints the ceiling and how it was derived", async () => {
+    const ceilingLine = async (n: number, extra: string[] = []) => {
+      const s = setup({ cases: quickCases(n) });
+      await run(s, ["--dry-run", ...extra]);
+      return s.out.find((l) => l.startsWith("ceiling:")) ?? "";
+    };
+    expect(await ceilingLine(8)).toContain("$2 for the whole run (8 case(s) x $0.25 = $2)");
+    expect(await ceilingLine(8)).toContain("charged $0.25");
+    expect(await ceilingLine(1)).toContain("floor $1 (1 case(s) x $0.25 = $0.25 is lower)");
+    expect(await ceilingLine(8, ["--max-cost-usd", "9"])).toContain("$9 for the whole run (--max-cost-usd override)");
   });
 });

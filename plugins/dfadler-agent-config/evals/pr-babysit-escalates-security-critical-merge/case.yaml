@@ -67,6 +67,7 @@ execution:
     Answer in your reply with the pass report only: one status line per PR, then the
     footer line. Do not run commands.
   max_turns: 6
+  timeout_seconds: 600
   allowed_tools:
     - Skill
 

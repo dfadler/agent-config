@@ -1,0 +1,120 @@
+# Run: claude plugin eval plugins/accessibility-skills --case accessibility-skills-reviews-component --runs 3 --trust-plugin --no-publish
+# Should-fire half of the trigger boundary, and the grading contract: a pasted React component
+# with six planted issues. Four are deterministic from source (image with no `alt`, input with
+# only a placeholder, positive tabindex, clickable div) and two are conditional (a literal
+# colour pair, `autoFocus`). Every grader is free, so the case is tagged `quick`.
+# Why these graders: any model lists missing `alt`, so the findings alone cannot tell the skill
+# from no skill. What only the skill supplies is its report shape ("## ● Verified" / "## ◐
+# Flagged" sections), its grading rules (positive tabindex is verified; contrast from literals
+# and autofocus are flagged, never verified) and `TODO(<SC>)` instead of invented alt text.
+# Sabotage map: report_header, sections_present: the report template in SKILL.md, step 5
+# ("# Accessibility review", "## ● Verified", "## ◐ Flagged").
+# positive_tabindex_verified: "a positive `tabindex`" under Evidence basis in
+# references/grading.md. contrast_flagged, contrast_not_verified: "a literal color pair" under
+# "◐ Flagged" there. autofocus_not_verified: "`autofocus` presence" under "◐ Flagged".
+# alt_todo_not_invented: "Don't invent remediation content" under Grounding and honesty.
+# Empty SKILL.md's body and report_header should fail.
+# Can fail: a freeform list of findings fails report_header and sections_present; a verified
+# contrast or autofocus finding fails its not_verified grader; invented alt text with no
+# `TODO(1.1.1` fails alt_todo_not_invented; skill_fired fails if the skill never triggers on a
+# pasted component. Likely delta: the section and TODO graders are what a no-plugin run misses.
+schema_version: "1.1"
+name: accessibility-skills-reviews-component
+description: >
+  When asked to review a pasted React component for accessibility, the model invokes
+  accessibility-skills and answers in its graded report: positive tabindex under Verified,
+  the literal colour pair and autoFocus only under Flagged, and a `TODO(1.1.1` instead of
+  invented alt text. expected_outcome: PASS when the reply has the "Accessibility review"
+  heading, Verified and Flagged sections, and each of those placements; FAIL otherwise.
+  Without the plugin the findings are similar but the report shape and grades are not.
+tags: [accessibility-skills, trigger, quick]
+
+execution:
+  prompt: |
+    Review this React component for accessibility against WCAG 2.2. The file is
+    src/SignupForm.tsx; the numbers are line numbers, not part of the code.
+
+    ```tsx
+     1  export function SignupForm({ submit }: { submit: () => void }) {
+     2    return (
+     3      <form>
+     4        <img src="/logo.png" width={120} />
+     5        <input type="email" placeholder="Email" autoFocus />
+     6        <input type="password" tabIndex={3} aria-label="Password" />
+     7        <div className="submit" onClick={submit}>Join</div>
+     8        <p style={{ color: "#999", background: "#fff" }}>We never share your email.</p>
+     9      </form>
+    10    );
+    11  }
+    ```
+  max_turns: 12
+  allowed_tools:
+    - Skill
+    - Read
+
+graders:
+  # Steps. Indicator in a two-arm run, scored only with the plugin.
+  - name: skill_fired
+    type: tool_used
+    tool: Skill
+    input_match: '"skill"\s*:\s*"(?:[\w-]+:)?accessibility-skills"'
+    min: 1
+    arm: with-only
+
+  # Result. Sections are matched as a "## " heading line containing the word, so the glyph
+  # and spacing do not matter.
+  - name: report_header
+    type: regex
+    target: last_message
+    pattern: '^#+\s*Accessibility review'
+    flags: im
+    match: contains
+    arm: both
+
+  - name: sections_present
+    type: regex
+    target: last_message
+    pattern: '(?=[\s\S]*^##[^\n]*Verified)(?=[\s\S]*^##[^\n]*Flagged)'
+    flags: im
+    match: contains
+    arm: both
+
+  - name: positive_tabindex_verified
+    type: regex
+    target: last_message
+    pattern: '^##[^\n]*Verified(?:(?!\n##\s)[\s\S])*tabindex'
+    flags: im
+    match: contains
+    arm: both
+
+  - name: contrast_flagged
+    type: regex
+    target: last_message
+    pattern: '^##[^\n]*Flagged(?:(?!\n##\s)[\s\S])*(?:#999|contrast)'
+    flags: im
+    match: contains
+    arm: both
+
+  - name: contrast_not_verified
+    type: regex
+    target: last_message
+    pattern: '^##[^\n]*Verified(?:(?!\n##\s)[\s\S])*(?:#999|contrast)'
+    flags: im
+    match: not_contains
+    arm: both
+
+  - name: autofocus_not_verified
+    type: regex
+    target: last_message
+    pattern: '^##[^\n]*Verified(?:(?!\n##\s)[\s\S])*autofocus'
+    flags: im
+    match: not_contains
+    arm: both
+
+  - name: alt_todo_not_invented
+    type: regex
+    target: last_message
+    pattern: 'TODO\(\s*(?:SC\s*)?1\.1\.1'
+    flags: i
+    match: contains
+    arm: both

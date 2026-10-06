@@ -214,8 +214,17 @@ only its own run command and why its graders are shaped as they are.
   phrase in the skill when you write it.
 - **Layout.** `fetch-execute-guide` keeps its plugin wrapper (with `SKILL.md` at the
   plugin root) because bare skills have no eval path.
+- **gha-ci-audit: two formats on purpose
+  ([#412](https://github.com/dfadler/agent-config/issues/412)).**
   `plugins/gha-ci-audit/evals/evals.json` is the separate skill-creator format, which
-  `claude plugin eval` does not read.
+  `claude plugin eval` does not read. It drives the plugin's own orchestrator, which runs the
+  audit against live GitHub data (`gh api`) and grades the published report; a plugin eval
+  cannot do that hermetically (no network, and `Bash` is withheld without a recorded grant).
+  So the legacy file stays for end-to-end audits, and `evals/<case>/case.yaml` covers only
+  what a Skill-only run can check: the trigger boundary (`audit-fires-on-slow-ci`,
+  `audit-stays-quiet-on-workflow-authoring`, `audit-stays-quiet-on-failed-run`). Revisit if `claude plugin eval` gains a way
+  to mock `gh` without `--scaffold`, or if a recorded-fixture mode is added to the collector
+  so a case can feed the scripts canned `runs.json` and `jobs.json`.
 
 ## GitHub operations
 

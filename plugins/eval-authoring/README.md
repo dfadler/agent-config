@@ -21,7 +21,7 @@ checks what a script can; the rest needs a paid run.
 | [`hooks/`](hooks/hooks.json) | PostToolUse hook on `Write\|Edit`: lints after Claude edits a file under a plugin's eval directory and reports findings back as context. Report only, always exits 0, no-ops elsewhere and under `tests/`. |
 | [`skills/author-cases`](skills/author-cases/SKILL.md) | Writing cases: graders (free first), mocks, fixtures, should-fire and should-not-fire prompts. |
 | [`skills/run-evals`](skills/run-evals/SKILL.md) | Slash command only (paid). Lints, shows the planned commands, then runs the wrapper. |
-| [`scripts/ts/run-evals/`](scripts/ts/run-evals/run-evals.ts) | The wrapper: cost tiers `quick` / `standard` / `thorough`, one run per distinct grant set, preflight checks, never `--scaffold`. |
+| [`scripts/ts/run-evals/`](scripts/ts/run-evals/run-evals.ts) | The wrapper: cost tiers `quick` / `standard` / `thorough`, one CLI invocation per case (each under its own grants), a cumulative cost ceiling, preflight checks, never `--scaffold`. |
 | [`skills/diagnose-scores`](skills/diagnose-scores/SKILL.md) | Finds the result file and dispatches the diagnoser. |
 | [`scripts/ts/diagnose/`](scripts/ts/diagnose/diagnose.ts) | Free per-case verdict from an `aggregate-result.json` (delta, variance, run errors, split judge votes). |
 | [`agents/`](agents/) | `case-reviewer` (runs the lint, then judges wording and boundary coverage) and `score-diagnoser` (interprets the script's verdict). Both read-only. |
@@ -55,7 +55,7 @@ Cost: a run is cases x runs x arms agent runs plus three judge calls per `llm` o
 grader per run. `quick` runs only cases tagged `quick` (free graders), once, plugin arm only;
 `standard` is 3 runs and `thorough` 5, both with the CLI's default arms.
 All tiers pass `--threshold 1` (every grader must pass, so one miss fails a case) and a
-tier-specific `--max-cost-usd`; see [run-evals](skills/run-evals/SKILL.md#what-the-tier-values-mean).
+tier-specific cost ceiling (`quick` scales with the number of cases); see [run-evals](skills/run-evals/SKILL.md#what-the-tier-values-mean).
 
 ## Requirements
 
@@ -81,8 +81,11 @@ diagnosis verdicts (tested on fixtures shaped from [#450](https://github.com/dfa
 
 Not confirmed against a logged-in run:
 
-- How several grants reach `--allow-tools` (the wrapper repeats the flag), that repeated
-  `--case` selects the group, and where results land.
+- How several grants reach `--allow-tools` (the wrapper repeats the flag), that
+  `--output-dir X` writes `aggregate-result.json` into `X` rather than a subdirectory
+  (the wrapper reads both), that a result's `costUsd` is present when a run is partial or
+  errored, and what `--json` does (it made the CLI exit 1 in
+  [#536](https://github.com/dfadler/agent-config/issues/536); the wrapper no longer passes it).
 - That the CLI's "cannot pass with the granted tools" warning appears before authentication
   (the lint keeps EVAL004 and EVAL005 in full until then).
 - The `aggregate-result.json` shape the diagnosis reads, including split judge votes parsed

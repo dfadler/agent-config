@@ -41,6 +41,8 @@ export type Spawner = (
 export interface Io {
   readonly platform: string;
   readonly cwd: string;
+  /** The current time; injected so tests can fix the run directory name. */
+  readonly now: () => Date;
   readonly out: (text: string) => void;
   readonly err: (text: string) => void;
   readonly spawn: Spawner;
@@ -128,6 +130,7 @@ export const findExecutables = (
 export const nodeIo = (env: Readonly<Record<string, string | undefined>>): Io => ({
   platform: process.platform,
   cwd: process.cwd(),
+  now: () => new Date(),
   out: (text) => process.stdout.write(text),
   err: (text) => process.stderr.write(text),
   spawn: spawnProcess,

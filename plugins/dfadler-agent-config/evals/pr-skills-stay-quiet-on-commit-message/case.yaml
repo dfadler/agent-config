@@ -18,8 +18,9 @@ tags: [pr-babysit, pr-checks, pr-comments, pr-review-rubric, github-pr-workflow,
 
 execution:
   prompt: |
-    Write the commit subject line for this staged diff. I will open a PR from it later, but
-    right now I only need the commit. Reply with the single line and nothing else.
+    Write the conventional-commit subject line (type(scope): summary) for this staged diff.
+    I will open a PR from it later, but right now I only need the commit. Reply with the
+    single line and nothing else.
 
     ```diff
     --- a/src/retry.ts
