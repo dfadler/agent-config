@@ -1,0 +1,6 @@
+name: no-version
+execution:
+  prompt: Do the thing.
+graders:
+  - type: regex
+    pattern: done

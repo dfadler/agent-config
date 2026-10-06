@@ -1,0 +1,51 @@
+# Run: node plugins/eval-authoring/scripts/ts/run-evals/run-evals.ts --tier quick plugins/typescript-gotchas
+# Boundary case inside the skill's own scope: the prompt is non-test TypeScript (so the skill
+# may fire) but reads from a DOM collection, which the skill lists under "What is NOT flagged"
+# because `.children` lacks `.at()`. The skill must not push the model into `children.at(-1)`.
+# Sabotage map: no_at_on_dom_collection checks the "DOM collections" exception; remove it and
+# a run that applies the rule blindly should write `list.children.at(-1)` and fail.
+# Can fail: `list.children.at(-1)` (a type error, since HTMLCollection has no `.at`) fails
+# no_at_on_dom_collection. Indexing with a bracket or `lastElementChild` passes. A
+# regression guard against over-application, so a no-plugin arm passes it by default.
+schema_version: "1.1"
+name: typescript-gotchas-keeps-dom-brackets
+description: >
+  When asked for a TypeScript helper that touches the last child of a DOM list,
+  the model must not call `.at()` on `children`, which has no such method.
+  expected_outcome: PASS when the reply never calls `.at(` on `children` or
+  `childNodes`; FAIL when it does.
+tags: [typescript-gotchas, boundary, quick]
+
+execution:
+  prompt: |
+    In src/ui/list.ts of my TypeScript project, write
+    `markLastItem(list: HTMLUListElement): void`, which adds the CSS class
+    "last" to the last child element of the list (use `list.children`).
+    Reply with the complete file in one code block and no other text.
+  max_turns: 6
+  allowed_tools:
+    - Skill
+
+graders:
+  # Steps. Indicator only: whether the skill fires here is not the property under test.
+  - name: skill_fired
+    type: tool_used
+    tool: Skill
+    input_match: '"skill"\s*:\s*"(?:[\w-]+:)?typescript-gotchas"'
+    min: 1
+    arm: with-only
+
+  # Result.
+  - name: no_at_on_dom_collection
+    type: regex
+    target: last_message
+    pattern: '\b(children|childNodes)\.at\(|querySelectorAll\([^)]*\)\.at\('
+    match: not_contains
+    arm: both
+
+  - name: adds_the_class
+    type: regex
+    target: last_message
+    pattern: 'classList\.add\(\s*["'']last["'']\s*\)'
+    match: contains
+    arm: both

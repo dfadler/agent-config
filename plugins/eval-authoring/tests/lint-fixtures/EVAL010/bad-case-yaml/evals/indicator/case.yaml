@@ -1,0 +1,10 @@
+schema_version: "1.1"
+name: indicator
+execution:
+  prompt: Look the thing up.
+graders:
+  - type: regex
+    pattern: lookup
+    target: mock_calls
+  - type: regex
+    pattern: done

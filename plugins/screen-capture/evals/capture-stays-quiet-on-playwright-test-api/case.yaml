@@ -1,0 +1,45 @@
+# Run (one case at a time, #536/#538): claude plugin eval plugins/screen-capture --case capture-stays-quiet-on-playwright-test-api --trust-plugin --no-publish
+# Shared run/grant facts: docs/contributing.md, "Plugin evals". No grant needed (Skill only).
+# Should-not-fire half for the whole plugin: a near-miss that shares "screenshot" and
+# "Playwright" with capture's description but is a test-assertion API question, not rendering a
+# URL to a file. The Skill check names all four skills, so any screen-capture skill firing fails.
+# Sabotage map: skill_not_invoked checks capture's description ("whenever something needs a page
+# rendered to a file"); widen it to "any screenshot or Playwright task" and a run should fail.
+# Can fail: any screen-capture skill invoked fails skill_not_invoked; a reply without a
+# `mask: [` option fails answers_with_mask. Regression guard: a no-plugin arm passes it, so no
+# delta by design.
+schema_version: "1.1"
+name: capture-stays-quiet-on-playwright-test-api
+description: >
+  A question about excluding a banner from a Playwright Test toHaveScreenshot comparison must
+  not invoke any screen-capture skill. expected_outcome: PASS when no screen-capture skill is
+  invoked and the reply shows the mask option; FAIL when a skill is invoked or mask is missing.
+tags: [screen-capture, capture, trigger, quick]
+
+execution:
+  prompt: |
+    In my Playwright Test suite, `await expect(page).toHaveScreenshot()` keeps
+    failing because a rotating promo banner changes between runs. How do I
+    exclude the banner from the comparison? Show the test code in your reply;
+    don't create files or run commands.
+  max_turns: 6
+  allowed_tools:
+    - Skill
+
+graders:
+  # Steps. min 0 is explicit; arm both so the never-called check is scored in a two-arm run.
+  - name: skill_not_invoked
+    type: tool_used
+    tool: Skill
+    input_match: '"skill"\s*:\s*"(?:screen-capture:)?(?:capture|compare|attach|lighthouse)"'
+    min: 0
+    max: 0
+    arm: both
+
+  # Result: the task was done (a completion check, not a skill property).
+  - name: answers_with_mask
+    type: regex
+    target: last_message
+    pattern: 'mask\s*:\s*\['
+    match: contains
+    arm: both

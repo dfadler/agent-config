@@ -6,9 +6,12 @@ description: >
   served by its own already-running dev server. Resolves the two URLs to
   capture (from `.claude/settings.json` config or explicit overrides),
   delegates the actual capture to `screen-capture:capture` once per URL, and
-  delegates upload/PR-comment formatting to `screen-capture:attach`. Use
-  when asked to compare rendered output between two branches, produce a
-  before/after screenshot for a PR, or verify a visual change against main.
+  delegates upload/PR-comment formatting to `screen-capture:attach`. ALWAYS
+  invoke this skill first when asked to "make a before/after comparison",
+  "compare rendered output between branches", "show reviewers my UI change"
+  or "verify a visual change against main", even when the config looks
+  incomplete: it knows the config keys and the `--before`/`--after`
+  overrides, and what to do when a URL is missing.
 license: MIT
 metadata:
   version: "0.1.0"

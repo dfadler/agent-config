@@ -1,0 +1,69 @@
+# Run: claude plugin eval plugins/accessibility-skills --case accessibility-skills-stays-quiet-on-render-perf --runs 3 --trust-plugin --no-publish
+# Should-not-fire half: same artifact type as the should-fire cases (a pasted React component
+# with "review this component" wording), but the user asks for a different concern. The
+# component also holds a tempting accessibility defect (a clickable `<li>`) so an over-eager
+# skill would take the bait. Every grader is free, so the case is tagged `quick`.
+# Sabotage map: skill_not_invoked checks the description's scope ("code review for web markup
+# ... Checks source against the a11yproject.com checklist"); widen it to "any component
+# review" and a run should invoke the skill and fail.
+# Can fail: the skill is invoked fails skill_not_invoked; an accessibility report in the reply
+# fails no_a11y_report; a reply that misses the missing `key` fails names_missing_key. A
+# regression guard: a no-plugin arm passes it by default, so expect no delta.
+schema_version: "1.1"
+name: accessibility-skills-stays-quiet-on-render-perf
+description: >
+  A request to review a pasted React component for re-render performance must not invoke
+  accessibility-skills, even though the component has an accessibility defect. expected_outcome:
+  PASS when the skill is not invoked, the reply has no "Accessibility review" report and it
+  names the missing list `key`; FAIL otherwise. A regression guard with no expected delta.
+tags: [accessibility-skills, trigger, quick]
+
+execution:
+  prompt: |
+    Review this React component for re-render performance only. It is
+    src/ResultList.tsx. Reply with a short bulleted list of problems and no other text.
+
+    ```tsx
+    export function ResultList({ items, onPick }: Props) {
+      const sorted = items.slice().sort((a, b) => a.score - b.score);
+      return (
+        <ul>
+          {sorted.map((item) => (
+            <li onClick={() => onPick(item)}>{item.name}</li>
+          ))}
+        </ul>
+      );
+    }
+    ```
+  max_turns: 6
+  allowed_tools:
+    - Skill
+
+graders:
+  # Steps. min 0 is explicit: tool_used defaults min to 1. arm both so the "never called"
+  # check is scored in a two-arm run too.
+  - name: skill_not_invoked
+    type: tool_used
+    tool: Skill
+    input_match: '"skill"\s*:\s*"(?:[\w-]+:)?accessibility-skills"'
+    min: 0
+    max: 0
+    arm: both
+
+  # Result.
+  - name: no_a11y_report
+    type: regex
+    target: last_message
+    pattern: '^#+\s*Accessibility review'
+    flags: im
+    match: not_contains
+    arm: both
+
+  # Task-completion check, not a skill property.
+  - name: names_missing_key
+    type: regex
+    target: last_message
+    pattern: '\bkey\b'
+    flags: i
+    match: contains
+    arm: both

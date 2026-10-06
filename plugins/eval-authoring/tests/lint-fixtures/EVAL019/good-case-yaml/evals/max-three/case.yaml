@@ -1,0 +1,8 @@
+schema_version: "1.1"
+name: max-three
+execution:
+  prompt: Do the thing.
+graders:
+  - type: "tool_used"
+    tool: "Bash"
+    max: 3
