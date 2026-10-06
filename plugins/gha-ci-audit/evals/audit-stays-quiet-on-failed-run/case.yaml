@@ -41,6 +41,9 @@ graders:
   - name: names_the_permission
     type: regex
     target: last_message
-    pattern: 'pull-requests:\s*write'
+    # Accepts the YAML form and prose: "pull-requests: write", "pull requests write",
+    # "write access to pull requests". Does not match "contents: write" or "issues: write".
+    pattern: 'pull[- ]requests?:?\s*write|write\s+(?:access|permissions?)?\s*(?:to|for|on)\s+(?:the\s+)?pull[- ]requests?'
+    flags: i
     match: contains
     arm: both
