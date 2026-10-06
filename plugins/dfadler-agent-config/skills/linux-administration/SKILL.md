@@ -1,7 +1,11 @@
 ---
 name: linux-administration
 description: |
-  First-party Linux system administration guidance for systemd-based
+  ALWAYS invoke before answering or planning any Linux administration command on
+  a systemd host, even when told not to run anything and only asked for a plan, a
+  verdict or a list of confirmation questions: `dd` or other writes to a block
+  device, disabling SSH password auth or editing sshd_config over a live session,
+  creating users, opening firewall ports. First-party Linux system administration guidance for systemd-based
   distributions: package management (apt/dnf/pacman), systemd service
   management and diagnosis, filesystem operations, user/permission
   management, disk partitioning, network/firewall configuration

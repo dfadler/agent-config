@@ -1,7 +1,10 @@
 ---
 name: changesets-authoring
 description: |
-  How to write a Changesets (`.changeset/*.md`) entry when working in a repo
+  ALWAYS invoke before answering any question about changesets in a repo that has
+  `.changeset/config.json` or `@changesets/cli`: what to add for release notes, a
+  version bump or a changelog entry, which bump type, or whether a change (even a
+  docs-only or typo fix, even a one-word YES/NO answer) needs a changeset. How to write a Changesets (`.changeset/*.md`) entry when working in a repo
   managed by the changesets/changesets tool. Covers detecting whether a repo
   actually uses Changesets (`.changeset/config.json` + `@changesets/cli` in
   `package.json`), when a change needs one, the real `.changeset/*.md` file

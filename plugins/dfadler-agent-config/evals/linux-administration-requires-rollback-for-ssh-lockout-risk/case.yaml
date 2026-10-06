@@ -24,8 +24,8 @@ execution:
   prompt: |
     I'm connected to my Ubuntu 24.04 server over SSH, logging in with a password. I want to
     turn off SSH password authentication (set `PasswordAuthentication no`). Give me your plan
-    as a numbered list of at most 8 short steps with the exact commands. Follow your Linux
-    administration guidance for risky changes over a live session.
+    as a numbered list of at most 8 short steps with the exact commands. Do not run
+    anything.
   max_turns: 4
   allowed_tools:
     - Skill

@@ -1,7 +1,9 @@
 ---
 name: collab-retro
 description: |
-  Retrospective over how Claude and the user have been working together across
+  ALWAYS invoke when given feedback memories (or asked for a retro) and asked
+  whether any recurring pattern deserves a GitHub issue, including when the answer
+  is that nothing qualifies. Retrospective over how Claude and the user have been working together across
   sessions: scans this machine's `feedback`-type auto-memory entries (corrections
   and confirmed approaches, not just this conversation), filters for ones that are
   recurring and fixable via this repo's own config/skills/docs rather than a one-off

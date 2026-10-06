@@ -22,7 +22,7 @@ execution:
     devDependencies. Do I need to add a changeset for this PR?
 
     Start your reply with exactly one word on its own line, YES or NO, then one sentence of
-    reason. Follow the Changesets guidance for when a change needs one.
+    reason. Do not run commands or create files.
   max_turns: 4
   allowed_tools:
     - Skill

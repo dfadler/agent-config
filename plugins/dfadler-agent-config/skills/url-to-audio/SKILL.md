@@ -1,6 +1,9 @@
 ---
 name: url-to-audio
 description: |
+  ALWAYS invoke before answering any request to narrate or convert a URL or
+  article to audio, even when only asked what you would do or which backend you
+  would use (including when `OPENAI_API_KEY` is unset and the fallback is `say`).
   Turn a web article into a narrated audio file: fetch the page, extract the
   clean reading text, and synthesize it with macOS `say` by default (free,
   local, already installed, no API key) or OpenAI TTS optionally (when
