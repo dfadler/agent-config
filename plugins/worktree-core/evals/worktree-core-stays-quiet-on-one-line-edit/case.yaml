@@ -1,0 +1,51 @@
+# Run: claude plugin eval plugins/worktree-core --case worktree-core-stays-quiet-on-one-line-edit --runs 3 --trust-plugin --no-publish
+# Shared run/grant facts: docs/contributing.md, "Plugin evals". No grant; reply-only, nothing
+# is edited.
+# Should-not-fire near-miss on the skill's creation topic: a one-character typo fix needs no
+# worktree (the global policy exempts "a one-line edit"), so the skill should stay out of the
+# way and the reply should not go set up a worktree. Delta 0 by design. All free, quick.
+# Can fail: no_worktree_skill_fired fails if the skill over-triggers on a trivial edit;
+# no_worktree_setup fails if the reply sets up a worktree for it (the skill over-applied);
+# fixes_typo (completion check) fails if the reply does not give the corrected word.
+schema_version: "1.1"
+name: worktree-core-stays-quiet-on-one-line-edit
+description: >
+  A one-word typo fix in a README is not worth a worktree, so git-worktree-usage must not
+  fire and the reply neither creates a worktree nor skips the fix. expected_outcome: PASS when
+  the skill is not invoked, the reply gives the corrected word and no worktree setup; FAIL
+  otherwise. Regression guard: Delta 0 by design.
+tags: [worktree-core, trigger, quick]
+
+execution:
+  prompt: |
+    README.md line 12 says "you will recieve an email". Fix the typo. Don't run anything;
+    reply with only the corrected sentence and, in one short clause, how you would make the
+    edit.
+  max_turns: 6
+  allowed_tools:
+    - Skill
+
+graders:
+  - name: no_worktree_skill_fired
+    type: tool_used
+    tool: Skill
+    input_match: '"skill"\s*:\s*"(?:[\w-]+:)?git-worktree-usage"'
+    min: 0
+    max: 0
+    arm: both
+
+  - name: no_worktree_setup
+    type: regex
+    target: last_message
+    pattern: 'EnterWorktree|git\s+worktree\s+add'
+    match: not_contains
+    arm: both
+
+  # Completion check, tautological for a baseline.
+  - name: fixes_typo
+    type: regex
+    target: last_message
+    pattern: 'receive an email'
+    match: contains
+    arm: both
+    weight: 0.5
