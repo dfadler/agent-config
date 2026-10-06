@@ -1,0 +1,70 @@
+# Run: claude plugin eval plugins/worktree-core --case worktree-core-restores-without-stash --runs 3 --trust-plugin --no-publish
+# Shared run/grant facts: docs/contributing.md, "Plugin evals". No grant; reply-only, commands
+# are written and never run (hermetic).
+# Should-fire case for the git stash collision hazard: a scoped "revert these files, then get
+# my edits back" need while another session shares the repo. All free, quick.
+# Can fail: uses_git_restore fails without `git restore --source=HEAD ... --worktree` (the default
+# source is the index); gets_edits_back fails if the edits are never copied or applied back; no_stash fails on
+# any `git stash` (the no-plugin default, since a stash is the usual way to set edits aside);
+# no_checkout_head fails on `git checkout HEAD` (the skill names it as the variant that also
+# resets the index); backs_up_with_copy (half weight) wants the filesystem-copy backup the
+# skill pairs with git restore. The prompt does not mention stash.
+# Skill phrases checked: "`git restore --source=HEAD --worktree -- <files>`", "plus a
+# filesystem copy as your own backup", "`git stash` is repo-wide, not per-worktree".
+# No skill_fired grader: a 2026-10-05 measurement showed the skill rarely fires on this reply-only
+# prompt, yet the plugin's description still shapes the reply. The case measures that with the
+# with/without delta (run with --ablation with-without), not whether the skill was invoked.
+schema_version: "1.1"
+name: worktree-core-restores-without-stash
+description: >
+  Asked how to temporarily revert two files to HEAD for a before screenshot and get the edits
+  back, while another Claude Code session shares the repo, the model
+  answers with git restore and a file copy, not git stash. expected_outcome: PASS when the
+  reply has git restore with --worktree and no git stash or git checkout HEAD; FAIL otherwise.
+tags: [worktree-core, trigger, quick]
+
+execution:
+  prompt: |
+    I have two Claude Code sessions running in different worktrees of this repo. In mine I
+    want to temporarily revert src/Header.tsx and src/Header.css to HEAD so I can take a
+    "before" screenshot, then get my edits back afterwards. Give the shell commands in order.
+    Nothing is available to run here, so your final message must be only one bash code block,
+    no comments and no other text.
+  max_turns: 6
+  allowed_tools:
+    - Skill
+
+graders:
+  - name: uses_git_restore
+    type: regex
+    target: last_message
+    pattern: 'git\s+restore\b(?=[^\n]*--worktree)(?=[^\n]*(?:--source[=\s]HEAD|-s\s*HEAD))'
+    match: contains
+
+  - name: no_stash
+    type: regex
+    target: last_message
+    pattern: 'git\s+stash'
+    match: not_contains
+
+  - name: no_checkout_head
+    type: regex
+    target: last_message
+    pattern: 'git\s+checkout\s+HEAD\b'
+    match: not_contains
+
+  # Half weight: a copy backup is the skill's advice. A `git diff > file` patch kept outside the
+  # index is the same idea (seen in correct replies), so both count.
+  - name: backs_up_with_copy
+    type: regex
+    target: last_message
+    pattern: '(?:^|\n|&&|;)\s*cp\s+|git\s+diff\b[^\n]*>\s*\S'
+    match: contains
+    weight: 0.5
+
+  # The prompt asks for the edits back afterwards: a copy-back into src/ or a `git apply`.
+  - name: gets_edits_back
+    type: regex
+    target: last_message
+    pattern: 'git\s+apply\b|\b(?:cp|mv)\b[^\n]*\bsrc/\S*\s*(?:\n|$|&&|;)'
+    match: contains
