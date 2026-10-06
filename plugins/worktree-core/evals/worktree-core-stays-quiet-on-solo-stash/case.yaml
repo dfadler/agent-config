@@ -40,14 +40,14 @@ graders:
   - name: uses_stash
     type: regex
     target: last_message
-    pattern: 'git\s+stash\b'
+    pattern: 'git\s+stash(?!\s+(?:pop|apply|drop|list|show|branch|clear)\b)'
     match: contains
     arm: both
 
   - name: restores_changes
     type: regex
     target: last_message
-    pattern: 'git\s+stash\s+(?:pop|apply)\b'
+    pattern: 'git\s+stash(?!\s+(?:pop|apply|drop|list|show|branch|clear)\b)[\s\S]*git\s+(?:switch|checkout)\s+hotfix\b[\s\S]*git\s+(?:switch|checkout)\b[\s\S]*git\s+stash\s+(?:pop|apply)\b'
     match: contains
     arm: both
     weight: 0.5

@@ -40,6 +40,6 @@ graders:
   - name: rewrites_history
     type: regex
     target: last_message
-    pattern: '\brebase\b|reset\s+--soft|merge\s+--squash'
+    pattern: 'reset\s+--soft|merge\s+--squash|rebase\s+(?:-i|--interactive)\b|GIT_SEQUENCE_EDITOR|--autosquash'
     match: contains
     arm: both

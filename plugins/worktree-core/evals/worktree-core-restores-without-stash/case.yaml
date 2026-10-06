@@ -3,7 +3,8 @@
 # are written and never run (hermetic).
 # Should-fire case for the git stash collision hazard: a scoped "revert these files, then get
 # my edits back" need while another session shares the repo. All free, quick.
-# Can fail: uses_git_restore fails without `git restore ... --worktree`; no_stash fails on
+# Can fail: uses_git_restore fails without `git restore --source=HEAD ... --worktree` (the default
+# source is the index); gets_edits_back fails if the edits are never copied or applied back; no_stash fails on
 # any `git stash` (the no-plugin default, since a stash is the usual way to set edits aside);
 # no_checkout_head fails on `git checkout HEAD` (the skill names it as the variant that also
 # resets the index); backs_up_with_copy (half weight) wants the filesystem-copy backup the
@@ -37,7 +38,7 @@ graders:
   - name: uses_git_restore
     type: regex
     target: last_message
-    pattern: 'git\s+restore\b[^\n]*--worktree'
+    pattern: 'git\s+restore\b(?=[^\n]*--worktree)(?=[^\n]*(?:--source[=\s]HEAD|-s\s*HEAD))'
     match: contains
 
   - name: no_stash
@@ -60,3 +61,10 @@ graders:
     pattern: '(?:^|\n|&&|;)\s*cp\s+|git\s+diff\b[^\n]*>\s*\S'
     match: contains
     weight: 0.5
+
+  # The prompt asks for the edits back afterwards: a copy-back into src/ or a `git apply`.
+  - name: gets_edits_back
+    type: regex
+    target: last_message
+    pattern: 'git\s+apply\b|\b(?:cp|mv)\b[^\n]*\bsrc/\S*\s*(?:\n|$|&&|;)'
+    match: contains

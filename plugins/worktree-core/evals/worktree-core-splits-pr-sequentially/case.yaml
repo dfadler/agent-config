@@ -43,20 +43,20 @@ graders:
   - name: has_sequencing_section
     type: regex
     target: last_message
-    pattern: '\bSequencing\b'
+    pattern: '\bSequencing\b[^\n]*\b(?:merge|merged|order|first|before|after|depends?)\b'
     flags: i
     match: contains
 
   - name: every_base_is_main
     type: regex
     target: last_message
-    pattern: '(?<!--)\bbase\b[:\s=]*`?(?!main\b)(?:big-change|PR\s*#?\d|previous|the\s+(?:migration|endpoint))'
+    pattern: '(?<!--)\bbase\b[:\s=]*`?(?!main\b)(?:big-change|PR\s*#?\d|previous|develop|master|trunk|release|the\s+(?:migration|endpoint))'
     flags: i
     match: not_contains
 
   - name: names_main_base
     type: regex
     target: last_message
-    pattern: '\bmain\b'
+    pattern: '\b(?:base|target(?:s|ing)?|against)\b[^\n]{0,24}\bmain\b'
     match: contains
     weight: 0.5
