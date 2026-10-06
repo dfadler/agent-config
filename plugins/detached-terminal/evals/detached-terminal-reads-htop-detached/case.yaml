@@ -1,0 +1,57 @@
+# Run: claude plugin eval plugins/detached-terminal --case detached-terminal-reads-htop-detached --runs 3 --trust-plugin --no-publish
+# Shared run/grant facts: docs/contributing.md, "Plugin evals". No grant; the model must not
+# run anything (no real terminal or GUI), the reply carries the commands.
+# Second should-fire case, on the "alternate-screen app, read what is on screen" half of the
+# description rather than the keystroke half: a TUI that is only read, never typed into. It also
+# covers the description's "you'd otherwise reach for open -a Terminal" clause. All free, quick.
+# Can fail: skill_fired fails if a read-only TUI request does not match the description;
+# starts_detached_session and reads_screen fail without the agent_term.py start/read pair
+# (a plain `top -l 1` answer scores 0 here, and is a reasonable answer a baseline gives);
+# no_gui_launch fails on open -a Terminal or osascript. The prompt cues "don't take my
+# focus", so no_gui_launch is cheap for a baseline; the start/read regexes carry the delta.
+# Skill phrases checked: "Read what's *on screen*" (alternate-screen apps), Usage `read`.
+schema_version: "1.1"
+name: detached-terminal-reads-htop-detached
+description: >
+  Asked to look at htop's screen and name the top CPU process without taking the user's
+  focus, the model invokes detached-terminal and answers with agent_term.py start (running
+  htop) and read, and no GUI terminal launch. expected_outcome: PASS when the skill is
+  invoked and the reply starts htop on a detached session and reads it; FAIL when the skill
+  is not invoked, the start/read pair is missing, or a GUI terminal is launched.
+tags: [detached-terminal, trigger, quick]
+
+execution:
+  prompt: |
+    Run htop and tell me which process is using the most CPU right now. I'm in the middle of
+    typing in another app, so don't take my focus. Don't run anything; answer with the exact
+    shell commands you would run, in order, in one bash code block and no other text.
+  max_turns: 6
+  allowed_tools:
+    - Skill
+
+graders:
+  - name: skill_fired
+    type: tool_used
+    tool: Skill
+    input_match: '"skill"\s*:\s*"(?:[\w-]+:)?detached-terminal"'
+    min: 1
+    arm: with-only
+
+  - name: starts_detached_session
+    type: regex
+    target: last_message
+    pattern: 'agent_term\.py["'']?\s+start\s+\S+[^\n]*--\s+htop\b'
+    match: contains
+
+  - name: reads_screen
+    type: regex
+    target: last_message
+    pattern: 'agent_term\.py["'']?\s+read\s+\S+'
+    match: contains
+
+  - name: no_gui_launch
+    type: regex
+    target: last_message
+    pattern: 'open\s+-a\b|osascript|tell application'
+    flags: i
+    match: not_contains
