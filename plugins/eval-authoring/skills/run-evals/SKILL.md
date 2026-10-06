@@ -44,9 +44,10 @@ it, do not rebuild any of that.
    Do not run a paid eval while the lint reports errors; show the findings instead.
 3. **Show the plan:** run the wrapper with `--dry-run` and the chosen tier. Tell the
    user the tier's run count and cost ceiling, and the grants it will pass. Grants
-   come from `<eval-dir>/grants.yaml` ([format](../../docs/grants-format.md)), one
-   run per distinct grant set, and a grant applies to every case in that run. The
-   wrapper never passes `--scaffold`.
+   come from `<eval-dir>/grants.yaml` ([format](../../docs/grants-format.md)); each
+   case runs in its own CLI invocation (`--case` takes one glob) under exactly its own
+   grants. The wrapper never passes `--scaffold`, `--json` or `--report`; it reads
+   `aggregate-result.json` from a per-case directory under `<eval-dir>/results/`.
 4. **Hand the command to the user.** The run needs a shell where `claude plugin eval`
    can authenticate; an agent session usually cannot (child runs fail with
    `Not logged in`). Give the exact non-dry-run command to run in their own shell.
@@ -60,7 +61,8 @@ it, do not rebuild any of that.
    - `4`: unmet requirement (Claude Code or git too old, sandbox backend, `claude`
      missing, plugin eval unavailable).
    - `7`: **partial or untrustworthy** (cost ceiling hit, credential rejected, a run
-     errored, or paid graders skipped). Its scores are unreliable; never report it
+     errored, paid graders skipped, a planned case missing from its result, or a
+     result that could not be read). Its scores are unreliable; never report it
      as a pass.
    - `20`: internal error. `130` and `143`: interrupted or terminated.
 
@@ -77,11 +79,13 @@ so a single miss fails the case, **including a miss on a half-weight wording reg
 `--max-cost-usd` is a ceiling on the list-price cost estimate, with no default ceiling
 in the CLI. It is checked before each run starts; once spent, nothing further starts,
 runs already started finish, and if any run is left unstarted the CLI exits 2 (the
-wrapper reports 7, partial). The ceiling applies to one CLI invocation, and the wrapper
-makes one per distinct grant set. The docs give no per-run price; the CLI's `--help`
-says the same, so whether `quick`'s $1 covers your suite is not known before a run. If a
-run reports exit 7 with the ceiling hit, its scores are partial: trim the cases (`--case`)
-rather than reading them as failures.
+wrapper reports 7, partial). The wrapper treats the tier value (or `--max-cost-usd`) as
+the ceiling for the whole run: it makes one invocation per case, gives each the budget
+left, adds up each result's `costUsd`, and stops launching when nothing is left,
+listing the cases it did not run (exit 7). A result with no readable `costUsd` is
+charged its full allotment. The docs give no per-run price, so whether `quick`'s $1
+covers your suite is not known before a run. If a run reports exit 7 with the ceiling
+hit, its scores are partial: trim the cases rather than reading them as failures.
 
 ## Gotchas
 

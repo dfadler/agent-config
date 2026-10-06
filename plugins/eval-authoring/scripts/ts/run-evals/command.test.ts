@@ -8,8 +8,6 @@ import {
 import { DEFAULT_JUDGE_MODEL, DEFAULT_MODEL, TIERS } from "./tiers.ts";
 
 const reporting = {
-  jsonFile: undefined,
-  reportFile: undefined,
   outputDir: undefined,
   publishReport: false,
   keepTemp: false,
@@ -18,7 +16,7 @@ const reporting = {
 const spec = (over: Partial<RunSpec> = {}): RunSpec => ({
   target: "plugins/p",
   tier: TIERS.standard,
-  cases: ["a", "b"],
+  caseName: "a",
   grants: [],
   model: undefined,
   judgeModel: undefined,
@@ -66,11 +64,18 @@ describe("buildCliArgs", () => {
     }
   });
 
-  it("puts --json last, after the target", () => {
+  it("emits exactly one --case, the spec's case", () => {
+    const args = buildCliArgs(spec({ caseName: "only-this" }));
+    expect(args.filter((a) => a === "--case")).toHaveLength(1);
+    expect(args[args.indexOf("--case") + 1]).toBe("only-this");
+  });
+
+  it("never passes --json or --report", () => {
     const args = buildCliArgs(
-      spec({ reporting: { ...reporting, jsonFile: "out.json" } }),
+      spec({ reporting: { ...reporting, outputDir: "o" } }),
     );
-    expect(args.slice(-2)).toEqual(["--json", "out.json"]);
+    expect(args).not.toContain("--json");
+    expect(args).not.toContain("--report");
   });
 
   it("sets threshold, runs, cost ceiling and pinned models explicitly", () => {
@@ -134,8 +139,6 @@ describe("buildCliArgs", () => {
         trustPlugin: true,
         grants: ["Bash"],
         reporting: {
-          jsonFile: "j",
-          reportFile: "r",
           outputDir: "o",
           publishReport: true,
           keepTemp: true,
@@ -150,8 +153,6 @@ describe("buildCliArgs", () => {
       spec({
         evalDir: "e",
         reporting: {
-          jsonFile: "j.json",
-          reportFile: "r.html",
           outputDir: "out",
           publishReport: false,
           keepTemp: true,
@@ -160,7 +161,6 @@ describe("buildCliArgs", () => {
     ).join(" ");
     for (const part of [
       "--keep-temp",
-      "--report r.html",
       "--output-dir out",
       "--eval-dir e",
     ]) {

@@ -17,6 +17,8 @@ import {
   inspectResult,
   interpretCliExit,
   judgeRun,
+  plannedCaseProblem,
+  rawResultFacts,
   type JudgeInput,
   type ResultFindings,
 } from "./outcome.ts";
@@ -75,7 +77,7 @@ describe("judgeRun exit mapping", () => {
   });
   it("a pass with unreadable results cannot be trusted", () => {
     const j = judge({ findings: undefined, resultProblem: "no file" });
-    expect(j.code).toBe(EXIT_FAILURE);
+    expect(j.code).toBe(EXIT_PARTIAL);
     expect(j.reasons.join()).toContain("no file");
   });
   it("a failure with unreadable results adds nothing extra", () => {
@@ -202,5 +204,33 @@ describe("worstExit", () => {
     expect(worstExit(EXIT_FAILURE, EXIT_PARTIAL)).toBe(EXIT_PARTIAL);
     expect(worstExit(EXIT_PARTIAL, EXIT_FAILURE)).toBe(EXIT_PARTIAL);
     expect(worstExit(EXIT_TERMINATED, EXIT_DEPENDENCY)).toBe(EXIT_TERMINATED);
+  });
+});
+
+describe("rawResultFacts", () => {
+  it("reads costUsd and the case names", () => {
+    expect(
+      rawResultFacts(JSON.stringify({ costUsd: 0.47, cases: [{ name: "a" }, { name: "b" }] })),
+    ).toEqual({ costUsd: 0.47, caseNames: ["a", "b"] });
+  });
+  it("gives undefined for unreadable text, a missing or bad cost, and a missing cases list", () => {
+    const none = { costUsd: undefined, caseNames: undefined };
+    expect(rawResultFacts(undefined)).toEqual(none);
+    expect(rawResultFacts("{nope")).toEqual(none);
+    expect(rawResultFacts("[]")).toEqual(none);
+    expect(rawResultFacts(JSON.stringify({ costUsd: "1", cases: [] }))).toEqual({ costUsd: undefined, caseNames: [] });
+    expect(rawResultFacts(JSON.stringify({ costUsd: -1 })).costUsd).toBeUndefined();
+  });
+});
+
+describe("plannedCaseProblem", () => {
+  it("accepts exactly the planned case and an unreadable result", () => {
+    expect(plannedCaseProblem("a", ["a"])).toBeUndefined();
+    expect(plannedCaseProblem("a", undefined)).toBeUndefined();
+  });
+  it("names a missing case and extra cases", () => {
+    expect(plannedCaseProblem("a", [])).toContain("'a' did not run (result has no cases)");
+    expect(plannedCaseProblem("a", ["b"])).toContain("'a' did not run (result has b)");
+    expect(plannedCaseProblem("a", ["a", "b"])).toContain("unplanned case(s) ran: b");
   });
 });

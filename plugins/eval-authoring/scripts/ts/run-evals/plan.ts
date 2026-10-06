@@ -1,6 +1,6 @@
 /**
- * Splits a suite into run groups: cases with identical grant sets share one
- * run, each group running under exactly its own grants, never a union
+ * Splits a suite into run groups: cases with identical grant sets share their
+ * grants, each running under exactly its own grants, never a union
  * (docs/grants-format.md).
  */
 import {
@@ -17,6 +17,12 @@ export interface RunGroup {
   readonly grants: readonly string[];
   /** Case names in the group, in suite order. */
   readonly cases: readonly string[];
+}
+
+/** One CLI invocation: a single case under its grant set. */
+export interface Invocation {
+  readonly grants: readonly string[];
+  readonly caseName: string;
 }
 
 export type Plan =
@@ -80,6 +86,18 @@ export const planGroups = (
   }, []);
   return { ok: true, groups };
 };
+
+/**
+ * Flatten groups into one invocation per case, in suite order within each
+ * group. Grouping only decides which cases share a grant set: `--case` takes
+ * one glob, so each case is its own CLI run (#536, #538).
+ */
+export const planInvocations = (
+  groups: readonly RunGroup[],
+): readonly Invocation[] =>
+  groups.flatMap((g) =>
+    g.cases.map((caseName) => ({ grants: g.grants, caseName })),
+  );
 
 /** True when any group is granted Bash, which needs an OS sandbox backend. */
 export const needsBash = (groups: readonly RunGroup[]): boolean =>
