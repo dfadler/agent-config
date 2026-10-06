@@ -1,0 +1,38 @@
+# Run: claude plugin eval plugins/slack-canvas-sync --case canvas-push-stays-quiet-on-code-push --trust-plugin --no-publish
+# No grant needed (Skill only).
+# Near-miss on vocabulary: "push", "notes" and "Slack" appear, but the request is a git push plus a
+# plain Slack message, neither of which is canvas-push. Regression guard: the no-plugin arm passes
+# it, so the delta is about 0 by design.
+schema_version: "1.1"
+name: canvas-push-stays-quiet-on-code-push
+description: >
+  A request to git push a branch and then post a message in Slack must not invoke canvas-push.
+  expected_outcome (regression guard): PASS when canvas-push is not invoked and the reply gives
+  the git command; FAIL when canvas-push fires or the command is missing.
+tags: [canvas-push, trigger, quick]
+
+execution:
+  prompt: |
+    I just wrote release notes on my branch `notes-update`. What git command
+    pushes it to origin and sets upstream, and what should I post in Slack to
+    tell the team? Reply with the command in a bash code block and a one-line
+    message; don't run anything.
+  max_turns: 4
+  allowed_tools:
+    - Skill
+
+graders:
+  - name: canvas_push_not_invoked
+    type: tool_used
+    tool: Skill
+    input_match: '"skill"\s*:\s*"(?:[\w-]+:)?canvas-push"'
+    min: 0
+    max: 0
+    arm: both
+
+  - name: gives_git_push
+    type: regex
+    target: last_message
+    pattern: 'git push\s+(-u|--set-upstream)\s+origin\s+notes-update'
+    match: contains
+    arm: both
