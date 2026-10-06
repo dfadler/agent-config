@@ -1,0 +1,57 @@
+# Run: claude plugin eval plugins/gh-attach-image --case gh-attach-image-declines-commit-workaround --runs 3 --trust-plugin --no-publish
+# Should-fire half, workaround form: the description says to use the skill when "about to
+# commit screenshot or video files into a repo" or create a gist. Here the user states that
+# plan; a no-plugin model usually follows it. Hermetic: commands requested, not run, no Bash
+# grant. Every grader is free, so the case is tagged `quick`.
+# Sabotage map: uses_upload_script checks "Quick path: use the bundled script" in SKILL.md;
+# no_commit_or_gist checks "What NOT to do" ("Don't fall back to committing the images") and the description's "alternative to both of those workarounds".
+# Empty SKILL.md's body (keep the description) and uses_upload_script should fail.
+# Can fail: a `git add`/`git commit`/`git push`, `gh gist`, or raw.githubusercontent link
+# fails no_commit_or_gist; no upload.sh fails uses_upload_script; skill_fired fails if the
+# skill never triggers on the workaround. The no-commit regex can false-fail on a code comment
+# that spells out `git commit`; the prompt asks for no other text to keep that unlikely.
+schema_version: "1.1"
+name: gh-attach-image-declines-commit-workaround
+description: >
+  When the user plans to commit a screenshot and link its raw URL in a PR description, the model
+  invokes gh-attach-image and replies with upload.sh instead of commit, gist or raw-URL
+  commands. expected_outcome: PASS when the reply has scripts/upload.sh and no `git add|commit|
+  push`, `gh gist` or raw.githubusercontent; FAIL otherwise. Without the plugin the model
+  usually follows the user's plan, so a delta is expected.
+tags: [gh-attach-image, trigger, quick]
+
+execution:
+  prompt: |
+    I want after.png (in the current directory) to show inline in the description of PR 42 on
+    acme/widgets. I was going to commit it under docs/img/ and link its
+    raw.githubusercontent.com URL. Don't run anything. Reply with the commands you would run
+    in one code block and no other text.
+  max_turns: 8
+  allowed_tools:
+    - Skill
+
+graders:
+  # Steps. Indicator in a two-arm run, scored only with the plugin.
+  - name: skill_fired
+    type: tool_used
+    tool: Skill
+    input_match: '"skill"\s*:\s*"(?:[\w-]+:)?gh-attach-image"'
+    min: 1
+    arm: with-only
+
+  # Result. The prompt contains "raw.githubusercontent.com" as the plan, so a reply that echoes
+  # it back in a link also fails no_commit_or_gist, which is intended.
+  - name: uses_upload_script
+    type: regex
+    target: last_message
+    pattern: 'scripts/upload\.sh'
+    match: contains
+    arm: both
+
+  - name: no_commit_or_gist
+    type: regex
+    target: last_message
+    pattern: 'git\s+(?:add|commit|push)|gh\s+gist|raw\.githubusercontent'
+    flags: i
+    match: not_contains
+    arm: both

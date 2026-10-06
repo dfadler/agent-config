@@ -1,0 +1,64 @@
+# Run: claude plugin eval plugins/gh-attach-image --case gh-attach-image-uploads-video-as-comment --runs 3 --trust-plugin --no-publish
+# Should-fire half, video-as-comment form. Hermetic: the prompt asks for the commands, not for
+# a run, and the case grants no Bash, so nothing can reach GitHub; the graders read the reply.
+# Why this prompt: no-plugin, the model has no reason to name `upload.sh`, `--comment` or the
+# user-attachments flow at all (gh has no attach flag), so these graders only pass when the skill
+# was read. The prompt does not name the skill or the script. Every grader is free, so the case
+# is tagged `quick`.
+# Sabotage map: uses_upload_script and has_expected_flags check the "Quick path: use the
+# bundled script" section of SKILL.md (`upload.sh --repo OWNER/NAME --issue 7 --comment`);
+# no_workarounds checks "What NOT to do". Empty SKILL.md's body (keep the description) and
+# uses_upload_script should fail.
+# Can fail: a reply that uses gh alone, a gist, or a commit fails uses_upload_script or
+# no_workarounds; `--issue 7`, `--comment` or `--repo acme/widgets` missing fails
+# has_expected_flags; skill_fired fails if the skill never triggers on a video-to-issue request.
+schema_version: "1.1"
+name: gh-attach-image-uploads-video-as-comment
+description: >
+  When asked to post a local video as a new comment on a GitHub issue so it plays inline, the
+  model invokes gh-attach-image and replies with the bundled upload.sh using --repo, --issue
+  and --comment, with no commit, gist or raw URL. expected_outcome: PASS when the reply has
+  scripts/upload.sh with all three flags and none of the workarounds; FAIL otherwise. Without
+  the plugin there is no upload.sh to name, so a delta is expected.
+tags: [gh-attach-image, trigger, quick]
+
+execution:
+  prompt: |
+    I recorded a walkthrough, demo.mp4, in the current directory. Post it as a new comment on
+    issue 7 of acme/widgets so it plays inline. Don't run anything. Reply with the exact
+    command or commands in one code block and no other text.
+  max_turns: 8
+  allowed_tools:
+    - Skill
+
+graders:
+  # Steps. Indicator in a two-arm run, scored only with the plugin.
+  - name: skill_fired
+    type: tool_used
+    tool: Skill
+    input_match: '"skill"\s*:\s*"(?:[\w-]+:)?gh-attach-image"'
+    min: 1
+    arm: with-only
+
+  # Result. The script path may be literal or ${CLAUDE_SKILL_DIR}-prefixed.
+  - name: uses_upload_script
+    type: regex
+    target: last_message
+    pattern: 'scripts/upload\.sh'
+    match: contains
+    arm: both
+
+  - name: has_expected_flags
+    type: regex
+    target: last_message
+    pattern: '(?=[\s\S]*--repo\s+acme/widgets)(?=[\s\S]*--issue\s+7\b)(?=[\s\S]*--comment\b)(?=[\s\S]*demo\.mp4)'
+    match: contains
+    arm: both
+
+  - name: no_workarounds
+    type: regex
+    target: last_message
+    pattern: 'git\s+(?:add|commit|push)|gh\s+gist|raw\.githubusercontent'
+    flags: i
+    match: not_contains
+    arm: both
