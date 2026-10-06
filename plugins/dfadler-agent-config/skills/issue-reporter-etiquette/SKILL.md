@@ -1,6 +1,10 @@
 ---
 name: issue-reporter-etiquette
 description: |
+  Load this before drafting any comment on a GitHub issue you are working —
+  an acknowledgment before starting, a note that part of the request is
+  deferred, a status update, or a closing comment. It defines the AI marker,
+  naming deferred parts and why, and naming every PR, SHA and release.
   How to behave, in public, toward the person who filed a GitHub issue this
   session is working — distinct from `pr-babysit`/`pr-review-rubric`, which
   cover replying to review comments *on a PR*. Covers acknowledging a filed

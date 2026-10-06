@@ -1,6 +1,11 @@
 ---
 name: pr-babysit
 description: |
+  ALWAYS invoke this skill first when the user hands over a babysit snapshot or
+  asks for a pass over their open PRs, even with --auto-merge and even when the
+  snapshot JSON is pasted in. It defines the per-PR status lines, the rule that
+  a ready-to-merge PR touching `.github/workflows/` is never auto-merged and goes
+  to a human, and the closing `PACING:` footer.
   One pass of PR shepherding: snapshot every open PR (or one named PR) via a
   project-supplied snapshot script, act on whatever is actionable — fix
   branch-related CI failures, address review comments, rerun flaky checks,
