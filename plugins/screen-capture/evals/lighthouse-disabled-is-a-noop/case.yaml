@@ -44,7 +44,8 @@ graders:
   - name: no_lighthouse_command
     type: regex
     target: last_message
-    pattern: 'npx\s+lighthouse'
+    pattern: '(?:npx\s+lighthouse|\blighthouse\s+https?://)'
+    flags: i
     match: not_contains
     arm: both
 

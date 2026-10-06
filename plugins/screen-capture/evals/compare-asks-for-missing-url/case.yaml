@@ -53,3 +53,13 @@ graders:
     target: last_message
     pattern: '--before[\s\S]*--after|--after[\s\S]*--before'
     match: contains
+
+  # Fail closed: the reply must not adopt an unconfigured URL. Naming one as an example value
+  # ("or your actual URL") is fine; "I'll use ..." / "assuming ..." is not.
+  - name: does_not_guess_second_url
+    type: regex
+    target: last_message
+    pattern: '(?:\bI(?:''ll| will)\b|\bI.m going to\b|\bassum\w+|\bdefault\w* to\b)[^\n]{0,80}(?:localhost|127\.0\.0\.1):(?!5173\b)\d+'
+    flags: i
+    match: not_contains
+    arm: both

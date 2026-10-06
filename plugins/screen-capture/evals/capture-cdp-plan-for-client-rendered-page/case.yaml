@@ -79,6 +79,6 @@ graders:
   - name: tears_down_browser_and_profile
     type: regex
     target: last_message
-    pattern: '\b(?:kill|terminat)\w*[\s\S]*(?:rm\s+-\w+|(?:delete|remove)[^\n]{0,40}(?:profile|user-data))|(?:rm\s+-\w+|(?:delete|remove)[^\n]{0,40}(?:profile|user-data))[\s\S]*\b(?:kill|terminat)\w*'
+    pattern: '(?:(?:p?kill|terminat|shut\s*down)\w*|(?:stop|quit|close)\w*\s+(?:the\s+)?chrome|SIGTERM)[\s\S]*(?:rm\s+-\w+[^\n]{0,60}(?:profile|user-data)|(?:delet|remov)\w*[^\n]{0,40}(?:profile|user-data))|(?:rm\s+-\w+[^\n]{0,60}(?:profile|user-data)|(?:delet|remov)\w*[^\n]{0,40}(?:profile|user-data))[\s\S]*(?:(?:p?kill|terminat|shut\s*down)\w*|(?:stop|quit|close)\w*\s+(?:the\s+)?chrome|SIGTERM)'
     flags: i
     match: contains

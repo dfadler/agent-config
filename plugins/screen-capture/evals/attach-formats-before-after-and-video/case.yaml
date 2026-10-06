@@ -24,7 +24,8 @@ tags: [screen-capture, attach, trigger, quick]
 
 execution:
   prompt: |
-    Add my visual verification to the description of PR 12 in acme/shop. The
+    Add my visual verification to the description of PR 12 in acme/shop (the
+    description is currently empty). The
     files are already uploaded; the URLs are:
     before: https://github.com/user-attachments/assets/aaaa-before
     after: https://github.com/user-attachments/assets/bbbb-after
@@ -33,7 +34,7 @@ execution:
 
     Don't run anything. Reply with exactly one markdown code block holding
     the section for the PR body, then one line with the gh command that
-    saves it to the PR.
+    saves that section, kept in a file section.md, to PR 12.
   max_turns: 6
   allowed_tools:
     - Skill
