@@ -1,0 +1,47 @@
+# Run (one case at a time): claude plugin eval plugins/slack-canvas-sync --case pull-quiet-on-push-request --trust-plugin --no-publish
+# Shared run/grant facts: docs/contributing.md, "Plugin evals". No grant needed (no tools).
+# Near-miss: the opposite direction. Sending local notes UP to Slack is canvas-push's job, not
+# canvas-pull's. Neither skill is model-invocable, so the guard is that the reply does not run
+# or describe the pull procedure for a push request. Regression guard (no-plugin arm passes).
+# Sabotage map: none; guards the description against over-matching on "sync ... Slack canvas".
+schema_version: "1.1"
+name: pull-quiet-on-push-request
+description: >
+  A request to publish local notes up to Slack canvases does not invoke canvas-pull or describe
+  a pull. expected_outcome (regression guard: the no-plugin arm also passes): PASS when no
+  canvas skill is invoked and the reply does not mention the pull procedure; FAIL otherwise.
+tags: [slack-canvas-sync, pull, trigger, quick]
+
+execution:
+  prompt: |
+    I edited a few markdown notes locally and want them to show up in the
+    matching Slack canvases. In one sentence, say which direction the sync
+    goes (local to Slack, or Slack to local); don't run anything.
+  max_turns: 6
+  allowed_tools:
+    - Skill
+
+graders:
+  - name: skill_not_invoked
+    type: tool_used
+    tool: Skill
+    input_match: '"skill"\s*:\s*"(?:[\w-]+:)?canvas-(?:pull|push)"'
+    min: 0
+    max: 0
+    arm: both
+
+  - name: says_local_to_slack
+    type: regex
+    target: last_message
+    pattern: 'local[\s\S]{0,30}(to|->|→|into|up to)[\s\S]{0,15}slack|(push|up)[\s\S]{0,40}slack|slack[\s\S]{0,20}(receives|gets)'
+    flags: i
+    match: contains
+    arm: both
+
+  - name: no_pull_procedure
+    type: regex
+    target: last_message
+    pattern: 'slack_read_canvas|pull --root|canvas-pull'
+    flags: i
+    match: not_contains
+    arm: both

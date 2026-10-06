@@ -1,0 +1,49 @@
+# Run (one case at a time): claude plugin eval plugins/slack-canvas-sync --case pull-quiet-on-git-pull --trust-plugin --no-publish
+# Shared run/grant facts: docs/contributing.md, "Plugin evals". No grant needed (no tools).
+# Near-miss: "pull" and "notes" are canvas-pull's vocabulary, but this is a plain git question.
+# canvas-pull is not model-invocable (disable-model-invocation), so the model should never call
+# the Skill tool for it; the real guard here is that the reply answers with git and does not
+# route to the canvas CLI. Regression guard: the no-plugin arm passes too, so no delta by design.
+# Sabotage map: none; this guards the description ("pull ... down to local notes") against
+# over-matching, should model invocation ever be enabled.
+schema_version: "1.1"
+name: pull-quiet-on-git-pull
+description: >
+  A question about pulling the latest changes into a local notes repo gets a git answer and no
+  canvas-pull invocation. expected_outcome (regression guard: the no-plugin arm also passes):
+  PASS when no skill is invoked and the reply names git pull and not the canvas CLI; FAIL otherwise.
+tags: [slack-canvas-sync, pull, trigger, quick]
+
+execution:
+  prompt: |
+    My notes live in a git repo and a teammate pushed changes to main. What
+    single command pulls their latest changes into my local copy? Answer in
+    one sentence; don't run anything.
+  max_turns: 6
+  allowed_tools:
+    - Skill
+
+graders:
+  - name: skill_not_invoked
+    type: tool_used
+    tool: Skill
+    input_match: '"skill"\s*:\s*"(?:[\w-]+:)?canvas-(?:pull|push)"'
+    min: 0
+    max: 0
+    arm: both
+
+  - name: answers_with_git
+    type: regex
+    target: last_message
+    pattern: 'git pull|git fetch'
+    flags: i
+    match: contains
+    arm: both
+
+  - name: no_canvas_routing
+    type: regex
+    target: last_message
+    pattern: 'slack_read_canvas|canvas-pull|canvas-sync|scan --root'
+    flags: i
+    match: not_contains
+    arm: both

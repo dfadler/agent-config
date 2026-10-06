@@ -18,9 +18,14 @@ function isDeletionReason(value: string): value is DeletionReason {
   );
 }
 
+/** Hash of a whole body, derived from its per-section hashes. */
+export function bodyHashOfHashes(hashes: string[]): string {
+  return hashText(hashes.join("\n"));
+}
+
 /** Hash of a whole normalized body, given its sections. */
 export function bodyHash(sections: string[]): string {
-  return hashText(sections.join("\n\n"));
+  return bodyHashOfHashes(sections.map(hashText));
 }
 
 export interface SectionSnapshot {
@@ -39,6 +44,39 @@ export interface FileEntry {
   body_hash: string;
   sections: SectionSnapshot[];
   last_synced_at: string;
+  /** Link to the canvas, from the create call. Local only; never shared. */
+  canvas_url?: string;
+  /** Hash of the navigation block last written; absent when none is wanted. */
+  nav_hash?: string;
+  /** Hash of the navigation block as last read back from the canvas. */
+  nav_remote_hash?: string;
+}
+
+/** A copy of `entry` with its navigation hashes set (undefined removes one). */
+export function withNavFields(
+  entry: FileEntry,
+  nav: { hash: string | undefined; remote: string | undefined },
+): FileEntry {
+  return {
+    canvas_id: entry.canvas_id,
+    title: entry.title,
+    body_hash: entry.body_hash,
+    sections: entry.sections,
+    last_synced_at: entry.last_synced_at,
+    ...(entry.canvas_url === undefined ? {} : { canvas_url: entry.canvas_url }),
+    ...(nav.hash === undefined ? {} : { nav_hash: nav.hash }),
+    ...(nav.remote === undefined ? {} : { nav_remote_hash: nav.remote }),
+  };
+}
+
+/** The optional per-file fields that carry over from one entry to the next. */
+export function carriedFields(entry: FileEntry | null): Partial<FileEntry> {
+  if (entry === null) return {};
+  return {
+    ...(entry.canvas_url === undefined ? {} : { canvas_url: entry.canvas_url }),
+    ...(entry.nav_hash === undefined ? {} : { nav_hash: entry.nav_hash }),
+    ...(entry.nav_remote_hash === undefined ? {} : { nav_remote_hash: entry.nav_remote_hash }),
+  };
 }
 
 /** A canvas the user has to delete by hand (the connector cannot). */
@@ -47,7 +85,11 @@ export interface PendingDeletion {
   title: string | null;
   reason: DeletionReason;
   added_at: string;
+  canvas_url?: string;
 }
+
+/** Scratch and test canvases carry this title prefix so they are easy to spot. */
+export const SCRATCH_TITLE_PREFIX = "[agent-sync-scratch]";
 
 export interface Manifest {
   version: typeof MANIFEST_VERSION;
@@ -115,7 +157,27 @@ export function parseEntry(value: unknown, where: string): FileEntry {
       parseSection(section, `${where}.sections[${String(i)}]`),
     ),
     last_synced_at: str(value["last_synced_at"], `${where}.last_synced_at`),
+    ...optionalUrl(value, where),
+    ...optionalString(value, "nav_hash", where),
+    ...optionalString(value, "nav_remote_hash", where),
   };
+}
+
+function optionalString(
+  value: Record<string, unknown>,
+  key: "nav_hash" | "nav_remote_hash",
+  where: string,
+): { nav_hash?: string; nav_remote_hash?: string } {
+  const found = value[key];
+  return found === undefined ? {} : { [key]: str(found, `${where}.${key}`) };
+}
+
+function optionalUrl(
+  value: Record<string, unknown>,
+  where: string,
+): { canvas_url?: string } {
+  const url = value["canvas_url"];
+  return url === undefined ? {} : { canvas_url: str(url, `${where}.canvas_url`) };
 }
 
 function parsePending(value: unknown, where: string): PendingDeletion {
@@ -129,6 +191,7 @@ function parsePending(value: unknown, where: string): PendingDeletion {
     title: strOrNull(value["title"], `${where}.title`),
     reason,
     added_at: str(value["added_at"], `${where}.added_at`),
+    ...optionalUrl(value, where),
   };
 }
 

@@ -1,0 +1,40 @@
+# Run: claude plugin eval plugins/slack-canvas-sync --case status-stays-quiet-on-vcs-status --trust-plugin --no-publish
+# Shared run/grant facts: docs/contributing.md, "Plugin evals". No grant needed (Skill only).
+# Should-not-fire: "status" and "what changed" share vocabulary with canvas-status, but this is a
+# plain version-control question. The Skill check names all three plugin skills.
+# Sabotage map: skill_not_invoked checks canvas-status's description ("sync status"); replace it
+# with "invoke for ANY request" and a run should fail.
+# Can fail: any plugin skill invoked fails skill_not_invoked; a reply without the command fails
+# answers_with_git_command. Regression guard: a no-plugin arm passes it, so no delta by design.
+schema_version: "1.1"
+name: status-stays-quiet-on-vcs-status
+description: >
+  A question about which files changed in a git working tree must not invoke any
+  slack-canvas-sync skill. expected_outcome (regression guard: the no-plugin arm also passes):
+  PASS when no plugin skill is invoked and the reply names git status; FAIL otherwise.
+tags: [slack-canvas-sync, canvas-status, trigger, quick]
+
+execution:
+  prompt: |
+    What is the status of my git working tree, and which files changed since
+    the last commit? Name the one command in one sentence; don't run anything.
+  max_turns: 6
+  allowed_tools:
+    - Skill
+
+graders:
+  - name: skill_not_invoked
+    type: tool_used
+    tool: Skill
+    input_match: '"skill"\s*:\s*"(?:slack-canvas-sync:)?canvas-(?:status|push|pull)"'
+    min: 0
+    max: 0
+    arm: both
+
+  - name: answers_with_git_command
+    type: regex
+    target: last_message
+    pattern: 'git\s+status|git\s+diff'
+    flags: i
+    match: contains
+    arm: both

@@ -1,0 +1,48 @@
+# Run: claude plugin eval plugins/slack-canvas-sync --case status-fires-on-manual-delete-list --trust-plugin --no-publish
+# Shared run/grant facts: docs/contributing.md, "Plugin evals". No grant needed (Skill only).
+# Reply-only, no mocks (the plugin declares no MCP server).
+# Should-fire: "which canvases do I delete by hand" is the pending-deletion half of the skill.
+# A baseline cannot know the `pending list` subcommand or that the sync never deletes itself.
+# Sabotage map: graders quote "Step 3: Pending manual deletion" (`pending list`) and the rule
+# "Never delete anything yourself" (no delete offer).
+# Can fail: skill_fired fails if the description stops matching; a plan that offers to delete
+# trips never_offers_delete.
+schema_version: "1.1"
+name: status-fires-on-manual-delete-list
+description: >
+  Asked which Slack canvases are left to delete by hand, the model invokes canvas-status and
+  plans pending list, without offering to delete. expected_outcome: PASS when the skill fires,
+  pending list is named and no delete is offered; FAIL otherwise.
+tags: [slack-canvas-sync, canvas-status, trigger, quick]
+
+execution:
+  prompt: |
+    CANVAS_SYNC_ROOT is set to /notes. I removed some notes that were synced
+    to Slack canvases. Which canvases am I supposed to delete by hand now?
+
+    Don't call any tools other than skills. Reply with a numbered plan of at
+    most 6 one-line steps, naming the exact subcommand you would run.
+  max_turns: 6
+  allowed_tools:
+    - Skill
+
+graders:
+  - name: skill_fired
+    type: tool_used
+    tool: Skill
+    input_match: '"skill"\s*:\s*"(?:[\w-]+:)?canvas-status"'
+    min: 1
+    arm: with-only
+
+  - name: lists_pending
+    type: regex
+    target: last_message
+    pattern: 'pending\s+list'
+    match: contains
+
+  - name: never_offers_delete
+    type: regex
+    target: last_message
+    pattern: '(I can|I will|I.ll|let me|want me to|shall I|offer to)\s+(go ahead and\s+)?delete'
+    flags: i
+    match: not_contains
