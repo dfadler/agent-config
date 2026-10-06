@@ -3,6 +3,7 @@
 # Should-not-fire half of github-pr-workflow's boundary: renaming a local branch is plain git
 # and shares "branch" and "before I open my PR" vocabulary with the skill, but drafts no PR
 # body, posts no comment, runs no `gh pr` command and merges nothing.
+# Scope: only github-pr-workflow is checked; another PR skill firing is out of scope here.
 # Sabotage map: github_pr_workflow_not_fired checks the description's closing line ("Load
 # whenever doing PR work in any repo"); replace it with "Load whenever working with git
 # branches" and a run should invoke the skill and fail. gives_rename_command is a content

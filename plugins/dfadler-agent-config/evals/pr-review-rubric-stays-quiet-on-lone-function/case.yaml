@@ -8,7 +8,9 @@
 # comments"); replace it with "Use whenever reviewing any code" and a run should invoke the
 # skill and fail. finds_bug is a content check a default reply also passes.
 # Can fail: the skill firing fails pr_review_rubric_not_fired; a reply that never mentions
-# the loop bound fails finds_bug. Regression guard: a no-plugin arm passes by default, so
+# the loop bound fails finds_bug. The prompt deliberately omits any "not a PR" cue, so the
+# case probes the description's own boundary rather than obedience to a disclaimer.
+# Regression guard: a no-plugin arm passes by default, so
 # Delta is about 0 by design.
 schema_version: "1.1"
 name: pr-review-rubric-stays-quiet-on-lone-function
@@ -20,7 +22,7 @@ tags: [pr-review-rubric, trigger, quick]
 
 execution:
   prompt: |
-    Quick question, not a PR: what is wrong with this loop? One sentence, no commands.
+    What is wrong with this loop? One sentence, no commands.
 
     ```ts
     function sum(items: number[]): number {
@@ -47,7 +49,7 @@ graders:
   - name: finds_bug
     type: regex
     target: last_message
-    pattern: 'off-by-one|<=|NaN|undefined|out of (?:bounds|range)|length'
+    pattern: 'off-by-one|<=\s*items\.length|(?:should|use|change)[^\n]*<\s*items\.length|out of (?:bounds|range)'
     flags: i
     match: contains
     arm: both

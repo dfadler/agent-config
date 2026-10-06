@@ -3,6 +3,8 @@
 # Should-not-fire half of pr-babysit's boundary: "which of my open PRs" shares vocabulary
 # with "check on my open PRs", but asking for a single read-only command is not a shepherding
 # pass (no snapshot, no action, no PACING footer).
+# Scope: only pr-babysit is checked. github-pr-workflow's description also covers drafting a
+# `gh pr` command, so a sibling PR skill firing here is out of scope for this case.
 # Sabotage map: pr_babysit_not_fired checks the description's trigger list ("check on my open
 # PRs", "shepherd PR N to merge"); replace it with "any question about open PRs" and a run
 # should invoke the skill and fail. gives_gh_command is a content check a default reply also
