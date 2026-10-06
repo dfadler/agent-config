@@ -1,0 +1,81 @@
+# Run: claude plugin eval plugins/dfadler-agent-config --case issue-reporter-etiquette-closing-comment-names-prs-shas-release --runs 3 --trust-plugin --no-publish
+# Shared run/grant facts: docs/contributing.md, "Plugin evals". No grant: Skill only. The
+# lookups the skill says to make (PR numbers, merge SHAs, release state) are pasted, because
+# the workspace is empty and no gh write or read may happen; the comment is drafted, not
+# posted.
+# Should-fire case for the Step 4 content contract: one closing comment naming every
+# implementing PR, each merge SHA in the "Fixed in `<sha>`" phrasing, and the release state
+# ("unreleased" when no tag contains the fix), led by the AI marker, with no issue closing.
+# Can fail: skill_fired fails if the description stops matching "close the loop on issue N";
+# marker, both_prs, both_shas and unreleased fail when the draft omits that element;
+# does_not_close fails if the reply adds `gh issue close`. A no-skill draft usually lacks
+# the marker and the "unreleased" wording.
+# Skill phrases checked: "Every PR that implements the fix", "The merge commit SHA(s)",
+# "unreleased, will ship in the next release", "Don't auto-close the issue".
+schema_version: "1.1"
+name: issue-reporter-etiquette-closing-comment-names-prs-shas-release
+description: >
+  Asked to close the loop on an issue fixed across two merged PRs, with lookups pasted, the
+  model invokes issue-reporter-etiquette and drafts one closing comment with the AI marker,
+  both PRs, both merge SHAs and the unreleased state. expected_outcome: PASS when the skill
+  fires and all five elements are present and no issue-closing command is added; FAIL
+  otherwise.
+tags: [issue-reporter-etiquette, trigger, quick]
+
+execution:
+  prompt: |
+    Close the loop with the reporter on issue 90 of dfadler/example-app ("CSV export drops
+    the last row"). Both PRs that fix it are merged. Here is what I looked up, so don't try
+    to run anything:
+
+    - PR 101 "fix: off-by-one in row writer", merge commit 3fa9c21
+    - PR 104 "test: cover empty and single-row exports", merge commit b82d4e7
+    - `git describe --contains` finds no tag containing either commit; the latest release is
+      older than both merges.
+    - Only PR 101's description had `Closes #90`; PR 104's did not.
+
+    Reply with the exact comment body you would post on the issue, in one code block and no
+    other text.
+  max_turns: 6
+  allowed_tools:
+    - Skill
+
+graders:
+  - name: skill_fired
+    type: tool_used
+    tool: Skill
+    input_match: '"skill"\s*:\s*"(?:[\w-]+:)?issue-reporter-etiquette"'
+    min: 1
+    arm: with-only
+
+  - name: marker
+    type: regex
+    target: last_message
+    pattern: '🤖 \*\*Claude:\*\*'
+    match: contains
+
+  - name: both_prs
+    type: regex
+    target: last_message
+    pattern: '#101[\s\S]*#104|#104[\s\S]*#101'
+    match: contains
+
+  - name: both_shas
+    type: regex
+    target: last_message
+    pattern: '3fa9c21[\s\S]*b82d4e7|b82d4e7[\s\S]*3fa9c21'
+    match: contains
+
+  - name: unreleased
+    type: regex
+    target: last_message
+    pattern: 'unreleased|not yet (?:released|tagged)|next release'
+    flags: i
+    match: contains
+
+  - name: does_not_close
+    type: regex
+    target: last_message
+    pattern: 'gh issue close'
+    flags: i
+    match: not_contains

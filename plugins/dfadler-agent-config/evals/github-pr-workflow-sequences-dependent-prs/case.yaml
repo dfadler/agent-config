@@ -1,0 +1,59 @@
+# Run: claude plugin eval plugins/dfadler-agent-config --case github-pr-workflow-sequences-dependent-prs --runs 3 --trust-plugin --no-publish
+# Shared run/grant facts: docs/contributing.md, "Plugin evals". No grant: Skill only; the
+# reply is a drafted PR body, nothing is opened.
+# Should-fire case for github-pr-workflow's "Opening and sizing a PR": two PRs whose merge
+# order matters get a `## Sequencing` section, and the merge method is an ordinary merge
+# commit. The prompt names neither convention.
+# Can fail: skill_fired fails if the description stops matching PR work; sequencing_section
+# fails without the heading; merge_commit_method fails if the reply recommends another
+# method (a no-skill reply tends to say squash or "depends on your repo").
+# Skill phrases checked: "add a `## Sequencing` section to the PR body", "Merge via ordinary
+# merge commits, not squash".
+schema_version: "1.1"
+name: github-pr-workflow-sequences-dependent-prs
+description: >
+  Asked to draft the body of a PR that depends on another open PR and to say how to merge
+  them, the model invokes github-pr-workflow, includes a Sequencing section and recommends
+  merge commits. expected_outcome: PASS when the skill fires, the body has `## Sequencing`
+  and the merge method is a merge commit; FAIL otherwise.
+tags: [github-pr-workflow, trigger, quick]
+
+execution:
+  prompt: |
+    I have two PRs open in dfadler/example-app: #101 adds a new config parser and #102 uses
+    that parser in the CLI, so #102 only works once #101 is in. Draft the markdown body for
+    #102, and add one final line saying how I should merge them. Reply with the body and that
+    line only. Do not run commands or open anything.
+  max_turns: 6
+  allowed_tools:
+    - Skill
+
+graders:
+  - name: skill_fired
+    type: tool_used
+    tool: Skill
+    input_match: '"skill"\s*:\s*"(?:[\w-]+:)?github-pr-workflow"'
+    min: 1
+    arm: with-only
+
+  - name: sequencing_section
+    type: regex
+    target: last_message
+    pattern: '(?:^|\n)##\s*Sequencing'
+    match: contains
+
+  # Positive form so "not squash" prose cannot fail it; the method has to be a merge commit.
+  - name: merge_commit_method
+    type: regex
+    target: last_message
+    pattern: '(?:merge commit|ordinary merge|regular merge|--merge\b)'
+    flags: i
+    match: contains
+
+  # Completion check: both PRs are named in the body.
+  - name: names_both_prs
+    type: regex
+    target: last_message
+    pattern: '#101[\s\S]*#102|#102[\s\S]*#101'
+    match: contains
+    weight: 0.5

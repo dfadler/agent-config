@@ -1,0 +1,97 @@
+# Run: claude plugin eval plugins/dfadler-agent-config --case pr-babysit-reports-snapshot-error-and-pacing --runs 3 --trust-plugin --no-publish
+# Shared run/grant facts: docs/contributing.md, "Plugin evals". No grant: Skill only; the
+# snapshot is pasted and Bash is not offered.
+# Should-fire case for pr-babysit's routing of skipped entries: a draft PR is "skip" (report
+# only) and a snapshot-error entry is "escalate" and must report skipped.detail because no
+# verdict exists. Delegation to pr-checks/pr-comments is #484 and is not tested here.
+# Can fail: skill_fired fails if the description stops matching; reports_error_detail fails if
+# the reply drops the detail text; draft_reported_as_skip (half weight) fails if PR 31 is not
+# reported as skipped; pacing_line fails if the footer is missing (a default reply has no `PACING:`
+# line, so this is the check most likely to tell the skill from no skill).
+# Skill phrases checked: "report `skipped.detail` instead", "`PACING: short` / `PACING: long`".
+schema_version: "1.1"
+name: pr-babysit-reports-snapshot-error-and-pacing
+description: >
+  Given a snapshot with a draft PR (skip) and a PR whose snapshot failed (escalate with a
+  detail string), the model invokes pr-babysit, reports the detail, leaves the draft alone and
+  ends with a PACING line. expected_outcome: PASS when the skill fires, the detail text is in
+  the report and a PACING line is present; FAIL otherwise.
+tags: [pr-babysit, trigger, quick]
+
+execution:
+  prompt: |
+    Check on my open PRs. The snapshot command already ran; its output is below. Do not run
+    it again or run any other command.
+
+    ```json
+    {
+      "generatedAt": "2026-10-05T12:00:00Z",
+      "repo": "dfadler/example-app",
+      "selfLogin": "dfadler",
+      "prs": [
+        {
+          "number": 31,
+          "title": "wip: new settings page",
+          "url": "https://github.com/dfadler/example-app/pull/31",
+          "author": "dfadler",
+          "headRefName": "settings-page",
+          "baseRefName": "main",
+          "headSha": "1a2b3c4",
+          "isDraft": true,
+          "skipped": {"reason": "draft"},
+          "recommendation": "skip"
+        },
+        {
+          "number": 32,
+          "title": "fix: retry on 502",
+          "url": "https://github.com/dfadler/example-app/pull/32",
+          "author": "dfadler",
+          "headRefName": "retry-502",
+          "baseRefName": "main",
+          "headSha": "5d6e7f8",
+          "isDraft": false,
+          "skipped": {"reason": "snapshot-error", "detail": "GraphQL timeout while paging reviewThreads"},
+          "recommendation": "escalate"
+        }
+      ],
+      "pacingHint": "long"
+    }
+    ```
+
+    Reply with the pass report only: one status line per PR, then the footer line.
+  max_turns: 6
+  allowed_tools:
+    - Skill
+
+graders:
+  - name: skill_fired
+    type: tool_used
+    tool: Skill
+    input_match: '"skill"\s*:\s*"(?:[\w-]+:)?pr-babysit"'
+    min: 1
+    arm: with-only
+
+  # Result: the escalation names the error instead of an empty "needs a human".
+  - name: reports_error_detail
+    type: regex
+    target: last_message
+    pattern: 'timeout while paging reviewThreads'
+    flags: i
+    match: contains
+
+  # Result: the draft PR is reported as skipped. A completion check a default reply also
+  # passes (hence no sabotage claim for it); an action verb check would false-fail on
+  # "not merged".
+  - name: draft_reported_as_skip
+    type: regex
+    target: last_message
+    pattern: '#?31[^\n]*(?:skip|draft)'
+    flags: i
+    match: contains
+    weight: 0.5
+
+  - name: pacing_line
+    type: regex
+    target: last_message
+    pattern: 'PACING:\s*\*{0,2}\s*(?:short|long)'
+    match: contains
