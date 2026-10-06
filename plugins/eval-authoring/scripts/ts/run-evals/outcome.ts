@@ -87,6 +87,63 @@ export const inspectResult = (result: AggregateResult): ResultFindings => ({
     .map((c) => c.name),
 });
 
+/**
+ * What the typed parser drops but the wrapper needs: the top-level `costUsd`
+ * (list price, judge calls included) and the names of the cases that ran.
+ * Read straight from the JSON so the parser's frozen types stay untouched.
+ */
+export interface RawFacts {
+  readonly costUsd: number | undefined;
+  readonly caseNames: readonly string[] | undefined;
+}
+
+const isRecord = (v: unknown): v is Record<string, unknown> =>
+  typeof v === "object" && v !== null && !Array.isArray(v);
+
+export const rawResultFacts = (text: string | undefined): RawFacts => {
+  const none: RawFacts = { costUsd: undefined, caseNames: undefined };
+  if (text === undefined) return none;
+  const json = ((): unknown => {
+    try {
+      return JSON.parse(text);
+    } catch {
+      return undefined;
+    }
+  })();
+  if (!isRecord(json)) return none;
+  const cost = json["costUsd"];
+  const cases = json["cases"];
+  return {
+    costUsd:
+      typeof cost === "number" && Number.isFinite(cost) && cost >= 0
+        ? cost
+        : undefined,
+    caseNames: Array.isArray(cases)
+      ? cases.flatMap((c: unknown) =>
+          isRecord(c) && typeof c["name"] === "string" ? [c["name"]] : [],
+        )
+      : undefined,
+  };
+};
+
+/**
+ * The planned-vs-ran check: a problem message when the result does not hold
+ * exactly the one planned case, undefined when it does (or when there is no
+ * readable result, which `judgeRun` already reports).
+ */
+export const plannedCaseProblem = (
+  planned: string,
+  ran: readonly string[] | undefined,
+): string | undefined => {
+  if (ran === undefined) return undefined;
+  const extra = ran.filter((n) => n !== planned);
+  return !ran.includes(planned)
+    ? `skipped case: '${planned}' did not run (result has ${ran.length === 0 ? "no cases" : ran.join(", ")})`
+    : extra.length > 0
+      ? `unplanned case(s) ran: ${extra.join(", ")} (planned only '${planned}')`
+      : undefined;
+};
+
 const AGGREGATE_FILE = "aggregate-result.json";
 
 /** Result directories a run could have written, newest last: the base itself, or its timestamped children. */
@@ -166,7 +223,7 @@ export const judgeRun = (input: JudgeInput): Judgement => {
       : []),
     ...(findings === undefined
       ? meaning === "pass"
-        ? [note(EXIT_FAILURE, [`cannot trust a pass: ${input.resultProblem ?? "results unreadable"}`], false)]
+        ? [note(EXIT_PARTIAL, [`cannot trust a pass: ${input.resultProblem ?? "results unreadable"}`], false)]
         : []
       : [
           ...(findings.partial

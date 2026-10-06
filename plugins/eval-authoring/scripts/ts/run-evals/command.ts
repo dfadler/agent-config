@@ -39,11 +39,7 @@ export const allowToolsArgs = (
 
 /** Where the user asked for output beyond the default terminal report. */
 export interface Reporting {
-  /** `--json <path>`: JSON to a file. (`--json` alone silences the console, so the wrapper never uses it.) */
-  readonly jsonFile: string | undefined;
-  /** `--report <path>`: the HTML report. */
-  readonly reportFile: string | undefined;
-  /** `--output-dir`: a different results directory. */
+  /** `--output-dir`: this invocation's own results directory. */
   readonly outputDir: string | undefined;
   /** `--publish-report`. Without it the wrapper passes `--no-publish`. */
   readonly publishReport: boolean;
@@ -56,13 +52,16 @@ export interface RunSpec {
   /** The plugin under test (a path). It goes first so no option reads it as a value. */
   readonly target: string;
   readonly tier: Tier;
-  /** Case names. One `--case` per name. */
-  readonly cases: readonly string[];
-  /** The group's grant set (`grantSet` from the parser), passed as `--allow-tools`. */
+  /**
+   * The one case this invocation runs. `--case` is a single glob and the CLI
+   * keeps only the last one given (#536, #538), so a spec never has several.
+   */
+  readonly caseName: string;
+  /** The case's grant set (`grantSet` from the parser), passed as `--allow-tools`. */
   readonly grants: readonly string[];
   readonly model: string | undefined;
   readonly judgeModel: string | undefined;
-  /** Overrides the tier's cost ceiling; undefined keeps the tier's. Applies to this one CLI invocation. */
+  /** `--max-cost-usd` for this invocation (the wrapper passes the remaining budget); undefined keeps the tier's. */
   readonly maxCostUsd: number | undefined;
   /** `--eval-dir`, when the caller overrides the plugin's own eval directory. */
   readonly evalDir: string | undefined;
@@ -75,9 +74,10 @@ export interface RunSpec {
 export const hasGlobMeta = (name: string): boolean => /[*?[\]{}\\]/.test(name);
 
 /**
- * The full argv after `claude` for one run group. Order matters: target first,
- * then the variadic-looking options (`--case`, `--allow-tools`, `--tag`), then
- * the scalar flags, then `--json <path>` last. `--scaffold` is never passed:
+ * The full argv after `claude` for one invocation (one case). Order matters:
+ * target first, then the variadic-looking options (`--case`, `--allow-tools`,
+ * `--tag`), then the scalar flags. `--json` and `--report` are never passed:
+ * the wrapper reads `aggregate-result.json` from the output directory. `--scaffold` is never passed:
  * it runs author-supplied bash as the user, so it stays a manual opt-in.
  */
 export const buildCliArgs = (
@@ -88,7 +88,8 @@ export const buildCliArgs = (
   return [
     ...CLI_SUBCOMMAND,
     spec.target,
-    ...spec.cases.flatMap((c) => ["--case", c]),
+    "--case",
+    spec.caseName,
     ...allowToolsArgs(spec.grants, shape),
     ...(tier.tag === undefined ? [] : ["--tag", tier.tag]),
     "--runs",
@@ -106,12 +107,8 @@ export const buildCliArgs = (
     ...(spec.trustPlugin ? ["--trust-plugin"] : []),
     reporting.publishReport ? "--publish-report" : "--no-publish",
     ...(reporting.keepTemp ? ["--keep-temp"] : []),
-    ...(reporting.reportFile === undefined
-      ? []
-      : ["--report", reporting.reportFile]),
     ...(reporting.outputDir === undefined
       ? []
       : ["--output-dir", reporting.outputDir]),
-    ...(reporting.jsonFile === undefined ? [] : ["--json", reporting.jsonFile]),
   ];
 };

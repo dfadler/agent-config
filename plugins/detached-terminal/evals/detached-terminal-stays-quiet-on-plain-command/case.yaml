@@ -1,0 +1,49 @@
+# Run: claude plugin eval plugins/detached-terminal --case detached-terminal-stays-quiet-on-plain-command --runs 3 --trust-plugin --no-publish
+# Shared run/grant facts: docs/contributing.md, "Plugin evals". No grant; reply-only.
+# Should-not-fire half of the boundary: a non-interactive command the description names as
+# the wrong use ("ordinary non-interactive commands (plain Bash)"). Regression guard: a
+# baseline passes it, so the delta is 0 by design. All free, quick.
+# Can fail: no_terminal_skill_fired fails if detached-terminal over-triggers on a plain
+# one-shot command; no_agent_term fails if the reply reaches for agent_term.py anyway;
+# uses_plain_command fails if the reply does not answer with an ordinary line counter.
+schema_version: "1.1"
+name: detached-terminal-stays-quiet-on-plain-command
+description: >
+  A request to count lines in markdown files is a plain non-interactive command, so
+  detached-terminal must not fire and the reply must not use agent_term.py. expected_outcome:
+  PASS when the skill is not invoked and the reply is a plain wc/awk style command; FAIL when
+  the skill is invoked or agent_term.py appears. Regression guard: Delta 0 by design.
+tags: [detached-terminal, trigger, quick]
+
+execution:
+  prompt: |
+    Count the lines in every .md file under docs/ and show me the total. Don't run anything;
+    answer with the exact shell command in one bash code block and no other text.
+  max_turns: 6
+  allowed_tools:
+    - Skill
+
+graders:
+  - name: no_terminal_skill_fired
+    type: tool_used
+    tool: Skill
+    input_match: '"skill"\s*:\s*"(?:[\w-]+:)?detached-terminal"'
+    min: 0
+    max: 0
+    arm: both
+
+  - name: no_agent_term
+    type: regex
+    target: last_message
+    pattern: 'agent_term'
+    match: not_contains
+    arm: both
+
+  # Completion check, not a skill property (tautological for a baseline).
+  - name: uses_plain_command
+    type: regex
+    target: last_message
+    pattern: 'wc\s+-l|awk|grep\s+-c|cloc'
+    match: contains
+    arm: both
+    weight: 0.5

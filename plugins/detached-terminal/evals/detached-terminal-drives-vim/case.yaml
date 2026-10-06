@@ -1,0 +1,81 @@
+# Run: claude plugin eval plugins/detached-terminal --case detached-terminal-drives-vim --runs 3 --trust-plugin --no-publish
+# Shared run/grant facts: docs/contributing.md, "Plugin evals". No grant: the model must NOT
+# run anything. The prompt asks for the commands in the reply, so no Bash is granted and no
+# terminal, GUI or PTY is ever touched (hermetic; see claude/conventions/focus-stealing.md).
+# Should-fire half of the boundary (drive an interactive TUI); the should-not-fire half is the
+# three detached-terminal-stays-quiet-* cases. Every grader is free, so the case is tagged quick.
+# Can fail: skill_fired fails if the description stops matching a "drive an editor and read
+# the screen" request; starts_detached_session / reads_screen / sends_keys fail when the reply
+# does not use the skill's agent_term.py start/read/keys cycle (a no-plugin model does not know
+# that script, so these discriminate); no_gui_launch fails on `open -a Terminal` or osascript.
+# The prompt cues "nothing may pop up", so no_gui_launch alone is cheap for a baseline to pass.
+# Skill phrases checked: Usage ("agent_term.py" start/read/keys/stop, "A full drive-a-TUI
+# cycle"), the `vim -u NONE notes.txt` example, "There is no attach".
+schema_version: "1.1"
+name: detached-terminal-drives-vim
+description: >
+  Asked to edit a file by driving vim (start it, look at the screen, type, look again, save
+  and quit) without disturbing the user, the model invokes detached-terminal and answers with
+  agent_term.py start, read and keys commands and no GUI terminal launch. expected_outcome:
+  PASS when the skill is invoked and the reply holds a start/read/keys cycle with no
+  open -a or osascript; FAIL when the skill is not invoked, the cycle is missing, or a GUI
+  terminal is launched.
+tags: [detached-terminal, trigger, quick]
+
+execution:
+  prompt: |
+    I need notes.txt edited in vim, and I want you to do it by actually driving the editor:
+    start it, look at what is on the screen, send keystrokes, look again, then save and
+    quit. I'm typing in another app right now, so nothing may pop up in front of me. Don't
+    run anything; answer with the exact shell commands you would run, in order, in one bash
+    code block and no other text. Write any script path out in full in every command, not
+    through a variable.
+  max_turns: 6
+  allowed_tools:
+    - Skill
+
+graders:
+  # Steps: the skill fired on a prompt that never names it.
+  - name: skill_fired
+    type: tool_used
+    tool: Skill
+    input_match: '"skill"\s*:\s*"(?:[\w-]+:)?detached-terminal"'
+    min: 1
+    arm: with-only
+
+  # Result: the skill's start/read/keys cycle. The script path may be quoted or use
+  # ${CLAUDE_SKILL_DIR}, so only the script name and subcommand are anchored.
+  - name: starts_detached_session
+    type: regex
+    target: last_message
+    pattern: 'agent_term\.py["'']?\s+start\s+\S+[^\n]*--\s+vim\b'
+    match: contains
+
+  - name: reads_screen
+    type: regex
+    target: last_message
+    pattern: 'agent_term\.py["'']?\s+read\s+\S+'
+    match: contains
+
+  - name: sends_keys
+    type: regex
+    target: last_message
+    pattern: 'agent_term\.py["'']?\s+keys\s+\S+\s+--\s+\S'
+    match: contains
+
+  # The reply is one code block, so prose such as "instead of open -a Terminal" cannot trip this.
+  - name: no_gui_launch
+    type: regex
+    target: last_message
+    pattern: 'open\s+-a\b|osascript|tell application'
+    flags: i
+    match: not_contains
+    weight: 0.5
+
+  # Half weight: the model may rely on :wq and leave the session to its TTL.
+  - name: stops_session
+    type: regex
+    target: last_message
+    pattern: 'agent_term\.py["'']?\s+stop\s+\S+'
+    match: contains
+    weight: 0.5
