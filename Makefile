@@ -182,7 +182,8 @@ CLAUDE_MD_MAX_LINES := 350
 .PHONY: help check lint lint-sh lint-shellcheck lint-shfmt lint-set-flags lint-claude-md \
         lint-py lint-ts lint-actions fmt fmt-py test test-sh test-py test-ts \
         structure typecheck typecheck-ts venv node-modules coverage coverage-py \
-        coverage-ts check-links check-skills lint-plugin-evals
+        coverage-ts check-links check-skills lint-plugin-evals check-vitest-flags \
+        check-vitest-v3-names
 
 help: ## Show available targets
 	@grep -E '^[a-z-]+:.*?## ' $(MAKEFILE_LIST) | awk -F':.*?## ' '{printf "  \033[36m%-14s\033[0m %s\n", $$1, $$2}'
@@ -194,14 +195,14 @@ help: ## Show available targets
 #   shell.yml      lint-shellcheck, lint-shfmt, lint-set-flags, lint-claude-md,
 #                  structure, test-sh, coverage
 #   python.yml     lint-py, typecheck, test-py, coverage-py
-#   typescript.yml lint-ts, typecheck-ts, check-skills, lint-plugin-evals, test-ts,
-#                  coverage-ts
+#   typescript.yml lint-ts, typecheck-ts, check-skills, lint-plugin-evals,
+#                  check-vitest-flags, check-vitest-v3-names, test-ts, coverage-ts
 #   actionlint.yml lint-actions
 #
 # Each workflow calls its own subset rather than `make check` — shell.yml has
 # no Python installed, and pointing it at an aggregate target that had grown a
 # pytest dependency is exactly how this broke once already.
-check: lint structure typecheck test lint-actions coverage coverage-py lint-ts typecheck-ts check-skills lint-plugin-evals test-ts coverage-ts ## Everything CI runs
+check: lint structure typecheck test lint-actions coverage coverage-py lint-ts typecheck-ts check-skills lint-plugin-evals check-vitest-flags check-vitest-v3-names test-ts coverage-ts ## Everything CI runs
 
 venv: $(VENV_STAMP) ## Create/refresh .venv from requirements-dev.txt
 
@@ -253,6 +254,15 @@ lint-plugin-evals: node-modules ## eval-authoring lint over every plugin's evals
 # workflow adds the ./.github/actions/setup-node-pnpm step); the lint, typecheck
 # and coverage targets already cover the new file. A plugin-owned check uses
 # plugins/<plugin>/scripts/ts/check-foo.ts instead.
+
+# Vitest flag drift (#479): every --flag the vitest plugin, .claude/rules/vitest.md
+# and docs/testing.md document must be in `vitest --help` for the pinned version.
+check-vitest-flags: node-modules ## Documented Vitest flags exist in the pinned version
+	@node scripts/ts/check-vitest-flags.ts
+
+# Vitest 3 names (poolOptions, maxThreads, ...) only appear with a removed/renamed note.
+check-vitest-v3-names: node-modules ## No unannotated Vitest 3 option names in plugins/docs/.claude
+	@node scripts/ts/check-vitest-v3-names.ts
 
 test-ts: node-modules ## Run the Vitest suite
 	@pnpm test --silent
