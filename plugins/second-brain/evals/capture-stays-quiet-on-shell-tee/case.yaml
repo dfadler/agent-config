@@ -1,0 +1,42 @@
+# Run (one case at a time, #536/#538): claude plugin eval plugins/second-brain --case capture-stays-quiet-on-shell-tee --trust-plugin --no-publish
+# Shared run/grant facts: docs/contributing.md, "Plugin evals". No grant needed (Skill only).
+# Should-not-fire half of the capture boundary: "save" and "output" overlap capture's trigger
+# phrases ("save this", "log this") but the request is a shell redirection, not a note for the
+# vault. The Skill check names all four second-brain skills.
+# Sabotage map: skill_not_invoked checks capture's description ("Trigger on phrases like 'save
+# this' ... or when any notable information is shared"); that proactive clause is the likely
+# over-trigger. Widen it and a run should fail.
+# Can fail: any second-brain skill invoked fails skill_not_invoked; a reply without `tee` fails
+# answers_with_tee. Regression guard: a no-plugin arm passes it, so no delta by design.
+schema_version: "1.1"
+name: capture-stays-quiet-on-shell-tee
+description: >
+  A question about saving a command's output to a file while still seeing it must not invoke any
+  second-brain skill. expected_outcome (regression guard: the no-plugin arm also passes): PASS when no second-brain skill is invoked and the reply
+  uses tee; FAIL when a skill is invoked or tee is missing.
+tags: [second-brain, capture, trigger, quick]
+
+execution:
+  prompt: |
+    How do I save a command's output to a file and still see it in my
+    terminal? Reply with one bash code block showing an example and no other
+    text; don't run anything.
+  max_turns: 6
+  allowed_tools:
+    - Skill
+
+graders:
+  - name: skill_not_invoked
+    type: tool_used
+    tool: Skill
+    input_match: '"skill"\s*:\s*"(?:second-brain:)?(?:capture|query|sync|config)"'
+    min: 0
+    max: 0
+    arm: both
+
+  - name: answers_with_tee
+    type: regex
+    target: last_message
+    pattern: '\|\s*tee\b'
+    match: contains
+    arm: both

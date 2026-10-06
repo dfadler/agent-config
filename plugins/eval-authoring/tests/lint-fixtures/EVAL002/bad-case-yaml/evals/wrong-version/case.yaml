@@ -1,0 +1,7 @@
+schema_version: "1.0"
+name: wrong-version
+execution:
+  prompt: Do the thing.
+graders:
+  - type: regex
+    pattern: done

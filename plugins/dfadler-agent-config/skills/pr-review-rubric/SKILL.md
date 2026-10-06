@@ -1,6 +1,10 @@
 ---
 name: pr-review-rubric
 description: |
+  Load this before reviewing any pull request or diff, including a diff pasted
+  into the conversation, and before writing review findings. It defines the
+  finding format (AI marker, Category/Severity/Effort tag line, "How verified:")
+  and the rule that a review never approves a PR on its own.
   Methodology and output discipline for reviewing a pull request's diff: a rubric
   covering correctness, security, test coverage, edge cases, cross-file data-flow
   tracing, intent-vs-implementation, and prior-PR/issue historical context; a severity

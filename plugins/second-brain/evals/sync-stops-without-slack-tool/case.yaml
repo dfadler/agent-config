@@ -1,0 +1,55 @@
+# Run (one case at a time, #536/#538): claude plugin eval plugins/second-brain --case sync-stops-without-slack-tool --trust-plugin --no-publish
+# Shared run/grant facts: docs/contributing.md, "Plugin evals". No grant needed (Skill only).
+# Should-fire half of the sync boundary on its fail-closed path. sync needs a `slack_read_canvas`
+# tool and must stop with a "Slack MCP authentication is required" message if it is absent. An
+# eval run loads no Slack server and no user MCP servers, so the tool really is absent, which
+# makes this the one sync path that is naturally hermetic. The vault path is stated so the
+# failure is the Slack prerequisite (Step 1), not the vault-path check (Step 0).
+# Sabotage map: names_slack_mcp_auth and no_report_claimed check "Step 1: Prerequisites check"
+# ("stop and tell the user that Slack MCP authentication is required") and "Step 5" (the report
+# counts only exist after a run).
+# Can fail: a reply that offers to proceed without Slack, or claims counts such as
+# "Canvases checked: 3", fails the matching grader; skill_fired fails if the description stops
+# matching "run the weekly sync".
+schema_version: "1.1"
+name: sync-stops-without-slack-tool
+description: >
+  Asked to run the weekly sync in a session with no Slack tool, the model invokes sync and stops,
+  saying Slack MCP authentication is required, without reporting a completed sync.
+  expected_outcome: PASS when the skill fires, the reply names Slack MCP and authentication and
+  no sync counts are claimed; FAIL otherwise.
+tags: [second-brain, sync, trigger, quick]
+
+execution:
+  prompt: |
+    SECOND_BRAIN_VAULT_PATH is set to /vault. Run the weekly sync of my vault
+    from its Slack canvases.
+
+    Don't call any tools other than skills. If you cannot proceed, say why in
+    at most 3 sentences.
+  max_turns: 6
+  allowed_tools:
+    - Skill
+
+graders:
+  # Steps. Indicator in a two-arm run, scored only with the plugin.
+  - name: skill_fired
+    type: tool_used
+    tool: Skill
+    input_match: '"skill"\s*:\s*"(?:[\w-]+:)?sync"'
+    min: 1
+    arm: with-only
+
+  # Result.
+  - name: names_slack_mcp_auth
+    type: regex
+    target: last_message
+    pattern: 'Slack MCP[\s\S]*authenticat|authenticat[\s\S]*Slack MCP'
+    flags: i
+    match: contains
+
+  - name: no_report_claimed
+    type: regex
+    target: last_message
+    pattern: 'Canvases checked:\s*\d|Notes updated:\s*\d'
+    match: not_contains

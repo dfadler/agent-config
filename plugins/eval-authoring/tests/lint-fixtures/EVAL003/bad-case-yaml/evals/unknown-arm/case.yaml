@@ -1,0 +1,8 @@
+schema_version: "1.1"
+name: unknown-arm
+execution:
+  prompt: Do the thing.
+graders:
+  - type: regex
+    pattern: done
+    arm: without

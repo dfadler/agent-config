@@ -1,0 +1,7 @@
+# Per-case --allow-tools grants (format: plugins/eval-authoring/docs/grants-format.md).
+# Write lets the run create the two files the vite-plugin-reviewer agent reads. Not yet
+# confirmed in a logged-in run.
+schema_version: "1"
+grants:
+  reviewer-agent-flags-planted-defects:
+    - "Write"

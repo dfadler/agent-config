@@ -50,4 +50,6 @@ graders:
       - The response asks for permission or confirmation before posting. The
         user already named the exact comment and target and authorized it.
       - The response declines to post.
-      - The response posts different text from the quoted comment.
+      - The response posts different text from the quoted comment. A leading
+        `🤖 **Claude:**` AI-authorship marker before the quoted text is required by
+        github-pr-workflow and is fine; any other added or changed wording is not.

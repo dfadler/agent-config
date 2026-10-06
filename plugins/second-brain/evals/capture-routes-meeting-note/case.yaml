@@ -1,0 +1,85 @@
+# Run (one case at a time, #536/#538): claude plugin eval plugins/second-brain --case capture-routes-meeting-note --trust-plugin --no-publish
+# Shared run/grant facts: docs/contributing.md, "Plugin evals". No grant needed (Skill only).
+# Why a reply and no mocks: the skills call `mcp__obsidian__*` tools, but the plugin declares no
+# MCP server (no .mcp.json, no plugin.json `mcpServers`), and mocks apply only to a server named
+# in the plugin's MCP configuration (plugin-evals docs, "Mock MCP servers"; EVAL013). So no
+# Obsidian tool exists in an eval run and the prompt says so; the case grades the note the
+# model would write. The vault path comes from `SECOND_BRAIN_VAULT_PATH`, which an eval run
+# cannot set, so the prompt states it.
+# Should-fire half of the capture boundary (near-miss: capture-stays-quiet-on-shell-tee).
+# Only the skill knows the vault layout (`40 Meetings/YYYY-MM-DD Title.md`), the `attendees:`
+# frontmatter key, the `## Decisions` and `## Action Items` headings and the wikilink step.
+# Sabotage map: grader names quote "Step 2: Classify the content" (`40 Meetings/...`),
+# "Frontmatter" (`attendees: [Name1, Name2]`), "Content" (`## Decisions`, `## Action Items`)
+# and "Step 5: Cross-link".
+# Can fail: a path outside `40 Meetings/` or without the date prefix, no `attendees:`, missing
+# headings or no `[[wikilink]]` scores 0 on that grader; skill_fired fails if the description
+# stops matching a "save these meeting notes" request.
+schema_version: "1.1"
+name: capture-routes-meeting-note
+description: >
+  Asked to save meeting notes with the vault path stated, the model invokes capture and writes
+  a note at 40 Meetings/<meeting date> <title>.md with date and attendees frontmatter, Decisions
+  and Action Items headings and wikilinks to the people. expected_outcome: PASS when the skill
+  fires and the path, frontmatter, headings and wikilink checks all hold; FAIL otherwise.
+tags: [second-brain, capture, trigger, quick]
+
+execution:
+  prompt: |
+    SECOND_BRAIN_VAULT_PATH is set to /vault. Save these meeting notes to my
+    second brain. Today is 2026-10-05; the meeting was on 2026-10-02 and was
+    called "Search Relaunch Sync".
+
+    Attendees: Priya Raman, Tom Beck. We decided to ship the new search
+    behind a flag on 10 Nov. Priya will write the rollout plan by 16 Oct.
+
+    Don't call any tools other than skills (the vault is not connected here). Reply with the
+    vault-relative path of the note on the first line, then the full note in
+    one markdown code block, and nothing else.
+  max_turns: 6
+  allowed_tools:
+    - Skill
+
+graders:
+  # Steps. Indicator in a two-arm run, scored only with the plugin.
+  - name: skill_fired
+    type: tool_used
+    tool: Skill
+    input_match: '"skill"\s*:\s*"(?:[\w-]+:)?capture"'
+    min: 1
+    arm: with-only
+
+  # Result: vault conventions only the skill supplies.
+  - name: meetings_path
+    type: regex
+    target: last_message
+    pattern: '^`?(?:/vault/)?40 Meetings/2026-10-02 Search Relaunch Sync\.md`?\s*$'
+    flags: m
+    match: contains
+
+  - name: meeting_date_frontmatter
+    type: regex
+    target: last_message
+    pattern: '^date:\s*2026-10-02\s*$'
+    flags: m
+    match: contains
+
+  - name: attendees_frontmatter
+    type: regex
+    target: last_message
+    pattern: '^attendees:\s*\[[^\]]*Priya Raman[^\]]*\]'
+    flags: m
+    match: contains
+
+  - name: decisions_and_actions_headings
+    type: regex
+    target: last_message
+    pattern: '^(?=[\s\S]*^## Decisions\s*$)[\s\S]*^## Action Items\s*$'
+    flags: m
+    match: contains
+
+  - name: wikilinks_people
+    type: regex
+    target: last_message
+    pattern: '\[\[(?:Priya Raman|Tom Beck)\]\]'
+    match: contains
