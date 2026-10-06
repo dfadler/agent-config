@@ -13,7 +13,8 @@ import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
 import { afterAll as after, test } from "vitest";
 import { FakeCanvas } from "./fake-canvas.ts";
-import { normalizeSections } from "./normalize.ts";
+import { emptyManifest, snapshotFile } from "./manifest.ts";
+import { normalizeLocal, normalizeSections } from "./normalize.ts";
 import {
   STATE_DIR,
   SyncError,
@@ -29,6 +30,7 @@ import {
   readFingerprint,
   recordStep,
   retirePath,
+  saveManifest,
   scan,
   trackedInGit,
   type PlanResult,
@@ -71,8 +73,8 @@ interface PushOutcome {
 }
 
 /** Drive one push the way the skill does: plan, apply to the canvas, record. */
-function push(root: string, rel: string, canvas: FakeCanvas | null): PushOutcome {
-  const plan = planPush(root, rel, canvas === null ? null : canvas.readResult());
+function push(root: string, rel: string, canvas: FakeCanvas | null, id = "FTEST000001"): PushOutcome {
+  const plan = planPush(root, rel, canvas === null ? null : canvas.readResult(id));
   if (plan.blocked !== null) return { plan, canvas, record: null };
   let target = canvas;
   if (plan.create !== null) {
@@ -81,7 +83,7 @@ function push(root: string, rel: string, canvas: FakeCanvas | null): PushOutcome
     for (const batch of plan.batches) target?.applyUpdate(batch);
   }
   assert.ok(target);
-  return { plan, canvas: target, record: recordStep(root, rel, target.readResult(), "push", NOW) };
+  return { plan, canvas: target, record: recordStep(root, rel, target.readResult(id), "push", NOW) };
 }
 
 const NOTE = "# Note\n\nfirst paragraph\n\n- a\n- b\n\nlast paragraph\n";
@@ -376,6 +378,35 @@ test("a canvas tracked under another file is refused", () => {
   const read = { ...canvas.readResult(), canvas_id: "FOTHER" };
   assert.throws(() => planPush(root, "a.md", read), /different canvas/);
   assert.throws(() => pullStep(root, "a.md", read, true, NOW), /different canvas/);
+  assert.throws(() => recordStep(root, "a.md", read, "push", NOW), /different canvas/);
+});
+
+test("recording a read of another file's canvas never binds the file to it", () => {
+  // a.md and b.md have identical bodies, so a read of a's canvas would plan
+  // clean for b and, unchecked, be recorded as b's.
+  const root = makeRoot({ "a.md": NOTE, "b.md": NOTE });
+  const manifest = emptyManifest();
+  const sections = normalizeLocal(NOTE).sections;
+  manifest.files["a.md"] = snapshotFile({ canvasId: "FAAAA", title: "Note", sections, now: NOW });
+  manifest.files["b.md"] = snapshotFile({ canvasId: "FBBBB", title: "Note", sections, now: NOW });
+  saveManifest(root, manifest);
+  const before = readFile(root, `${STATE_DIR}/manifest.json`);
+
+  const readOfA = new FakeCanvas("Note", sections).readResult("FAAAA");
+  assert.throws(() => recordStep(root, "b.md", readOfA, "push", NOW), /different canvas/);
+  assert.equal(readFile(root, `${STATE_DIR}/manifest.json`), before);
+});
+
+test("an untracked file may not claim a canvas another file already tracks", () => {
+  const root = makeRoot({ "a.md": NOTE });
+  const { canvas } = push(root, "a.md", null);
+  assert.ok(canvas);
+  writeFile(root, "b.md", NOTE);
+  const read = canvas.readResult();
+  assert.throws(() => planPush(root, "b.md", read), /already tracked by a\.md/);
+  assert.throws(() => pullStep(root, "b.md", read, true, NOW), /already tracked by a\.md/);
+  assert.throws(() => recordStep(root, "b.md", read, "push", NOW), /already tracked by a\.md/);
+  assert.equal(loadManifest(root).files["b.md"], undefined);
 });
 
 test("a tracked file needs its current read to be planned", () => {
@@ -399,7 +430,7 @@ test("a canvas created from a scratch-titled file is flagged for deletion up fro
     "real.md": "# Real\n\nbody\n",
   });
   const first = push(root, "scratch.md", null);
-  push(root, "real.md", null);
+  push(root, "real.md", null, "FREAL000001");
   assert.equal(first.record?.recorded, true);
 
   const pending = pendingList(root).pending;

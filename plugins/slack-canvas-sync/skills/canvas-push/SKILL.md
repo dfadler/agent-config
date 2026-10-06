@@ -85,8 +85,11 @@ pass 1 has been applied and recorded (re-run `scan`), never from a prediction.
 For a **new** file:
 
 ```bash
-CANVAS plan-push --root "$ROOT" --path "$REL"
+CANVAS plan-push --root "$ROOT" --path "$REL" < /dev/null
 ```
+
+(`plan-push` reads stdin to get the canvas read, so for a file with no canvas yet
+give it an empty one with `< /dev/null`; otherwise it can wait on an open pipe.)
 
 For a **tracked** file, call `slack_read_canvas` with its `canvas_id`, save the
 tool's result **verbatim** to a temporary file (a quoted heredoc, `<<'JSON'`, in

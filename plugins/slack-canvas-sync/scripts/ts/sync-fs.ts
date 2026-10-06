@@ -310,6 +310,26 @@ export function retirePath(
 
 // --- plan ---
 
+/**
+ * Refuse a canvas read that does not belong to `rel`. A tracked file only
+ * accepts the canvas it is bound to; an untracked file may not claim a canvas
+ * another file already tracks. Without this a read of the wrong canvas can bind
+ * a file to someone else's canvas, and later pushes would overwrite it.
+ */
+function assertCanvasIdentity(manifest: Manifest, rel: string, canvasId: string): void {
+  const base = manifest.files[rel];
+  if (base !== undefined) {
+    if (base.canvas_id !== canvasId) {
+      throw new SyncError(`${rel} is tracked as a different canvas than the one read`);
+    }
+    return;
+  }
+  const holder = Object.entries(manifest.files).find(([, entry]) => entry.canvas_id === canvasId);
+  if (holder !== undefined) {
+    throw new SyncError(`that canvas is already tracked by ${holder[0]}, not ${rel}`);
+  }
+}
+
 export interface ChunkCounts {
   same: number;
   push: number;
@@ -417,9 +437,7 @@ export function planPush(root: string, rel: string, read: unknown): PlanResult {
   }
 
   const remote = parseRemoteRead(read);
-  if (base !== null && base.canvas_id !== remote.canvasId) {
-    throw new SyncError(`${rel} is tracked as a different canvas than the one read`);
-  }
+  assertCanvasIdentity(manifest, rel, remote.canvasId);
   const plan = planFile(base, local, remote.content);
   const applied = applyPlan(plan, local, remote.content);
   const conflicted = applied.conflicts.length > 0 || applied.titleConflict !== null;
@@ -484,6 +502,7 @@ export function recordStep(
   const manifest = loadManifest(root);
   const base = manifest.files[rel] ?? null;
   const remote = parseRemoteRead(read);
+  assertCanvasIdentity(manifest, rel, remote.canvasId);
   const plan = planFile(base, local, remote.content);
   const remaining = countChunks(plan);
   const leftover = after === "push" ? remaining.push : remaining.pull;
@@ -565,9 +584,7 @@ export function pullStep(
   const remote = parseRemoteRead(read);
   const manifest = loadManifest(root);
   const base = manifest.files[rel] ?? null;
-  if (base !== null && base.canvas_id !== remote.canvasId) {
-    throw new SyncError(`${rel} is tracked as a different canvas than the one read`);
-  }
+  assertCanvasIdentity(manifest, rel, remote.canvasId);
   const file = absPath(root, rel);
 
   if (!existsSync(file)) {
