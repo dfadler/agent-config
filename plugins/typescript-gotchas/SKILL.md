@@ -2,10 +2,12 @@
 name: typescript-gotchas
 description: |
   TypeScript/JS gotchas: subtle patterns that compile but cause runtime bugs or
-  are better expressed with a safer/clearer API. Use when writing or editing
-  TypeScript or JavaScript source files (`.ts`/`.tsx`/`.js`/`.jsx`) that are
-  NOT test files (i.e. not `*.test.*`, `*.spec.*`, or files under `__tests__/`
-  directories). Triggers on array access, string indexing, or any time you
+  are better expressed with a safer/clearer API. Use when writing, editing,
+  refactoring, or rewriting TypeScript or JavaScript source files
+  (`.ts`/`.tsx`/`.js`/`.jsx`) that are NOT test files (i.e. not `*.test.*`,
+  `*.spec.*`, or files under `__tests__/` directories), including code pasted
+  into the chat or a task such as removing a utility library like lodash.
+  Triggers on array access, string indexing, or any time you
   would write `[i]` to read from an array or string.
 metadata:
   version: "1.0.0"

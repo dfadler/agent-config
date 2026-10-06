@@ -1,0 +1,57 @@
+# Run: claude plugin eval plugins/gha-ci-audit --case audit-fires-on-slow-ci
+# Shared run/grant facts: docs/contributing.md, "Plugin evals". No grant needed (Skill only),
+# so the run has no Bash, no network and never reaches GitHub. That is why this case asks for
+# the plan and not the audit: the audit itself needs live `gh api` data (see docs/contributing.md,
+# "Layout", for why the end-to-end audits stay in evals/evals.json).
+# Should-fire half of the gha-ci-audit boundary; the should-not-fire half is
+# audit-stays-quiet-on-workflow-authoring. Every grader is free, so the case is tagged quick.
+# Can fail: skill_fired fails if the description stops matching a plain "CI is slow" prompt.
+# Without the skill a generic plan names `gh run list` or the Actions UI, not the skill's
+# bundled scripts, so bundled_scripts_named scores 0. Skill phrases checked: "Bundled analysis
+# scripts" (analyze_runs.py, analyze_jobs.py, find_p50_run.py, fetch_workflow_stats.sh),
+# Step 5 "billable minutes". The prompt says "money", not "billable minutes", so the reply has
+# to introduce that term. Unverified: whether a no-plugin reply says it by habit; if it does,
+# names_billable_minutes is a weak signal and the first run should show it.
+schema_version: "1.1"
+name: audit-fires-on-slow-ci
+description: >
+  Asked, without naming the skill, why GitHub Actions CI feels slow and expensive in a named
+  repo, the model invokes gha-ci-audit and lays out a plan that uses its bundled analysis
+  scripts and billable-minute accounting. expected_outcome: PASS when the skill is invoked and
+  the reply names a bundled script; FAIL when the skill is not invoked or the reply names none.
+tags: [gha-ci-audit, trigger, quick]
+
+execution:
+  prompt: |
+    Our GitHub Actions CI feels slow and expensive. I'm in the acme/webapp repo. Before
+    running anything, tell me how you would find out what is on the critical path and
+    where the money goes, including the exact scripts or commands you would use.
+    Answer in your reply; don't create files or run commands.
+  max_turns: 6
+  allowed_tools:
+    - Skill
+
+graders:
+  # Steps: the skill fired on a prompt that never names it. An indicator in a two-arm run.
+  - name: skill_fired
+    type: tool_used
+    tool: Skill
+    input_match: '"skill"\s*:\s*"(?:[\w-]+:)?gha-ci-audit"'
+    min: 1
+    arm: with-only
+
+  # Result: the skill's own script names, which a generic plan has no reason to produce.
+  - name: bundled_scripts_named
+    type: regex
+    target: last_message
+    pattern: 'analyze_jobs\.py|analyze_runs\.py|find_p50_run\.py|fetch_workflow_stats\.sh'
+    match: contains
+
+  # Result: Step 5 separates wall-clock time from billable job-minutes.
+  - name: names_billable_minutes
+    type: regex
+    target: last_message
+    pattern: 'billable\s+(?:job[- ])?minutes|job-minutes'
+    flags: i
+    match: contains
+    weight: 0.5

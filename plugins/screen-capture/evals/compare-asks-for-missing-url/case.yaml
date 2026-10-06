@@ -1,0 +1,65 @@
+# Run (one case at a time, #536/#538): claude plugin eval plugins/screen-capture --case compare-asks-for-missing-url --trust-plugin --no-publish
+# Shared run/grant facts: docs/contributing.md, "Plugin evals". No grant needed (Skill only).
+# Should-fire half of the compare boundary, on its fail-closed path: config names only one of
+# the two URLs, so compare must treat it as ambiguous and ask, not guess a port.
+# Why this path: the model cannot know the config key `compare_base_url` or the
+# `--before`/`--after` override without the skill, so both regexes are skill-specific; a
+# generic answer says "start a second dev server" or guesses a port.
+# Sabotage map: resolves_missing_key and names_override check "Resolving the two URLs" ("only
+# one of `base_url` / `compare_base_url` is set", "requiring explicit `--before`/`--after`").
+# Can fail: a reply that guesses the second URL or omits the key name and override scores 0 on
+# that grader; skill_fired fails if the description stops matching a before/after request.
+schema_version: "1.1"
+name: compare-asks-for-missing-url
+description: >
+  With only base_url configured and no --before/--after, the model invokes compare and says it
+  needs compare_base_url in settings.json or an explicit --before/--after pair instead of
+  guessing a URL. expected_outcome: PASS when the skill fires and the reply names
+  compare_base_url and the --before and --after flags; FAIL otherwise.
+tags: [screen-capture, compare, trigger, quick]
+
+execution:
+  prompt: |
+    Make a before/after comparison for PR 12 of acme/shop so reviewers can
+    see my header change. My .claude/settings.json has:
+    {"screenCapture": {"base_url": "http://localhost:5173"}}
+    Nothing else is configured and no URLs were passed to you.
+
+    Do the first step now. Reply with at most 5 sentences: what you need from
+    me, and the exact setting or command-line flags I can use to give it to
+    you.
+  max_turns: 6
+  allowed_tools:
+    - Skill
+
+graders:
+  # Steps. Indicator in a two-arm run, scored only with the plugin.
+  - name: skill_fired
+    type: tool_used
+    tool: Skill
+    input_match: '"skill"\s*:\s*"(?:[\w-]+:)?compare"'
+    min: 1
+    arm: with-only
+
+  # Result.
+  - name: names_missing_key
+    type: regex
+    target: last_message
+    pattern: 'compare_base_url'
+    match: contains
+
+  - name: names_override
+    type: regex
+    target: last_message
+    pattern: '--before[\s\S]*--after|--after[\s\S]*--before'
+    match: contains
+
+  # Fail closed: the reply must not adopt an unconfigured URL. Naming one as an example value
+  # ("or your actual URL") is fine; "I'll use ..." / "assuming ..." is not.
+  - name: does_not_guess_second_url
+    type: regex
+    target: last_message
+    pattern: '(?:\bI(?:''ll| will)\b|\bI.m going to\b|\bassum\w+|\bdefault\w* to\b)[^\n]{0,80}(?:localhost|127\.0\.0\.1):(?!5173\b)\d+'
+    flags: i
+    match: not_contains
+    arm: both

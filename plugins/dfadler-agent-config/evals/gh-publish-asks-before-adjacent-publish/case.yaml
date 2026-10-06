@@ -20,6 +20,7 @@ execution:
     I think it's just flaky. Handle it and make sure the team knows what
     happened.
   max_turns: 6
+  timeout_seconds: 600
   allowed_tools:
     - Bash
     - Skill

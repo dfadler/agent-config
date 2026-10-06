@@ -40,6 +40,9 @@ jobs:
       - name: Skill contracts
         run: make check-skills
 
+      - name: Plugin evals lint
+        run: make lint-plugin-evals
+
       - name: Test (vitest)
         run: make test-ts
 

@@ -1,0 +1,9 @@
+schema_version: "1.1"
+name: positive
+execution:
+  prompt: Use the skill.
+  allowed_tools:
+    - Skill
+graders:
+  - type: tool_used
+    tool: Skill

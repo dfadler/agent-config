@@ -1,0 +1,71 @@
+# Run: node plugins/eval-authoring/scripts/ts/run-evals/run-evals.ts --tier quick plugins/vite
+# Shared run/grant facts: docs/contributing.md, "Plugin evals". No grant needed (Skill only).
+# Should-fire half of the scaffold boundary; the should-not-fire half is
+# scaffold-stays-quiet-on-proxy-config. Every grader is free, so the case is tagged quick.
+# Can fail: without the skill the model has no reason to use the `\0` virtual-id prefix, the
+# `src/vite/plugins/` placement or a `: Plugin` factory return type, so those three regexes
+# score 0 on a generic answer; skill_fired fails if the description stops matching.
+# Skill phrases checked: "Virtual modules" (the `\0` prefix), "File placement"
+# (`<project>/src/vite/plugins/<plugin-name>.ts`), "Return type" (`Plugin`).
+schema_version: "1.1"
+name: scaffold-fires-on-new-plugin
+description: >
+  Asked for a new Vite plugin that serves a virtual module, without naming the skill, the
+  model invokes scaffold and answers with a factory function typed Plugin, a \0-prefixed
+  virtual module id, and the project-local file path src/vite/plugins/. expected_outcome:
+  PASS when the skill is invoked and all three result checks hold; FAIL when the skill is
+  not invoked or the reply lacks the \0 prefix, the Plugin return type or the placement.
+tags: [vite, scaffold, trigger, quick]
+
+execution:
+  prompt: |
+    I want app code in my Vite project to be able to write
+    `import hash from 'virtual:git-hash'` and get the current git commit hash.
+    The plugin is only used inside this one project, never published. Write the
+    plugin and tell me which file it goes in. Show the code in your reply; don't
+    create files or run commands.
+  max_turns: 6
+  allowed_tools:
+    - Skill
+
+graders:
+  # Steps: the skill fired on a prompt that never names it.
+  - name: skill_fired
+    type: tool_used
+    tool: Skill
+    input_match: '"skill"\s*:\s*"(?:[\w-]+:)?scaffold"'
+    min: 1
+    arm: with-only
+
+  # Result: three conventions only the skill teaches.
+  - name: nul_prefixed_virtual_id
+    type: regex
+    target: last_message
+    pattern: '\\0|\\x00|\\u0000'
+    match: contains
+
+  - name: factory_with_plugin_return_type
+    type: regex
+    target: last_message
+    pattern: '\)\s*:\s*(?:Plugin|PluginOption|VitePlugin)\b'
+    match: contains
+
+  # Behavior: the plugin must resolve and load the virtual module, and read a git hash.
+  - name: serves_virtual_module
+    type: regex
+    target: last_message
+    pattern: '^(?=[\s\S]*resolveId)[\s\S]*\bload\b\s*[(:]'
+    match: contains
+
+  - name: reads_git_hash
+    type: regex
+    target: last_message
+    pattern: 'rev-parse|git\s+log|git\s+show'
+    match: contains
+    weight: 0.5
+
+  - name: project_local_placement
+    type: regex
+    target: last_message
+    pattern: 'src/vite/plugins/'
+    match: contains

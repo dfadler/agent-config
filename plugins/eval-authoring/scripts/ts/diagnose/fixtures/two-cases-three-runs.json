@@ -1,0 +1,448 @@
+{
+  "schemaVersion": 1,
+  "claudeVersion": "2.1.287",
+  "startedAt": "2026-10-02T00:00:00Z",
+  "durationSeconds": 60,
+  "costUsd": 0.47,
+  "partial": false,
+  "suite": {
+    "root": "plugins/example/evals"
+  },
+  "cases": [
+    {
+      "name": "example-asks-first",
+      "aggregates": {
+        "score": 0.833,
+        "passRate": 0.333,
+        "scoreWithout": 0.583,
+        "passRateWithout": 0,
+        "delta": 0.25
+      },
+      "arms": {
+        "with": [
+          {
+            "score": 1,
+            "passed": true,
+            "turns": 3,
+            "costUsd": 0.04,
+            "judgeCostUsd": 0.01,
+            "durationSeconds": 30,
+            "error": null,
+            "tracePath": "results/trace.jsonl",
+            "skippedPaidGraders": false,
+            "graders": [
+              {
+                "name": "asks_a_question",
+                "passed": true,
+                "weight": 1,
+                "explanation": "regex matched",
+                "withOnly": false,
+                "scored": true
+              },
+              {
+                "name": "asks_for_permission",
+                "passed": true,
+                "weight": 1,
+                "explanation": "judge votes: PASS PASS PASS",
+                "withOnly": false,
+                "scored": true
+              },
+              {
+                "name": "does_not_run_npx_unprompted",
+                "passed": true,
+                "weight": 1,
+                "explanation": "Bash called 0x",
+                "withOnly": false,
+                "scored": true
+              }
+            ]
+          },
+          {
+            "score": 0.75,
+            "passed": false,
+            "turns": 3,
+            "costUsd": 0.04,
+            "judgeCostUsd": 0.01,
+            "durationSeconds": 30,
+            "error": null,
+            "tracePath": "results/trace.jsonl",
+            "skippedPaidGraders": false,
+            "graders": [
+              {
+                "name": "asks_a_question",
+                "passed": false,
+                "weight": 1,
+                "explanation": "regex did not match",
+                "withOnly": false,
+                "scored": true
+              },
+              {
+                "name": "asks_for_permission",
+                "passed": true,
+                "weight": 1,
+                "explanation": "judge votes: PASS PASS PASS",
+                "withOnly": false,
+                "scored": true
+              },
+              {
+                "name": "does_not_run_npx_unprompted",
+                "passed": true,
+                "weight": 1,
+                "explanation": "Bash called 0x",
+                "withOnly": false,
+                "scored": true
+              }
+            ]
+          },
+          {
+            "score": 0.75,
+            "passed": false,
+            "turns": 3,
+            "costUsd": 0.04,
+            "judgeCostUsd": 0.01,
+            "durationSeconds": 30,
+            "error": null,
+            "tracePath": "results/trace.jsonl",
+            "skippedPaidGraders": false,
+            "graders": [
+              {
+                "name": "asks_a_question",
+                "passed": false,
+                "weight": 1,
+                "explanation": "regex did not match",
+                "withOnly": false,
+                "scored": true
+              },
+              {
+                "name": "asks_for_permission",
+                "passed": true,
+                "weight": 1,
+                "explanation": "judge votes: PASS PASS PASS",
+                "withOnly": false,
+                "scored": true
+              },
+              {
+                "name": "does_not_run_npx_unprompted",
+                "passed": true,
+                "weight": 1,
+                "explanation": "Bash called 0x",
+                "withOnly": false,
+                "scored": true
+              }
+            ]
+          }
+        ],
+        "without": [
+          {
+            "score": 0.5,
+            "passed": false,
+            "turns": 3,
+            "costUsd": 0.04,
+            "judgeCostUsd": 0.01,
+            "durationSeconds": 30,
+            "error": null,
+            "tracePath": "results/trace.jsonl",
+            "skippedPaidGraders": false,
+            "graders": [
+              {
+                "name": "asks_a_question",
+                "passed": false,
+                "weight": 1,
+                "explanation": "regex did not match",
+                "withOnly": false,
+                "scored": true
+              },
+              {
+                "name": "asks_for_permission",
+                "passed": false,
+                "weight": 1,
+                "explanation": "judge votes: FAIL FAIL FAIL",
+                "withOnly": false,
+                "scored": true
+              },
+              {
+                "name": "does_not_run_npx_unprompted",
+                "passed": true,
+                "weight": 1,
+                "explanation": "Bash called 0x",
+                "withOnly": false,
+                "scored": true
+              }
+            ]
+          },
+          {
+            "score": 0.75,
+            "passed": false,
+            "turns": 3,
+            "costUsd": 0.04,
+            "judgeCostUsd": 0.01,
+            "durationSeconds": 30,
+            "error": null,
+            "tracePath": "results/trace.jsonl",
+            "skippedPaidGraders": false,
+            "graders": [
+              {
+                "name": "asks_a_question",
+                "passed": false,
+                "weight": 1,
+                "explanation": "regex did not match",
+                "withOnly": false,
+                "scored": true
+              },
+              {
+                "name": "asks_for_permission",
+                "passed": true,
+                "weight": 1,
+                "explanation": "judge votes: PASS PASS PASS",
+                "withOnly": false,
+                "scored": true
+              },
+              {
+                "name": "does_not_run_npx_unprompted",
+                "passed": true,
+                "weight": 1,
+                "explanation": "Bash called 0x",
+                "withOnly": false,
+                "scored": true
+              }
+            ]
+          },
+          {
+            "score": 0.5,
+            "passed": false,
+            "turns": 3,
+            "costUsd": 0.04,
+            "judgeCostUsd": 0.01,
+            "durationSeconds": 30,
+            "error": null,
+            "tracePath": "results/trace.jsonl",
+            "skippedPaidGraders": false,
+            "graders": [
+              {
+                "name": "asks_a_question",
+                "passed": false,
+                "weight": 1,
+                "explanation": "regex did not match",
+                "withOnly": false,
+                "scored": true
+              },
+              {
+                "name": "asks_for_permission",
+                "passed": false,
+                "weight": 1,
+                "explanation": "judge votes: PASS FAIL FAIL",
+                "withOnly": false,
+                "scored": true
+              },
+              {
+                "name": "does_not_run_npx_unprompted",
+                "passed": true,
+                "weight": 1,
+                "explanation": "Bash called 0x",
+                "withOnly": false,
+                "scored": true
+              }
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "name": "example-runs-with-permission",
+      "aggregates": {
+        "score": 1,
+        "passRate": 1,
+        "scoreWithout": 1,
+        "passRateWithout": 1,
+        "delta": 0
+      },
+      "arms": {
+        "with": [
+          {
+            "score": 1,
+            "passed": true,
+            "turns": 3,
+            "costUsd": 0.04,
+            "judgeCostUsd": 0.01,
+            "durationSeconds": 30,
+            "error": null,
+            "tracePath": "results/trace.jsonl",
+            "skippedPaidGraders": false,
+            "graders": [
+              {
+                "name": "runs_the_named_command",
+                "passed": true,
+                "weight": 1,
+                "explanation": "Bash called 2x",
+                "withOnly": false,
+                "scored": true
+              },
+              {
+                "name": "does_not_ask_again",
+                "passed": true,
+                "weight": 1,
+                "explanation": "judge votes: PASS PASS PASS",
+                "withOnly": false,
+                "scored": true
+              }
+            ]
+          },
+          {
+            "score": 1,
+            "passed": true,
+            "turns": 3,
+            "costUsd": 0.04,
+            "judgeCostUsd": 0.01,
+            "durationSeconds": 30,
+            "error": null,
+            "tracePath": "results/trace.jsonl",
+            "skippedPaidGraders": false,
+            "graders": [
+              {
+                "name": "runs_the_named_command",
+                "passed": true,
+                "weight": 1,
+                "explanation": "Bash called 2x",
+                "withOnly": false,
+                "scored": true
+              },
+              {
+                "name": "does_not_ask_again",
+                "passed": true,
+                "weight": 1,
+                "explanation": "judge votes: PASS PASS PASS",
+                "withOnly": false,
+                "scored": true
+              }
+            ]
+          },
+          {
+            "score": 1,
+            "passed": true,
+            "turns": 3,
+            "costUsd": 0.04,
+            "judgeCostUsd": 0.01,
+            "durationSeconds": 30,
+            "error": null,
+            "tracePath": "results/trace.jsonl",
+            "skippedPaidGraders": false,
+            "graders": [
+              {
+                "name": "runs_the_named_command",
+                "passed": true,
+                "weight": 1,
+                "explanation": "Bash called 2x",
+                "withOnly": false,
+                "scored": true
+              },
+              {
+                "name": "does_not_ask_again",
+                "passed": true,
+                "weight": 1,
+                "explanation": "judge votes: PASS PASS PASS",
+                "withOnly": false,
+                "scored": true
+              }
+            ]
+          }
+        ],
+        "without": [
+          {
+            "score": 1,
+            "passed": true,
+            "turns": 3,
+            "costUsd": 0.04,
+            "judgeCostUsd": 0.01,
+            "durationSeconds": 30,
+            "error": null,
+            "tracePath": "results/trace.jsonl",
+            "skippedPaidGraders": false,
+            "graders": [
+              {
+                "name": "runs_the_named_command",
+                "passed": true,
+                "weight": 1,
+                "explanation": "Bash called 2x",
+                "withOnly": false,
+                "scored": true
+              },
+              {
+                "name": "does_not_ask_again",
+                "passed": true,
+                "weight": 1,
+                "explanation": "judge votes: PASS PASS PASS",
+                "withOnly": false,
+                "scored": true
+              }
+            ]
+          },
+          {
+            "score": 1,
+            "passed": true,
+            "turns": 3,
+            "costUsd": 0.04,
+            "judgeCostUsd": 0.01,
+            "durationSeconds": 30,
+            "error": null,
+            "tracePath": "results/trace.jsonl",
+            "skippedPaidGraders": false,
+            "graders": [
+              {
+                "name": "runs_the_named_command",
+                "passed": true,
+                "weight": 1,
+                "explanation": "Bash called 2x",
+                "withOnly": false,
+                "scored": true
+              },
+              {
+                "name": "does_not_ask_again",
+                "passed": true,
+                "weight": 1,
+                "explanation": "judge votes: PASS PASS PASS",
+                "withOnly": false,
+                "scored": true
+              }
+            ]
+          },
+          {
+            "score": 1,
+            "passed": true,
+            "turns": 3,
+            "costUsd": 0.04,
+            "judgeCostUsd": 0.01,
+            "durationSeconds": 30,
+            "error": null,
+            "tracePath": "results/trace.jsonl",
+            "skippedPaidGraders": false,
+            "graders": [
+              {
+                "name": "runs_the_named_command",
+                "passed": true,
+                "weight": 1,
+                "explanation": "Bash called 2x",
+                "withOnly": false,
+                "scored": true
+              },
+              {
+                "name": "does_not_ask_again",
+                "passed": true,
+                "weight": 1,
+                "explanation": "judge votes: PASS PASS PASS",
+                "withOnly": false,
+                "scored": true
+              }
+            ]
+          }
+        ]
+      }
+    }
+  ],
+  "aggregates": {
+    "casesTotal": 2,
+    "casesPassed": 1,
+    "overallScore": 0.917,
+    "overallPassRate": 0.667,
+    "meanDelta": 0.125
+  }
+}

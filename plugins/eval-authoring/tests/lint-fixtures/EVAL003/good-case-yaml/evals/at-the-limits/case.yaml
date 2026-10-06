@@ -1,0 +1,14 @@
+schema_version: "1.1"
+name: at-the-limits
+runs: 1
+execution:
+  prompt: Do the thing.
+  max_turns: 200
+  timeout_seconds: 3600
+  env:
+    EVAL_MODE: fast
+graders:
+  - type: regex
+    pattern: done
+    weight: 0.5
+    arm: with-only

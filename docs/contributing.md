@@ -189,7 +189,19 @@ only its own run command and why its graders are shaped as they are.
   first), so a grader that needs one can never pass and a `max: 0` check on it can never
   fail ([#442](https://github.com/dfadler/agent-config/issues/442)). A case that needs a
   grant records its exact command in its header; a case without one needs only `Skill`.
-  Add `--ablation with-without` where the header says to.
+  Add `--ablation with-without` where the header says to. Record the grant in
+  `plugins/<name>/evals/grants.yaml` too (format: `plugins/eval-authoring/docs/grants-format.md`);
+  `make lint-plugin-evals` runs the eval-authoring lint over every plugin and CI fails on an
+  error finding such as EVAL004, so a case with `Bash` in `allowed_tools` and no recorded grant
+  does not merge.
+- **Adding a lint rule.** The lint is `plugins/eval-authoring/scripts/ts/lint/`; a rule is
+  one file in `rules/` plus good and bad fixtures under `tests/lint-fixtures/`, found by
+  auto-discovery with no registry to edit. Steps, the `Rule` interface and the sabotage
+  check are in `plugins/eval-authoring/docs/lint-rules.md`; don't copy them here.
+  `node plugins/eval-authoring/scripts/ts/lint/cli.ts --list-rules` prints the current set.
+- **Repo evals in CI.** `make lint-plugin-evals` (part of `make check`, run by the
+  TypeScript workflow) lints every plugin's `evals/` for free. It never runs a paid
+  eval; those are run by hand with the `run-evals` wrapper.
 - **Grader shape.** Prefer free `regex` graders where a literal string is reliable and
   keep an `llm` grader only for a judgment a regex cannot make; rationale in
   [#411](https://github.com/dfadler/agent-config/issues/411).
@@ -202,8 +214,17 @@ only its own run command and why its graders are shaped as they are.
   phrase in the skill when you write it.
 - **Layout.** `fetch-execute-guide` keeps its plugin wrapper (with `SKILL.md` at the
   plugin root) because bare skills have no eval path.
+- **gha-ci-audit: two formats on purpose
+  ([#412](https://github.com/dfadler/agent-config/issues/412)).**
   `plugins/gha-ci-audit/evals/evals.json` is the separate skill-creator format, which
-  `claude plugin eval` does not read.
+  `claude plugin eval` does not read. It drives the plugin's own orchestrator, which runs the
+  audit against live GitHub data (`gh api`) and grades the published report; a plugin eval
+  cannot do that hermetically (no network, and `Bash` is withheld without a recorded grant).
+  So the legacy file stays for end-to-end audits, and `evals/<case>/case.yaml` covers only
+  what a Skill-only run can check: the trigger boundary (`audit-fires-on-slow-ci`,
+  `audit-stays-quiet-on-workflow-authoring`, `audit-stays-quiet-on-failed-run`). Revisit if `claude plugin eval` gains a way
+  to mock `gh` without `--scaffold`, or if a recorded-fixture mode is added to the collector
+  so a case can feed the scripts canned `runs.json` and `jobs.json`.
 
 ## GitHub operations
 

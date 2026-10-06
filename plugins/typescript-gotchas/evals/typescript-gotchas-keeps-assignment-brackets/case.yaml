@@ -1,0 +1,51 @@
+# Run: node plugins/eval-authoring/scripts/ts/run-evals/run-evals.ts --tier quick plugins/typescript-gotchas
+# Boundary case inside the skill's scope: non-test TypeScript that writes to the last
+# element. The skill lists "Assignment" under "What is NOT flagged" because `.at()` is
+# read-only. The model must not write `.at(-1) = value`, which is a syntax error.
+# Sabotage map: no_at_assignment checks that "Assignment" exception; remove it and a run
+# that applies the rule blindly may write `arr.at(-1) = v` and fail.
+# Can fail: `.at(-1) = v` fails no_at_assignment; a reply with neither a bracket
+# assignment nor `splice(-1` fails replaces_in_place. A regression guard against
+# over-application, so a no-plugin arm passes it by default and shows no delta.
+schema_version: "1.1"
+name: typescript-gotchas-keeps-assignment-brackets
+description: >
+  When asked for a TypeScript helper that overwrites the last element of an array
+  in place, the model must not assign through `.at()`. expected_outcome: PASS when
+  the reply assigns by bracket (`arr[arr.length - 1] = v`) or `splice(-1, ...)` and
+  never writes `.at(-1) =`; FAIL otherwise.
+tags: [typescript-gotchas, boundary, quick]
+
+execution:
+  prompt: |
+    In src/utils/stack.ts of my TypeScript project, write
+    `replaceTop(stack: number[], value: number): void`, which overwrites the
+    last element of the array in place (it is never empty). Reply with the
+    complete file in one code block and no other text.
+  max_turns: 6
+  allowed_tools:
+    - Skill
+
+graders:
+  # Steps. Indicator only: whether the skill fires here is not the property under test.
+  - name: skill_fired
+    type: tool_used
+    tool: Skill
+    input_match: '"skill"\s*:\s*"(?:[\w-]+:)?typescript-gotchas"'
+    min: 1
+    arm: with-only
+
+  # Result.
+  - name: no_at_assignment
+    type: regex
+    target: last_message
+    pattern: '\.at\([^)]*\)\s*=[^=]'
+    match: not_contains
+    arm: both
+
+  - name: replaces_in_place
+    type: regex
+    target: last_message
+    pattern: '\w\[\s*[\w.]+\.length\s*-\s*1\s*\]\s*=[^=]|splice\(\s*-1'
+    match: contains
+    arm: both

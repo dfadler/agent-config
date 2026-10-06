@@ -1,0 +1,8 @@
+# Per-case --allow-tools grants (format: plugins/eval-authoring/docs/grants-format.md).
+# Both patterns were confirmed to match as intended in a logged-in run (#450).
+schema_version: "1"
+grants:
+  fetch-execute-asks-first:
+    - "Bash(npx *)"
+  fetch-execute-runs-with-permission:
+    - "Bash(npx --yes cowsay@latest *)"

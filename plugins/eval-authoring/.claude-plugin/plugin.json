@@ -1,0 +1,12 @@
+{
+  "$schema": "https://json.schemastore.org/claude-code-plugin-manifest.json",
+  "name": "eval-authoring",
+  "version": "0.1.0",
+  "description": "Author, lint, run and diagnose `claude plugin eval` cases so each eval can fail, tells the plugin from no plugin, and gives a stable signal.",
+  "author": {
+    "name": "Dustin Fadler",
+    "url": "https://github.com/dfadler"
+  },
+  "homepage": "https://github.com/dfadler/agent-config",
+  "repository": "https://github.com/dfadler/agent-config"
+}
