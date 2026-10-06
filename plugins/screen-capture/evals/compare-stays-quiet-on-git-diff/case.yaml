@@ -18,8 +18,8 @@ tags: [screen-capture, compare, trigger, quick]
 execution:
   prompt: |
     I want to compare src/Header.tsx on main against my branch feature/header
-    and see which lines differ. What git command do I run? Reply with one
-    bash code block and no other text; don't run anything.
+    and see which lines differ. Do it now and reply with the one bash command
+    you ran, in a bash code block and no other text.
   max_turns: 6
   allowed_tools:
     - Skill

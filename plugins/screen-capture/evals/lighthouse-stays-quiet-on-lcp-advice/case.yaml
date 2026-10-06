@@ -20,8 +20,8 @@ tags: [screen-capture, lighthouse, trigger, quick]
 execution:
   prompt: |
     My Lighthouse report says mobile LCP is 4.8s and the LCP element is a large
-    hero image. What should I change? Answer in at most 3 bullets; don't run
-    anything.
+    hero image. Do it now: reply with the at most 3 changes you would make, as
+    bullets.
   max_turns: 6
   allowed_tools:
     - Skill

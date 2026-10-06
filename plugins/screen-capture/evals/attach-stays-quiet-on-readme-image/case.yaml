@@ -18,8 +18,8 @@ tags: [screen-capture, attach, trigger, quick]
 
 execution:
   prompt: |
-    My README.md should show the image at docs/logo.png. What is the Markdown
-    line? Reply with that single line and nothing else; don't run anything.
+    My README.md should show the image at docs/logo.png. Do it now and reply
+    with the single Markdown line you added, nothing else.
   max_turns: 6
   allowed_tools:
     - Skill
