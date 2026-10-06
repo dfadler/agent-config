@@ -4,20 +4,19 @@
 # Should-fire case for a skill rule a no-plugin model has little reason to know: isolation is
 # decided at spawn time with `isolation: "worktree"`, not by the subagent calling EnterWorktree.
 # Most discriminating case of the suite. All free, quick.
-# Can fail: skill_fired fails if a subagent-isolation question does not match the description;
-# sets_isolation_worktree fails without `"isolation": "worktree"` in the arguments;
+# Can fail: # sets_isolation_worktree fails without `"isolation": "worktree"` in the arguments;
 # no_inner_worktree_call fails if the reply tells the subagent to call EnterWorktree or run
 # `git worktree add` itself. The prompt says "its own git worktree" but not how.
 # Skill phrase checked: "pass `isolation: \"worktree\"` on the `Agent`-tool call".
-# skill_fired is weighted 0.25: a 2026-10-05 measurement showed the skill rarely fires
-# on this reply-only prompt, yet the plugin's description still shapes the reply, so the
-# reply graders carry the case and skill_fired only records whether it was invoked.
+# No skill_fired grader: a 2026-10-05 measurement showed the skill rarely fires on this reply-only
+# prompt, yet the plugin's description still shapes the reply. The case measures that with the
+# with/without delta (run with --ablation with-without), not whether the skill was invoked.
 schema_version: "1.1"
 name: worktree-core-isolates-subagent-at-spawn
 description: >
-  Asked how to spawn a subagent into its own git worktree, the model invokes
-  git-worktree-usage and sets isolation to worktree on the Agent call instead of telling the
-  subagent to create one. expected_outcome: PASS when the skill is invoked and the arguments
+  Asked how to spawn a subagent into its own git worktree, the model
+  sets isolation to worktree on the Agent call instead of telling the
+  subagent to create one. expected_outcome: PASS when the arguments
   contain isolation worktree with no EnterWorktree or git worktree add; FAIL otherwise.
 tags: [worktree-core, trigger, quick]
 
@@ -32,14 +31,6 @@ execution:
     - Skill
 
 graders:
-  - name: skill_fired
-    type: tool_used
-    tool: Skill
-    input_match: '"skill"\s*:\s*"(?:[\w-]+:)?git-worktree-usage"'
-    min: 1
-    arm: with-only
-    weight: 0.25
-
   - name: sets_isolation_worktree
     type: regex
     target: last_message

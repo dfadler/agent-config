@@ -3,22 +3,21 @@
 # commands are written, never run, so no real repo is touched (hermetic).
 # Should-fire case for "catching a branch that already has an open PR up to a moved main".
 # All free, quick.
-# Can fail: skill_fired fails if the catch-up question does not match the description;
-# merges_main fails without a `git merge ... main` command; no_rebase fails on any `rebase`
+# Can fail: # merges_main fails without a `git merge ... main` command; no_rebase fails on any `rebase`
 # (a no-plugin model often answers `git rebase origin/main` or `git pull --rebase`). The
 # prompt states there is an open PR with review comments but never says "merge", so the
 # choice is not cued; a baseline that merges anyway passes, which lowers the delta.
 # Skill phrase checked: "catch it up to a moved `main` via merge, not rebase".
-# skill_fired is weighted 0.25: a 2026-10-05 measurement showed the skill rarely fires
-# on this reply-only prompt, yet the plugin's description still shapes the reply, so the
-# reply graders carry the case and skill_fired only records whether it was invoked.
+# No skill_fired grader: a 2026-10-05 measurement showed the skill rarely fires on this reply-only
+# prompt, yet the plugin's description still shapes the reply. The case measures that with the
+# with/without delta (run with --ablation with-without), not whether the skill was invoked.
 schema_version: "1.1"
 name: worktree-core-merges-open-pr-branch
 description: >
   Asked to bring a branch with an open, reviewed PR up to date with a moved main, the model
-  invokes git-worktree-usage and answers with git merge, not a rebase. expected_outcome: PASS
-  when the skill is invoked and the reply has a git merge of main and no rebase; FAIL when the
-  skill is not invoked, the merge is missing, or any rebase appears.
+  answers with git merge, not a rebase. expected_outcome: PASS
+  when the reply has a git merge of main and no rebase; FAIL when the merge is missing or any
+  rebase appears.
 tags: [worktree-core, trigger, quick]
 
 execution:
@@ -33,14 +32,6 @@ execution:
     - Skill
 
 graders:
-  - name: skill_fired
-    type: tool_used
-    tool: Skill
-    input_match: '"skill"\s*:\s*"(?:[\w-]+:)?git-worktree-usage"'
-    min: 1
-    arm: with-only
-    weight: 0.25
-
   - name: merges_main
     type: regex
     target: last_message

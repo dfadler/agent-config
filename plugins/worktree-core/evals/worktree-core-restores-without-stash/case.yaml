@@ -3,25 +3,23 @@
 # are written and never run (hermetic).
 # Should-fire case for the git stash collision hazard: a scoped "revert these files, then get
 # my edits back" need while another session shares the repo. All free, quick.
-# Can fail: skill_fired fails if the parallel-session stash question does not match the
-# description; uses_git_restore fails without `git restore ... --worktree`; no_stash fails on
+# Can fail: uses_git_restore fails without `git restore ... --worktree`; no_stash fails on
 # any `git stash` (the no-plugin default, since a stash is the usual way to set edits aside);
 # no_checkout_head fails on `git checkout HEAD` (the skill names it as the variant that also
 # resets the index); backs_up_with_copy (half weight) wants the filesystem-copy backup the
 # skill pairs with git restore. The prompt does not mention stash.
 # Skill phrases checked: "`git restore --source=HEAD --worktree -- <files>`", "plus a
 # filesystem copy as your own backup", "`git stash` is repo-wide, not per-worktree".
-# skill_fired is weighted 0.25: a 2026-10-05 measurement showed the skill rarely fires
-# on this reply-only prompt, yet the plugin's description still shapes the reply, so the
-# reply graders carry the case and skill_fired only records whether it was invoked.
+# No skill_fired grader: a 2026-10-05 measurement showed the skill rarely fires on this reply-only
+# prompt, yet the plugin's description still shapes the reply. The case measures that with the
+# with/without delta (run with --ablation with-without), not whether the skill was invoked.
 schema_version: "1.1"
 name: worktree-core-restores-without-stash
 description: >
   Asked how to temporarily revert two files to HEAD for a before screenshot and get the edits
-  back, while another Claude Code session shares the repo, the model invokes git-worktree-usage
-  and answers with git restore and a file copy, not git stash. expected_outcome: PASS when the
-  skill is invoked, the reply has git restore with --worktree and no git stash or git checkout
-  HEAD; FAIL otherwise.
+  back, while another Claude Code session shares the repo, the model
+  answers with git restore and a file copy, not git stash. expected_outcome: PASS when the
+  reply has git restore with --worktree and no git stash or git checkout HEAD; FAIL otherwise.
 tags: [worktree-core, trigger, quick]
 
 execution:
@@ -36,14 +34,6 @@ execution:
     - Skill
 
 graders:
-  - name: skill_fired
-    type: tool_used
-    tool: Skill
-    input_match: '"skill"\s*:\s*"(?:[\w-]+:)?git-worktree-usage"'
-    min: 1
-    arm: with-only
-    weight: 0.25
-
   - name: uses_git_restore
     type: regex
     target: last_message
@@ -62,10 +52,11 @@ graders:
     pattern: 'git\s+checkout\s+HEAD\b'
     match: not_contains
 
-  # Half weight: a copy backup is the skill's advice but a correct reply may restore from a patch.
+  # Half weight: a copy backup is the skill's advice. A `git diff > file` patch kept outside the
+  # index is the same idea (seen in correct replies), so both count.
   - name: backs_up_with_copy
     type: regex
     target: last_message
-    pattern: '(?:^|\n|&&|;)\s*cp\s+'
+    pattern: '(?:^|\n|&&|;)\s*cp\s+|git\s+diff\b[^\n]*>\s*\S'
     match: contains
     weight: 0.5

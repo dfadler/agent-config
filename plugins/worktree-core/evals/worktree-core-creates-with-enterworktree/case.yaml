@@ -7,21 +7,20 @@
 # off by default and do nothing in this run; they are not what these cases test.
 # Should-fire case for the skill's first rule; the near-misses are
 # worktree-core-stays-quiet-on-*. Every grader is free, so the case is tagged quick.
-# Can fail: skill_fired fails if "create a worktree" stops matching the description;
-# uses_enterworktree and no_raw_worktree_add fail when the reply gives `git worktree add`
+# Can fail: # uses_enterworktree and no_raw_worktree_add fail when the reply gives `git worktree add`
 # instead of the EnterWorktree tool, which is what a no-plugin model usually writes.
 # The prompt never names EnterWorktree, so the check is not cued.
 # Skill phrase checked: "Create worktrees with the `EnterWorktree` tool, never raw `git worktree add`".
-# skill_fired is weighted 0.25: a 2026-10-05 measurement showed the skill rarely fires
-# on this reply-only prompt, yet the plugin's description still shapes the reply, so the
-# reply graders carry the case and skill_fired only records whether it was invoked.
+# No skill_fired grader: a 2026-10-05 measurement showed the skill rarely fires on this reply-only
+# prompt, yet the plugin's description still shapes the reply. The case measures that with the
+# with/without delta (run with --ablation with-without), not whether the skill was invoked.
 schema_version: "1.1"
 name: worktree-core-creates-with-enterworktree
 description: >
-  Asked how to create an isolated worktree for a multi-file feature, the model invokes
-  git-worktree-usage and names the EnterWorktree tool, not raw git worktree add.
-  expected_outcome: PASS when the skill is invoked and the reply names EnterWorktree with no
-  git worktree add; FAIL when the skill is not invoked or the reply gives a raw git worktree
+  Asked how to create an isolated worktree for a multi-file feature, the model
+  names the EnterWorktree tool, not raw git worktree add.
+  expected_outcome: PASS when the reply names EnterWorktree with no
+  git worktree add; FAIL when the reply gives a raw git worktree
   command.
 tags: [worktree-core, trigger, quick]
 
@@ -36,14 +35,6 @@ execution:
     - Skill
 
 graders:
-  - name: skill_fired
-    type: tool_used
-    tool: Skill
-    input_match: '"skill"\s*:\s*"(?:[\w-]+:)?git-worktree-usage"'
-    min: 1
-    arm: with-only
-    weight: 0.25
-
   - name: uses_enterworktree
     type: regex
     target: last_message
