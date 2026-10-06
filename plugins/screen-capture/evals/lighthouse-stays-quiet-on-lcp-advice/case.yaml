@@ -1,0 +1,44 @@
+# Run (one case at a time, #536/#538): claude plugin eval plugins/screen-capture --case lighthouse-stays-quiet-on-lcp-advice --trust-plugin --no-publish
+# Shared run/grant facts: docs/contributing.md, "Plugin evals". No grant needed (Skill only).
+# Should-not-fire half of the lighthouse boundary: a prompt full of Lighthouse vocabulary
+# ("Lighthouse report", "LCP", "mobile") that wants advice on fixing a score, not a scripted CLI
+# pass stored in the vault.
+# Sabotage map: skill_not_invoked checks lighthouse's description ("Run a Lighthouse CLI pass
+# ... Use whenever a change needs a repeatable, scriptable ... check"); loosen it to "any
+# Lighthouse question" and a run should fail.
+# Can fail: any screen-capture skill invoked fails skill_not_invoked; a reply naming none of the
+# standard LCP image fixes fails answers_with_lcp_fix. Regression guard: a no-plugin arm passes
+# it, so no delta by design.
+schema_version: "1.1"
+name: lighthouse-stays-quiet-on-lcp-advice
+description: >
+  A question about improving a slow LCP from a hero image must not invoke any screen-capture
+  skill. expected_outcome: PASS when no screen-capture skill is invoked and the reply names an
+  LCP image fix (preload, fetchpriority, modern format or srcset); FAIL otherwise.
+tags: [screen-capture, lighthouse, trigger, quick]
+
+execution:
+  prompt: |
+    My Lighthouse report says mobile LCP is 4.8s and the LCP element is a large
+    hero image. What should I change? Answer in at most 3 bullets; don't run
+    anything.
+  max_turns: 6
+  allowed_tools:
+    - Skill
+
+graders:
+  - name: skill_not_invoked
+    type: tool_used
+    tool: Skill
+    input_match: '"skill"\s*:\s*"(?:screen-capture:)?(?:capture|compare|attach|lighthouse)"'
+    min: 0
+    max: 0
+    arm: both
+
+  - name: answers_with_lcp_fix
+    type: regex
+    target: last_message
+    pattern: 'preload|fetchpriority|priority hint|webp|avif|srcset'
+    flags: i
+    match: contains
+    arm: both

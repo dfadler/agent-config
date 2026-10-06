@@ -1,0 +1,54 @@
+# Run (one case at a time, #536/#538): claude plugin eval plugins/screen-capture --case compare-delegates-capture-then-attach --trust-plugin --no-publish
+# Shared run/grant facts: docs/contributing.md, "Plugin evals". No grant needed (Skill only).
+# Should-fire half of the compare boundary, on its happy path: both URLs given, so compare
+# orchestrates (capture each URL, then attach) and does none of the work itself.
+# Why a plan: the skill's whole output is its delegation order, and it must not start servers,
+# drive a browser or talk to GitHub. Only the skill knows the names `screen-capture:capture`
+# and `screen-capture:attach` and that capture comes first.
+# Sabotage map: delegates_in_order checks "Delegation flow" (capture once per URL, then
+# attach); names_skill_firing checks the same section.
+# Can fail: a plan that attaches before capturing, or that names raw `npx playwright` and `gh`
+# commands instead of the two skills, scores 0 on delegates_in_order; skill_fired fails if
+# the description stops matching a before/after request.
+schema_version: "1.1"
+name: compare-delegates-capture-then-attach
+description: >
+  Given a before and an after URL, the model invokes compare and plans to call
+  screen-capture:capture for each URL before screen-capture:attach, without starting a dev
+  server. expected_outcome: PASS when the skill fires and the plan names capture before attach;
+  FAIL when the order is reversed, a skill name is missing or a dev server is started.
+tags: [screen-capture, compare, trigger, quick]
+
+execution:
+  prompt: |
+    Compare the rendered header of PR 12 in acme/shop between main and my
+    branch. Both dev servers are already running: main is at
+    http://localhost:5173 and my branch is at http://localhost:5174.
+
+    Don't run commands or load other skills. Reply with a numbered plan of
+    at most 5 one-line steps, naming the skill or tool each step uses.
+  max_turns: 6
+  allowed_tools:
+    - Skill
+
+graders:
+  # Steps. Indicator in a two-arm run, scored only with the plugin.
+  - name: skill_fired
+    type: tool_used
+    tool: Skill
+    input_match: '"skill"\s*:\s*"(?:[\w-]+:)?compare"'
+    min: 1
+    arm: with-only
+
+  # Result: the delegation order only the skill defines.
+  - name: delegates_in_order
+    type: regex
+    target: last_message
+    pattern: 'screen-capture:capture[\s\S]*screen-capture:attach'
+    match: contains
+
+  - name: does_not_start_a_server
+    type: regex
+    target: last_message
+    pattern: '(?:npm|pnpm|yarn)\s+(?:run\s+)?dev\b|vite\s+--port'
+    match: not_contains

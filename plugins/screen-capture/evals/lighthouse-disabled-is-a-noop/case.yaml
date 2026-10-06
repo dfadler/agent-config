@@ -1,0 +1,55 @@
+# Run (one case at a time, #536/#538): claude plugin eval plugins/screen-capture --case lighthouse-disabled-is-a-noop --trust-plugin --no-publish
+# Shared run/grant facts: docs/contributing.md, "Plugin evals". No grant needed (Skill only);
+# nothing is run.
+# Should-fire half of the lighthouse boundary on the config-off path: `lighthouse_enabled:
+# false` makes the skill a no-op, "not an error", so a caller can invoke it on every PR.
+# Expect a small or zero delta: the prompt shows the false setting, and a baseline may also
+# decline to run. The case still guards a skill that ignores the flag or reports an error.
+# Sabotage map: no_lighthouse_command and reports_noop_not_error check "Config keys"
+# (`lighthouse_enabled`: "skip the CLI pass entirely (treat as a no-op, not an error)"). No
+# error-wording regex: "no error" would false-fail it.
+# Can fail: a reply containing `npx lighthouse` fails no_lighthouse_command; a reply that never
+# says it skips fails reports_noop_not_error; skill_fired fails if the description stops
+# matching.
+schema_version: "1.1"
+name: lighthouse-disabled-is-a-noop
+description: >
+  With lighthouseEnabled false in settings.json, the model invokes lighthouse and reports that
+  the pass is skipped, with no Lighthouse command. expected_outcome: PASS
+  when the skill fires, no npx lighthouse command appears and the reply says the pass is
+  skipped; FAIL when a command appears or the skip is not stated.
+tags: [screen-capture, lighthouse, trigger, quick]
+
+execution:
+  prompt: |
+    My .claude/settings.json has {"screenCapture": {"lighthouseEnabled": false}}.
+    Run the Lighthouse pass on http://localhost:5173 for the repo agent-config.
+
+    Don't run anything. Reply in one sentence saying what you do.
+  max_turns: 6
+  allowed_tools:
+    - Skill
+
+graders:
+  # Steps. Indicator in a two-arm run, scored only with the plugin.
+  - name: skill_fired
+    type: tool_used
+    tool: Skill
+    input_match: '"skill"\s*:\s*"(?:[\w-]+:)?lighthouse"'
+    min: 1
+    arm: with-only
+
+  # Result.
+  - name: no_lighthouse_command
+    type: regex
+    target: last_message
+    pattern: 'npx\s+lighthouse'
+    match: not_contains
+    arm: both
+
+  - name: reports_noop_not_error
+    type: regex
+    target: last_message
+    pattern: '\b(?:skip(?:s|ped|ping)?|no-op|disabled|nothing to run|not run)\b'
+    flags: i
+    match: contains

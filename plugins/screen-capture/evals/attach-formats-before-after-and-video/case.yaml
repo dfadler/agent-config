@@ -1,0 +1,82 @@
+# Run (one case at a time, #536/#538): claude plugin eval plugins/screen-capture --case attach-formats-before-after-and-video --trust-plugin --no-publish
+# Shared run/grant facts: docs/contributing.md, "Plugin evals". No grant needed (Skill only);
+# the model writes the PR section and the gh command and never runs them (hermetic, no network).
+# Should-fire half of the attach boundary (near-miss: attach-stays-quiet-on-readme-image).
+# Why this prompt: the upload URLs are supplied (an eval run has no network and no
+# gh-attach-image), so the case grades what attach itself owns: the `## Visual verification`
+# section, the Before/After table with `![before]`/`![after]` images, the video URL on its own
+# unwrapped line (a wrapped video URL renders a broken image) and saving via
+# `gh pr edit --body-file`. A generic answer tends to wrap the video or use a different heading.
+# Sabotage map: grader names quote "Format" under "--target=github" (`## Visual verification`,
+# the `| Before | After |` table, "The video URL goes on its own line, unwrapped") and "Post"
+# (`gh pr edit --body-file`).
+# Can fail: any of the five result checks scoring 0; skill_fired fails if the description stops
+# matching a request to put captured files in a PR.
+schema_version: "1.1"
+name: attach-formats-before-after-and-video
+description: >
+  Given three uploaded asset URLs and a caption, the model invokes attach and writes the PR body
+  section: the Visual verification heading, a Before/After table with image embeds, the video
+  URL on its own unwrapped line, and a gh pr edit --body-file command. expected_outcome: PASS
+  when the skill fires and all five checks hold; FAIL otherwise, notably when the video URL is
+  wrapped in image markdown.
+tags: [screen-capture, attach, trigger, quick]
+
+execution:
+  prompt: |
+    Add my visual verification to the description of PR 12 in acme/shop. The
+    files are already uploaded; the URLs are:
+    before: https://github.com/user-attachments/assets/aaaa-before
+    after: https://github.com/user-attachments/assets/bbbb-after
+    walkthrough video: https://github.com/user-attachments/assets/cccc-video
+    Caption: header no longer wraps at 390px
+
+    Don't run anything. Reply with exactly one markdown code block holding
+    the section for the PR body, then one line with the gh command that
+    saves it to the PR.
+  max_turns: 6
+  allowed_tools:
+    - Skill
+
+graders:
+  # Steps. Indicator in a two-arm run, scored only with the plugin.
+  - name: skill_fired
+    type: tool_used
+    tool: Skill
+    input_match: '"skill"\s*:\s*"(?:[\w-]+:)?attach"'
+    min: 1
+    arm: with-only
+
+  # Result.
+  - name: section_heading
+    type: regex
+    target: last_message
+    pattern: '^## Visual verification\s*$'
+    flags: m
+    match: contains
+
+  - name: before_after_table
+    type: regex
+    target: last_message
+    pattern: '\|\s*Before\s*\|\s*After\s*\|[\s\S]*!\[before\]\(https://github\.com/user-attachments/assets/aaaa-before\)[\s\S]*!\[after\]\(https://github\.com/user-attachments/assets/bbbb-after\)'
+    flags: i
+    match: contains
+
+  - name: video_url_on_own_line
+    type: regex
+    target: last_message
+    pattern: '^https://github\.com/user-attachments/assets/cccc-video\s*$'
+    flags: m
+    match: contains
+
+  - name: video_url_not_wrapped
+    type: regex
+    target: last_message
+    pattern: '!\[[^\]]*\]\(https://github\.com/user-attachments/assets/cccc-video\)'
+    match: not_contains
+
+  - name: saves_with_body_file
+    type: regex
+    target: last_message
+    pattern: 'gh\s+pr\s+edit\s+12[^\n]*--body-file'
+    match: contains
