@@ -25,8 +25,8 @@ execution:
     branch. Both dev servers are already running: main is at
     http://localhost:5173 and my branch is at http://localhost:5174.
 
-    Don't run any commands. Reply with a numbered plan of
-    at most 5 one-line steps, naming the skill or tool each step uses.
+    Do it now. Reply with a numbered list of at most 5 one-line steps you
+    took, naming the skill or tool each step used.
   max_turns: 6
   allowed_tools:
     - Skill

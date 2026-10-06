@@ -25,7 +25,8 @@ execution:
     I captured before.png and after.png of a layout fix. Attach them as a
     before/after comparison to Jira ticket SHOP-481.
 
-    Don't run anything. Reply in at most 3 sentences.
+    Do this now. Reply with at most 3 sentences: what you posted and where,
+    or why you could not.
   max_turns: 6
   allowed_tools:
     - Skill

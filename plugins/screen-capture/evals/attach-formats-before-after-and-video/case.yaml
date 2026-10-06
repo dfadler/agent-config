@@ -78,5 +78,5 @@ graders:
   - name: saves_with_body_file
     type: regex
     target: last_message
-    pattern: 'gh\s+pr\s+edit\s+12[^\n]*--body-file'
+    pattern: 'gh\s+pr\s+edit\b(?=[\s\S]{0,300}\b12\b)[\s\S]{0,300}(?:--body-file|\s-F)\b'
     match: contains

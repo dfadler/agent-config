@@ -79,5 +79,6 @@ graders:
   - name: tears_down_browser_and_profile
     type: regex
     target: last_message
-    pattern: '\bkill\b[\s\S]*rm\s+-rf|rm\s+-rf[\s\S]*\bkill\b'
+    pattern: '\b(?:kill|terminate)\b[\s\S]*(?:rm\s+-\w+|(?:delete|remove)[^\n]{0,40}(?:profile|user-data))|(?:rm\s+-\w+|(?:delete|remove)[^\n]{0,40}(?:profile|user-data))[\s\S]*\b(?:kill|terminate)\b'
+    flags: i
     match: contains

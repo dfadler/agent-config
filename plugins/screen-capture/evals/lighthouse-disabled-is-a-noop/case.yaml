@@ -25,7 +25,8 @@ execution:
     My .claude/settings.json has {"screenCapture": {"lighthouseEnabled": false}}.
     Run the Lighthouse pass on http://localhost:5173 for the repo agent-config.
 
-    Don't run anything. Reply in one sentence saying what you do.
+    Do it now. Reply with one sentence: the command you ran, or why you ran
+    none.
   max_turns: 6
   allowed_tools:
     - Skill
