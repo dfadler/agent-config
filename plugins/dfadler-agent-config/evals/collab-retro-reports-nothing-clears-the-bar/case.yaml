@@ -16,7 +16,7 @@ description: >
   Given three one-off feedback memories from a single project, the model invokes collab-retro
   and reports that nothing clears the bar instead of drafting an issue. expected_outcome: PASS
   when the skill fires and the reply starts with NOTHING and has no issue template; FAIL
-  otherwise. A no-skill reply may decide NOTHING too, so the Delta may be small.
+  otherwise. Guard: a no-skill reply may decide NOTHING too, so the Delta may be small.
 tags: [collab-retro, trigger, quick]
 
 execution:

@@ -3,8 +3,8 @@
 # Should-not-fire case for typescript-conventions: a Python `typing.cast` question shares
 # "type assertion", "cast" and "comment" vocabulary with the skill but is not TypeScript or
 # JavaScript. Regression guard: a no-plugin arm passes by default, Delta about 0 by design.
-# Can fail: skill_not_fired fails if the TS skill loads for Python; answers_with_isinstance
-# fails if the reply does not offer an isinstance-style narrowing.
+# Can fail: skill_not_fired fails if the TS skill loads for Python. answers_with_isinstance
+# is a sanity check (isinstance is the obvious answer), not a discriminator.
 schema_version: "1.1"
 name: typescript-conventions-stays-quiet-on-python
 description: >

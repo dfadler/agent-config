@@ -3,9 +3,10 @@
 # Should-not-fire case for gh-publish-guide: a read-only `gh` question shares "gh",
 # "issues" and "comments" with the publish skill but publishes nothing, so the guide has
 # nothing to decide. The existing cases all expect it to fire; none covers its boundary.
-# Caveat: the skill's description says to load it before publish calls "and whenever a skill
-# is about to post", so a model may load it on any gh talk. If a run shows it firing here,
-# decide whether that is over-triggering or an acceptable load before changing the skill.
+# Decision: loading the guide for a read-only `gh issue list` question counts as
+# over-triggering. The description scopes it to publish actions ("before `gh issue create`
+# ... or an equivalent `gh api` publish call"), so a firing here means the description is too
+# broad and should be tightened, not that the case should be relaxed.
 # Regression guard: a no-plugin arm passes by default, Delta about 0 by design.
 # Can fail: guide_not_fired fails if gh-publish-guide loads for a read-only request;
 # lists_issues fails if the reply has no read-only gh command.
@@ -37,6 +38,6 @@ graders:
   - name: lists_issues
     type: regex
     target: last_message
-    pattern: 'gh issue list[^\n]*(?:--label|-l)[ =]+"?bug'
+    pattern: 'gh issue list[^\n]*(?:(?:--label|-l)[ =]+"?bug|label:bug)'
     match: contains
     arm: both

@@ -40,7 +40,7 @@ graders:
   - name: fetches_with_curl
     type: regex
     target: last_message
-    pattern: 'curl[^\n]*(?:-[a-zA-Z]*L|--location)[^\n]*example\.com'
+    pattern: 'curl[^\n]*(?:-[a-zA-Z]*L|--location)[\s\S]{0,200}?example\.com'
     match: contains
 
   - name: extracts_via_stdin

@@ -59,5 +59,5 @@ graders:
   - name: narrows_or_validates
     type: regex
     target: last_message
-    pattern: '\bis\s+User\b|typeof\s|["'']\s+in\s+\w+|safeParse|asserts\s'
+    pattern: '\bis\s+User\b|typeof\s|["'']\s+in\s+\w+|safeParse|asserts\s|\bis[A-Z]\w*\(|instanceof'
     match: contains

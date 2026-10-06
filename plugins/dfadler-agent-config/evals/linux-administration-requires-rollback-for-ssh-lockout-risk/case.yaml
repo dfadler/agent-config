@@ -47,13 +47,14 @@ graders:
   - name: second_access_path
     type: regex
     target: last_message
-    pattern: 'second\s+(?:ssh\s+)?(?:session|connection|terminal|access)|another\s+(?:ssh\s+)?(?:session|terminal)|out-of-band|console|rescue mode|auto-?revert|rollback|key-based login'
+    pattern: 'second\s+(?:ssh\s+)?(?:session|connection|terminal|access)|another\s+(?:ssh\s+)?(?:session|terminal)|out-of-band|console access|rescue mode|auto-?revert|\bat now\b'
     flags: i
     match: contains
 
-  # `reload` appears in the plan, and a `restart` of ssh/sshd does not.
+  # A reload command appears, and no command line restarts ssh/sshd (a "do not restart"
+  # warning in prose does not count).
   - name: reload_not_restart
     type: regex
     target: last_message
-    pattern: '(?=[\s\S]*systemctl\s+reload\s+(?:ssh|sshd)\b)(?![\s\S]*systemctl\s+restart\s+(?:ssh|sshd)\b)'
+    pattern: '(?=[\s\S]*(?:systemctl\s+reload\s+(?:ssh|sshd)\b|service\s+(?:ssh|sshd)\s+reload))(?![\s\S]*(?:^|\n)\s*(?:\d+[.)]\s*)?(?:[-*]\s*)?(?:`)?(?:sudo\s+)?systemctl\s+restart\s+(?:ssh|sshd)\b)'
     match: contains

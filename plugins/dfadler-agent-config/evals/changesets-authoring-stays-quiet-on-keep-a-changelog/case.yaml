@@ -4,7 +4,8 @@
 # CHANGELOG.md shares "changelog", "bump" and "release notes" with the skill but has no
 # Changesets. Regression guard: a no-plugin arm passes by default, Delta about 0 by design.
 # Can fail: skill_not_fired fails if changesets-authoring over-triggers on a plain changelog
-# request; writes_entry fails if the reply has no changelog entry under a Fixed heading.
+# request. writes_entry is a sanity check (the prompt nearly dictates it), not a
+# discriminator.
 schema_version: "1.1"
 name: changesets-authoring-stays-quiet-on-keep-a-changelog
 description: >

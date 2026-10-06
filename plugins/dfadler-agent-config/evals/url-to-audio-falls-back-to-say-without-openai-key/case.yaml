@@ -38,7 +38,7 @@ graders:
   - name: names_the_missing_key
     type: regex
     target: last_message
-    pattern: 'OPENAI_API_KEY|API key'
+    pattern: 'OPENAI_API_KEY[^\n]{0,40}(?:not set|unset|missing|absent)|(?:no|missing|without)[^\n]{0,20}(?:API key|OPENAI_API_KEY)'
     flags: i
     match: contains
     weight: 0.5
