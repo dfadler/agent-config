@@ -1,0 +1,8 @@
+schema_version: "1.1"
+name: trace-quotes
+execution:
+  prompt: Do the thing.
+graders:
+  - type: "regex"
+    pattern: "echo \\\"hello world\\\""
+    target: "trace"

@@ -1,0 +1,53 @@
+# Run: claude plugin eval plugins/dfadler-agent-config --case pr-skills-stay-quiet-on-commit-message --runs 3 --trust-plugin --no-publish
+# Shared run/grant facts: docs/contributing.md, "Plugin evals". No grant: Skill only.
+# Should-not-fire guard shared by the six PR-side skills (pr-babysit, pr-checks, pr-comments,
+# pr-review-rubric, github-pr-workflow, issue-reporter-etiquette): a local, pre-PR git
+# chore that shares "git", "diff" and "PR" vocabulary with them but involves no PR, CI check,
+# review feedback or issue.
+# Regression guard: a no-plugin arm passes by default, so the Delta is about 0 by design.
+# Can fail: no_pr_skill_fired fails if any of the six over-triggers on a commit message
+# request; writes_subject fails if the reply is not a conventional-commit subject line.
+schema_version: "1.1"
+name: pr-skills-stay-quiet-on-commit-message
+description: >
+  A request for a commit subject line for a local diff, mentioning that a PR will follow
+  later, must not invoke any of the six PR-side skills. expected_outcome: regression guard,
+  Delta about 0 by design. PASS when none of them fires and the reply is a
+  conventional-commit subject; FAIL when one fires.
+tags: [pr-babysit, pr-checks, pr-comments, pr-review-rubric, github-pr-workflow, issue-reporter-etiquette, trigger, quick]
+
+execution:
+  prompt: |
+    Write the conventional-commit subject line (type(scope): summary) for this staged diff.
+    I will open a PR from it later, but right now I only need the commit. Reply with the
+    single line and nothing else.
+
+    ```diff
+    --- a/src/retry.ts
+    +++ b/src/retry.ts
+    @@ -19,5 +19,5 @@
+    -  const d = baseDelay * 2 ** attempt;
+    -  await sleep(d);
+    +  const delayMs = baseDelay * 2 ** attempt;
+    +  await sleep(delayMs);
+    ```
+  max_turns: 4
+  allowed_tools:
+    - Skill
+
+graders:
+  - name: no_pr_skill_fired
+    type: tool_used
+    tool: Skill
+    input_match: '"skill"\s*:\s*"(?:[\w-]+:)?(?:pr-babysit|pr-checks|pr-comments|pr-review-rubric|github-pr-workflow|issue-reporter-etiquette)"'
+    min: 0
+    max: 0
+    arm: both
+
+  - name: writes_subject
+    type: regex
+    target: last_message
+    pattern: '^\W*(?:refactor|fix|chore|style|feat)(?:\([\w-]+\))?!?:\s+\S'
+    flags: i
+    match: contains
+    arm: both

@@ -1,0 +1,7 @@
+# Per-case --allow-tools grants (format: plugins/eval-authoring/docs/grants-format.md).
+# Write lets the run create the two case files that the case-reviewer reads. Not yet
+# confirmed in a logged-in run (#469).
+schema_version: "1"
+grants:
+  case-reviewer-flags-planted-weak-case:
+    - "Write"

@@ -1,0 +1,7 @@
+schema_version: "1.1"
+name: positive
+execution:
+  prompt: Do the work.
+graders:
+  - type: tool_used
+    tool: Write

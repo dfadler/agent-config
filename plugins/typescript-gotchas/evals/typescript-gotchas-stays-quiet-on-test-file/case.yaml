@@ -1,0 +1,50 @@
+# Run: node plugins/eval-authoring/scripts/ts/run-evals/run-evals.ts --tier quick plugins/typescript-gotchas
+# Should-not-fire half of the trigger boundary: a near-miss that shares the vocabulary
+# (TypeScript, array, last element) but asks for a `*.test.ts` file, which the description
+# excludes ("NOT test files (i.e. not `*.test.*`...").
+# Sabotage map: skill_not_invoked checks that description exclusion; delete "NOT test files"
+# from it and a run should invoke the skill and fail.
+# Can fail: the skill is invoked (description over-triggers on a test file) fails
+# skill_not_invoked; a reply with no vitest assertions fails writes_the_test. This is a
+# regression guard, so a no-plugin arm passes it by default and shows no delta by design.
+schema_version: "1.1"
+name: typescript-gotchas-stays-quiet-on-test-file
+description: >
+  A request for a vitest file that checks the last element of an array must not
+  invoke typescript-gotchas, which applies to non-test source only.
+  expected_outcome: PASS when the skill is not invoked and the reply holds vitest
+  assertions; FAIL when typescript-gotchas is invoked or the reply holds no test.
+  A regression guard: a no-plugin arm is expected to pass too, so it shows no delta.
+tags: [typescript-gotchas, trigger, quick]
+
+execution:
+  prompt: |
+    Write src/history.test.ts, a vitest file for this helper, and show it in
+    your reply. Cover a list with several entries and an empty list.
+
+    ```ts
+    export const lastVisited = (urls: string[]): string | undefined =>
+      urls.at(-1);
+    ```
+  max_turns: 6
+  allowed_tools:
+    - Skill
+
+graders:
+  # Steps. min 0 is explicit: tool_used defaults min to 1. arm both so the "never called"
+  # check is scored in a two-arm run too.
+  - name: skill_not_invoked
+    type: tool_used
+    tool: Skill
+    input_match: '"skill"\s*:\s*"(?:[\w-]+:)?typescript-gotchas"'
+    min: 0
+    max: 0
+    arm: both
+
+  # Result: the task was done (a task-completion check, not a skill property).
+  - name: writes_the_test
+    type: regex
+    target: last_message
+    pattern: 'expect\(\s*lastVisited'
+    match: contains
+    arm: both

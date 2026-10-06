@@ -2,7 +2,7 @@
  * The repo's shell exit-code taxonomy, as typed constants. Same numbers and
  * meanings as claude/conventions/shell-script-hygiene.md so a TypeScript check
  * and the shell script it replaces are interchangeable to callers. The gap
- * between 6 and 20 is deliberate headroom; do not invent codes without
+ * between 7 and 20 is deliberate headroom; do not invent codes without
  * extending that list first.
  */
 
@@ -20,8 +20,14 @@ export const EXIT_DEPENDENCY = 4;
 export const EXIT_NETWORK = 5;
 /** Operation timed out. */
 export const EXIT_TIMEOUT = 6;
+/** A partial or untrustworthy run: finished, but results can't be fully trusted. */
+export const EXIT_PARTIAL = 7;
 /** Unexpected or assertion failure; should not happen. */
 export const EXIT_INTERNAL = 20;
+/** Interrupted (130, the shell convention for SIGINT); passed through. */
+export const EXIT_INTERRUPTED = 130;
+/** Terminated (143, the shell convention for SIGTERM); passed through. */
+export const EXIT_TERMINATED = 143;
 
 /** A failure code: every code except success. */
 export type FailureCode =
@@ -31,7 +37,10 @@ export type FailureCode =
   | typeof EXIT_DEPENDENCY
   | typeof EXIT_NETWORK
   | typeof EXIT_TIMEOUT
-  | typeof EXIT_INTERNAL;
+  | typeof EXIT_PARTIAL
+  | typeof EXIT_INTERNAL
+  | typeof EXIT_INTERRUPTED
+  | typeof EXIT_TERMINATED;
 
 /** Any code in the taxonomy. */
 export type ExitCode = typeof EXIT_OK | FailureCode;

@@ -1,0 +1,42 @@
+# Run (one case at a time, #536/#538): claude plugin eval plugins/screen-capture --case attach-stays-quiet-on-readme-image --trust-plugin --no-publish
+# Shared run/grant facts: docs/contributing.md, "Plugin evals". No grant needed (Skill only).
+# Should-not-fire half of the attach boundary: showing an image in a README shares "image" and
+# "show" with attach's description but is a repo-local Markdown embed, not a captured artefact
+# posted to a PR or issue.
+# Sabotage map: skill_not_invoked checks attach's description ("captured screenshot/video
+# artefacts ... to a destination"); drop that scope and a run should fail.
+# Can fail: any screen-capture skill invoked fails skill_not_invoked; a reply that is not a
+# single image-embed line for docs/logo.png fails answers_with_embed. Regression guard: a
+# no-plugin arm passes it, so no delta by design.
+schema_version: "1.1"
+name: attach-stays-quiet-on-readme-image
+description: >
+  A request for the Markdown line that shows a repo-local image in a README must not invoke any
+  screen-capture skill. expected_outcome: PASS when no screen-capture skill is invoked and the
+  reply is an image embed of docs/logo.png; FAIL otherwise.
+tags: [screen-capture, attach, trigger, quick]
+
+execution:
+  prompt: |
+    My README.md should show the image at docs/logo.png. Do it now and reply
+    with the single Markdown line you added, nothing else.
+  max_turns: 6
+  allowed_tools:
+    - Skill
+
+graders:
+  - name: skill_not_invoked
+    type: tool_used
+    tool: Skill
+    input_match: '"skill"\s*:\s*"(?:screen-capture:)?(?:capture|compare|attach|lighthouse)"'
+    min: 0
+    max: 0
+    arm: both
+
+  - name: answers_with_embed
+    type: regex
+    target: last_message
+    pattern: '^`{0,3}!\[[^\]]*\]\(\.?/?docs/logo\.png\)`{0,3}\s*$'
+    flags: m
+    match: contains
+    arm: both

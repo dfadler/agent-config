@@ -1,0 +1,64 @@
+# Run (one case at a time, #536/#538): claude plugin eval plugins/second-brain --case capture-routes-person-note --trust-plugin --no-publish
+# Shared run/grant facts: docs/contributing.md, "Plugin evals". No grant needed (Skill only).
+# Reply-only, no mocks: the plugin declares no MCP server, so the Obsidian tools cannot be
+# mocked (see capture-routes-meeting-note for the reason); the prompt states the vault path.
+# Should-fire half of the capture boundary for a second content type. An evergreen person note
+# goes to `50 People/Full Name.md` with no date prefix, unlike meetings; a baseline has no
+# reason to pick that folder or to leave the date out of the filename.
+# Sabotage map: grader names quote "Step 2: Classify the content" (`50 People/Full Name.md`),
+# "File naming" ("Evergreen content (people, concepts, runbooks): `Title.md`") and
+# "Frontmatter" (`date:` and `tags:`).
+# Can fail: a path outside `50 People/`, a dated filename, or missing `date:`/`tags:` frontmatter
+# scores 0 on that grader; skill_fired fails if the description stops matching.
+schema_version: "1.1"
+name: capture-routes-person-note
+description: >
+  Asked to save what the user knows about a person, the model invokes capture and writes
+  50 People/Priya Raman.md (no date in the filename) with date and tags frontmatter.
+  expected_outcome: PASS when the skill fires and the path and both frontmatter keys are right;
+  FAIL otherwise, notably a dated filename or another folder.
+tags: [second-brain, capture, trigger, quick]
+
+execution:
+  prompt: |
+    SECOND_BRAIN_VAULT_PATH is set to /vault. Today is 2026-10-05. Add to my
+    second brain what I know about Priya Raman: staff engineer on Search,
+    joined in 2024, prefers async updates, owns the search rollout plan.
+
+    Don't call any tools other than skills (the vault is not connected here). Reply with the
+    vault-relative path of the note on the first line, then the full note in
+    one markdown code block, and nothing else.
+  max_turns: 6
+  allowed_tools:
+    - Skill
+
+graders:
+  # Steps. Indicator in a two-arm run, scored only with the plugin.
+  - name: skill_fired
+    type: tool_used
+    tool: Skill
+    input_match: '"skill"\s*:\s*"(?:[\w-]+:)?capture"'
+    min: 1
+    arm: with-only
+
+  # Result.
+  - name: people_path_without_date
+    type: regex
+    target: last_message
+    pattern: '^`?(?:/vault/)?50 People/Priya Raman\.md`?\s*$'
+    flags: m
+    match: contains
+
+  - name: date_frontmatter
+    type: regex
+    target: last_message
+    pattern: '^date:\s*2026-10-05\s*$'
+    flags: m
+    match: contains
+
+  - name: tags_frontmatter
+    type: regex
+    target: last_message
+    pattern: '^tags:\s*\['
+    flags: m
+    match: contains

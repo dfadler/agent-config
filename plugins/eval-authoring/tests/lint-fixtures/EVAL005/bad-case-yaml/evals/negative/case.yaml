@@ -1,0 +1,9 @@
+schema_version: "1.1"
+name: negative
+execution:
+  prompt: Do the work.
+graders:
+  - type: tool_used
+    tool: Bash
+    min: 0
+    max: 0

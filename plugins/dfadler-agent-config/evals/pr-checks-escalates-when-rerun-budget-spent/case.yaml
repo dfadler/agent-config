@@ -1,0 +1,83 @@
+# Run: claude plugin eval plugins/dfadler-agent-config --case pr-checks-escalates-when-rerun-budget-spent --runs 3 --trust-plugin --no-publish
+# Shared run/grant facts: docs/contributing.md, "Plugin evals". No grant: Skill only; the
+# pre-fetched data is pasted and Bash is not offered.
+# Should-fire case for pr-checks' flaky path: a clearly infra failure whose rerun budget is
+# spent must be escalated, not rerun, and never "fixed" by editing CI config. Complements
+# pr-checks-uses-prefetched-snapshot (cancelled run) with the rerunBudgetLeft gate.
+# Can fail: skill_fired fails if the description stops matching; escalates fails if the reply
+# does not report a blocker; classified_flaky_or_infra (half weight) fails if the line uses
+# neither of the skill's words. Rerun and config-edit regexes were left out: Bash is not
+# offered so a rerun cannot happen, and "edits CI config" false-fails on "not editing". A
+# baseline that reads rerunBudgetLeft:false from the data will pass `escalates`, so expect a
+# small Delta; this is mostly a guard on the skill's hard limit.
+# Skill phrases checked: "otherwise report the blocker", "At most 2 reruns".
+schema_version: "1.1"
+name: pr-checks-escalates-when-rerun-budget-spent
+description: >
+  Given pre-fetched checks where an infra timeout has already used its rerun budget, the
+  model invokes pr-checks and escalates instead of rerunning or editing CI config.
+  expected_outcome: PASS when the skill fires and the reply reports a blocker for
+  integration-tests; FAIL when the skill never fires or the reply reports no blocker. Small
+  Delta expected (guard on the rerun-budget limit).
+tags: [pr-checks, trigger, quick]
+
+execution:
+  prompt: |
+    Handle the CI checks for PR 482 using the data below (current as of a minute ago). The
+    failing log tail is included. Do not run commands; answer in your reply.
+
+    ```json
+    {
+      "checks": [
+        {"name": "build", "state": "pass", "conclusion": "SUCCESS", "required": true},
+        {"name": "integration-tests", "state": "fail", "conclusion": "FAILURE", "required": true}
+      ],
+      "failedRuns": [
+        {
+          "runId": 9100555,
+          "workflow": "integration",
+          "runAttempt": 3,
+          "conclusion": "FAILURE",
+          "url": "https://github.com/example/repo/actions/runs/9100555",
+          "rerunBudgetLeft": false
+        }
+      ]
+    }
+    ```
+
+    Log tail of run 9100555:
+
+    ```
+    Run docker pull registry.example.com/base:latest
+    error pulling image: net/http: TLS handshake timeout
+    Error: Process completed with exit code 1.
+    ```
+
+    Reply with one line per check (name, classification, action), then one closing line.
+  max_turns: 6
+  allowed_tools:
+    - Skill
+
+graders:
+  - name: skill_fired
+    type: tool_used
+    tool: Skill
+    input_match: '"skill"\s*:\s*"(?:[\w-]+:)?pr-checks"'
+    min: 1
+    arm: with-only
+
+  - name: escalates
+    type: regex
+    target: last_message
+    pattern: 'integration-tests[^\n]*(?:escalat|blocked|blocker|budget)'
+    flags: i
+    match: contains
+
+  # The skill's classification word for a timeout; a default reply may say "transient".
+  - name: classified_flaky_or_infra
+    type: regex
+    target: last_message
+    pattern: 'integration-tests[^\n]*(?:flaky|infra)'
+    flags: i
+    match: contains
+    weight: 0.5
