@@ -3,7 +3,7 @@
 // claude/CLAUDE.md is the *global* ~/.claude/CLAUDE.md (see setup.sh), loaded
 // into every session on this machine regardless of project, so it must stay
 // small. The ceiling is a MEASURED baseline plus headroom and lives in the
-// Makefile (CLAUDE_MD_MAX_LINES), so changing it takes a deliberate commit.
+// `lint-claude-md` script in package.json, so changing it takes a deliberate commit.
 import {
   cliError,
   EXIT_FAILURE,

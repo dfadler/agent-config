@@ -4,15 +4,15 @@ description: >
   package.json, then installs dependencies from pnpm-lock.yaml.
 
 # Run actions/checkout first: this reads .nvmrc and package.json from the
-# working directory. Any workflow that runs a TypeScript check (a `make`
-# target that depends on node-modules) uses this one step instead of the
+# working directory. Any workflow that runs a TypeScript check (a
+# `pnpm run` script or `make` target) uses this one step instead of the
 # pnpm/action-setup + setup-node + install sequence, so the pins live in one
 # place. typescript.yml, sh-claude-md-size.yml and sh-set-flags.yml use it today; the other
 # sh-*.yml workflows add it as their checks move to TypeScript.
 #
 # Versions are not inputs on purpose: .nvmrc and `packageManager` are the
 # single source of truth (also used locally), and `--frozen-lockfile` inside
-# `make node-modules` fails on any lockfile drift.
+# `pnpm install --frozen-lockfile` fails on any lockfile drift.
 #
 # External actions are pinned by full commit SHA with the version as a trailing
 # comment (see docs/github-actions.md); a tag can be repointed without the
@@ -32,4 +32,4 @@ runs:
 
     - name: Install pinned dependencies
       shell: bash
-      run: make node-modules
+      run: pnpm install --frozen-lockfile

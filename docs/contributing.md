@@ -130,22 +130,22 @@ make check          # lint + structure + typecheck + test + actionlint + coverag
 | `make test-sh` | `bats` suites under `scripts/tests/` |
 | `make test-py` | `pytest` suite under `scripts/tests/` |
 | `make coverage` | Re-runs the `bats` suites under `kcov` and enforces the coverage floor (Linux only) |
-| `make lint-ts` / `typecheck-ts` / `test-ts` / `coverage-ts` | `eslint`, `tsc --noEmit`, Vitest, and its coverage floor over `scripts/ts/` (see [`testing.md`](testing.md)) |
-| `make check-skills` | A skill another skill references must have a `## Contract` (Input/Output), and references must resolve ([`docs/skill-composition.md`](./skill-composition.md)) |
+| `make lint-ts` / `typecheck-ts` / `test-ts` / `coverage-ts` (`pnpm run lint` / `typecheck` / `test` / `coverage`) | `eslint`, `tsc --noEmit`, Vitest, and its coverage floor over `scripts/ts/` (see [`testing.md`](testing.md)) |
+| `make check-skills` (`pnpm run check-skills`) | A skill another skill references must have a `## Contract` (Input/Output), and references must resolve ([`docs/skill-composition.md`](./skill-composition.md)) |
 | `make fmt` | Rewrites sources to the repo's `shfmt` / `ruff` style |
 | `make lint-actions` | `actionlint` over `.github/workflows/` |
 
 ```bash
 brew install shellcheck shfmt bats-core actionlint
 make venv          # Python side: .venv from requirements-dev.txt
-nvm use            # TypeScript side: Node from .nvmrc, then `make node-modules`
+nvm use            # TypeScript side: Node from .nvmrc, then `pnpm install --frozen-lockfile`
 ```
 
 The TypeScript targets need the Node in `.nvmrc` (22.18+ for native type
 stripping — the system Homebrew Node may not qualify), so run `nvm use` first.
 The package manager is pnpm, pinned by `packageManager` in `package.json`;
 dependencies are pinned by `pnpm-lock.yaml`, and `make node-modules` runs
-`pnpm install --frozen-lockfile`.
+`pnpm install --frozen-lockfile`. The Node-based checks (the TypeScript ones, `lint-set-flags`, `lint-claude-md`, `check-links`) are `package.json` scripts: CI runs `pnpm run <name>` and the `make` targets delegate to the same scripts. The shell and Python checks stay `make`-only.
 
 `make check` uses `.venv` when it exists and otherwise falls back to whatever
 `python3` is on `PATH`, so a shell-only change doesn't require building one.

@@ -14,8 +14,8 @@ name: Shell
 # Checks and the make targets they invoke:
 #   shellcheck     make lint-shellcheck
 #   shfmt          make lint-shfmt
-#   set-flags      make lint-set-flags
-#   claude-md-size make lint-claude-md
+#   set-flags      pnpm run lint-set-flags
+#   claude-md-size pnpm run lint-claude-md
 #   structure      make structure
 #   test-sh        make test-sh
 #   coverage       make coverage   (needs test-sh: guards the kcov build)

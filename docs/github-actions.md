@@ -40,8 +40,8 @@ a CI failure here.
   instance of something bigger appears, or once an actual shared multi-job
   pipeline exists (e.g. a release workflow several triggers need identically).
 - **Node setup is the `.github/actions/setup-node-pnpm` composite.** Node from
-  `.nvmrc`, pnpm from `packageManager`, then `make node-modules`. Any workflow
-  whose `make` target depends on `node-modules` runs it right after checkout
+  `.nvmrc`, pnpm from `packageManager`, then `pnpm install --frozen-lockfile`. Any workflow
+  that runs a `pnpm run` script (or a `make` target that depends on `node-modules`) runs it right after checkout
   instead of repeating the three steps (`typescript.yml` and
   `sh-claude-md-size.yml` do; the other `sh-*.yml` files add it as their checks
   move to TypeScript). Its external actions are

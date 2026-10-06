@@ -178,11 +178,11 @@ describe("end to end (spawns node)", () => {
     }
   });
 
-  it("the repo's own claude/CLAUDE.md satisfies the Makefile's ceiling", () => {
-    // Read the ceiling from the Makefile so a bump there cannot leave this
+  it("the repo's own claude/CLAUDE.md satisfies the package.json ceiling", () => {
+    // Read the ceiling from package.json so a bump there cannot leave this
     // test checking a stale value.
-    const makefile = readFileSync(join(REPO_ROOT, "Makefile"), "utf8");
-    const max = /^CLAUDE_MD_MAX_LINES\s*:=\s*([0-9]+)/m.exec(makefile)?.[1];
+    const pkg = readFileSync(join(REPO_ROOT, "package.json"), "utf8");
+    const max = /check-claude-md-lines\.ts claude\/CLAUDE\.md ([0-9]+)/.exec(pkg)?.[1];
     expect(max).toBeDefined();
     const r = exec(join(REPO_ROOT, "claude", "CLAUDE.md"), max ?? "0");
     expect(r.status).toBe(0);

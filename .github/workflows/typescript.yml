@@ -3,8 +3,8 @@ name: TypeScript
 # Lints, typechecks and tests the TypeScript scripts under scripts/ts/ (and,
 # as they land, plugin scripts — see #419, #420).
 #
-# Same contract as shell.yml and python.yml: CI calls the `make` targets humans
-# run locally, so `make check` and a green PR mean the same thing. The Node
+# Calls the package.json scripts (`pnpm run <name>`) that the matching `make`
+# targets delegate to, so `make check` and a green PR mean the same thing. The Node
 # version comes from .nvmrc, the pnpm version from `packageManager` in
 # package.json, and dependencies are pinned by pnpm-lock.yaml
 # (`--frozen-lockfile` fails on any drift).
@@ -28,23 +28,23 @@ jobs:
           # after checkout — don't leave the GITHUB_TOKEN in reach.
           persist-credentials: false
 
-      # Node from .nvmrc, pnpm from `packageManager`, then `make node-modules`.
+      # Node from .nvmrc, pnpm from `packageManager`, then `pnpm install --frozen-lockfile`.
       - uses: ./.github/actions/setup-node-pnpm
 
       - name: Lint (eslint)
-        run: make lint-ts
+        run: pnpm run lint
 
       - name: Typecheck (tsc --noEmit)
-        run: make typecheck-ts
+        run: pnpm run typecheck
 
       - name: Skill contracts
-        run: make check-skills
+        run: pnpm run check-skills
 
       - name: Plugin evals lint
-        run: make lint-plugin-evals
+        run: pnpm run lint-plugin-evals
 
       - name: Test (vitest)
-        run: make test-ts
+        run: pnpm run test
 
       - name: Coverage (vitest, floor)
-        run: make coverage-ts
+        run: pnpm run coverage
