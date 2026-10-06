@@ -39,6 +39,9 @@ import { runPreflight } from "./preflight.ts";
 import {
   DEFAULT_TIER,
   TIERS,
+  ceilingFor,
+  QUICK_FLOOR_USD,
+  QUICK_PER_CASE_USD,
   isTierName,
   type AblationMode,
   type Tier,
@@ -55,13 +58,16 @@ Options:
 ${Object.values(TIERS).map((t) => `                         ${t.name}: ${t.description}`).join("\n")}
   --max-cost-usd <usd> override the tier's cost ceiling (positive number).
                        The CLI has no default ceiling; the wrapper's tiers set
-                       one (quick 1, standard 5, thorough 15). The ceiling
-                       covers the whole wrapper run: each invocation gets the
-                       remaining budget as its own --max-cost-usd, the wrapper
-                       adds up each result's costUsd (list price, judge calls
-                       included), and it stops launching when nothing is left,
-                       listing the unstarted cases (exit 7). A result with no
-                       readable costUsd is charged its full allotment
+                       one: quick ${String(QUICK_PER_CASE_USD)} per case with a floor of ${String(QUICK_FLOOR_USD)}, standard
+                       5 and thorough 15 (flat). The override is always a
+                       total for the whole wrapper run, never per case. Each
+                       invocation gets the remaining budget as its own
+                       --max-cost-usd, the wrapper adds up each result's
+                       costUsd (list price, judge calls included), and it
+                       stops launching when nothing is left, listing the
+                       unstarted cases (exit 7). A result with no readable
+                       costUsd is charged its per-case share (ceiling divided
+                       by cases), capped at what is left
   --model <id>         pin the model (default: pinned in the wrapper)
   --judge-model <id>   pin the judge model (default: pinned in the wrapper)
   --eval-dir <dir>     eval directory relative to the plugin
@@ -219,6 +225,8 @@ export interface RunSummary {
   readonly plugin: string;
   /** The cost ceiling for the whole run, and what the results charged against it. */
   readonly ceilingUsd: number;
+  /** How the ceiling was derived (cases x per-case, the floor, flat, or the override). */
+  readonly ceilingBasis: string;
   readonly spentUsd: number;
   readonly invocations: readonly InvocationSummary[];
   /** Cases never launched (budget spent, or an earlier invocation stopped the run). */
@@ -233,7 +241,7 @@ export interface InvocationSummary {
   readonly cliStatus: number | null;
   /** The budget this invocation was given as its `--max-cost-usd`. */
   readonly allottedUsd: number;
-  /** What it was charged: the result's costUsd, or the full allotment when that was unreadable. */
+  /** What it was charged: the result's costUsd, or the per-case share of the ceiling when that was unreadable. */
   readonly chargedUsd: number;
   readonly exit: ExitCode;
   readonly reasons: readonly string[];
@@ -321,6 +329,7 @@ const runInvocation = async (
   inv: Invocation,
   outputDir: string,
   budgetUsd: number,
+  shareUsd: number,
 ): Promise<{ readonly summary: InvocationSummary; readonly stop: boolean }> => {
   const args = buildCliArgs(
     invocationSpec(options, target, trust, inv, outputDir, budgetUsd),
@@ -344,7 +353,7 @@ const runInvocation = async (
       summary: {
         ...base,
         cliStatus: null,
-        chargedUsd: budgetUsd,
+        chargedUsd: Math.min(shareUsd, budgetUsd),
         exit: EXIT_DEPENDENCY,
         reasons: [`could not start claude: ${ran.error}`],
         resultDir: undefined,
@@ -364,9 +373,10 @@ const runInvocation = async (
     skipUnavailable: options.skipUnavailable,
   });
   const mismatch = plannedCaseProblem(inv.caseName, facts.caseNames);
+  const unreadableCharge = Math.min(shareUsd, budgetUsd);
   const noCost =
     facts.costUsd === undefined
-      ? [`no readable costUsd in the result: charged the full $${String(budgetUsd)} allotment`]
+      ? [`no readable costUsd in the result: charged the $${String(unreadableCharge)} per-case share of the ceiling`]
       : [];
   const reasons = [
     ...verdict.reasons,
@@ -380,7 +390,7 @@ const runInvocation = async (
     summary: {
       ...base,
       cliStatus: ran.status,
-      chargedUsd: facts.costUsd ?? budgetUsd,
+      chargedUsd: facts.costUsd ?? unreadableCharge,
       exit:
         mismatch === undefined ? verdict.code : worstExit(verdict.code, EXIT_PARTIAL),
       reasons,
@@ -433,7 +443,9 @@ export const main = async (
   const runDir = join(base, `run-${runStamp(io)}`);
   const invocations = planInvocations(plan.groups);
   const total = invocations.length;
-  const ceilingUsd = options.maxCostUsd ?? options.tier.maxCostUsd;
+  const ceiling = ceilingFor(options.tier, total, options.maxCostUsd);
+  const ceilingUsd = ceiling.usd;
+  const shareUsd = round4(ceilingUsd / total);
 
   if (options.dryRun) {
     invocations.forEach((inv, i) => {
@@ -452,11 +464,17 @@ export const main = async (
       );
     });
     io.out(
-      `note: each invocation shows the full $${String(ceilingUsd)} ceiling; a real run gives later invocations only the budget left after earlier results\n`,
+      `ceiling: $${String(ceilingUsd)} for the whole run (${ceiling.basis}); a result with no costUsd is charged $${String(shareUsd)} (ceiling / ${String(total)} cases)\n`,
+    );
+    io.out(
+      `note: each invocation shows the full ceiling; a real run gives later invocations only the budget left after earlier results\n`,
     );
     return EXIT_OK;
   }
 
+  io.err(
+    `run-evals: cost ceiling $${String(ceilingUsd)} for ${String(total)} case(s) (${ceiling.basis})\n`,
+  );
   const findings = await runPreflight(io, needsBash(plan.groups));
   findings.forEach((f) => {
     io.err(`run-evals: preflight ${f.level}: ${f.message}\n`);
@@ -482,6 +500,7 @@ export const main = async (
         inv,
         invocationDir(runDir, i + 1, total, inv),
         remaining,
+        shareUsd,
       );
       return {
         done: [...acc.done, r.summary],
@@ -510,6 +529,7 @@ export const main = async (
     scoringNote: scoringNote(options.tier.ablation),
     plugin: basename(target),
     ceilingUsd,
+    ceilingBasis: ceiling.basis,
     spentUsd: progress.spentUsd,
     invocations: progress.done,
     unstarted,

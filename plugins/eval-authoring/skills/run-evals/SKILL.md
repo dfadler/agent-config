@@ -79,13 +79,18 @@ so a single miss fails the case, **including a miss on a half-weight wording reg
 `--max-cost-usd` is a ceiling on the list-price cost estimate, with no default ceiling
 in the CLI. It is checked before each run starts; once spent, nothing further starts,
 runs already started finish, and if any run is left unstarted the CLI exits 2 (the
-wrapper reports 7, partial). The wrapper treats the tier value (or `--max-cost-usd`) as
-the ceiling for the whole run: it makes one invocation per case, gives each the budget
-left, adds up each result's `costUsd`, and stops launching when nothing is left,
-listing the cases it did not run (exit 7). A result with no readable `costUsd` is
-charged its full allotment. The docs give no per-run price, so whether `quick`'s $1
-covers your suite is not known before a run. If a run reports exit 7 with the ceiling
-hit, its scores are partial: trim the cases rather than reading them as failures.
+wrapper reports 7, partial). The wrapper sets one ceiling for the whole run: `quick`
+gets the larger of $1 and $0.25 per selected case (8 cases: $2; 12: $3), `standard` a
+flat $5, `thorough` a flat $15, and `--max-cost-usd` replaces any of these as a total,
+never per case. `--dry-run` prints the ceiling and how it was derived. The wrapper makes
+one invocation per case, gives each the budget left, adds up each result's `costUsd`,
+and stops launching when nothing is left, listing the cases it did not run (exit 7). A
+result with no readable `costUsd` is charged the ceiling divided by the number of cases
+(capped at what is left), so one cost-less result does not use up the budget. The $0.25
+rate comes from logged-in runs ($0.04 to $0.12 a run, judge calls included; derivation in
+`tiers.ts`) with about 2x headroom; it is an estimate until a quick run reports real
+costs. If a run reports exit 7 with the ceiling hit, its scores are partial: trim the
+cases rather than reading them as failures.
 
 ## Gotchas
 

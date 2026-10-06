@@ -403,17 +403,37 @@ describe("one invocation per case", () => {
       expect(summary).toMatchObject({ unstarted: ["c3"], ceilingUsd: 1, spentUsd: 1.2 });
     });
 
-    it("charges the full allotment when costUsd is missing or the result unreadable", async () => {
+    it("charges a missing costUsd its per-case share, so later cases still run", async () => {
       const noCost = setup({
         cases: three(),
         onCli: (args) => ({ result: resultJsonFor([caseOf(args)], { costUsd: undefined }) }),
       });
-      expect(await run(noCost, ["--max-cost-usd", "2"])).toBe(EXIT_PARTIAL);
-      expect(cliCalls(noCost.calls)).toHaveLength(1);
+      expect(await run(noCost, ["--max-cost-usd", "3"])).toBe(EXIT_OK);
+      expect(budgets(noCost)).toEqual(["3", "2", "1"]);
       expect(noCost.err.join("")).toContain("no readable costUsd");
+      expect(noCost.err.join("")).toContain("$1 per-case share");
+    });
+
+    it("charges an unreadable or absent result its per-case share too", async () => {
       const none = setup({ cases: three() });
-      await run(none);
-      expect(cliCalls(none.calls)).toHaveLength(1);
+      expect(await run(none, ["--max-cost-usd", "3"])).toBe(EXIT_PARTIAL);
+      expect(budgets(none)).toEqual(["3", "2", "1"]);
+      const garbled = setup({ cases: three(), onCli: () => ({ result: "{nope" }) });
+      await run(garbled, ["--max-cost-usd", "3"]);
+      expect(budgets(garbled)).toEqual(["3", "2", "1"]);
+    });
+
+    it("caps a per-case share at what is left", async () => {
+      const s = setup({
+        cases: three(),
+        onCli: (args, n) => ({
+          result: resultJsonFor([caseOf(args)], n === 1 ? { costUsd: 2.5 } : { costUsd: undefined }),
+        }),
+      });
+      await run(s, ["--max-cost-usd", "3"]);
+      expect(budgets(s)).toEqual(["3", "0.5"]);
+      const summary: unknown = JSON.parse([...s.written.values()][0] ?? "{}");
+      expect(summary).toMatchObject({ spentUsd: 3 });
     });
 
     it("uses the tier's ceiling when there is no override", async () => {
@@ -443,5 +463,60 @@ describe("one invocation per case", () => {
     expect(lines[2]).toMatch(/^invocation 3\/3: .* --case c3 /);
     expect(s.out.join("")).toContain("only the budget left");
     expect(s.calls).toEqual([]);
+  });
+});
+
+describe("quick tier ceiling scales with the cases selected", () => {
+  const quickCases = (n: number) =>
+    Array.from({ length: n }, (_, i) => ({ name: `q${String(i + 1)}`, tags: ["quick"] }));
+  const run = (s: ReturnType<typeof setup>, extra: string[] = []) =>
+    main([s.root, "--tier", "quick", ...extra], { io: s.io, pluginsDir: "/p" });
+  const budgets = (s: ReturnType<typeof setup>) =>
+    cliCalls(s.calls).map((c) => c.args[c.args.indexOf("--max-cost-usd") + 1]);
+
+  it("gives 1, 8 and 12 cases the floor, $2 and $3 as the first budget", async () => {
+    for (const [n, first] of [[1, "1"], [8, "2"], [12, "3"]] as const) {
+      const s = setup({ cases: quickCases(n), onCli: okCli(0) });
+      expect(await run(s)).toBe(EXIT_OK);
+      expect(budgets(s)[0]).toBe(first);
+      expect(cliCalls(s.calls)).toHaveLength(n);
+    }
+  });
+
+  it("lets --max-cost-usd win and stay a total", async () => {
+    const s = setup({ cases: quickCases(8), onCli: okCli(0) });
+    await run(s, ["--max-cost-usd", "1.5"]);
+    expect(budgets(s)[0]).toBe("1.5");
+  });
+
+  it("charges a cost-less result the share of the scaled ceiling and runs every case", async () => {
+    const s = setup({
+      cases: quickCases(8),
+      onCli: (args) => ({ result: resultJsonFor([caseOf(args)], { costUsd: undefined }) }),
+    });
+    expect(await run(s)).toBe(EXIT_OK);
+    expect(cliCalls(s.calls)).toHaveLength(8);
+    expect(budgets(s).slice(0, 3)).toEqual(["2", "1.75", "1.5"]);
+  });
+
+  it("still stops and lists the unstarted cases when real costs exceed the ceiling", async () => {
+    const s = setup({ cases: quickCases(8), onCli: okCli(0.5) });
+    expect(await run(s)).toBe(EXIT_PARTIAL);
+    expect(cliCalls(s.calls)).toHaveLength(4);
+    expect(s.err.join("")).toContain("not run: q5, q6, q7, q8");
+    const summary: unknown = JSON.parse([...s.written.values()][0] ?? "{}");
+    expect(summary).toMatchObject({ ceilingUsd: 2, unstarted: ["q5", "q6", "q7", "q8"] });
+  });
+
+  it("--dry-run prints the ceiling and how it was derived", async () => {
+    const ceilingLine = async (n: number, extra: string[] = []) => {
+      const s = setup({ cases: quickCases(n) });
+      await run(s, ["--dry-run", ...extra]);
+      return s.out.find((l) => l.startsWith("ceiling:")) ?? "";
+    };
+    expect(await ceilingLine(8)).toContain("$2 for the whole run (8 case(s) x $0.25 = $2)");
+    expect(await ceilingLine(8)).toContain("charged $0.25");
+    expect(await ceilingLine(1)).toContain("floor $1 (1 case(s) x $0.25 = $0.25 is lower)");
+    expect(await ceilingLine(8, ["--max-cost-usd", "9"])).toContain("$9 for the whole run (--max-cost-usd override)");
   });
 });
