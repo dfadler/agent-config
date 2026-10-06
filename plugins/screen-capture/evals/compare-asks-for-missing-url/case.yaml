@@ -25,7 +25,7 @@ execution:
     {"screenCapture": {"base_url": "http://localhost:5173"}}
     Nothing else is configured and no URLs were passed to you.
 
-    Don't run anything. In at most 4 sentences, say what you would do next.
+    Don't run anything. In at most 5 sentences, say what you would do next.
   max_turns: 6
   allowed_tools:
     - Skill

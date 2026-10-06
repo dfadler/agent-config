@@ -45,16 +45,10 @@ graders:
     arm: with-only
 
   # Result.
-  - name: mobile_output_path
+  - name: both_output_paths
     type: regex
     target: last_message
-    pattern: 'knowledge/lighthouse/agent-config/2026-10-05T143022-mobile\.json'
-    match: contains
-
-  - name: desktop_output_path
-    type: regex
-    target: last_message
-    pattern: 'knowledge/lighthouse/agent-config/2026-10-05T143022-desktop\.json'
+    pattern: '^(?=[\s\S]*knowledge/lighthouse/agent-config/2026-10-05T143022-mobile\.json)[\s\S]*knowledge/lighthouse/agent-config/2026-10-05T143022-desktop\.json'
     match: contains
 
   - name: desktop_preset

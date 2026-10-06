@@ -16,7 +16,7 @@ name: attach-fails-closed-for-jira
 description: >
   Asked to attach before/after captures to a Jira ticket, the model invokes attach and says the
   target is not supported yet instead of using the GitHub path or inventing a Jira upload.
-  expected_outcome: PASS when the skill fires, the reply says the Jira target is not supported
+  expected_outcome (says_not_supported is the discriminating check; no_github_fallthrough is a guard): PASS when the skill fires, the reply says the Jira target is not supported
   or implemented yet and shows no gh PR/issue command; FAIL otherwise.
 tags: [screen-capture, attach, trigger, quick]
 

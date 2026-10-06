@@ -15,7 +15,7 @@ schema_version: "1.1"
 name: lighthouse-disabled-is-a-noop
 description: >
   With lighthouseEnabled false in settings.json, the model invokes lighthouse and reports that
-  the pass is skipped, with no Lighthouse command. expected_outcome: PASS
+  the pass is skipped, with no Lighthouse command. expected_outcome (a deliberate guard against ignoring the flag, near-zero delta expected): PASS
   when the skill fires, no npx lighthouse command appears and the reply says the pass is
   skipped; FAIL when a command appears or the skip is not stated.
 tags: [screen-capture, lighthouse, trigger, quick]
