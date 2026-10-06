@@ -1,29 +1,27 @@
 # Run: claude plugin eval plugins/accessibility-skills --case accessibility-skills-reviews-stylesheet --runs 3 --trust-plugin --no-publish
 # Should-fire half, CSS form: the description covers "markup and CSS", so this checks that a
-# stylesheet with no markup at all still fires the skill and gets the full report. Planted:
-# `outline: none` on a focus state (2.4.7), a 16px close control (2.5.8), an infinite spinner
-# animation with no `prefers-reduced-motion` rule (2.3.3), links with the underline removed
-# (1.4.1). Every grader is free, so the case is tagged `quick`.
-# Why these graders: the report's "Checklist categories reviewed" line with its N/A list and the
-# closing "Not covered by this review" section are the skill's own contract and a no-plugin
-# reply has no reason to produce either; the three success criteria check that the checklist's
-# Keyboard, Mobile and touch and Animation categories were applied to CSS. Models know these
-# criteria, so the SC regex alone is a default-behavior check.
-# Sabotage map: categories_line, not_covered_section: the report template in SKILL.md
-# ("Checklist categories reviewed:", "## Not covered by this review"). names_three_criteria:
-# the Keyboard, "Mobile and touch" and "Animation" sections of references/checklist.md. Empty
-# SKILL.md's body and categories_line should fail.
-# Can fail: a freeform answer fails categories_line and not_covered_section; a missed
-# reduced-motion, target-size or focus finding fails names_three_criteria; skill_fired fails if
-# a CSS-only paste never triggers the skill.
+# stylesheet with no markup at all still fires the skill and gets the full report. The CSS
+# plants `outline: none` on a focus state, a 16px close control, an infinite spinner animation
+# with no `prefers-reduced-motion` rule and links with the underline removed, so the review
+# has real material. Every grader is free, so the case is tagged `quick`.
+# Why these graders: the report's "Checklist categories reviewed" line (with its N/A list) and
+# the closing "Not covered by this review" section are the skill's own contract; a no-plugin
+# reply has no reason to produce either. The findings are not graded: models already know
+# these criteria (a first draft graded 2.4.7, 2.5.8 and 2.3.3 and case-reviewer flagged it as
+# passable without the skill).
+# Sabotage map: report_header, categories_line, not_covered_section: the report template in
+# SKILL.md, step 5 ("# Accessibility review", "Checklist categories reviewed:", "## Not covered
+# by this review"). Empty SKILL.md's body and all three should fail.
+# Can fail: a freeform answer fails report_header, categories_line and not_covered_section;
+# skill_fired fails if a CSS-only paste never triggers the skill.
 schema_version: "1.1"
 name: accessibility-skills-reviews-stylesheet
 description: >
   When asked to check a pasted stylesheet for accessibility issues, the model invokes
-  accessibility-skills and replies in its report format, citing 2.4.7, 2.5.8 and 2.3.3.
-  expected_outcome: PASS when the reply has the "Accessibility review" heading, a "Checklist
-  categories reviewed:" line, a "Not covered by this review" section and all three criteria
-  numbers; FAIL otherwise. The criteria numbers are partly a default-behavior check.
+  accessibility-skills and replies in its report format. expected_outcome: PASS when the reply
+  has the "Accessibility review" heading, a "Checklist categories reviewed:" line and a "Not
+  covered by this review" section; FAIL otherwise. The report shape is what a no-plugin reply
+  lacks; the findings themselves are not graded.
 tags: [accessibility-skills, trigger, quick]
 
 execution:
@@ -76,12 +74,5 @@ graders:
     target: last_message
     pattern: '^##[^\n]*Not covered by this review'
     flags: im
-    match: contains
-    arm: both
-
-  - name: names_three_criteria
-    type: regex
-    target: last_message
-    pattern: '(?=[\s\S]*2\.4\.7)(?=[\s\S]*2\.5\.8)(?=[\s\S]*2\.3\.3)'
     match: contains
     arm: both
