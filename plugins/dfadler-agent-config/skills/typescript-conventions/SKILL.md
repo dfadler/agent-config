@@ -2,8 +2,9 @@
 name: typescript-conventions
 description: |
   ALWAYS invoke when writing, rewriting or reviewing TypeScript/JS that contains a
-  type assertion (`as Foo`, `as unknown as Foo`, `!`) or when adding or rewriting a
-  multi-line comment in a `.ts`/`.js` file or pasted snippet. TypeScript/JS conventions: when to avoid a type assertion (`as Foo`,
+  type assertion (`as Foo`, `as unknown as Foo`, `!`) or when adding, rewriting or
+  choosing the syntax of any comment (`//`, `/* */`, JSDoc, even a one-line comment
+  inside a call) in a `.ts`/`.js` file or pasted snippet. TypeScript/JS conventions: when to avoid a type assertion (`as Foo`,
   `as unknown as Foo`, `as any`, the non-null `!` operator) in favor of
   narrowing, boundary validation, or fixing the source type; and which
   comment form (`//`, inline `/* … */`, a starred multi-line `/* … */`

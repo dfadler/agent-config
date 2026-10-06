@@ -1,0 +1,58 @@
+# Run: claude plugin eval plugins/dfadler-agent-config --case typescript-conventions-uses-inline-block-inside-a-call --runs 3 --trust-plugin --no-publish
+# Shared run/grant facts: docs/contributing.md, "Plugin evals". No grant: Skill only; inputs are
+# pasted and nothing runs.
+# Delta case for typescript-conventions "Comment syntax": a comment that sits inside one
+# statement (a call spread over several lines) is an inline `/* ... */`, even when a formatter
+# put it on its own line; not `//`. A default answer uses `//`.
+# Can fail: skill_fired if the description stops matching; inline_block if no single-line
+# `/* ... */` sits on its own line directly above the `3,` argument; no_line_comment if any `//`
+# appears.
+# Skill phrases checked: "`/* … */` inline — sits inside a single statement ... a comment a
+# formatter wrapped onto its own line is still this form as long as the statement continues".
+schema_version: "1.1"
+name: typescript-conventions-uses-inline-block-inside-a-call
+description: >
+    Asked to comment an argument inside a multi-line call, the model invokes
+    typescript-conventions and uses an inline `/* ... */` directly above the argument, not `//`.
+    expected_outcome: PASS when the skill fires, a one-line block comment is directly above `3,`
+    and no `//` appears; FAIL otherwise.
+tags: [typescript-conventions, trigger, quick]
+
+execution:
+  prompt: |
+    Add a one-line comment explaining the `3` argument below: it stays at 3 retries until the
+    flaky-network fix ships, then it goes to 5. Keep the call formatted exactly as it is, with
+    the comment inside the call.
+
+    ```ts
+    retry(
+      fetchOrders,
+      3,
+      onError,
+    );
+    ```
+
+    Reply with one TypeScript code block and nothing else. Do not run anything.
+  max_turns: 4
+  allowed_tools:
+    - Skill
+
+graders:
+  - name: skill_fired
+    type: tool_used
+    tool: Skill
+    input_match: '"skill"\s*:\s*"(?:[\w-]+:)?typescript-conventions"'
+    min: 1
+    arm: with-only
+
+  - name: inline_block
+    type: regex
+    target: last_message
+    pattern: '/\*[^\n]*\*/\s*\n\s*3,'
+    match: contains
+
+  - name: no_line_comment
+    type: regex
+    target: last_message
+    pattern: '//'
+    match: not_contains

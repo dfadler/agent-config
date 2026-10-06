@@ -1,0 +1,77 @@
+# Run: claude plugin eval plugins/dfadler-agent-config --case collab-retro-skips-duplicate-of-open-issue --runs 3 --trust-plugin --no-publish
+# Shared run/grant facts: docs/contributing.md, "Plugin evals". No grant: Skill only; inputs are
+# pasted and nothing runs.
+# Delta case for collab-retro Step 2: a recurring pattern that an open issue already covers
+# is reported as a match and not redrafted, and commenting on the existing issue is its own
+# publish action that needs its own permission. A model without the skill tends to draft a
+# fresh issue.
+# Can fail: skill_fired if the description stops matching "retro"; decides_duplicate if the
+# reply starts DRAFT; names_issue if #412 is not cited; no_draft if a `## Pattern observed`
+# section appears; asks_before_commenting if the permission step is missing.
+# Skill phrases checked: "don't open a duplicate", "commenting on the existing issue is its own
+# publish action and needs its own permission".
+schema_version: "1.1"
+name: collab-retro-skips-duplicate-of-open-issue
+description: >
+    Given a recurring feedback pattern and an open issue that already covers it, the model
+    invokes collab-retro and reports the duplicate without drafting a new issue. expected_outcome:
+    PASS when the skill fires, the reply starts with DUPLICATE, cites #412, drafts nothing and
+    says commenting needs permission; FAIL otherwise.
+tags: [collab-retro, trigger, quick]
+
+execution:
+  prompt: |
+    Do a collaboration retro. I can't run the scanner or `gh` here, so this is what they
+    printed and what is in the files.
+
+    ```
+    $ scan-feedback-memories.sh
+    2026-09-28  -Users-dfadler-Development-api-gateway   feedback_confirm_before_force_push
+    2026-09-11  -Users-dfadler-Development-billing-app   feedback_ask_before_force_pushing
+
+    $ gh issue list --repo dfadler/agent-config --label agent-improvement --state open
+    412  Add a CLAUDE.md rule: confirm before any git push --force  agent-improvement
+    ```
+
+    feedback_confirm_before_force_push: "Always ask me before running git push --force."
+    feedback_ask_before_force_pushing: "Never force-push without checking with me first."
+
+    Start your reply with exactly one word on its own line: DRAFT if you would draft a new
+    issue, or DUPLICATE if an open issue already covers it. Then one or two sentences. Do not run
+    commands or post anything.
+  max_turns: 6
+  allowed_tools:
+    - Skill
+
+graders:
+  - name: skill_fired
+    type: tool_used
+    tool: Skill
+    input_match: '"skill"\s*:\s*"(?:[\w-]+:)?collab-retro"'
+    min: 1
+    arm: with-only
+
+  - name: decides_duplicate
+    type: regex
+    target: last_message
+    pattern: '^\W*DUPLICATE\b'
+    match: contains
+
+  - name: names_issue
+    type: regex
+    target: last_message
+    pattern: '#?412\b'
+    match: contains
+
+  - name: no_draft
+    type: regex
+    target: last_message
+    pattern: '##\s*Pattern observed'
+    match: not_contains
+
+  - name: asks_before_commenting
+    type: regex
+    target: last_message
+    pattern: '(?:permission|go-ahead|approval|ask(?:ing)?\s+(?:you|first))'
+    flags: i
+    match: contains

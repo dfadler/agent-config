@@ -1,8 +1,9 @@
 ---
 name: changesets-authoring
 description: |
-  ALWAYS invoke before answering any question about changesets in a repo that has
-  `.changeset/config.json` or `@changesets/cli`: what to add for release notes, a
+  ALWAYS invoke before answering any question about changesets in any JS/TS repo,
+  whether or not it has `.changeset/config.json` or `@changesets/cli` (the skill
+  decides if the convention applies): what to add for release notes, a
   version bump or a changelog entry, which bump type, or whether a change (even a
   docs-only or typo fix, even a one-word YES/NO answer) needs a changeset. How to write a Changesets (`.changeset/*.md`) entry when working in a repo
   managed by the changesets/changesets tool. Covers detecting whether a repo
