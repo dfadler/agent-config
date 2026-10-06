@@ -40,7 +40,7 @@ graders:
   - name: resizes_to_800
     type: regex
     target: last_message
-    pattern: '(?:magick|convert|mogrify)[^\n]*800'
+    pattern: '(?:magick|convert|mogrify)[^\n]*-(?:resize|scale|thumbnail)\s+["'']?800(?!\d)'
     flags: i
     match: contains
     arm: both

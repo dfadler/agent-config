@@ -42,11 +42,12 @@ graders:
     min: 1
     arm: with-only
 
-  # Result. `--pr` followed by a word boundary does not match `--project`.
+  # Result. Anywhere in the reply: the prompt needs neither flag, and `gh pr edit` takes
+  # neither. `--pr` followed by a word boundary does not match `--project`.
   - name: default_mode_not_append
     type: regex
     target: last_message
-    pattern: 'upload\.sh[\s\S]{0,160}?--(?:pr|issue)\b'
+    pattern: '--(?:pr|issue)\b'
     match: not_contains
     arm: both
 

@@ -18,9 +18,10 @@ name: gh-attach-image-explains-404-before-save
 description: >
   When told an uploaded user-attachments URL returns 404, the model invokes gh-attach-image
   and answers that the upload did not fail: save a body or comment that references the URL.
-  expected_outcome: PASS when the reply says to save a body, comment or description and
-  recommends no gist or raw URL; FAIL otherwise. Partly known by default, so the delta may be
-  small.
+  expected_outcome: PASS when the reply says to save a body, comment or description that
+  references the URL and recommends no gist or raw URL; FAIL otherwise. Mainly a trigger probe:
+  the claim-on-save behavior is partly known by default, so the delta may be small and
+  skill_fired is the main signal.
 tags: [gh-attach-image, trigger, quick]
 
 execution:
@@ -41,11 +42,12 @@ graders:
     min: 1
     arm: with-only
 
-  # Result. Needs a "save" word and a place it is saved (body, comment or description).
+  # Result. Needs "save", a place it is saved (body, comment or description) and the idea that
+  # the saved text references the URL (reference, include, contain or embed).
   - name: says_save_the_body
     type: regex
     target: last_message
-    pattern: '(?=[\s\S]*\bsav(?:e|ed|ing)\b)(?=[\s\S]*\b(?:body|comment|description)\b)'
+    pattern: '(?=[\s\S]*\bsav(?:e|ed|ing)\b)(?=[\s\S]*\b(?:body|comment|description)\b)(?=[\s\S]*\b(?:referenc\w+|includ\w+|contain\w*|embed\w*)\b)'
     flags: i
     match: contains
     arm: both

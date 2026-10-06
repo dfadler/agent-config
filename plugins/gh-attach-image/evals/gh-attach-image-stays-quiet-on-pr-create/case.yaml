@@ -41,7 +41,7 @@ graders:
   - name: uses_pr_create
     type: regex
     target: last_message
-    pattern: 'gh\s+pr\s+create[\s\S]*(?:--body-file|\s-F\s)'
+    pattern: 'gh\s+pr\s+create[\s\S]*(?:--body-file|-F)\s+body\.md'
     match: contains
     arm: both
 
