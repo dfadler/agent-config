@@ -1,0 +1,88 @@
+# Run: claude plugin eval plugins/accessibility-skills --case accessibility-skills-does-not-certify-compliance --runs 3 --trust-plugin --no-publish
+# Should-fire half, "is this markup WCAG compliant" phrasing from the description, on source
+# that is clean: no finding is planted, so the only way to answer well is the skill's honesty
+# rule. The skill reads source only; a clean source review is not a pass, so the reply must say
+# what it did not cover and send contrast and keyboard behaviour to a scanner. Every grader is
+# free, so the case is tagged `quick`.
+# Sabotage map: not_covered_section, names_scanner: the "## Not covered by this review"
+# section of the report template in SKILL.md and "recommend axe-core/Lighthouse" there.
+# no_bare_yes: "Don't let" "not covered by this review" read as "passed" (SKILL.md, after the
+# template) and "checked and passed" under Grounding and honesty in references/grading.md.
+# Empty SKILL.md's body and not_covered_section should fail.
+# Can fail: a reply that opens with "Yes" fails no_bare_yes; a review with no uncovered section
+# fails not_covered_section; no scanner named fails names_scanner; skill_fired fails if the
+# question never triggers the skill. A no-plugin reply may also hedge about contrast, so
+# expect a smaller delta than the section-shape cases; the heading is the discriminator.
+schema_version: "1.1"
+name: accessibility-skills-does-not-certify-compliance
+description: >
+  When asked whether a clean, pasted page is WCAG 2.2 AA compliant, the model invokes
+  accessibility-skills and does not certify it: the reply has a "Not covered by this review"
+  section naming axe-core and does not open with "Yes". expected_outcome: PASS when the skill
+  fires, the section and axe-core are present and the reply does not open with a bare "Yes";
+  FAIL otherwise.
+tags: [accessibility-skills, trigger, quick]
+
+execution:
+  prompt: |
+    Is this markup WCAG 2.2 AA compliant? It is contact.html. The stylesheet is not
+    included.
+
+    ```html
+    <!doctype html>
+    <html lang="en">
+    <head>
+      <title>Contact us</title>
+      <meta name="viewport" content="width=device-width, initial-scale=1">
+    </head>
+    <body>
+      <main>
+        <h1>Contact us</h1>
+        <form>
+          <label for="email">Email</label>
+          <input id="email" type="email" autocomplete="email">
+          <button type="submit">Send message</button>
+        </form>
+      </main>
+    </body>
+    </html>
+    ```
+  max_turns: 12
+  allowed_tools:
+    - Skill
+    - Read
+
+graders:
+  # Steps. Indicator in a two-arm run, scored only with the plugin.
+  - name: skill_fired
+    type: tool_used
+    tool: Skill
+    input_match: '"skill"\s*:\s*"(?:[\w-]+:)?accessibility-skills"'
+    min: 1
+    arm: with-only
+
+  # Result.
+  - name: not_covered_section
+    type: regex
+    target: last_message
+    pattern: '^##[^\n]*Not covered by this review'
+    flags: im
+    match: contains
+    arm: both
+
+  - name: names_scanner
+    type: regex
+    target: last_message
+    pattern: 'axe-core'
+    flags: i
+    match: contains
+    arm: both
+
+  # No flag m, so ^ is the start of the reply: a reply that opens by certifying fails.
+  - name: no_bare_yes
+    type: regex
+    target: last_message
+    pattern: '^\W*Yes\b'
+    flags: i
+    match: not_contains
+    arm: both
