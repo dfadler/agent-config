@@ -51,7 +51,7 @@ Work down the ladder; stop at the first rung that reproduces the failure.
    workers; passing the flag to the outer `node` alone would not.
 
 In Vitest 4+, `poolOptions` was removed, `maxThreads`/`maxForks` became `maxWorkers`,
-and `VITEST_MAX_THREADS`/`VITEST_MAX_FORKS` became `VITEST_MAX_WORKERS`
+and `VITEST_MAX_THREADS`/`VITEST_MAX_FORKS` were renamed `VITEST_MAX_WORKERS`
 ([migration guide](https://v4.vitest.dev/guide/migration.html)). `--maxWorkers` needs
 Vitest 4+; check `vitest --version`. Check any other flag with `vitest --help` for the
 installed version before relying on it.

@@ -43,6 +43,12 @@ jobs:
       - name: Plugin evals lint
         run: make lint-plugin-evals
 
+      - name: Vitest flag drift
+        run: make check-vitest-flags
+
+      - name: Vitest 3 option names
+        run: make check-vitest-v3-names
+
       - name: Test (vitest)
         run: make test-ts
 
