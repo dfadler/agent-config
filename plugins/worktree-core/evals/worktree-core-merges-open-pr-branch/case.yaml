@@ -1,0 +1,50 @@
+# Run: claude plugin eval plugins/worktree-core --case worktree-core-merges-open-pr-branch --runs 3 --trust-plugin --no-publish
+# Shared run/grant facts: docs/contributing.md, "Plugin evals". No grant; reply-only, and the
+# commands are written, never run, so no real repo is touched (hermetic).
+# Should-fire case for "catching a branch that already has an open PR up to a moved main".
+# All free, quick.
+# Can fail: skill_fired fails if the catch-up question does not match the description;
+# merges_main fails without a `git merge ... main` command; no_rebase fails on any `rebase`
+# (a no-plugin model often answers `git rebase origin/main` or `git pull --rebase`). The
+# prompt states there is an open PR with review comments but never says "merge", so the
+# choice is not cued; a baseline that merges anyway passes, which lowers the delta.
+# Skill phrase checked: "catch it up to a moved `main` via merge, not rebase".
+schema_version: "1.1"
+name: worktree-core-merges-open-pr-branch
+description: >
+  Asked to bring a branch with an open, reviewed PR up to date with a moved main, the model
+  invokes git-worktree-usage and answers with git merge, not a rebase. expected_outcome: PASS
+  when the skill is invoked and the reply has a git merge of main and no rebase; FAIL when the
+  skill is not invoked, the merge is missing, or any rebase appears.
+tags: [worktree-core, trigger, quick]
+
+execution:
+  prompt: |
+    Branch feat/search has an open pull request (#88) that already has review comments.
+    main has moved on since I branched. Give the git commands to bring feat/search up to
+    date with main, assuming I'm on feat/search with a clean tree. Don't run anything; answer
+    with the commands in one bash code block, no comments and no other text.
+  max_turns: 6
+  allowed_tools:
+    - Skill
+
+graders:
+  - name: skill_fired
+    type: tool_used
+    tool: Skill
+    input_match: '"skill"\s*:\s*"(?:[\w-]+:)?git-worktree-usage"'
+    min: 1
+    arm: with-only
+
+  - name: merges_main
+    type: regex
+    target: last_message
+    pattern: 'git\s+merge\b[^\n]*\bmain\b'
+    match: contains
+
+  - name: no_rebase
+    type: regex
+    target: last_message
+    pattern: '\brebase\b'
+    flags: i
+    match: not_contains

@@ -1,0 +1,51 @@
+# Run: claude plugin eval plugins/worktree-core --case worktree-core-isolates-subagent-at-spawn --runs 3 --trust-plugin --no-publish
+# Shared run/grant facts: docs/contributing.md, "Plugin evals". No grant; reply-only. The
+# Agent tool is not granted and nothing runs; the model only writes the arguments it would pass.
+# Should-fire case for a skill rule a no-plugin model has little reason to know: isolation is
+# decided at spawn time with `isolation: "worktree"`, not by the subagent calling EnterWorktree.
+# Most discriminating case of the suite. All free, quick.
+# Can fail: skill_fired fails if a subagent-isolation question does not match the description;
+# sets_isolation_worktree fails without `"isolation": "worktree"` in the arguments;
+# no_inner_worktree_call fails if the reply tells the subagent to call EnterWorktree or run
+# `git worktree add` itself. The prompt says "its own git worktree" but not how.
+# Skill phrase checked: "pass `isolation: \"worktree\"` on the `Agent`-tool call".
+schema_version: "1.1"
+name: worktree-core-isolates-subagent-at-spawn
+description: >
+  Asked how to spawn a subagent into its own git worktree, the model invokes
+  git-worktree-usage and sets isolation to worktree on the Agent call instead of telling the
+  subagent to create one. expected_outcome: PASS when the skill is invoked and the arguments
+  contain isolation worktree with no EnterWorktree or git worktree add; FAIL otherwise.
+tags: [worktree-core, trigger, quick]
+
+execution:
+  prompt: |
+    I'm spawning a subagent with the Agent tool to refactor src/parser/ while I keep editing
+    in the main checkout, and I want the subagent isolated in its own git worktree. Don't run
+    anything; show only the arguments of the Agent tool call as one JSON object in a single
+    code block, with no other text.
+  max_turns: 6
+  allowed_tools:
+    - Skill
+
+graders:
+  - name: skill_fired
+    type: tool_used
+    tool: Skill
+    input_match: '"skill"\s*:\s*"(?:[\w-]+:)?git-worktree-usage"'
+    min: 1
+    arm: with-only
+
+  - name: sets_isolation_worktree
+    type: regex
+    target: last_message
+    pattern: '"isolation"\s*:\s*"worktree"'
+    match: contains
+
+  # The reply is one JSON block, so a subagent prompt telling it to create a worktree is the
+  # only way these words appear.
+  - name: no_inner_worktree_call
+    type: regex
+    target: last_message
+    pattern: 'EnterWorktree|git\s+worktree\s+add'
+    match: not_contains

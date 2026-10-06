@@ -1,0 +1,44 @@
+# Run: claude plugin eval plugins/worktree-core --case worktree-core-stays-quiet-on-prerequisite-rebase --runs 3 --trust-plugin --no-publish
+# Shared run/grant facts: docs/contributing.md, "Plugin evals". No grant; reply-only.
+# Should-not-fire near-miss that shares the skill's vocabulary (branch, main, rebase, PR) but
+# wants the opposite answer: with no PR yet, rebasing is fine ("Rebase freely before a PR
+# exists"). Guards against the merge-not-rebase rule being over-applied. Delta 0 by design.
+# All free, quick.
+# Can fail: no_worktree_skill_fired fails if the skill over-triggers on a plain local history
+# cleanup; rewrites_history fails if the reply refuses to rebase/squash (the skill over-applied
+# in the with-plugin arm).
+schema_version: "1.1"
+name: worktree-core-stays-quiet-on-prerequisite-rebase
+description: >
+  Squashing four unpushed commits on a branch with no PR is ordinary history editing, so
+  git-worktree-usage must not fire and the reply uses rebase, reset --soft or merge --squash.
+  expected_outcome: PASS when the skill is not invoked and the reply rewrites history; FAIL when
+  the skill is invoked or the reply avoids rewriting. Regression guard: Delta 0 by design.
+tags: [worktree-core, trigger, quick]
+
+execution:
+  prompt: |
+    I have a local branch cleanup/tidy with 4 messy commits. It has never been pushed and
+    there is no pull request. Give the git commands to squash them into one commit on top of
+    the latest origin/main. Don't run anything; answer with the commands in one bash code
+    block, no comments and no other text.
+  max_turns: 6
+  allowed_tools:
+    - Skill
+
+graders:
+  - name: no_worktree_skill_fired
+    type: tool_used
+    tool: Skill
+    input_match: '"skill"\s*:\s*"(?:[\w-]+:)?git-worktree-usage"'
+    min: 0
+    max: 0
+    arm: both
+
+  # Completion check; a baseline passes it too.
+  - name: rewrites_history
+    type: regex
+    target: last_message
+    pattern: '\brebase\b|reset\s+--soft|merge\s+--squash'
+    match: contains
+    arm: both

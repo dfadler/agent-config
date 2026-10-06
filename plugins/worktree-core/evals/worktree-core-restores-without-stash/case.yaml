@@ -1,0 +1,66 @@
+# Run: claude plugin eval plugins/worktree-core --case worktree-core-restores-without-stash --runs 3 --trust-plugin --no-publish
+# Shared run/grant facts: docs/contributing.md, "Plugin evals". No grant; reply-only, commands
+# are written and never run (hermetic).
+# Should-fire case for the git stash collision hazard: a scoped "revert these files, then get
+# my edits back" need while another session shares the repo. All free, quick.
+# Can fail: skill_fired fails if the parallel-session stash question does not match the
+# description; uses_git_restore fails without `git restore ... --worktree`; no_stash fails on
+# any `git stash` (the no-plugin default, since a stash is the usual way to set edits aside);
+# no_checkout_head fails on `git checkout HEAD` (the skill names it as the variant that also
+# resets the index); backs_up_with_copy (half weight) wants the filesystem-copy backup the
+# skill pairs with git restore. The prompt does not mention stash.
+# Skill phrases checked: "`git restore --source=HEAD --worktree -- <files>`", "plus a
+# filesystem copy as your own backup", "`git stash` is repo-wide, not per-worktree".
+schema_version: "1.1"
+name: worktree-core-restores-without-stash
+description: >
+  Asked how to temporarily revert two files to HEAD for a before screenshot and get the edits
+  back, while another Claude Code session shares the repo, the model invokes git-worktree-usage
+  and answers with git restore and a file copy, not git stash. expected_outcome: PASS when the
+  skill is invoked, the reply has git restore with --worktree and no git stash or git checkout
+  HEAD; FAIL otherwise.
+tags: [worktree-core, trigger, quick]
+
+execution:
+  prompt: |
+    I have two Claude Code sessions running in different worktrees of this repo. In mine I
+    want to temporarily revert src/Header.tsx and src/Header.css to HEAD so I can take a
+    "before" screenshot, then get my edits back afterwards. Give the shell commands in order.
+    Don't run anything; answer in one bash code block, no comments and no other text.
+  max_turns: 6
+  allowed_tools:
+    - Skill
+
+graders:
+  - name: skill_fired
+    type: tool_used
+    tool: Skill
+    input_match: '"skill"\s*:\s*"(?:[\w-]+:)?git-worktree-usage"'
+    min: 1
+    arm: with-only
+
+  - name: uses_git_restore
+    type: regex
+    target: last_message
+    pattern: 'git\s+restore\b[^\n]*--worktree'
+    match: contains
+
+  - name: no_stash
+    type: regex
+    target: last_message
+    pattern: 'git\s+stash'
+    match: not_contains
+
+  - name: no_checkout_head
+    type: regex
+    target: last_message
+    pattern: 'git\s+checkout\s+(?:HEAD\b|--\s)'
+    match: not_contains
+
+  # Half weight: a copy backup is the skill's advice but a correct reply may restore from a patch.
+  - name: backs_up_with_copy
+    type: regex
+    target: last_message
+    pattern: '(?:^|\n|&&|;)\s*cp\s+'
+    match: contains
+    weight: 0.5
