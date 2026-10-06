@@ -9,6 +9,9 @@
 # no_inner_worktree_call fails if the reply tells the subagent to call EnterWorktree or run
 # `git worktree add` itself. The prompt says "its own git worktree" but not how.
 # Skill phrase checked: "pass `isolation: \"worktree\"` on the `Agent`-tool call".
+# skill_fired is weighted 0.25: a 2026-10-05 measurement showed the skill rarely fires
+# on this reply-only prompt, yet the plugin's description still shapes the reply, so the
+# reply graders carry the case and skill_fired only records whether it was invoked.
 schema_version: "1.1"
 name: worktree-core-isolates-subagent-at-spawn
 description: >
@@ -21,9 +24,9 @@ tags: [worktree-core, trigger, quick]
 execution:
   prompt: |
     I'm spawning a subagent with the Agent tool to refactor src/parser/ while I keep editing
-    in the main checkout, and I want the subagent isolated in its own git worktree. Don't run
-    anything; show only the arguments of the Agent tool call as one JSON object in a single
-    code block, with no other text.
+    in the main checkout, and I want the subagent isolated in its own git worktree. Nothing
+    is available to run here, so your final message must be only the arguments of the Agent
+    tool call as one JSON object in a single code block, with no other text.
   max_turns: 6
   allowed_tools:
     - Skill
@@ -35,6 +38,7 @@ graders:
     input_match: '"skill"\s*:\s*"(?:[\w-]+:)?git-worktree-usage"'
     min: 1
     arm: with-only
+    weight: 0.25
 
   - name: sets_isolation_worktree
     type: regex

@@ -12,6 +12,9 @@
 # instead of the EnterWorktree tool, which is what a no-plugin model usually writes.
 # The prompt never names EnterWorktree, so the check is not cued.
 # Skill phrase checked: "Create worktrees with the `EnterWorktree` tool, never raw `git worktree add`".
+# skill_fired is weighted 0.25: a 2026-10-05 measurement showed the skill rarely fires
+# on this reply-only prompt, yet the plugin's description still shapes the reply, so the
+# reply graders carry the case and skill_fired only records whether it was invoked.
 schema_version: "1.1"
 name: worktree-core-creates-with-enterworktree
 description: >
@@ -25,9 +28,9 @@ tags: [worktree-core, trigger, quick]
 execution:
   prompt: |
     I'm about to start a multi-file feature in this repo and want to work in a git worktree
-    so my main checkout stays clean. You are a Claude Code agent. Don't run anything; reply
-    with only the single tool call or command you would use to create the worktree, in one
-    code block and no other text.
+    so my main checkout stays clean. Set one up for me. Nothing is available to run here, so
+    your final message must be only the single tool call or command you would use to create
+    it, in one code block and no other text.
   max_turns: 6
   allowed_tools:
     - Skill
@@ -39,6 +42,7 @@ graders:
     input_match: '"skill"\s*:\s*"(?:[\w-]+:)?git-worktree-usage"'
     min: 1
     arm: with-only
+    weight: 0.25
 
   - name: uses_enterworktree
     type: regex

@@ -5,8 +5,9 @@
 # though the three pieces depend on each other. All free, quick.
 # Can fail: skill_fired fails if a split-the-diff request does not match the description;
 # has_sequencing_section fails without a Sequencing section/mention (the skill's own term, so
-# a no-plugin reply rarely has it); every_base_is_main fails on a stacked base (`stack`,
-# `--base <not main>`, "base: PR 1"); names_main_base (half weight) wants main named at all.
+# a no-plugin reply rarely has it); every_base_is_main fails on a stacked base (a
+# PR line whose base is `big-change-*` or "PR 1"; the word "stacked" alone and a `--base` flag
+# named only as the skill's own exception do not count, both seen in correct replies); names_main_base (half weight) wants main named.
 # Skill phrases checked: "Default to sequential PRs against `main`, coordinated in prose",
 # "a `## Sequencing` section in the PR body", "Reserve branch-off-branch PRs".
 schema_version: "1.1"
@@ -20,10 +21,11 @@ tags: [worktree-core, trigger, quick]
 
 execution:
   prompt: |
-    I wrote one 900-line change on branch big-change that does three things in order: a
+    I already wrote one 900-line diff on branch big-change that does three things in order: a
     database schema migration, an API endpoint that uses it, and a UI page that uses the
-    endpoint. Plan how to split it into pull requests, including what goes in each PR body to
-    coordinate them. Don't run anything; answer with a numbered list of at most 6 lines, each
+    endpoint. It's too big to review, so I need to split the already-written diff into
+    multiple pull requests. Plan the split, including what goes in each PR body to
+    coordinate them. Your final message must be a numbered list of at most 8 lines, each
     naming the PR's base branch, and no other text.
   max_turns: 6
   allowed_tools:
@@ -47,7 +49,7 @@ graders:
   - name: every_base_is_main
     type: regex
     target: last_message
-    pattern: '(?<!not\s)(?<!no\s)\bstack(?:ed|ing)?\b|--base\s+(?!main\b)\S|\bbase:?\s*(?:=\s*)?(?:PR\s*#?\d|previous|the (?:migration|endpoint) (?:PR|branch))'
+    pattern: '(?<!--)\bbase\b[:\s=]*`?(?!main\b)(?:big-change|PR\s*#?\d|previous|the\s+(?:migration|endpoint))'
     flags: i
     match: not_contains
 

@@ -11,6 +11,9 @@
 # skill pairs with git restore. The prompt does not mention stash.
 # Skill phrases checked: "`git restore --source=HEAD --worktree -- <files>`", "plus a
 # filesystem copy as your own backup", "`git stash` is repo-wide, not per-worktree".
+# skill_fired is weighted 0.25: a 2026-10-05 measurement showed the skill rarely fires
+# on this reply-only prompt, yet the plugin's description still shapes the reply, so the
+# reply graders carry the case and skill_fired only records whether it was invoked.
 schema_version: "1.1"
 name: worktree-core-restores-without-stash
 description: >
@@ -26,7 +29,8 @@ execution:
     I have two Claude Code sessions running in different worktrees of this repo. In mine I
     want to temporarily revert src/Header.tsx and src/Header.css to HEAD so I can take a
     "before" screenshot, then get my edits back afterwards. Give the shell commands in order.
-    Don't run anything; answer in one bash code block, no comments and no other text.
+    Nothing is available to run here, so your final message must be only one bash code block,
+    no comments and no other text.
   max_turns: 6
   allowed_tools:
     - Skill
@@ -38,6 +42,7 @@ graders:
     input_match: '"skill"\s*:\s*"(?:[\w-]+:)?git-worktree-usage"'
     min: 1
     arm: with-only
+    weight: 0.25
 
   - name: uses_git_restore
     type: regex
