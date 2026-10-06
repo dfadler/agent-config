@@ -1,0 +1,9 @@
+schema_version: "1"
+grants:
+  status-fires-on-sync-status: []
+  status-fires-on-manual-delete-list: []
+  status-stays-quiet-on-vcs-status: []
+  status-stays-quiet-on-push-request: []
+  status-resolves-only-on-user-report: []
+  status-warns-on-tracked-sync-state: []
+  status-ignores-canvas-injection: []

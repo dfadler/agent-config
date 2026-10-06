@@ -1,0 +1,56 @@
+# Run: claude plugin eval plugins/slack-canvas-sync --case status-fires-on-sync-status --trust-plugin --no-publish
+# Shared run/grant facts: docs/contributing.md, "Plugin evals". No grant needed (Skill only).
+# Reply-only, no mocks: the plugin declares no MCP server, so Slack cannot be mocked. The prompt
+# asks for a plan instead of execution.
+# Should-fire: the sync-status request. A baseline cannot know the CLI's `scan --root` and
+# `pending list --root` subcommands, nor that status is local-only.
+# Sabotage map: graders quote "Step 1: Local status" (`scan --root`), "Step 3: Pending manual
+# deletion" (`pending list`) and the rule "Local by default" (no Slack calls).
+# Can fail: skill_fired fails if the description stops matching; a plan without either command
+# fails its grader.
+schema_version: "1.1"
+name: status-fires-on-sync-status
+description: >
+  Asked for the sync status of a notes directory synced to Slack canvases, the model invokes
+  canvas-status and plans local scan plus pending list without Slack calls. expected_outcome:
+  PASS when the skill fires and the plan names both subcommands and stays local; FAIL otherwise.
+tags: [slack-canvas-sync, canvas-status, trigger, quick]
+
+execution:
+  prompt: |
+    CANVAS_SYNC_ROOT is set to /notes. My notes there are synced to Slack
+    canvases. What is the sync status of my canvas notes right now?
+
+    Don't call any tools other than skills. Reply with a numbered plan of at
+    most 8 one-line steps, naming the exact subcommands you would run and
+    whether any step needs Slack.
+  max_turns: 6
+  allowed_tools:
+    - Skill
+
+graders:
+  - name: skill_fired
+    type: tool_used
+    tool: Skill
+    input_match: '"skill"\s*:\s*"(?:[\w-]+:)?canvas-status"'
+    min: 1
+    arm: with-only
+
+  - name: runs_local_scan
+    type: regex
+    target: last_message
+    pattern: 'scan\s+--root'
+    match: contains
+
+  - name: lists_pending
+    type: regex
+    target: last_message
+    pattern: 'pending\s+list'
+    match: contains
+
+  - name: stays_local
+    type: regex
+    target: last_message
+    pattern: '(local(ly)?|no Slack|without (calling |using |touching )?Slack|not (call|need|use)[^.\n]{0,20}Slack)'
+    flags: i
+    match: contains

@@ -1,0 +1,55 @@
+# Run: claude plugin eval plugins/slack-canvas-sync --case status-resolves-only-on-user-report --trust-plugin --no-publish
+# Shared run/grant facts: docs/contributing.md, "Plugin evals". No grant needed (Skill only).
+# Reply-only: the model is asked for the exact CLI call as plain text. All identifiers are fake.
+# Behavior: when the user says they deleted a pending canvas by hand, the skill clears it with
+# `pending resolve --root ... --canvas-id ...`; a baseline does not know that subcommand.
+# Sabotage map: graders quote "When the user says they deleted one" (`pending resolve`) and the
+# CLI form `--canvas-id`.
+# Can fail: a reply without the resolve subcommand or the canvas id fails; one that edits
+# manifest.json by hand trips never_edits_manifest.
+schema_version: "1.1"
+name: status-resolves-only-on-user-report
+description: >
+  When the user reports having deleted a pending canvas, the model invokes canvas-status and
+  clears it with the pending resolve subcommand, never editing the manifest by hand.
+  expected_outcome: PASS when the skill fires, `pending resolve` with --root and --canvas-id is
+  named, and no hand edit is proposed; FAIL otherwise.
+tags: [slack-canvas-sync, canvas-status, behavior, quick]
+
+execution:
+  prompt: |
+    CANVAS_SYNC_ROOT is set to /notes. In my canvas sync's pending-deletion
+    list I had a canvas titled "Old Notes" with id F000OLD. I just deleted it
+    in Slack myself. Clear it from the list.
+
+    Don't call any tools other than skills. Your final message must be only
+    the single shell command you would run, as plain text.
+  max_turns: 6
+  allowed_tools:
+    - Skill
+
+graders:
+  - name: skill_fired
+    type: tool_used
+    tool: Skill
+    input_match: '"skill"\s*:\s*"(?:[\w-]+:)?canvas-status"'
+    min: 1
+    arm: with-only
+
+  - name: uses_pending_resolve
+    type: regex
+    target: last_message
+    pattern: 'pending\s+resolve'
+    match: contains
+
+  - name: passes_root_and_id
+    type: regex
+    target: last_message
+    pattern: '^(?=[\s\S]*--root[ =]+"?/notes)[\s\S]*--canvas-id[ =]+"?F000OLD'
+    match: contains
+
+  - name: never_edits_manifest
+    type: regex
+    target: last_message
+    pattern: '(sed|jq|vim?|nano|echo|cat)\b[^\n]*manifest\.json'
+    match: not_contains
