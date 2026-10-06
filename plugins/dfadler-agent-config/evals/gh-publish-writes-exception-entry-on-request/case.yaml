@@ -55,5 +55,12 @@ graders:
   - name: note_field
     type: regex
     target: last_message
-    pattern: '"note"\s*:\s*"[^"]{3,}"'
+    pattern: '"note"\s*:\s*"[^"\s][^"]{2,}"'
     match: contains
+
+  # No trailing comma before a closing brace or bracket (invalid JSON).
+  - name: no_trailing_comma
+    type: regex
+    target: last_message
+    pattern: ',\s*[}\]]'
+    match: not_contains

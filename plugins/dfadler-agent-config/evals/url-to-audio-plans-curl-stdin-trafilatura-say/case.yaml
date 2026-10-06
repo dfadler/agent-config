@@ -46,7 +46,7 @@ graders:
   - name: extracts_via_stdin
     type: regex
     target: last_message
-    pattern: 'trafilatura\s*<'
+    pattern: 'trafilatura\s*<[^\n>]*>\s*(\S+)[\s\S]*?\bsay\b[\s\S]*?(?:-f\s+|<\s*)\1'
     match: contains
 
   - name: says_to_m4a

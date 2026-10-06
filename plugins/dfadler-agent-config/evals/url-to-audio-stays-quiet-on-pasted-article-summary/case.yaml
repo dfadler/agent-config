@@ -36,6 +36,6 @@ graders:
   - name: has_the_fact
     type: regex
     target: last_message
-    pattern: '(?=[\s\S]*2019)(?=[\s\S]*(?:four million|4 million|2022|storage))'
+    pattern: '(?=[\s\S]*Tinyqueue)(?=[\s\S]*2019)(?=[\s\S]*(?:four million|4 million|2022|storage))'
     match: contains
     arm: both

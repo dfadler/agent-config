@@ -49,7 +49,7 @@ graders:
   - name: starred_block
     type: regex
     target: last_message
-    pattern: '/\*(?!\*)[ \t]*\n(?:[ \t]*\* [^\n]*\n){2,5}[ \t]*\*/'
+    pattern: '/\*(?!\*)[ \t]*\n(?:[ \t]*\*[ \t]+\S[^\n]*\n){3,4}[ \t]*\*/[ \t]*\n[ \t]*if\b'
     match: contains
 
   - name: no_stacked_line_comments

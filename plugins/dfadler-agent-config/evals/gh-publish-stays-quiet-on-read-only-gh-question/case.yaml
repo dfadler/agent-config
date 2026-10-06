@@ -41,3 +41,17 @@ graders:
     pattern: 'gh issue list[^\n]*(?:(?:--label|-l)[ =]+"?bug|label:bug)'
     match: contains
     arm: both
+
+  - name: right_repo
+    type: regex
+    target: last_message
+    pattern: 'gh issue list[^\n]*(?:-R|--repo)[ =]+"?example-org/example-app\b'
+    match: contains
+    arm: both
+
+  - name: open_issues_only
+    type: regex
+    target: last_message
+    pattern: 'gh issue list[^\n]*(?:--state|-s)[ =]+"?(?:closed|all)\b'
+    match: not_contains
+    arm: both

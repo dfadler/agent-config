@@ -65,6 +65,20 @@ graders:
     pattern: '##\s*Pattern observed[\s\S]*##\s*Suggested change'
     match: contains
 
+  # The reply is a title line, then the template body: marker, Pattern observed, Why it's
+  # worth fixing here, Suggested change, in that order.
+  - name: why_section
+    type: regex
+    target: last_message
+    pattern: '##\s*Pattern observed[\s\S]*##\s*Why it.s worth fixing here[\s\S]*##\s*Suggested change'
+    match: contains
+
+  - name: title_line
+    type: regex
+    target: last_message
+    pattern: '^\W*(?:Title:?\W*)?[A-Za-z][^\n]{8,}\n[\s\S]*🤖 \*\*Claude:\*\*'
+    match: contains
+
   - name: no_project_names
     type: regex
     target: last_message
