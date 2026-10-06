@@ -15,6 +15,8 @@
 REAL_HOOK="$BATS_TEST_DIRNAME/../../plugins/worktree-core/skills/git-worktree-usage/scripts/check-worktree-symlinks-hook.sh"
 HOOK_LIB="$BATS_TEST_DIRNAME/../../plugins/worktree-core/skills/git-worktree-usage/scripts/worktree-hook-lib.sh"
 
+load helpers
+
 setup() {
   TMP="$(mktemp -d)"
   cp "$REAL_HOOK" "$TMP/check-worktree-symlinks-hook.sh"
@@ -103,14 +105,14 @@ run_hook() {
   _install_fake_verify
   run_hook WORKTREE_SYMLINK_CHECK=on FAKE_OUTPUT="node_modules resolves to a stale worktree"
   [ "$status" -eq 0 ]
-  [[ "$output" == "🔗"*"node_modules resolves to a stale worktree"* ]]
+  assert_glob "$output" '🔗*node_modules resolves to a stale worktree*'
 }
 
 @test "opted in, a failing verify script (mismatch not fixed) is swallowed — the hook still exits 0" {
   _install_fake_verify
   run_hook WORKTREE_SYMLINK_CHECK=on FAKE_OUTPUT="could not relink node_modules" FAKE_EXIT=1
   [ "$status" -eq 0 ]
-  [[ "$output" == *"could not relink node_modules"* ]]
+  assert_glob "$output" '*could not relink node_modules*'
 }
 
 @test "WORKTREE_SYMLINK_CHECK=1/true/yes/on all opt in and run verify" {

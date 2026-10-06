@@ -16,6 +16,8 @@ bats_require_minimum_version 1.5.0 # for `run --separate-stderr`
 
 REAL_HOOK="$BATS_TEST_DIRNAME/../../plugins/dfadler-agent-config/hooks/scripts/memory-hygiene-stop-hook.sh"
 
+load helpers
+
 setup() {
   TMP="$(mktemp -d)"
   cp "$REAL_HOOK" "$TMP/memory-hygiene-stop-hook.sh"
@@ -79,9 +81,9 @@ _clean_repo_json() {
   json="$(_dirty_repo_json)"
   run_hook "$json"
   [ "$status" -eq 0 ]
-  [[ "$output" == *'"hookEventName": "Stop"'* ]]
-  [[ "$output" == *'"decision": "block"'* ]]
-  [[ "$output" == *"memory-hygiene.md"* ]]
+  assert_glob "$output" '*"hookEventName": "Stop"*'
+  assert_glob "$output" '*"decision": "block"*'
+  assert_glob "$output" '*memory-hygiene.md*'
   [ -e "$TMPDIR/agent-config-memory-hygiene/session-a" ]
 }
 
@@ -90,7 +92,7 @@ _clean_repo_json() {
   json="$(_dirty_repo_json)"
   run_hook "$json"
   [ "$status" -eq 0 ]
-  [[ "$output" == *'"decision": "block"'* ]]
+  assert_glob "$output" '*"decision": "block"*'
 }
 
 @test "opted in, dirty repo, second call in the same session: throttled to silence" {
@@ -98,7 +100,7 @@ _clean_repo_json() {
   json="$(_dirty_repo_json)"
   run_hook "$json"
   [ "$status" -eq 0 ]
-  [[ "$output" == *'"decision": "block"'* ]]
+  assert_glob "$output" '*"decision": "block"*'
 
   touch "$REPO/another-untracked-file"
   run_hook "$json"
@@ -110,11 +112,11 @@ _clean_repo_json() {
   export MEMORY_HYGIENE_REMINDER=on
   run_hook "$(_dirty_repo_json session-a)"
   [ "$status" -eq 0 ]
-  [[ "$output" == *'"decision": "block"'* ]]
+  assert_glob "$output" '*"decision": "block"*'
 
   run_hook "$(_dirty_repo_json session-b)"
   [ "$status" -eq 0 ]
-  [[ "$output" == *'"decision": "block"'* ]]
+  assert_glob "$output" '*"decision": "block"*'
 }
 
 @test "opted in, clean repo: no reminder, no marker written" {

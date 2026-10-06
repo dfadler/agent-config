@@ -124,7 +124,7 @@ run_verify() {
   [ "$status" -ne 0 ]
   assert_output_contains "failed to relink"
   # Never claims success on a fix that didn't actually happen.
-  [[ "$output" != *"relinked node_modules"* ]]
+  refute_glob "$output" '*relinked node_modules*'
 }
 
 @test "a materialized real directory (not a symlink) is left untouched" {
@@ -317,7 +317,7 @@ EOF
   mkdir -p "$SANDBOX/not-a-repo"
   run_verify "$SANDBOX/not-a-repo"
   [ "$status" -eq 2 ]
-  [[ "$output" == *"Not inside a git repository"* ]]
+  assert_glob "$output" '*Not inside a git repository*'
 }
 
 @test "jq missing on PATH is a silent no-op for a project with no .claude/settings.json at all" {
@@ -356,5 +356,5 @@ EOF
 
   run bash -c 'cd -- "$1" && PATH="$2" bash "$3"' bash "$wt" "$mini_bin" "$SCRIPT_UNDER_TEST"
   [ "$status" -eq 4 ]
-  [[ "$output" == *"jq is required"* ]]
+  assert_glob "$output" '*jq is required*'
 }
