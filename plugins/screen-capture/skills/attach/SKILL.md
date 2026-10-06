@@ -70,6 +70,10 @@ or silently no-op.
    never re-derives the `uploads.github.com` call itself. Upload every
    supplied file (`--before`, `--after`, `--video`) in one `upload.sh`
    invocation so the returned URLs are ready before formatting.
+   **If `gh-attach-image` isn't installed**, stop and tell the user to install
+   it (it ships in this repo's `gh-attach-image` plugin) rather than
+   hand-rolling the upload call; if they can't, have them drag the files into
+   the PR or issue editor and format the body around the URLs they paste back.
 2. **Format.** Build the PR/issue body section from the returned URLs:
 
    ```markdown
