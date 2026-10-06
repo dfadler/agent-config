@@ -16,4 +16,4 @@ jobs:
           persist-credentials: false
       - uses: ./.github/actions/setup-node-pnpm
       - name: Lint (set-flags)
-        run: make lint-set-flags
+        run: pnpm run lint-set-flags

@@ -147,37 +147,9 @@ COVERAGE_PY_MIN := 52
 #     see the PR that introduced this comment for why.
 COVERAGE_PY_JSON := $(COVERAGE_PY_DIR)/py-coverage.json
 
-# Ceiling for claude/CLAUDE.md (see scripts/ts/check-claude-md-lines.ts). The
-# global CLAUDE.md loads into every session on this machine regardless of
-# project, so unrelated content belongs in a skill/doc instead of growing this
-# file — #137 trimmed it from 352 to 302 lines by relocating the TypeScript
-# sections into the typescript-conventions skill. 330 was that post-trim
-# measurement plus headroom for organic growth, not the exact count. #139
-# converged genuinely global git-workflow research (#83-85, tracked since
-# #81) back into this file, raising it to 385 lines; 400 was that measurement
-# plus the same style of headroom. A worktree-cleanup bullet (kill
-# background processes before removing a worktree) landed separately and
-# pushed it to 412; 425 is that measurement plus the same headroom again,
-# not a new baseline to fill up to. #168's sourced-only exemption rewrite
-# pushed it to 430; 440 is that measurement plus the same style of headroom.
-# #174's concurrency guideline pushed it to 451, #175's no-autonomous-merge
-# guardrail for security-critical/regulated paths pushed it further to 476,
-# and #181's web-research injection-hardening section pushed it further to
-# 505; 520 was that measurement plus the same style of headroom. #191's
-# audit moved duplicated mechanics out to the skills that already owned them
-# (visual-verification capture steps to screen-capture, the CI-checks
-# escalation order to pr-checks, and PR-review-comment classification to
-# pr-comments — CLAUDE.md keeps only the policy/pointer), pulling it back
-# down to 460, and the repo-wide git-stash-hazard bullet pushed it back up
-# to 477; 490 was that measurement plus the same style of headroom. #203's
-# follow-up to #191 moved the remaining worktree/git mechanics (worktree
-# creation and locking conventions, the stash-collision hazard, conflict-
-# resolution escalation levels, PR-splitting sequencing, branch naming) into
-# a new `git-worktree-usage` skill, leaving only the policy/pointer behind
-# and pulling this file down to 336 lines; 350 is that measurement plus the
-# same style of headroom, not a new baseline to fill up to. Raising it
-# further takes a deliberate commit, the same as COVERAGE_MIN above.
-CLAUDE_MD_MAX_LINES := 350
+# The claude/CLAUDE.md line ceiling now lives in package.json's `lint-claude-md`
+# script (see scripts/ts/check-claude-md-lines.ts), where CI reads it too. Its
+# change history (#137, #139, #168, #174, #175, #181, #191, #203) is in git.
 
 .PHONY: help check lint lint-sh lint-shellcheck lint-shfmt lint-set-flags lint-claude-md \
         lint-py lint-ts lint-actions fmt fmt-py test test-sh test-py test-ts \
@@ -198,6 +170,10 @@ help: ## Show available targets
 #   typescript.yml lint-ts, typecheck-ts, check-skills, lint-plugin-evals,
 #                  check-vitest-flags, check-vitest-v3-names, test-ts, coverage-ts
 #   actionlint.yml lint-actions
+#
+# The Node-based targets (the TypeScript ones, lint-set-flags, lint-claude-md,
+# check-links) delegate to package.json scripts; the Node workflows run those
+# directly (`pnpm run <name>`). The shell/Python targets are make-only.
 #
 # Each workflow calls its own subset rather than `make check` — shell.yml has
 # no Python installed, and pointing it at an aggregate target that had grown a
@@ -243,16 +219,19 @@ lint-plugin-evals: node-modules ## eval-authoring lint over every plugin's evals
 	@pnpm run --silent lint-plugin-evals
 
 # Ported check: how a shell lint moved to TypeScript is wired. The entrypoint
-# is a plain node call (Node 22.18+ strips types, no build step), the target
-# depends on node-modules so a fresh checkout works, and CI calls the target,
-# never the node command (see docs/testing.md for the script shape):
+# is a plain node call in a package.json script (Node 22.18+ strips types, no
+# build step); CI calls `pnpm run <name>`, and a thin make target delegates to
+# the same script so `make check` stays the local aggregate (see docs/testing.md
+# for the script shape):
 #
+#   package.json:  "lint-foo": "node scripts/ts/check-foo.ts [ARGS]"
 #   lint-foo: node-modules ## <what it checks>
-#   	@node scripts/ts/check-foo.ts [ARGS]
+#   	@pnpm run --silent lint-foo
 #
-# Add the target to `.PHONY`, to `check`, and to the workflow that runs it (that
-# workflow adds the ./.github/actions/setup-node-pnpm step); the lint, typecheck
-# and coverage targets already cover the new file. A plugin-owned check uses
+# Add the script to package.json, the target to `.PHONY` and `check`, and
+# `pnpm run lint-foo` to the workflow that runs it (that workflow adds the
+# ./.github/actions/setup-node-pnpm step); the lint, typecheck and coverage
+# scripts already cover the new file. A plugin-owned check uses
 # plugins/<plugin>/scripts/ts/check-foo.ts instead.
 
 # Vitest flag drift (#479): every --flag the vitest plugin, .claude/rules/vitest.md
@@ -282,10 +261,10 @@ lint-shfmt: ## shfmt (check only)
 	@$(SH_FIND) | xargs -0 shfmt -i 2 -ci -d
 
 lint-set-flags: node-modules ## set-flags convention
-	@node scripts/ts/check-shell-set-flags.ts
+	@pnpm run --silent lint-set-flags
 
 lint-claude-md: node-modules ## CLAUDE.md size
-	@node scripts/ts/check-claude-md-lines.ts claude/CLAUDE.md $(CLAUDE_MD_MAX_LINES)
+	@pnpm run --silent lint-claude-md
 
 # lint-claude-md is TypeScript now, so lint-sh needs Node (node-modules).
 lint-sh: lint-shellcheck lint-shfmt lint-set-flags lint-claude-md ## shellcheck + shfmt + set-flags + CLAUDE.md size
@@ -362,4 +341,4 @@ lint-actions: ## Lint .github/workflows with actionlint
 # CI's own checkout, and a broken-link false positive there would go straight
 # to a red default branch. Fold it into `check`/`lint` once that's confirmed.
 check-links: node-modules ## Verify relative markdown links resolve to real files
-	@node scripts/ts/check-markdown-links.ts --path .
+	@pnpm run --silent check-links

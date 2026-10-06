@@ -2,7 +2,7 @@
   "name": "agent-config-scripts",
   "private": true,
   "type": "module",
-  "description": "TypeScript tooling for agent-config scripts. Not published; pins dev dependencies and exposes the commands the Makefile calls.",
+  "description": "TypeScript tooling for agent-config scripts. Not published; pins dev dependencies and exposes the Node-based checks (`pnpm run <name>`); CI calls these, and the Makefile targets delegate to them.",
   "packageManager": "pnpm@11.28.2",
   "engines": {
     "node": ">=22.18"
@@ -12,6 +12,9 @@
     "typecheck": "tsc --noEmit",
     "check-skills": "node scripts/ts/check-skill-contracts.ts .",
     "lint-plugin-evals": "node plugins/eval-authoring/scripts/ts/lint-repo.ts .",
+    "lint-set-flags": "node scripts/ts/check-shell-set-flags.ts",
+    "lint-claude-md": "node scripts/ts/check-claude-md-lines.ts claude/CLAUDE.md 350",
+    "check-links": "node scripts/ts/check-markdown-links.ts --path .",
     "test": "vitest run",
     "coverage": "vitest run --coverage"
   },
