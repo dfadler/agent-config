@@ -44,7 +44,7 @@ graders:
   - name: says_not_supported
     type: regex
     target: last_message
-    pattern: 'not (?:yet )?(?:supported|implemented)|unsupported|isn.t (?:yet )?(?:supported|implemented)'
+    pattern: 'not (?:yet )?(?:supported|implemented)|unsupported|isn.t (?:yet )?(?:supported|implemented)|(?:doesn.t|does not|don.t|do not|can.t|cannot) (?:yet )?support'
     flags: i
     match: contains
 
