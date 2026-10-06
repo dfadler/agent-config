@@ -1,0 +1,59 @@
+# Run: claude plugin eval plugins/dfadler-agent-config --case linux-administration-requires-rollback-for-ssh-lockout-risk --runs 3 --trust-plugin --no-publish
+# Shared run/grant facts: docs/contributing.md, "Plugin evals". No grant: Skill only; the
+# plan is written in the reply, nothing is run.
+# Should-fire case for the SSH hardening reference and the Tier 3 session-continuity rule:
+# disabling password auth over the very session being used needs a validated config
+# (`sshd -t`), a second access path or auto-revert, and a reload rather than a restart.
+# Can fail: skill_fired fails if the description stops matching; validates_config fails if
+# `sshd -t` is absent; second_access_path fails if the plan has no second session / console /
+# rollback; reload_not_restart fails if the plan restarts sshd instead of reloading it. A
+# default model likely knows `sshd -t`, so only the last two are expected to separate.
+# Skill phrases checked: "run `sshd -t` ... after every edit and before reloading",
+# "needs a confirmed second access path (a second open session, console/out-of-band access",
+# "Reload, don't restart, for a config-only change".
+schema_version: "1.1"
+name: linux-administration-requires-rollback-for-ssh-lockout-risk
+description: >
+  Asked for a plan to disable SSH password auth on a host the user is logged into over that
+  SSH session with a password, the model invokes linux-administration and the plan validates
+  with `sshd -t`, keeps a second access path or rollback and reloads instead of restarting.
+  expected_outcome: PASS when the skill fires and the plan has all three; FAIL otherwise.
+tags: [linux-administration, trigger, quick]
+
+execution:
+  prompt: |
+    I'm connected to my Ubuntu 24.04 server over SSH, logging in with a password. I want to
+    turn off SSH password authentication (set `PasswordAuthentication no`). Give me your plan
+    as a numbered list of at most 8 short steps with the exact commands. Do not run
+    anything.
+  max_turns: 4
+  allowed_tools:
+    - Skill
+
+graders:
+  - name: skill_fired
+    type: tool_used
+    tool: Skill
+    input_match: '"skill"\s*:\s*"(?:[\w-]+:)?linux-administration"'
+    min: 1
+    arm: with-only
+
+  - name: validates_config
+    type: regex
+    target: last_message
+    pattern: 'sshd\s+-t\b'
+    match: contains
+
+  - name: second_access_path
+    type: regex
+    target: last_message
+    pattern: 'second\s+(?:ssh\s+)?(?:session|connection|terminal|access)|another\s+(?:ssh\s+)?(?:session|terminal)|out-of-band|console|rescue mode|auto-?revert|rollback|key-based login'
+    flags: i
+    match: contains
+
+  # `reload` appears in the plan, and a `restart` of ssh/sshd does not.
+  - name: reload_not_restart
+    type: regex
+    target: last_message
+    pattern: '(?=[\s\S]*systemctl\s+reload\s+(?:ssh|sshd)\b)(?![\s\S]*systemctl\s+restart\s+(?:ssh|sshd)\b)'
+    match: contains

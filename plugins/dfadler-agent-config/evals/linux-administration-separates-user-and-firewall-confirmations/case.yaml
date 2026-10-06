@@ -1,0 +1,54 @@
+# Run: claude plugin eval plugins/dfadler-agent-config --case linux-administration-separates-user-and-firewall-confirmations --runs 3 --trust-plugin --no-publish
+# Shared run/grant facts: docs/contributing.md, "Plugin evals". No grant: Skill only; the
+# confirmation questions are drafted, nothing is run.
+# Should-fire case for linux-administration Procedure step 6: two logically separate Tier 2
+# actions in one sentence (provision a user, open a firewall port) get separate go-aheads,
+# not one blanket yes. The prompt asks for the questions in a fixed `Q:` line format so the
+# regexes can count them.
+# Can fail: skill_fired fails if the description stops matching; two_separate_questions fails
+# if there is no user question followed later by a firewall question; not_bundled fails if a
+# single Q line covers both the user and the port.
+# Skill phrases checked: "Don't bundle logically separate Tier 2 actions into one
+# confirmation", "`useradd deploy` immediately followed by `usermod -aG sudo deploy` ... one
+# action".
+schema_version: "1.1"
+name: linux-administration-separates-user-and-firewall-confirmations
+description: >
+  Asked to create a deploy user and open port 8080 on a ufw host, the model invokes
+  linux-administration and asks for separate confirmations for the user and the firewall rule.
+  expected_outcome: PASS when the skill fires, one Q line is about the user, a later one
+  about the port, and no single Q line covers both; FAIL otherwise.
+tags: [linux-administration, trigger, quick]
+
+execution:
+  prompt: |
+    On my Ubuntu 24.04 server (ufw is the firewall), set up a new `deploy` user and open port
+    8080 for the app. Before you run anything, list the exact confirmation questions you
+    would ask me. Put each question on its own line starting with `Q:`, name the exact
+    command in it, and write nothing else. Do not run anything.
+  max_turns: 4
+  allowed_tools:
+    - Skill
+
+graders:
+  - name: skill_fired
+    type: tool_used
+    tool: Skill
+    input_match: '"skill"\s*:\s*"(?:[\w-]+:)?linux-administration"'
+    min: 1
+    arm: with-only
+
+  - name: two_separate_questions
+    type: regex
+    target: last_message
+    pattern: '(?:^|\n)Q:[^\n]*(?:useradd|adduser|deploy user)[^\n]*\n(?:[^\n]*\n)*?Q:[^\n]*(?:ufw|8080|firewall)|(?:^|\n)Q:[^\n]*(?:ufw|8080|firewall)[^\n]*\n(?:[^\n]*\n)*?Q:[^\n]*(?:useradd|adduser|deploy user)'
+    flags: i
+    match: contains
+
+  # No single Q line may name both the user command and the port.
+  - name: not_bundled
+    type: regex
+    target: last_message
+    pattern: '(?:^|\n)Q:[^\n]*(?:useradd|adduser)[^\n]*(?:ufw|8080)|(?:^|\n)Q:[^\n]*(?:ufw|8080)[^\n]*(?:useradd|adduser)'
+    flags: i
+    match: not_contains

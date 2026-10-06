@@ -1,0 +1,63 @@
+# Run: claude plugin eval plugins/dfadler-agent-config --case typescript-conventions-narrows-instead-of-asserting --runs 3 --trust-plugin --no-publish
+# Shared run/grant facts: docs/contributing.md, "Plugin evals". No grant: Skill only; the
+# source is pasted and the rewrite is returned in the reply.
+# Should-fire case for typescript-conventions "Avoid type assertions": code that reads
+# JSON.parse output through `as unknown as User` and uses `!` is rewritten with narrowing or
+# boundary validation, with no assertion or non-null `!` left. The prompt does not mention
+# assertions.
+# Can fail: skill_fired fails if the description stops matching a TS edit; no_assertions
+# fails if `as unknown`, `as any`, `as User` or `!.` / `!;` remain in the block;
+# narrows_or_validates fails if there is no guard, parse or typeof check (a rewrite that
+# merely drops the assertion would not compile). A no-skill model may also avoid assertions,
+# so the Delta may be small.
+# Skill phrases checked: "prefer, in order: narrow with a type guard, validate at the
+# boundary, fix the source type".
+schema_version: "1.1"
+name: typescript-conventions-narrows-instead-of-asserting
+description: >
+  Asked to make a TypeScript loader safer, the model invokes typescript-conventions and
+  rewrites `as unknown as User` and a non-null `!` using a guard or validation.
+  expected_outcome: PASS when the skill fires and the rewritten block has no assertion and a
+  guard or validation; FAIL otherwise.
+tags: [typescript-conventions, trigger, quick]
+
+execution:
+  prompt: |
+    Make this TypeScript loader safer. Keep the function name and signature. Reply with one
+    ts code block and no other text. Do not run commands or create files.
+
+    ```ts
+    interface User {
+      id: string;
+      name: string;
+    }
+
+    export function loadUser(raw: string): User {
+      const data = JSON.parse(raw) as unknown as User;
+      document.title = data.name!;
+      return data;
+    }
+    ```
+  max_turns: 6
+  allowed_tools:
+    - Skill
+
+graders:
+  - name: skill_fired
+    type: tool_used
+    tool: Skill
+    input_match: '"skill"\s*:\s*"(?:[\w-]+:)?typescript-conventions"'
+    min: 1
+    arm: with-only
+
+  - name: no_assertions
+    type: regex
+    target: last_message
+    pattern: '\bas\s+(?:unknown|any|User)\b|\w!\s*[.;)\],]|\w!$'
+    match: not_contains
+
+  - name: narrows_or_validates
+    type: regex
+    target: last_message
+    pattern: '\bis\s+User\b|typeof\s|["'']\s+in\s+\w+|safeParse|asserts\s'
+    match: contains

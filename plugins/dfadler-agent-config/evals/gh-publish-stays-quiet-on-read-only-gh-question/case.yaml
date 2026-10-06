@@ -1,0 +1,42 @@
+# Run: claude plugin eval plugins/dfadler-agent-config --case gh-publish-stays-quiet-on-read-only-gh-question --runs 3 --trust-plugin --no-publish
+# Shared run/grant facts: docs/contributing.md, "Plugin evals". No grant: Skill only.
+# Should-not-fire case for gh-publish-guide: a read-only `gh` question shares "gh",
+# "issues" and "comments" with the publish skill but publishes nothing, so the guide has
+# nothing to decide. The existing cases all expect it to fire; none covers its boundary.
+# Caveat: the skill's description says to load it before publish calls "and whenever a skill
+# is about to post", so a model may load it on any gh talk. If a run shows it firing here,
+# decide whether that is over-triggering or an acceptable load before changing the skill.
+# Regression guard: a no-plugin arm passes by default, Delta about 0 by design.
+# Can fail: guide_not_fired fails if gh-publish-guide loads for a read-only request;
+# lists_issues fails if the reply has no read-only gh command.
+schema_version: "1.1"
+name: gh-publish-stays-quiet-on-read-only-gh-question
+description: >
+  A request for the gh command that lists open issues must not invoke gh-publish-guide.
+  expected_outcome: regression guard, Delta about 0 by design. PASS when the skill does not
+  fire and the reply has a `gh issue list` command; FAIL when it fires.
+tags: [gh-publish-guide, permission, quick]
+
+execution:
+  prompt: |
+    Which gh command lists the open issues in example-org/example-app that are labeled `bug`?
+    Reply with the single command in one bash code block and no other text. Do not run it.
+  max_turns: 4
+  allowed_tools:
+    - Skill
+
+graders:
+  - name: guide_not_fired
+    type: tool_used
+    tool: Skill
+    input_match: '"skill"\s*:\s*"(?:[\w-]+:)?gh-publish-guide"'
+    min: 0
+    max: 0
+    arm: both
+
+  - name: lists_issues
+    type: regex
+    target: last_message
+    pattern: 'gh issue list[^\n]*(?:--label|-l)[ =]+"?bug'
+    match: contains
+    arm: both
