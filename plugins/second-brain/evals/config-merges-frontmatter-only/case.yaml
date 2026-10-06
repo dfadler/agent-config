@@ -19,7 +19,7 @@ name: config-merges-frontmatter-only
 description: >
   Given a global and a per-project config file, the model loads second-brain:config and returns
   the merged frontmatter as JSON: project values win, both files' other keys survive, a
-  key-like line in the body is ignored and no file paths appear. expected_outcome: PASS when the
+  key-like line in the body is ignored and no file paths appear. expected_outcome (merge-rules check, small delta expected): PASS when the
   four merged values are right, chrome-cdp and file paths are absent; FAIL otherwise.
 tags: [second-brain, config, trigger, quick]
 

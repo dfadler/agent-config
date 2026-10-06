@@ -13,7 +13,7 @@ schema_version: "1.1"
 name: config-stays-quiet-on-yaml-merge-question
 description: >
   A user's request for Python code that merges two YAML config files with overrides must not
-  invoke any second-brain skill. expected_outcome: PASS when no second-brain skill is invoked
+  invoke any second-brain skill. expected_outcome (regression guard: the no-plugin arm also passes): PASS when no second-brain skill is invoked
   and the reply loads YAML in code; FAIL otherwise.
 tags: [second-brain, config, trigger, quick]
 
@@ -38,6 +38,6 @@ graders:
   - name: answers_with_yaml_code
     type: regex
     target: last_message
-    pattern: 'yaml\.(?:safe_)?load'
+    pattern: '\b(?:safe_|full_)?load\b'
     match: contains
     arm: both

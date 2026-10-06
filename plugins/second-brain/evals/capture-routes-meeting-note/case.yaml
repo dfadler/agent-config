@@ -57,6 +57,13 @@ graders:
     flags: m
     match: contains
 
+  - name: meeting_date_frontmatter
+    type: regex
+    target: last_message
+    pattern: '^date:\s*2026-10-02\s*$'
+    flags: m
+    match: contains
+
   - name: attendees_frontmatter
     type: regex
     target: last_message

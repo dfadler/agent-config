@@ -12,7 +12,7 @@ schema_version: "1.1"
 name: capture-stays-quiet-on-shell-tee
 description: >
   A question about saving a command's output to a file while still seeing it must not invoke any
-  second-brain skill. expected_outcome: PASS when no second-brain skill is invoked and the reply
+  second-brain skill. expected_outcome (regression guard: the no-plugin arm also passes): PASS when no second-brain skill is invoked and the reply
   uses tee; FAIL when a skill is invoked or tee is missing.
 tags: [second-brain, capture, trigger, quick]
 

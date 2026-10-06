@@ -12,7 +12,7 @@ schema_version: "1.1"
 name: sync-stays-quiet-on-obsidian-device-sync
 description: >
   A question about syncing an Obsidian vault between a laptop and a phone must not invoke any
-  second-brain skill. expected_outcome: PASS when no second-brain skill is invoked and the reply
+  second-brain skill. expected_outcome (regression guard: the no-plugin arm also passes): PASS when no second-brain skill is invoked and the reply
   names a device-sync option; FAIL otherwise.
 tags: [second-brain, sync, trigger, quick]
 

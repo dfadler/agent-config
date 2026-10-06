@@ -17,8 +17,8 @@ name: query-plans-vault-search
 description: >
   Asked what was decided about a topic in the user's second brain, the model invokes query and
   lists the Obsidian calls it would make: search_files, directory_tree, then
-  read_multiple_files. expected_outcome: PASS when the skill fires and the three tool names
-  appear with search before read; FAIL otherwise.
+  read_multiple_files. expected_outcome: PASS when the skill fires, directory_tree appears and
+  search_files comes before read_multiple_files; FAIL otherwise.
 tags: [second-brain, query, trigger, quick]
 
 execution:

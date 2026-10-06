@@ -28,7 +28,7 @@ execution:
     canvases.
 
     Don't call any tools other than skills. Reply with a numbered plan of at
-    most 9 one-line steps, naming the exact search string, frontmatter keys,
+    most 12 one-line steps, naming the exact search string, frontmatter keys,
     sections and file path you would use.
   max_turns: 6
   allowed_tools:

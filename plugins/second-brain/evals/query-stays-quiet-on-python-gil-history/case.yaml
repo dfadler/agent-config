@@ -12,7 +12,7 @@ schema_version: "1.1"
 name: query-stays-quiet-on-python-gil-history
 description: >
   A general-knowledge question phrased as "what's the history of" must not invoke any
-  second-brain skill. expected_outcome: PASS when no second-brain skill is invoked and the reply
+  second-brain skill. expected_outcome (regression guard: the no-plugin arm also passes): PASS when no second-brain skill is invoked and the reply
   explains the Python global interpreter lock; FAIL otherwise.
 tags: [second-brain, query, trigger, quick]
 

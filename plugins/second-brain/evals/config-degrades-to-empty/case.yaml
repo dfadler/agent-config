@@ -19,7 +19,7 @@ name: config-degrades-to-empty
 description: >
   Asked to load config for screen-capture through the config skill with no Obsidian tool
   available, the model loads second-brain:config and returns an empty JSON object, not an error.
-  expected_outcome: PASS when the skill is loaded and the entire reply is one code block holding
+  expected_outcome (degrade-path guard, delta near zero expected): PASS when the skill is loaded and the entire reply is one code block holding
   {}; FAIL when the reply reports an error, asks about the vault or invents settings.
 tags: [second-brain, config, trigger, quick]
 
