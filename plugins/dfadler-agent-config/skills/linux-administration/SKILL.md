@@ -1,7 +1,12 @@
 ---
 name: linux-administration
 description: |
-  First-party Linux system administration guidance for systemd-based
+  ALWAYS invoke before answering or planning any Linux administration command on
+  a systemd host, even when told not to run anything and only asked for a plan, a
+  verdict or a list of confirmation questions: `dd` or other writes to a block
+  device, disabling SSH password auth or editing sshd_config over a live session,
+  creating users, opening firewall ports, or explaining how a command or systemd unit
+  behaves (cite the man page). First-party Linux system administration guidance for systemd-based
   distributions: package management (apt/dnf/pacman), systemd service
   management and diagnosis, filesystem operations, user/permission
   management, disk partitioning, network/firewall configuration
@@ -16,9 +21,11 @@ description: |
   Use before running, or advising the user to run, any Linux administration
   command — installing/removing packages, starting/stopping/enabling
   services, changing file ownership or permissions, managing users or
-  groups, partitioning or formatting disks, or changing firewall/network
+  groups, partitioning or formatting disks (including `dd` to a block
+  device), disabling SSH password auth, or changing firewall/network
   configuration — on a systemd-based Linux host (local, remote/SSH, or a
-  container). Does not cover non-systemd init systems (sysvinit, OpenRC,
+  container). Also applies when asked only to plan, list or answer with the
+  commands without running them. Does not cover non-systemd init systems (sysvinit, OpenRC,
   runit) or Windows/macOS administration.
 license: MIT
 metadata:

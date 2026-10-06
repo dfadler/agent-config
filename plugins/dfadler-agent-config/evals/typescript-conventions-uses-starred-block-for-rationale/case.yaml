@@ -1,0 +1,65 @@
+# Run: claude plugin eval plugins/dfadler-agent-config --case typescript-conventions-uses-starred-block-for-rationale --runs 3 --trust-plugin --no-publish
+# Shared run/grant facts: docs/contributing.md, "Plugin evals". No grant: Skill only.
+# Should-fire case for typescript-conventions "Comment syntax": a multi-line rationale that
+# sits between statements, above an `if` rather than documenting a declaration, is a starred
+# `/* ... */` block, not a stack of `//` lines and not JSDoc. The prompt does not name the
+# form.
+# Can fail: skill_fired fails if the description stops matching a TS comment question;
+# starred_block fails if no `/*` + newline + ` * ` block is present; no_stacked_line_comments
+# fails on two consecutive `//` lines; no_jsdoc fails on a `/**` opener.
+# Skill phrases checked: "`/* ... */` multi-line (starred block)", "never a stack of `//`
+# lines", "JSDoc ... documents the declaration it directly precedes".
+schema_version: "1.1"
+name: typescript-conventions-uses-starred-block-for-rationale
+description: >
+  Asked to add a three-line explanation of a workaround above an `if` statement in a
+  TypeScript function, the model invokes typescript-conventions and writes a starred block
+  comment, not stacked `//` lines or JSDoc. expected_outcome: PASS when the skill fires and
+  the code block has a starred block comment and neither stacked `//` nor `/**`; FAIL
+  otherwise.
+tags: [typescript-conventions, trigger, quick]
+
+execution:
+  prompt: |
+    Add a three-line comment above the `if` in this function explaining why it exists: the
+    upstream API sometimes returns an empty string instead of null for a missing id, and we
+    treat both as missing until the API is fixed. Return the whole function in one ts code
+    block and no other text. Do not run commands or create files.
+
+    ```ts
+    export function normalizeId(id: string | null): string | null {
+      if (id === null || id === "") {
+        return null;
+      }
+      return id.trim();
+    }
+    ```
+  max_turns: 6
+  allowed_tools:
+    - Skill
+
+graders:
+  - name: skill_fired
+    type: tool_used
+    tool: Skill
+    input_match: '"skill"\s*:\s*"(?:[\w-]+:)?typescript-conventions"'
+    min: 1
+    arm: with-only
+
+  - name: starred_block
+    type: regex
+    target: last_message
+    pattern: '/\*(?!\*)[ \t]*\n(?:[ \t]*\*[ \t]+\S[^\n]*\n){3,4}[ \t]*\*/[ \t]*\n[ \t]*if\b'
+    match: contains
+
+  - name: no_stacked_line_comments
+    type: regex
+    target: last_message
+    pattern: '//[^\n]*\n[ \t]*//'
+    match: not_contains
+
+  - name: no_jsdoc
+    type: regex
+    target: last_message
+    pattern: '/\*\*'
+    match: not_contains

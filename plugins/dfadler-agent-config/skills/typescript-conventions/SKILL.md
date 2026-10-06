@@ -1,12 +1,16 @@
 ---
 name: typescript-conventions
 description: |
-  TypeScript/JS conventions: when to avoid a type assertion (`as Foo`,
+  ALWAYS invoke when writing, rewriting or reviewing TypeScript/JS that contains a
+  type assertion (`as Foo`, `as unknown as Foo`, `!`) or when adding, rewriting or
+  choosing the syntax of any comment (`//`, `/* */`, JSDoc, even a one-line comment
+  inside a call) in a `.ts`/`.js` file or pasted snippet. TypeScript/JS conventions: when to avoid a type assertion (`as Foo`,
   `as unknown as Foo`, `as any`, the non-null `!` operator) in favor of
   narrowing, boundary validation, or fixing the source type; and which
   comment form (`//`, inline `/* … */`, a starred multi-line `/* … */`
   block, or JSDoc `/** … */`) fits a given comment's role. Use when writing,
-  reviewing, or editing TypeScript or JavaScript code — a `.ts`/`.tsx`/
+  rewriting, refactoring, reviewing, or editing TypeScript or JavaScript code,
+  including pasted snippets and requests to add or rewrite a comment — a `.ts`/`.tsx`/
   `.js`/`.jsx` file, a type assertion or `@typescript-eslint/
   consistent-type-assertions`/`no-non-null-assertion` question, or a
   question about which comment syntax to use in JS/TS.

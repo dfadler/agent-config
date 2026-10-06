@@ -1,0 +1,41 @@
+# Run: claude plugin eval plugins/dfadler-agent-config --case collab-retro-stays-quiet-on-session-summary --runs 3 --trust-plugin --no-publish
+# Shared run/grant facts: docs/contributing.md, "Plugin evals". No grant: Skill only.
+# Should-not-fire half of the collab-retro boundary: a request to summarize what happened in
+# the current conversation shares "how we worked" vocabulary with the retro but is not a
+# cross-session pass over feedback memories. Regression guard, Delta about 0 by design.
+# Can fail: skill_not_fired fails if collab-retro over-triggers on a plain summary request;
+# summarizes fails if the reply does not mention the pasted work item.
+schema_version: "1.1"
+name: collab-retro-stays-quiet-on-session-summary
+description: >
+  A request to summarize the work done in this conversation must not invoke collab-retro.
+  expected_outcome: regression guard, Delta about 0 by design. PASS when the skill does not
+  fire and the reply mentions the retry change; FAIL when it fires.
+tags: [collab-retro, trigger, quick]
+
+execution:
+  prompt: |
+    Summarize what we did in this session in two sentences, for my standup. Here is what
+    happened: we added exponential backoff to the HTTP client in src/retry.ts, found that the
+    base delay was in seconds instead of milliseconds, fixed it, and added a unit test.
+    Reply with the two sentences only.
+  max_turns: 4
+  allowed_tools:
+    - Skill
+
+graders:
+  - name: skill_not_fired
+    type: tool_used
+    tool: Skill
+    input_match: '"skill"\s*:\s*"(?:[\w-]+:)?collab-retro"'
+    min: 0
+    max: 0
+    arm: both
+
+  - name: summarizes
+    type: regex
+    target: last_message
+    pattern: '(?=[\s\S]*back-?off)(?=[\s\S]*(?:milliseconds|\bms\b))(?=[\s\S]*test)'
+    flags: i
+    match: contains
+    arm: both

@@ -1,0 +1,66 @@
+# Run: claude plugin eval plugins/dfadler-agent-config --case gh-publish-writes-exception-entry-on-request --runs 3 --trust-plugin --no-publish
+# Shared run/grant facts: docs/contributing.md, "Plugin evals". No grant: Skill only; the
+# entry is drafted in the reply and no file is written. Adds to the three existing
+# gh-publish-* cases, which cover the permission decision, with the exceptions-file schema.
+# Should-fire case: the user explicitly asks for a standing exception, so the skill's
+# `~/.claude/gh-publish-exceptions.json` format applies (action names, an exact repo, a
+# required note). The action name `pr_comment` and the `note` field are not guessable
+# without the skill.
+# Can fail: skill_fired fails if the description stops matching; actions_field fails if the
+# JSON lacks `"actions": ["pr_comment"]`; repo_exact fails if the repo is absent or a
+# wildcard; note_field fails if no `note` is given.
+# Skill phrases checked: "`actions`: one or more of `issue_create`, `pr_create`,
+# `issue_comment`, `pr_comment`, ...", "an exact `owner/repo` - no wildcards", "`note`:
+# required".
+schema_version: "1.1"
+name: gh-publish-writes-exception-entry-on-request
+description: >
+  Asked for a standing exception so PR comments on one repo need no per-post confirmation,
+  the model invokes gh-publish-guide and drafts an entry in the exceptions file's schema.
+  expected_outcome: PASS when the skill fires and the JSON has `actions` with `pr_comment`,
+  the exact repo and a `note`; FAIL otherwise.
+tags: [gh-publish-guide, permission, quick]
+
+execution:
+  prompt: |
+    I want a standing exception so you can comment on pull requests in
+    example-org/example-app without asking me in chat each time. I am explicitly asking for
+    this. Show me the JSON entry that should go in the exceptions file. Reply with one json
+    code block holding only that entry, and nothing else. Do not edit any file.
+  max_turns: 6
+  allowed_tools:
+    - Skill
+
+graders:
+  - name: skill_fired
+    type: tool_used
+    tool: Skill
+    input_match: '"skill"\s*:\s*"(?:[\w-]+:)?gh-publish-guide"'
+    min: 1
+    arm: with-only
+
+  - name: actions_field
+    type: regex
+    target: last_message
+    pattern: '"actions"\s*:\s*\[\s*"pr_comment"\s*\]'
+    match: contains
+
+  # Positive form: the exact repo, so a wildcard or a missing repo fails.
+  - name: repo_exact
+    type: regex
+    target: last_message
+    pattern: '"repo"\s*:\s*"example-org/example-app"'
+    match: contains
+
+  - name: note_field
+    type: regex
+    target: last_message
+    pattern: '"note"\s*:\s*"[^"\s][^"]{2,}"'
+    match: contains
+
+  # No trailing comma before a closing brace or bracket (invalid JSON).
+  - name: no_trailing_comma
+    type: regex
+    target: last_message
+    pattern: ',\s*[}\]]'
+    match: not_contains

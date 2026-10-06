@@ -1,0 +1,42 @@
+# Run: claude plugin eval plugins/dfadler-agent-config --case changesets-authoring-stays-quiet-on-keep-a-changelog --runs 3 --trust-plugin --no-publish
+# Shared run/grant facts: docs/contributing.md, "Plugin evals". No grant: Skill only.
+# Should-not-fire half of the changesets boundary: a Python project with a hand-kept
+# CHANGELOG.md shares "changelog", "bump" and "release notes" with the skill but has no
+# Changesets. Regression guard: a no-plugin arm passes by default, Delta about 0 by design.
+# Can fail: skill_not_fired fails if changesets-authoring over-triggers on a plain changelog
+# request. writes_entry is a sanity check (the prompt nearly dictates it), not a
+# discriminator.
+schema_version: "1.1"
+name: changesets-authoring-stays-quiet-on-keep-a-changelog
+description: >
+  A request to add a CHANGELOG.md entry in a Python project must not invoke
+  changesets-authoring. expected_outcome: regression guard, Delta about 0 by design. PASS when
+  the skill does not fire and the reply is a Keep-a-Changelog entry under Fixed; FAIL when the
+  skill fires.
+tags: [changesets-authoring, trigger, quick]
+
+execution:
+  prompt: |
+    My Python package `tinyqueue` just got a bug fix: `pop()` raised IndexError on an empty
+    queue instead of returning None. The project keeps a hand-written CHANGELOG.md in Keep a
+    Changelog format with an `## [Unreleased]` section at the top. Write the entry to add.
+    Reply with one markdown code block and no other text. Do not run commands.
+  max_turns: 4
+  allowed_tools:
+    - Skill
+
+graders:
+  - name: skill_not_fired
+    type: tool_used
+    tool: Skill
+    input_match: '"skill"\s*:\s*"(?:[\w-]+:)?changesets-authoring"'
+    min: 0
+    max: 0
+    arm: both
+
+  - name: writes_entry
+    type: regex
+    target: last_message
+    pattern: '###\s*Fixed[\s\S]*pop'
+    match: contains
+    arm: both

@@ -1,0 +1,41 @@
+# Run: claude plugin eval plugins/dfadler-agent-config --case url-to-audio-stays-quiet-on-pasted-article-summary --runs 3 --trust-plugin --no-publish
+# Shared run/grant facts: docs/contributing.md, "Plugin evals". No grant: Skill only.
+# Should-not-fire case for url-to-audio: a request to summarize an article whose text is
+# pasted shares "article" and "read" vocabulary with the skill but wants text, not audio.
+# Regression guard: a no-plugin arm passes by default, Delta about 0 by design.
+# Can fail: skill_not_fired fails if url-to-audio loads for a text summary; has_the_fact
+# fails if the summary omits the planted date (2019).
+schema_version: "1.1"
+name: url-to-audio-stays-quiet-on-pasted-article-summary
+description: >
+  A request to summarize pasted article text in one sentence must not invoke url-to-audio.
+  expected_outcome: regression guard, Delta about 0 by design. PASS when the skill does not
+  fire and the summary has the launch year; FAIL when it fires.
+tags: [url-to-audio, trigger, quick]
+
+execution:
+  prompt: |
+    Read this article and give me a one-sentence summary. Reply with the sentence only.
+
+    "Tinyqueue launched in 2019 as a weekend project to replace a hand-rolled job runner. By
+    2022 it handled four million jobs a day, and the maintainers rewrote its storage layer
+    to cut memory use in half."
+  max_turns: 4
+  allowed_tools:
+    - Skill
+
+graders:
+  - name: skill_not_fired
+    type: tool_used
+    tool: Skill
+    input_match: '"skill"\s*:\s*"(?:[\w-]+:)?url-to-audio"'
+    min: 0
+    max: 0
+    arm: both
+
+  - name: has_the_fact
+    type: regex
+    target: last_message
+    pattern: '(?=[\s\S]*Tinyqueue)(?=[\s\S]*2019)(?=[\s\S]*(?:four million|4 million|2022|storage))'
+    match: contains
+    arm: both

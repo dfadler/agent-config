@@ -1,7 +1,9 @@
 ---
 name: collab-retro
 description: |
-  Retrospective over how Claude and the user have been working together across
+  ALWAYS invoke when given feedback memories (or asked for a retro) and asked
+  whether any recurring pattern deserves a GitHub issue, including when the answer
+  is that nothing qualifies. Retrospective over how Claude and the user have been working together across
   sessions: scans this machine's `feedback`-type auto-memory entries (corrections
   and confirmed approaches, not just this conversation), filters for ones that are
   recurring and fixable via this repo's own config/skills/docs rather than a one-off
@@ -9,7 +11,8 @@ description: |
   sensitive, and drafts a public GitHub issue on dfadler/agent-config proposing the
   improvement. Use when the user asks for a "retro", "self-improvement check",
   "what should we improve about how we work together", or explicitly invokes this
-  skill by name — also usable under /loop for a recurring cadence. Never runs
+  skill by name, or hands over feedback memories and asks whether any recurring
+  pattern is worth filing as an issue (including "nothing qualifies") — also usable under /loop for a recurring cadence. Never runs
   `gh issue create` without going through `gh-publish-guide` first: it drafts
   and shows the issue body, then asks.
 metadata:
