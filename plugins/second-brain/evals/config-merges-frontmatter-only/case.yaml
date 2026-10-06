@@ -1,0 +1,84 @@
+# Run (one case at a time, #536/#538): claude plugin eval plugins/second-brain --case config-merges-frontmatter-only --trust-plugin --no-publish
+# Shared run/grant facts: docs/contributing.md, "Plugin evals". No grant needed (Skill only).
+# Reply-only: the two vault files' contents are pasted into the prompt as if already read (the
+# plugin declares no MCP server, so a mocked read is not possible; see config-degrades-to-empty).
+# Names the skill for the same reason as config-degrades-to-empty (internal primitive).
+# What it checks: the skill's merge rules, with a trap. Only the YAML frontmatter block counts
+# (a `engine: chrome-cdp` line in the global file's body must be ignored), the per-project value
+# overrides the global one key by key, global-only and project-only keys both survive, and the
+# output is the bare key-value object with no file paths. A baseline given the same files and
+# told to merge may pass most of this, so expect a small delta; the trap line and the "no file
+# paths" check are what can separate them.
+# Sabotage map: grader names quote "Procedure" steps 4 and 5 ("extract the YAML frontmatter (the
+# block between the first two `---` lines)"; "a key present in both takes the per-project
+# value"; "a shallow merge") and "Output shape" ("nothing else (no file paths ...)").
+# Can fail: taking `engine: chrome-cdp` from the body, a global viewport instead of the project
+# one, a dropped key, or a `config/global` path in the reply scores 0 on that grader.
+schema_version: "1.1"
+name: config-merges-frontmatter-only
+description: >
+  Given a global and a per-project config file, the model loads second-brain:config and returns
+  the merged frontmatter as JSON: project values win, both files' other keys survive, a
+  key-like line in the body is ignored and no file paths appear. expected_outcome: PASS when the
+  four merged values are right, chrome-cdp and file paths are absent; FAIL otherwise.
+tags: [second-brain, config, trigger, quick]
+
+execution:
+  prompt: |
+    Use the second-brain:config skill's procedure on these two vault files,
+    already read, for `screen-capture agent-config`.
+
+    config/global/screen-capture.md:
+    ---
+    engine: playwright
+    viewport: 1280x900
+    output_dir: ./shots
+    ---
+    Notes for humans. This body line is not config:
+    engine: chrome-cdp
+
+    config/projects/agent-config/screen-capture.md:
+    ---
+    viewport: 390x844
+    browser: webkit
+    ---
+
+    Don't call any tools other than skills. Reply with only the merged config
+    as JSON in one code block and no other text.
+  max_turns: 8
+  allowed_tools:
+    - Skill
+
+graders:
+  # Steps. Indicator in a two-arm run, scored only with the plugin.
+  - name: skill_fired
+    type: tool_used
+    tool: Skill
+    input_match: '"skill"\s*:\s*"(?:[\w-]+:)?config"'
+    min: 1
+    arm: with-only
+
+  # Result.
+  - name: project_overrides_global
+    type: regex
+    target: last_message
+    pattern: '"viewport"\s*:\s*"390x844"'
+    match: contains
+
+  - name: keeps_global_only_keys
+    type: regex
+    target: last_message
+    pattern: '^(?=[\s\S]*"engine"\s*:\s*"playwright")[\s\S]*"output_dir"\s*:\s*"\./shots"'
+    match: contains
+
+  - name: keeps_project_only_key
+    type: regex
+    target: last_message
+    pattern: '"browser"\s*:\s*"webkit"'
+    match: contains
+
+  - name: ignores_body_and_paths
+    type: regex
+    target: last_message
+    pattern: 'chrome-cdp|config/(?:global|projects)'
+    match: not_contains

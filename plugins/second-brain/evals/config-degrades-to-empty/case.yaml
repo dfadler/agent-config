@@ -1,0 +1,52 @@
+# Run (one case at a time, #536/#538): claude plugin eval plugins/second-brain --case config-degrades-to-empty --trust-plugin --no-publish
+# Shared run/grant facts: docs/contributing.md, "Plugin evals". No grant needed (Skill only).
+# Why config earns cases: it is an internal primitive that other skills load (a user never
+# triggers it), so a natural should-fire prompt does not exist. This case names the skill and its
+# arguments, the way a calling skill would, which is the one honest way to exercise it, and the
+# boundary is covered by config-stays-quiet-on-yaml-merge-question. The prompt does not name the
+# result: only the skill says an unavailable vault yields `{}`, never an error.
+# Hermetic by construction: no Obsidian tool exists in an eval run (the plugin declares no MCP
+# server, so it cannot be mocked either), which is exactly the degrade-to-empty path the issue
+# asks for.
+# Sabotage map: returns_empty_object checks "Degradation" ("Return an empty config (`{}`) ...
+# Never raise, throw, or stop"); skill_fired checks the skill is loadable by name.
+# Can fail: a reply that reports an error, asks for the vault, or invents keys fails
+# returns_empty_object; skill_fired fails if the skill cannot be loaded as second-brain:config.
+# A no-plugin run cannot load the skill, so a delta is expected only if the baseline does not
+# also answer with an empty object; if it does, read this as a guard.
+schema_version: "1.1"
+name: config-degrades-to-empty
+description: >
+  Asked to load config for screen-capture through the config skill with no Obsidian tool
+  available, the model loads second-brain:config and returns an empty JSON object, not an error.
+  expected_outcome: PASS when the skill is loaded and the entire reply is one code block holding
+  {}; FAIL when the reply reports an error, asks about the vault or invents settings.
+tags: [second-brain, config, trigger, quick]
+
+execution:
+  prompt: |
+    Use the second-brain:config skill with the arguments `screen-capture
+    agent-config` and give me the resulting config. No Obsidian MCP server is
+    connected in this session.
+
+    Don't call any tools other than skills. Reply with only the config as
+    JSON in one code block and no other text.
+  max_turns: 8
+  allowed_tools:
+    - Skill
+
+graders:
+  # Steps. Indicator in a two-arm run, scored only with the plugin.
+  - name: skill_fired
+    type: tool_used
+    tool: Skill
+    input_match: '"skill"\s*:\s*"(?:[\w-]+:)?config"'
+    min: 1
+    arm: with-only
+
+  # Result.
+  - name: returns_empty_object
+    type: regex
+    target: last_message
+    pattern: '^\s*`{3}(?:json)?\s*\{\s*\}\s*`{3}\s*$'
+    match: contains

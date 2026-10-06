@@ -1,0 +1,56 @@
+# Run (one case at a time, #536/#538): claude plugin eval plugins/second-brain --case query-plans-vault-search --trust-plugin --no-publish
+# Shared run/grant facts: docs/contributing.md, "Plugin evals". No grant needed (Skill only).
+# Reply-only, no mocks: the plugin declares no MCP server, so `mcp__obsidian__*` cannot be
+# mocked and mock_calls cannot be graded (see capture-routes-meeting-note for the reason). The
+# case asks for the tool calls the model would make, as a list, and grades the names.
+# Should-fire half of the query boundary (near-miss: query-stays-quiet-on-python-gil-history).
+# A baseline cannot know the Obsidian MCP tool names the skill prescribes (`search_files`,
+# `directory_tree`, `read_multiple_files`) or their order (search, then read the hits).
+# Sabotage map: grader names quote "Step 2: Search broadly" (`mcp__obsidian__search_files`,
+# `mcp__obsidian__directory_tree`) and "Step 3: Read the relevant notes"
+# (`mcp__obsidian__read_multiple_files`).
+# Can fail: a list that guesses other tool names, reads before searching or omits the directory
+# check scores 0 on that grader; skill_fired fails if the description stops matching a
+# "what did we decide" question.
+schema_version: "1.1"
+name: query-plans-vault-search
+description: >
+  Asked what was decided about a topic in the user's second brain, the model invokes query and
+  lists the Obsidian calls it would make: search_files, directory_tree, then
+  read_multiple_files. expected_outcome: PASS when the skill fires and the three tool names
+  appear with search before read; FAIL otherwise.
+tags: [second-brain, query, trigger, quick]
+
+execution:
+  prompt: |
+    SECOND_BRAIN_VAULT_PATH is set to /vault. Check my second brain: what did
+    we decide about the search relaunch rollout?
+
+    Don't call any tools (the vault is not connected here). Instead list, one
+    per line and in order, the exact tool names you would call to find and
+    read the notes. No commentary.
+  max_turns: 6
+  allowed_tools:
+    - Skill
+
+graders:
+  # Steps. Indicator in a two-arm run, scored only with the plugin.
+  - name: skill_fired
+    type: tool_used
+    tool: Skill
+    input_match: '"skill"\s*:\s*"(?:[\w-]+:)?query"'
+    min: 1
+    arm: with-only
+
+  # Result.
+  - name: search_before_read
+    type: regex
+    target: last_message
+    pattern: 'mcp__obsidian__search_files[\s\S]*mcp__obsidian__read_multiple_files'
+    match: contains
+
+  - name: checks_directory_tree
+    type: regex
+    target: last_message
+    pattern: 'mcp__obsidian__directory_tree'
+    match: contains

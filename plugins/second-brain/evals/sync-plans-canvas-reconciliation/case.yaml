@@ -1,0 +1,69 @@
+# Run (one case at a time, #536/#538): claude plugin eval plugins/second-brain --case sync-plans-canvas-reconciliation --trust-plugin --no-publish
+# Shared run/grant facts: docs/contributing.md, "Plugin evals". No grant needed (Skill only).
+# Reply-only, no mocks: neither the Obsidian nor the Slack server is declared by the plugin, so
+# neither can be mocked (see capture-routes-meeting-note for the reason). The prompt asks the
+# model to assume the tools exist and to write the procedure as a plan.
+# Should-fire half of the sync boundary on its happy path (near-miss:
+# sync-stays-quiet-on-obsidian-device-sync). A baseline cannot know the `source: slack-canvas-`
+# search string, the `last_synced` key, that `## Local Notes` and `## Links` are preserved
+# verbatim, or that the report goes to `00 Inbox/<date> Sync Report.md`.
+# Sabotage map: grader names quote "Step 2: Find all source-tracked notes" (`source:
+# slack-canvas-`), "4a. Extract preserved sections" (`## Local Notes`, `## Links`), "4d"
+# (`last_synced`) and "Step 5: Write sync report" (`00 Inbox/YYYY-MM-DD Sync Report.md`).
+# Can fail: a plan missing the search key, the preserved sections, `last_synced` or the report
+# path scores 0 on that grader; skill_fired fails if the description stops matching.
+schema_version: "1.1"
+name: sync-plans-canvas-reconciliation
+description: >
+  Asked to sync the vault from Slack canvases with both tools assumed connected, the model
+  invokes sync and plans: find notes by source: slack-canvas-, preserve Local Notes and Links,
+  update last_synced and write 00 Inbox/<date> Sync Report.md. expected_outcome: PASS when the
+  skill fires and all four details appear; FAIL otherwise.
+tags: [second-brain, sync, trigger, quick]
+
+execution:
+  prompt: |
+    SECOND_BRAIN_VAULT_PATH is set to /vault and both the Obsidian and Slack
+    tools are connected. Today is 2026-10-05. Sync my vault from its Slack
+    canvases.
+
+    Don't call any tools other than skills. Reply with a numbered plan of at
+    most 9 one-line steps, naming the exact search string, frontmatter keys,
+    sections and file path you would use.
+  max_turns: 6
+  allowed_tools:
+    - Skill
+
+graders:
+  # Steps. Indicator in a two-arm run, scored only with the plugin.
+  - name: skill_fired
+    type: tool_used
+    tool: Skill
+    input_match: '"skill"\s*:\s*"(?:[\w-]+:)?sync"'
+    min: 1
+    arm: with-only
+
+  # Result: details only the skill supplies.
+  - name: finds_tracked_notes
+    type: regex
+    target: last_message
+    pattern: 'source: slack-canvas-'
+    match: contains
+
+  - name: preserves_local_sections
+    type: regex
+    target: last_message
+    pattern: '^(?=[\s\S]*## Local Notes)[\s\S]*## Links'
+    match: contains
+
+  - name: updates_last_synced
+    type: regex
+    target: last_message
+    pattern: 'last_synced'
+    match: contains
+
+  - name: writes_report_to_inbox
+    type: regex
+    target: last_message
+    pattern: '00 Inbox/2026-10-05 Sync Report\.md'
+    match: contains

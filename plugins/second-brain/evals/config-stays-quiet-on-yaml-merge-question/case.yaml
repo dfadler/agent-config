@@ -1,0 +1,43 @@
+# Run (one case at a time, #536/#538): claude plugin eval plugins/second-brain --case config-stays-quiet-on-yaml-merge-question --trust-plugin --no-publish
+# Shared run/grant facts: docs/contributing.md, "Plugin evals". No grant needed (Skill only).
+# Should-not-fire half of the config boundary: the skill is documented as never triggered by a
+# user request, and a user's own question about merging YAML, with "config" and "override" in it,
+# is exactly the request it must not claim. The Skill check names all four second-brain skills.
+# Sabotage map: skill_not_invoked checks config's description ("Not a user-facing slash command
+# -- this skill is never triggered by a user request directly"); delete that sentence and a run
+# should fail.
+# Can fail: any second-brain skill invoked fails skill_not_invoked; a reply with no YAML load
+# call fails answers_with_yaml_code. Regression guard: a no-plugin arm passes it, so no delta by
+# design.
+schema_version: "1.1"
+name: config-stays-quiet-on-yaml-merge-question
+description: >
+  A user's request for Python code that merges two YAML config files with overrides must not
+  invoke any second-brain skill. expected_outcome: PASS when no second-brain skill is invoked
+  and the reply loads YAML in code; FAIL otherwise.
+tags: [second-brain, config, trigger, quick]
+
+execution:
+  prompt: |
+    In Python, how do I load a base config.yaml and an override.yaml and merge
+    them so override values win for the top-level keys? Show the code in one
+    code block and no other text; don't run anything.
+  max_turns: 6
+  allowed_tools:
+    - Skill
+
+graders:
+  - name: skill_not_invoked
+    type: tool_used
+    tool: Skill
+    input_match: '"skill"\s*:\s*"(?:second-brain:)?(?:capture|query|sync|config)"'
+    min: 0
+    max: 0
+    arm: both
+
+  - name: answers_with_yaml_code
+    type: regex
+    target: last_message
+    pattern: 'yaml\.(?:safe_)?load'
+    match: contains
+    arm: both

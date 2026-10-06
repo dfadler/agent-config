@@ -1,0 +1,42 @@
+# Run (one case at a time, #536/#538): claude plugin eval plugins/second-brain --case sync-stays-quiet-on-obsidian-device-sync --trust-plugin --no-publish
+# Shared run/grant facts: docs/contributing.md, "Plugin evals". No grant needed (Skill only).
+# Should-not-fire half of the sync boundary: "sync" and "Obsidian vault" are sync's vocabulary,
+# but keeping a vault consistent across devices has nothing to do with Slack canvas sources.
+# The Skill check names all four second-brain skills.
+# Sabotage map: skill_not_invoked checks sync's description ("Sync the second-brain Obsidian
+# vault with its Slack canvas sources"); drop "Slack canvas" and a run should fail.
+# Can fail: any second-brain skill invoked fails skill_not_invoked; a reply naming none of the
+# usual sync options fails answers_with_sync_options. Regression guard: a no-plugin arm passes
+# it, so no delta by design.
+schema_version: "1.1"
+name: sync-stays-quiet-on-obsidian-device-sync
+description: >
+  A question about syncing an Obsidian vault between a laptop and a phone must not invoke any
+  second-brain skill. expected_outcome: PASS when no second-brain skill is invoked and the reply
+  names a device-sync option; FAIL otherwise.
+tags: [second-brain, sync, trigger, quick]
+
+execution:
+  prompt: |
+    How do I keep my Obsidian vault in sync between my laptop and my phone?
+    Name the two most common options in one sentence; don't run anything.
+  max_turns: 6
+  allowed_tools:
+    - Skill
+
+graders:
+  - name: skill_not_invoked
+    type: tool_used
+    tool: Skill
+    input_match: '"skill"\s*:\s*"(?:second-brain:)?(?:capture|query|sync|config)"'
+    min: 0
+    max: 0
+    arm: both
+
+  - name: answers_with_sync_options
+    type: regex
+    target: last_message
+    pattern: 'Obsidian Sync|iCloud|Syncthing|\bgit\b|Dropbox|Google Drive'
+    flags: i
+    match: contains
+    arm: both

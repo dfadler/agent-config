@@ -1,0 +1,52 @@
+# Run (one case at a time, #536/#538): claude plugin eval plugins/second-brain --case capture-stops-without-vault-path --trust-plugin --no-publish
+# Shared run/grant facts: docs/contributing.md, "Plugin evals". No grant needed (Skill only).
+# Should-fire half of the capture boundary on its fail-closed path: with no vault path
+# configured the skill must stop and say how to set one, not guess a path or start classifying.
+# This is the "vault absent" path the issue asks for. An eval run has no env var and no
+# ~/.claude/settings.json, so the absence is real, and the prompt says so without naming either
+# setting; only the skill knows `SECOND_BRAIN_VAULT_PATH` and `secondBrain.vaultPath`.
+# Sabotage map: names_both_settings and no_classification check "Step 1: Resolve the vault path"
+# ("If neither is set, stop and tell the user to set one. Do not guess a path.").
+# Can fail: a reply that never names the env var and the settings key fails names_both_settings;
+# one that routes the note to a folder fails no_classification; skill_fired fails if the
+# description stops matching.
+schema_version: "1.1"
+name: capture-stops-without-vault-path
+description: >
+  Asked to save a note with no vault location configured anywhere, the model invokes capture and
+  stops, naming SECOND_BRAIN_VAULT_PATH and secondBrain.vaultPath instead of guessing a path or
+  filing the note. expected_outcome: PASS when the skill fires, both setting names appear and no
+  vault folder is chosen; FAIL otherwise.
+tags: [second-brain, capture, trigger, quick]
+
+execution:
+  prompt: |
+    Save this to my second brain: the Postgres 17 upgrade is scheduled for
+    14 Nov. I haven't configured a vault location anywhere on this machine.
+
+    Don't call any tools. Reply in at most 3 sentences.
+  max_turns: 6
+  allowed_tools:
+    - Skill
+
+graders:
+  # Steps. Indicator in a two-arm run, scored only with the plugin.
+  - name: skill_fired
+    type: tool_used
+    tool: Skill
+    input_match: '"skill"\s*:\s*"(?:[\w-]+:)?capture"'
+    min: 1
+    arm: with-only
+
+  # Result.
+  - name: names_both_settings
+    type: regex
+    target: last_message
+    pattern: '^(?=[\s\S]*SECOND_BRAIN_VAULT_PATH)[\s\S]*secondBrain\.vaultPath'
+    match: contains
+
+  - name: no_classification
+    type: regex
+    target: last_message
+    pattern: '\b(?:00 Inbox|10 Projects|30 Resources|40 Meetings|50 People)\b'
+    match: not_contains
