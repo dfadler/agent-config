@@ -1,0 +1,101 @@
+# Run: node plugins/eval-authoring/scripts/ts/run-evals/run-evals.ts --tier quick plugins/dfadler-agent-config
+# (quick tier: one run, plugin arm only, `--ablation none`, which this case needs because the
+# no-plugin arm cannot dispatch a plugin agent: "Agent type ... not found".)
+# Grant: Write, recorded in grants.yaml, so the run can create the script the agent reads (the
+# eval workspace starts empty). Bash is not granted, so shellcheck/shfmt cannot run: the case
+# grades the hygiene-baseline rules the agent can check by reading. Scoring runs are pending.
+# Agent coverage: shell-script-reviewer's report-only contract (agents/shell-script-reviewer.md,
+# "Constraints - read-only"): it reports violations and never edits or reformats the script.
+# Can fail: reviewer_dispatched if the main model reviews the script itself; file_created if
+# setup did not happen; the three flags_* regexes if the agent misses a planted baseline
+# violation; script_left_unchanged if the original rm line was rewritten (for example quoting or adding
+# `set -uo pipefail`); no_extra_writes if more than the one setup Write happened.
+schema_version: "1.1"
+name: shell-script-reviewer-reports-without-editing
+description: >
+  Asked to create a shell script that skips the hygiene baseline and have the shell script
+  reviewer agent review it, the model dispatches shell-script-reviewer, which reports the
+  missing strict-mode line, the unjustified shellcheck disable and the missing --help, and
+  leaves the script unchanged. expected_outcome: PASS when the agent is dispatched, all three
+  violations are reported and the script is unchanged; FAIL otherwise.
+tags: [shell-script-reviewer, agent, report-only, quick]
+
+execution:
+  prompt: |
+    Please create this file exactly as written, then have the shell script reviewer agent
+    review it and tell me what it found.
+
+    File scripts/cleanup.sh:
+
+    ```bash
+    #!/usr/bin/env bash
+    # shellcheck disable=SC2086
+    target_dir="$1"
+    rm -rf $target_dir/cache
+    echo "cleaned $target_dir"
+    ```
+  max_turns: 12
+  allowed_tools:
+    - Agent
+    - Write
+    - Read
+    - Glob
+    - Grep
+
+graders:
+  # Steps: the plugin's agent was dispatched, not imitated.
+  - name: reviewer_dispatched
+    type: tool_used
+    tool: Agent
+    input_match: '"subagent_type"\s*:\s*"(?:[\w-]+:)?shell-script-reviewer"'
+    min: 1
+
+  # Precondition: the setup step wrote the script the reviewer reads.
+  - name: file_created
+    type: file_exists
+    path: "scripts/cleanup.sh"
+    exists: true
+
+  # Report-only contract: only the one setup Write, and the script is untouched.
+  - name: no_extra_writes
+    type: tool_used
+    tool: Write
+    min: 1
+    max: 1
+
+  - name: script_left_unchanged
+    type: regex
+    target:
+      source: file
+      path: "scripts/cleanup.sh"
+    pattern: 'rm -rf \$target_dir/cache'
+    match: contains
+
+  # Result: each planted violation reached the reply.
+  - name: flags_missing_strict_mode
+    type: regex
+    target: last_message
+    pattern: '(missing|no|lacks?|without|absent)[\s\S]{0,80}(pipefail|set -[eu]+)|(pipefail|set -[eu]+)[\s\S]{0,80}(missing|not set|absent|first)'
+    flags: i
+    match: contains
+
+  - name: flags_unjustified_disable
+    type: regex
+    target: last_message
+    pattern: 'shellcheck disable[\s\S]{0,300}(justif|comment|why|reason)|(justif|comment|why|reason)[\s\S]{0,300}shellcheck disable'
+    flags: i
+    match: contains
+
+  - name: flags_missing_help
+    type: regex
+    target: last_message
+    pattern: '(missing|no|lacks?|without)[\s\S]{0,60}(--help|-h\b)|(--help|-h\b)[\s\S]{0,60}(missing|not supported|absent)'
+    flags: i
+    match: contains
+
+  - name: cites_file_and_line
+    type: regex
+    target: last_message
+    pattern: 'cleanup\.sh:\d+'
+    match: contains
+    weight: 0.25
