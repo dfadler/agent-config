@@ -52,7 +52,7 @@ Full reasoning for each verdict, plus the duplication check and follow-up list:
 | `shell-script-hygiene.md` | Convert to skill |
 | `dependency-audits.md` | Convert to skill |
 | `issue-tracker.md` | Convert to skill |
-| `testing-sabotage-check.md` | Convert to skill |
+| `testing-sabotage-check.md` | Folded into `vitest:test-conventions`; stays an opt-in include for non-Vitest repos |
 | `cheap-model-delegation.md` + `heavy-workflow-cost.md` | Merge into one skill |
 | `memory-hygiene.md` | Convert to skill |
 

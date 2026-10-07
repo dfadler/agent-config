@@ -22,6 +22,10 @@ metadata:
 Vite plugins are plain objects with hook functions. Test them by calling hooks
 directly — no need to spin up a full Vite dev server for unit tests.
 
+If the `vitest` plugin is installed, also apply `vitest:test-conventions` for
+general test practice (isolation, mock hygiene, sabotage spot-check); this skill
+covers only the hook-specific patterns. If it is not installed, skip this.
+
 Check the project for existing test helpers, shared fake factories, or a
 `setupTests` file before writing new ones. Many monorepos already provide
 `makeChunk`, fake server builders, or a configured test environment.

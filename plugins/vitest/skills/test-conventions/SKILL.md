@@ -11,6 +11,14 @@ metadata:
 
 # Writing Vitest tests
 
+## Contract
+
+- **Input:** a Vitest test file or `vitest.config.ts` being written or edited.
+- **Output:** the same file following the rules below (isolation, determinism, mock
+  hygiene, sabotage spot-check, coverage thresholds).
+- **Does not:** cover Vite plugin hook patterns (`vite:test`) or diagnose flaky runs
+  (`flaky-tests`).
+
 Assume tests run in random order and in parallel workers; a suite that only passes in
 file order is a flaky suite waiting for CI.
 

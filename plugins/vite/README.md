@@ -12,6 +12,10 @@ Skills and agents for authoring, reviewing, testing, and maintaining Vite plugin
 | `vite:peer-deps` | Updating peerDependencies after a Vite major release |
 | `vite:dev-workflow` | Setting up a development and testing workflow for a plugin package |
 
+`vite:test` covers only plugin hook patterns. For general Vitest practice
+(isolation, mock hygiene, sabotage spot-check) install the `vitest` plugin and
+use `vitest:test-conventions`.
+
 ## Agents
 
 | Agent | Use |
