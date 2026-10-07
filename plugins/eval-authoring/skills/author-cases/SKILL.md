@@ -32,6 +32,8 @@ cannot decide.
    ask the user to run it, then review what it wrote. `claude plugin eval init --bare
    <name>` writes a blank case without asking questions; use it when you write the case
    yourself or in CI. Do not reimplement `init`.
+   Every case file you write, single-file `case.yaml` or `prompt.md`, starts with
+   `schema_version: "1.1"` and a `name`; a draft shown to the user needs both lines too.
 3. **Cover the boundary.** For each skill, write prompts a user would type, without
    naming the skill: some that should fire it, and some that should not, including
    near-misses that share its vocabulary but want something else. Every should-fire case
