@@ -22,9 +22,9 @@ const result = (
     ],
   });
 
-const check = (cliExit: string, json: string) =>
+const check = (cliExit: string, json: string, extra: string[] = []) =>
   main(
-    ["--cli-exit", cliExit, "--threshold", "0.8", "r.json"],
+    ["--cli-exit", cliExit, "--threshold", "0.8", ...extra, "r.json"],
     {},
     { readFile: () => ok(json) },
   );
@@ -68,6 +68,24 @@ describe("check-plugin-eval", () => {
     expect(warn.tag === "ok" && warn.value).toContain("warning: c1");
     const none = check("0", result());
     expect(none.tag === "ok" && none.value).not.toContain("warning");
+  });
+
+  it("--delta-floor gates a low delta; default stays warn-only", () => {
+    const low = result({ delta: 0.05 });
+    expect(codeOf(check("0", low))).toBe(0);
+    expect(codeOf(check("0", low, ["--delta-floor", "0.1"]))).toBe(1);
+    const at = result({ delta: 0.1 });
+    expect(codeOf(check("0", at, ["--delta-floor", "0.1"]))).toBe(0);
+    expect(codeOf(check("0", result(), ["--delta-floor", "0.1"]))).toBe(0);
+  });
+
+  it("an invalid run stays inconclusive under --delta-floor", () => {
+    const bad = result({ partial: true, delta: -1 });
+    expect(codeOf(check("0", bad, ["--delta-floor", "0.1"]))).toBe(7);
+  });
+
+  it("rejects a non-numeric --delta-floor", () => {
+    expect(codeOf(check("0", result(), ["--delta-floor", "x"]))).toBe(2);
   });
 
   it("rejects bad arguments with exit 2 and prints help", () => {
