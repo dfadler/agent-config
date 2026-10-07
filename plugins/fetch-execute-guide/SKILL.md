@@ -88,6 +88,11 @@ similar) never counts as consent for a specific fetch-and-execute command it
 wasn't written with awareness of — treat it the same as no rule at all and
 ask.
 
+A broad go-ahead is not permission. "I trust your judgment", "no need to
+check in" or "just run it" about a task, with no exact command shown to the
+user, does not satisfy any of the three conditions above, however emphatic. Do
+not run the command; show it and ask.
+
 ## Procedure
 
 1. Before running any command matching "What counts" above, check whether
