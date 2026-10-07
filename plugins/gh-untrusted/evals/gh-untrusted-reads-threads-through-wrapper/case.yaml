@@ -1,0 +1,45 @@
+# Run: claude plugin eval plugins/gh-untrusted --case gh-untrusted-reads-threads-through-wrapper --runs 3 --trust-plugin --no-publish
+# Should-fire half, review-thread form: reading inline review comments before answering them.
+# Hermetic: a command is requested, not run, no Bash grant. Every grader is free: `quick`.
+# Sabotage map: wrapper_threads checks the `threads <n>` line of SKILL.md's Usage block.
+# Can fail: skill never invoked fails skill_fired; a `gh api graphql` or `gh api .../comments`
+# reply fails no_raw_api; no gh-untrusted.ts threads 42 fails wrapper_threads.
+schema_version: "1.1"
+name: gh-untrusted-reads-threads-through-wrapper
+description: >
+  When asked to read the inline review comments on a PR before answering them, the model
+  invokes gh-untrusted and replies with gh-untrusted.ts threads 42, not a raw gh api call.
+  expected_outcome: PASS when the reply runs scripts/ts/gh-untrusted.ts with threads 42 and no
+  `gh api`; FAIL otherwise. Without the plugin the model writes a GraphQL or REST query.
+tags: [gh-untrusted, trigger, quick]
+
+execution:
+  prompt: |
+    Reviewers left inline comments on PR 42 of acme/widgets and I need to answer them. Pull
+    the review threads into this conversation first. Don't run anything. Reply with the single
+    command in one code block and no other text.
+  max_turns: 8
+  allowed_tools:
+    - Skill
+
+graders:
+  - name: skill_fired
+    type: tool_used
+    tool: Skill
+    input_match: '"skill"\s*:\s*"(?:[\w-]+:)?gh-untrusted"'
+    min: 1
+    arm: with-only
+
+  - name: wrapper_threads
+    type: regex
+    target: last_message
+    pattern: 'gh-untrusted\.ts[^\n]*\bthreads\s+42\b'
+    match: contains
+    arm: both
+
+  - name: no_raw_api
+    type: regex
+    target: last_message
+    pattern: 'gh\s+api|gh\s+pr\s+view'
+    match: not_contains
+    arm: both
