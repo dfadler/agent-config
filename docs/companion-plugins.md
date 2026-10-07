@@ -289,6 +289,12 @@ posture as `check_react_skills`: it never runs the installer or `rtk init --glob
 itself, since both are exactly the kind of side effect that needs asking first rather
 than happening automatically on every `setup.sh` run.
 
+Treat the advertised 60-90% savings as an upper bound on terminal output only: an
+independent benchmark found no net cost reduction
+([Quesma](https://quesma.com/blog/does-rtk-make-ai-coding-cheaper/)), and condensed
+output can hide a failure signal (a `prettier --check` false pass was hit here). When a
+result looks wrong, re-run it as `rtk proxy <cmd>`. Research notes: #440.
+
 ### Known conflict: rtk's git rewrite breaks git inside a worktree session
 
 Confirmed empirically (2026-09-27, via `rtk hook check`'s dry-run and reproduced
