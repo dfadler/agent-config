@@ -96,7 +96,11 @@ COVERAGE_MIN=70
 #     preprocessed .bats.src copies of the test files, and the percentage then
 #     measures bats-core far more than anything here.
 #   * --exclude-pattern drops scripts/tests: helpers.bash is test scaffolding,
-#     and scaffolding that grades itself inflates the number.
+#     and scaffolding that grades itself inflates the number. It also drops
+#     scripts/ci.sh: it is the CI runner itself (its targets are what CI
+#     executes, not what bats tests), and the bats suite only touches its
+#     argument handling, so including it would measure ~200 untested
+#     orchestration lines and sink the floor from 70% to 63% for no signal.
 #   * kcov's bash coverage is trace-based, so a script only enters the
 #     denominator once something EXECUTES it. A script no test ever runs
 #     (today, the gh-attach-image skill's upload.sh) is invisible rather than
@@ -106,7 +110,7 @@ COVERAGE_MIN=70
 #     that temp path rather than to setup.sh here. Both are gaps in what the
 #     floor guards, not claims that the code is untested.
 KCOV_INCLUDE="$ROOT/scripts,$ROOT/plugins,$ROOT/setup.sh"
-KCOV_EXCLUDE=/scripts/tests
+KCOV_EXCLUDE=/scripts/tests,/scripts/ci.sh
 
 # Python's own coverage floor, the sibling of COVERAGE_MIN (dfadler/
 # agent-config#208). Same discipline: the first honest measurement rounded
