@@ -1,5 +1,6 @@
 # Shared run/grant/deviation facts: docs/contributing.md, "Plugin evals".
-# Run: claude plugin eval plugins/vitest --case flaky-tests-ignores-deterministic-failure
+# Run: claude plugin eval plugins/vitest --case flaky-tests-ignores-deterministic-failure --ablation with-without
+# Guard, not a lift: Δ 0.00 is expected, since plain Claude also fixes the loop bound (#474).
 # Why these graders: the required fix and the forbidden flake tooling are literal strings.
 schema_version: "1.1"
 name: flaky-tests-ignores-deterministic-failure
