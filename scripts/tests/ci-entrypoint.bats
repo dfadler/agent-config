@@ -48,6 +48,9 @@ shim() {
 @test "coverage does not skip under CI, even off Linux" {
   shim
   export CI=true
+  # The real target does `rm -rf $COVERAGE_DIR`; when this suite itself runs
+  # under `ci.sh coverage`, that is the live kcov output dir.
+  export COVERAGE_DIR="$BATS_TEST_TMPDIR/cov"
   ci coverage
   assert_failure
   assert_output_contains "KCOV-RAN"

@@ -86,7 +86,7 @@ NODE_STAMP=node_modules/.installed
 # floor sits just under the measurement rather than exactly on it. Measured
 # on ubuntu-24.04 with kcov 42 and bats at the commit shell.yml pins. Lowering
 # this takes a deliberate commit; raising it as coverage improves is welcome.
-COVERAGE_DIR=coverage
+COVERAGE_DIR="${COVERAGE_DIR:-coverage}" # overridable so tests never delete a live kcov output dir
 COVERAGE_MIN=70
 
 # What lands in the denominator, and what doesn't:
