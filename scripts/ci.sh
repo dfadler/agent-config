@@ -43,8 +43,6 @@ sh_find() { find scripts plugins setup.sh teardown.sh doctor.sh -type f -name '*
 PY_SOURCES=(
   plugins/detached-terminal/scripts/agent_term.py
   scripts/tests/test_agent_term.py
-  plugins/dfadler-agent-config/skills/url-to-audio/scripts/chunk_text.py
-  scripts/tests/test_chunk_text.py
   plugins/gha-ci-audit/scripts/aggregate.py
   plugins/gha-ci-audit/scripts/analyze_jobs.py
   plugins/gha-ci-audit/scripts/analyze_runs.py
