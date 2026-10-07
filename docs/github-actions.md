@@ -18,7 +18,7 @@ a CI failure here.
   a few shared lines at the top of otherwise-unrelated jobs. It is also valid
   for *file organisation*: when one workflow has grown to a size where splitting
   each check into its own `sh-*.yml` file aids readability, `workflow_call`
-  lets a thin orchestrator (`all-checks.yml`, which calls `shell.yml`,
+  lets a thin orchestrator (`ci.yml`, which calls `shell.yml`,
   `typescript.yml` and `python.yml`; `shell.yml` in turn calls the `sh-*.yml`
   files) call them in parallel and still wire a `needs:`-based sentinel —
   something cross-file triggers (`workflow_run`) cannot do reliably on PRs. In that case, env vars and tool pins live in each
@@ -52,10 +52,10 @@ a CI failure here.
   what is defined inside *it*. Consequence: every called workflow that pins a
   tool version must declare its own `env:` block. See `sh-shfmt.yml` — it
   defines `SHFMT_VERSION` and `SHFMT_SHA256` inside the called file, not in
-  `all-checks.yml` or `shell.yml`, because a top-level `env:` in the orchestrator
+  `ci.yml` or `shell.yml`, because a top-level `env:` in the orchestrator
   would be silently ignored across the call boundary.
 - **Called workflows are `workflow_call` only and declare no `concurrency`.**
-  `all-checks.yml` owns `on: pull_request` / `push: branches: [main]`, the
+  `ci.yml` owns `on: pull_request` / `push: branches: [main]`, the
   `cancel-in-progress` concurrency group and `permissions: contents: read`.
   A concurrency group inside a called workflow conflicts with the caller's, so
   `shell.yml`, `typescript.yml`, `python.yml` and the `sh-*.yml` files declare
@@ -71,10 +71,12 @@ a CI failure here.
   silently satisfy the required check. The sentinel itself fails on any
   dependency result other than `success`, so a skipped job cannot pass it.
   **Here the required branch-protection context is the job name `all-checks`**
-  (defined only in `all-checks.yml`); the workflow name "CI" is just a
+  (defined only in `ci.yml`). The check context is the job name only, so the
+  file name and workflow name can change freely but renaming the job needs a
+  branch-protection settings change outside the repo, so don't rename it. The workflow name "CI" is just a
   UI prefix, kept different from the job name so the UI does not show two
   `all-checks` rows. To add a new gating check, call its reusable workflow from a job in
-  `all-checks.yml` and add that job to the sentinel's `needs:`. Gating therefore
+  `ci.yml` and add that job to the sentinel's `needs:`. Gating therefore
   covers shell, TypeScript and Python checks; a failing Python check blocks merge.
 - **GitHub check names for reusable workflow callers** take the form
   `<caller-job-id> / <called-job-name>`, nesting one level per call. Name the
@@ -87,9 +89,9 @@ a CI failure here.
   YAML. That's what keeps "CI is green" and "the local check is green" from
   drifting apart, and it's what makes `act`/local reproduction close to free —
   there's no CI-only logic to fall back to Docker for.
-- **Matrix builds, `workflow_call` inputs/secrets** — not yet relevant here
-  (single pinned runtime, no cross-workflow calls), but design them carefully
-  when they do show up: explicit `inputs`/`secrets` blocks, never
+- **Matrix builds, `workflow_call` inputs/secrets** — not yet needed here
+  (the existing `workflow_call` files take no inputs or secrets), but design
+  them carefully when they do show up: explicit `inputs`/`secrets` blocks, never
   `secrets: inherit` by default.
 
 ## Security hardening
