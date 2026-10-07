@@ -78,3 +78,9 @@ cannot decide.
   write a workaround script, and ask the user to run what the hook blocks.
 - Whether a case is useful is only known after a two-arm run (Δ above zero, graders
   discriminating). The lint cannot show that; say so rather than claiming it.
+- Action-based grading (grade the commands Claude runs, not its prose) needs a `Bash` grant
+  and changes behavior: the model may explain instead of run. In the #474 pilot (3 runs per
+  arm) it added variance rather than determinism (with 0.53 vs without 0.20, against 1.00
+  for the prose case), Bash never ran in any without-arm run, and `tool_order` gave a false
+  failure when two steps shared one command. Prefer prose graders; keep an action case only
+  if its with-arm variance is no worse and Δ is at least as large as the prose version's.
