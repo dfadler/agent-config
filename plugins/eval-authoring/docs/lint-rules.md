@@ -80,15 +80,15 @@ export const rule: Rule = {
 };
 ```
 
-Fixtures. Each fixture directory is a miniature plugin root; its cases live in `evals/`:
+Fixtures. Each fixture directory is a miniature plugin root; its cases live in `cases/` (not `evals/`, which `claude plugin eval` would load as real cases; pass `evalDir: "cases"` to `lintPlugin`):
 
 ```
 tests/lint-fixtures/EVAL900/
-  bad-prompt-md/evals/many/prompt.md              # "---\nmax_turns: 50\n---\nDo it.\n" + a grader
-  bad-prompt-md/evals/many/graders/done.md        # "---\ntype: regex\npattern: done\n---\n"
-  bad-case-yaml/evals/many/case.yaml              # same, in case.yaml layout
-  good-prompt-md/evals/few/...                    # max_turns: 5
-  good-case-yaml/evals/few/...
+  bad-prompt-md/cases/many/prompt.md              # "---\nmax_turns: 50\n---\nDo it.\n" + a grader
+  bad-prompt-md/cases/many/graders/done.md        # "---\ntype: regex\npattern: done\n---\n"
+  bad-case-yaml/cases/many/case.yaml              # same, in case.yaml layout
+  good-prompt-md/cases/few/...                    # max_turns: 5
+  good-case-yaml/cases/few/...
   bad-case-yaml/fixture.json                      # optional: { "fires": ["many"] }
 ```
 
