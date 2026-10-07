@@ -1,7 +1,7 @@
 // Plugin-eval result checker (#583), called by the plugin-evals workflow after
 // `claude plugin eval`. Decision record: docs/plugin-eval-ci.md (#436).
 //
-//   check-plugin-eval.ts --cli-exit N --threshold T aggregate-result.json
+//   check-plugin-eval.ts --cli-exit N --threshold T [--delta-floor F] aggregate-result.json
 //
 // Exit codes: 0 pass, 1 regression (valid run, CLI exit non-zero against the
 // threshold), 7 inconclusive (invalid run, so not a regression), 2 usage.
@@ -18,12 +18,14 @@ import { andThen, err, fromThrowable, ok, type Result } from "./lib/result.ts";
 import { run, type Main } from "./lib/run.ts";
 import { describeThrown } from "./lib/thrown.ts";
 
-const USAGE = `Usage: check-plugin-eval.ts [-h|--help] --cli-exit N --threshold T RESULT.json
+const USAGE = `Usage: check-plugin-eval.ts [-h|--help] --cli-exit N --threshold T [--delta-floor F] RESULT.json
 
 Decide pass / regression / inconclusive for a \`claude plugin eval\` run.
 
   --cli-exit N     Exit code the eval CLI returned (run with --threshold T).
   --threshold T    The threshold the CLI was given; reported in messages.
+  --delta-floor F  Opt-in gate (#585): a case with delta below F is a
+                   regression. Without it, delta is warn-only.
   RESULT.json      The run's aggregate-result.json.
 
 Inconclusive (exit 7, not a regression): CLI exit 2, \`partial: true\`, any
@@ -71,6 +73,19 @@ const deltaWarnings = (doc: Record<string, unknown>): readonly string[] =>
       : [];
   });
 
+/** Cases whose delta is below the floor; a missing delta is no signal. */
+const deltaBreaches = (
+  doc: Record<string, unknown>,
+  floor: number,
+): readonly string[] =>
+  list(doc["cases"]).flatMap((c) => {
+    if (!isRecord(c) || !isRecord(c["aggregates"])) return [];
+    const d = c["aggregates"]["delta"];
+    return typeof d === "number" && d < floor
+      ? [`${String(c["name"])}: delta ${String(d)} < floor ${String(floor)}`]
+      : [];
+  });
+
 const inconclusive = (why: string): Result<CliError, never> =>
   err(cliError(EXIT_PARTIAL, `inconclusive: ${why}`));
 
@@ -89,6 +104,7 @@ const parseCliExit = (v: unknown): Result<CliError, number> => {
 const decide = (
   cliExit: number,
   threshold: string,
+  floor: number | undefined,
   doc: unknown,
 ): Result<CliError, string> => {
   if (cliExit === 2) return inconclusive("eval CLI exited 2 (invalid run)");
@@ -98,6 +114,12 @@ const decide = (
   const bad = invalidReasons(doc);
   if (bad.length > 0) return inconclusive(bad.join("; "));
   const warns = deltaWarnings(doc).join("");
+  const breaches = floor === undefined ? [] : deltaBreaches(doc, floor);
+  if (breaches.length > 0) {
+    return err(
+      cliError(EXIT_FAILURE, `${warns}regression: ${breaches.join("; ")}`),
+    );
+  }
   return cliExit === 0
     ? ok(`${warns}pass: threshold ${threshold} met\n`)
     : err(
@@ -116,6 +138,7 @@ export const main: Main = (argv, _env, io) =>
         flags: [
           { name: "cli-exit", valued: true },
           { name: "threshold", valued: true },
+          { name: "delta-floor", valued: true },
         ],
         minPositionals: 1,
         maxPositionals: 1,
@@ -128,6 +151,13 @@ export const main: Main = (argv, _env, io) =>
       const path = p.positionals[0];
       if (typeof threshold !== "string" || path === undefined) {
         return err(cliError(EXIT_USAGE, `--threshold is required\n\n${USAGE}`));
+      }
+      const rawFloor = p.flags["delta-floor"];
+      const floor = typeof rawFloor === "string" ? Number(rawFloor) : undefined;
+      if (floor !== undefined && !Number.isFinite(floor)) {
+        return err(
+          cliError(EXIT_USAGE, `--delta-floor needs a number\n\n${USAGE}`),
+        );
       }
       return pipe(
         parseCliExit(p.flags["cli-exit"]),
@@ -144,7 +174,7 @@ export const main: Main = (argv, _env, io) =>
           );
           return doc.tag === "err"
             ? inconclusive(`${path}: ${doc.error.message}`)
-            : decide(cliExit, threshold, doc.value);
+            : decide(cliExit, threshold, floor, doc.value);
         }),
       );
     }),
