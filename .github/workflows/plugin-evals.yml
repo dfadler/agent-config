@@ -1,0 +1,139 @@
+name: Plugin evals
+
+# Paid `claude plugin eval` runs, per docs/plugin-eval-ci.md (#436, #582).
+#
+# STANDALONE and NON-GATING: not called from ci.yml. Triggers are manual and
+# weekly only. NEVER add `pull_request`: the job passes --trust-plugin next to a
+# paid API key, and this is a public repo.
+#
+# Result handling is delegated to scripts/ts/check-plugin-eval.ts (#583, PR #587):
+#   check-plugin-eval.ts --cli-exit N --threshold T aggregate-result.json
+# exit 0 pass, 1 regression, 7 inconclusive (CLI exit 2, partial,
+# skippedPaidGraders, arms.with[].error, unreadable file), 2 bad args.
+# Delta is warn-only inside the checker. Inconclusive fails the job too, but is
+# reported as inconclusive rather than as a regression.
+
+on:
+  schedule:
+    # Mondays 04:23 UTC; an off-the-hour minute avoids the top-of-hour queue.
+    - cron: "23 4 * * 1"
+  workflow_dispatch:
+    inputs:
+      plugin:
+        description: Plugin directory name under plugins/ (empty = every plugin with evals/)
+        type: string
+        default: ""
+      threshold:
+        description: Minimum pass score (claude plugin eval --threshold)
+        type: number
+        default: 0.8
+
+# Evals are paid and slow; queue rather than cancel a half-finished run.
+concurrency:
+  group: plugin-evals
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+
+env:
+  CLAUDE_CODE_VERSION: 2.1.283
+  EVAL_MODEL: claude-sonnet-5-5
+  EVAL_JUDGE_MODEL: claude-sonnet-5-5
+
+jobs:
+  plan:
+    name: plan
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    outputs:
+      matrix: ${{ steps.list.outputs.matrix }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - id: list
+        env:
+          PLUGIN: ${{ inputs.plugin }}
+        run: |
+          set -euo pipefail
+          if [ -n "$PLUGIN" ]; then
+            [ -d "plugins/$PLUGIN/evals" ] || { echo "no plugins/$PLUGIN/evals" >&2; exit 1; }
+            names="$PLUGIN"
+          else
+            names=$(for d in plugins/*/evals; do basename "$(dirname "$d")"; done)
+          fi
+          echo "matrix=$(printf '%s\n' "$names" | jq -R . | jq -sc '{plugin: .}')" >> "$GITHUB_OUTPUT"
+
+  eval:
+    name: eval (${{ matrix.plugin }})
+    needs: plan
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    # Protected environment holds the spend-capped ANTHROPIC_API_KEY.
+    environment: plugin-evals
+    permissions:
+      contents: read
+    strategy:
+      fail-fast: false
+      max-parallel: 1
+      matrix: ${{ fromJSON(needs.plan.outputs.matrix) }}
+    env:
+      PLUGIN: ${{ matrix.plugin }}
+      THRESHOLD: ${{ inputs.threshold || 0.8 }}
+      OUT_DIR: eval-results/${{ matrix.plugin }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - uses: ./.github/actions/setup-node-pnpm
+
+      # Bash-using eval cases need an OS sandbox backend.
+      - name: Install sandbox backend
+        run: sudo apt-get update && sudo apt-get install -y --no-install-recommends bubblewrap socat
+
+      - name: Install Claude Code
+        run: npm install -g "@anthropic-ai/claude-code@$CLAUDE_CODE_VERSION"
+
+      - name: Run evals
+        env:
+          ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+        run: |
+          set -uo pipefail
+          mkdir -p "$OUT_DIR"
+          # Target first: it must precede --json or it is read as that option's value.
+          claude plugin eval "plugins/$PLUGIN" \
+            --json "$OUT_DIR/aggregate-result.json" \
+            --trust-plugin \
+            --threshold "$THRESHOLD" \
+            --model "$EVAL_MODEL" \
+            --judge-model "$EVAL_JUDGE_MODEL" \
+            --ablation with-without \
+            --max-cost-usd 5 \
+            --no-publish \
+            -j 1 2>&1 | tee "$OUT_DIR/eval.log"
+          echo "${PIPESTATUS[0]}" > "$OUT_DIR/cli-exit"
+
+      # No secrets in this step: it only reads the result file.
+      - name: Check result
+        run: |
+          set -uo pipefail
+          node scripts/ts/check-plugin-eval.ts \
+            --cli-exit "$(cat "$OUT_DIR/cli-exit")" \
+            --threshold "$THRESHOLD" \
+            "$OUT_DIR/aggregate-result.json" | tee -a "$GITHUB_STEP_SUMMARY"
+          rc="${PIPESTATUS[0]}"
+          if [ "$rc" -eq 7 ]; then
+            echo "::error::Eval run was inconclusive (not a regression); see the result summary"
+          fi
+          exit "$rc"
+
+      - name: Upload results
+        if: ${{ !cancelled() }}
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: plugin-eval-${{ matrix.plugin }}-${{ github.run_id }}
+          path: eval-results/${{ matrix.plugin }}/
+          if-no-files-found: warn
+          retention-days: 30

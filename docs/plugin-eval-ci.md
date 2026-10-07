@@ -4,7 +4,7 @@ Decision record for [#436](https://github.com/dfadler/agent-config/issues/436). 
 [recommendation comment](https://github.com/dfadler/agent-config/issues/436#issuecomment-5940264329);
 CLI facts are from the [plugin-evals docs](https://code.claude.com/docs/en/plugin-evals).
 
-Not implemented yet. Recommendation:
+Workflow: `.github/workflows/plugin-evals.yml` (#582); result checker: #583. Recommendation:
 
 - **Trigger:** `workflow_dispatch` first, then a weekly `schedule`. Never `pull_request` (public repo, `--trust-plugin`, paid key).
 - **Scope:** plugins that have `evals/` (today `fetch-execute-guide`), one matrix entry each, after #442 removes vacuous cases.
