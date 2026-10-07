@@ -13,7 +13,7 @@ name: Python
 # so `make check` and a green PR mean the same thing. Dependencies are pinned
 # in requirements-dev.txt.
 
-# Called from all-checks.yml, whose all-checks sentinel is the only required
+# Called from ci.yml, whose all-checks sentinel is the only required
 # check for it. Concurrency is inherited from the caller.
 on:
   workflow_call:

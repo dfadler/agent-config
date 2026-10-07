@@ -161,7 +161,7 @@ help: ## Show available targets
 	@grep -E '^[a-z-]+:.*?## ' $(MAKEFILE_LIST) | awk -F':.*?## ' '{printf "  \033[36m%-14s\033[0m %s\n", $$1, $$2}'
 
 # `check` must be the UNION of what every workflow runs, because that is the
-# promise the README makes (all-checks.yml calls the first three below, plus
+# promise the README makes (ci.yml calls the first three below, plus
 # actionlint.yml runs standalone). The split, so a new target lands in both places:
 #
 #   shell.yml      lint-shellcheck, lint-shfmt, lint-set-flags, lint-claude-md,
@@ -244,7 +244,7 @@ check-vitest-v3-names: node-modules ## No unannotated Vitest 3 option names in p
 	@node scripts/ts/check-vitest-v3-names.ts
 
 test-ts: node-modules ## Run the Vitest suite
-	@pnpm test --silent
+	@pnpm run --silent test
 
 # Floor is a MEASURED baseline, same discipline as COVERAGE_MIN: the only
 # source today is the hash helper at 100%, and vitest.config.ts owns the

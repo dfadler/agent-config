@@ -2,14 +2,14 @@ name: Shell
 
 # Runs all shell CI checks. Each check lives in its own
 # .github/workflows/sh-*.yml reusable workflow; this file calls them in
-# parallel. It is itself called from all-checks.yml, which owns the triggers,
+# parallel. It is itself called from ci.yml, which owns the triggers,
 # concurrency and the required all-checks sentinel.
 #
 # To add a shell check:
 #   1. Create .github/workflows/sh-<name>.yml with `on: workflow_call:`
 #   2. Add a job here that calls it
 # To add a whole new language: write a new reusable workflow, call it from
-# all-checks.yml and add it to that sentinel's needs:.
+# ci.yml and add it to that sentinel's needs:.
 #
 # Checks and the make targets they invoke:
 #   shellcheck     make lint-shellcheck
