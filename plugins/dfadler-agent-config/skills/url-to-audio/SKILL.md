@@ -146,7 +146,7 @@ command that isn't logged back verbatim, per this repo's
 OpenAI's endpoint caps input length ([API
 reference](https://platform.openai.com/docs/api-reference/audio/createSpeech)):
 4096 characters for `tts-1`/`tts-1-hd`, 2000 tokens for `gpt-4o-mini-tts`.
-Chunk the article first with this skill's helper (Node 22.18+, no install
+Chunk the article first with this skill's helper (Node 22, no install
 needed):
 
 ```sh
@@ -203,7 +203,7 @@ process could read via `ps`
 body goes through `-d @file` for the same reason, since a chunk is
 untrusted extracted content that could otherwise blow past `ARG_MAX`.
 
-`assemble-audio.ts` (Node 22.18+, no install needed, has its own vitest
+`assemble-audio.ts` (Node 22, no install needed, has its own vitest
 coverage) is where the actual assembly decision lives: it refuses to ship
 anything if `failed` is set (a mid-loop break no longer means quietly
 concatenating only the chunks that finished), copies the single chunk
