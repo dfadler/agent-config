@@ -22,8 +22,7 @@ VITEST_MAX_THREADS, VITEST_MAX_FORKS) on a line that does not also say
 `;
 
 const DEFAULT_ROOTS: readonly string[] = ["plugins", "docs", ".claude"];
-// evals/ holds eval prompts that use v3 names on purpose, as bait for the model under test.
-const SKIP_DIRS: readonly string[] = ["node_modules", "worktrees", ".git", "evals"];
+const SKIP_DIRS: readonly string[] = ["node_modules", "worktrees", ".git"];
 const TEXT_FILE = /\.(?:md|ts|js|json|ya?ml|sh|txt)$/;
 
 const SUCCESS = "✓ No unannotated Vitest 3 option names.\n";

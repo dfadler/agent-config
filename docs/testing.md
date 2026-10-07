@@ -21,7 +21,7 @@ for using them, and package-manager forwarding, is the `vitest:flaky-tests` skil
 
 `make check-vitest-flags` fails when a flag documented here, in `.claude/rules/vitest.md`
 or in the `plugins/vitest` skills is missing from `vitest --help` on the pinned version;
-`make check-vitest-v3-names` (skipping `evals/`, whose prompts use v3 names as bait) fails on a Vitest 3 pool option or env name in `plugins/`,
+`make check-vitest-v3-names` fails on a Vitest 3 pool option or env name in `plugins/`,
 `docs/` or `.claude/` unless the same line says it was removed or renamed (the list is in
 `scripts/ts/vitest-guards.ts`). Both run in the typescript CI job.
 

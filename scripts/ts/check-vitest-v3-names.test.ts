@@ -46,8 +46,8 @@ describe("end to end against a fixture tree", () => {
     expect(r.stderr).toContain("two.ts");
   });
 
-  it("skips node_modules, worktrees and evals directories and non-text files", () => {
-    for (const d of ["node_modules", "worktrees", "evals"]) {
+  it("skips node_modules and worktrees directories and non-text files", () => {
+    for (const d of ["node_modules", "worktrees"]) {
       mkdirSync(join(dir, d));
       writeFileSync(join(dir, d, "c.md"), "maxForks\n");
     }
