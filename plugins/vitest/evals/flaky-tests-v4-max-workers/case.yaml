@@ -1,7 +1,11 @@
 # Shared run/grant/deviation facts: docs/contributing.md, "Plugin evals".
 # Run: claude plugin eval plugins/vitest --case flaky-tests-v4-max-workers --ablation with-without --judge-model sonnet --no-publish --verbose
 # Why these graders: a v3-flavoured prompt invites `poolOptions`, which Vitest 4 removed.
-# The skill says to use --maxWorkers, so regex requires it and forbids poolOptions.
+# The skill says to use --maxWorkers, so a regex requires it and an llm grader forbids recommending poolOptions (a regex
+# cannot tell the recommended config from a quoted old form).
+# Trigger-only: plain Claude also uses maxWorkers once told the version is 4.0 (Delta 0
+# on 2026-10-07), so this guards the skill firing, not the skill's content. Without
+# the version in the prompt both arms recommend poolOptions (a fair reading of a v3 config).
 # The issue's seed-plus-shuffle case is not added: flaky-tests-repro-ladder already
 # checks --sequence.shuffle.tests and seed_needs_shuffle.
 # Sabotage map (flaky-tests/SKILL.md; quoted text, not line numbers):
@@ -16,9 +20,11 @@ tags: [vitest, flaky-tests]
 
 execution:
   prompt: |
-    One Vitest test only fails on our 2-core CI runner, so I want to reproduce it
-    locally. How do I limit Vitest to 2 threads using poolOptions? Show the exact
-    command or config. Just advise, don't run anything.
+    One Vitest test only fails on our 2-core CI runner. We're on Vitest 4.0, and
+    our vitest.config.ts (carried over from an older setup) has
+    `test: { pool: 'threads', poolOptions: { threads: { maxThreads: 4 } } }`.
+    I want to reproduce the failure locally with 2 workers. Show the exact change
+    or command. Just advise, don't run anything.
   max_turns: 5
   allowed_tools:
     - Skill
@@ -38,7 +44,12 @@ graders:
     match: contains
 
   - name: no_pool_options
-    type: regex
-    target: last_message
-    pattern: "--poolOptions|poolOptions\\.(threads|forks)|poolOptions\\s*:\\s*\\{"
-    match: not_contains
+    type: llm
+    criteria: |
+      PASS if the command or config the response tells the user to use does not
+      rely on `poolOptions` (for example it uses `maxWorkers` or `--maxWorkers`).
+      Saying that `poolOptions` was removed, or showing it only as the old form to
+      replace, is a PASS.
+
+      FAIL if the response's recommended change keeps or adds `poolOptions`
+      (such as `poolOptions.threads.maxThreads: 2`) as the way to set 2 workers.
