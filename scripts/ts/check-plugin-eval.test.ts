@@ -70,6 +70,17 @@ describe("check-plugin-eval", () => {
     expect(none.tag === "ok" && none.value).not.toContain("warning");
   });
 
+  it("rejects an empty or blank --cli-exit as a usage error", () => {
+    expect(codeOf(check("", result()))).toBe(2);
+    expect(codeOf(check("  ", result()))).toBe(2);
+  });
+
+  it("treats a result without a cases array as inconclusive, not a pass", () => {
+    expect(codeOf(check("0", "{}"))).toBe(7);
+    expect(codeOf(check("0", JSON.stringify({ cases: "x" })))).toBe(7);
+    expect(codeOf(check("0", JSON.stringify({ cases: [] })))).toBe(0);
+  });
+
   it("rejects bad arguments with exit 2 and prints help", () => {
     expect(codeOf(main(["r.json"], {}, { readFile: () => ok("") }))).toBe(2);
     expect(main(["--help"], {}, { readFile: () => ok("") }).tag).toBe("ok");

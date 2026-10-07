@@ -75,7 +75,7 @@ const inconclusive = (why: string): Result<CliError, never> =>
   err(cliError(EXIT_PARTIAL, `inconclusive: ${why}`));
 
 const parseCliExit = (v: unknown): Result<CliError, number> => {
-  const n = typeof v === "string" ? Number(v) : NaN;
+  const n = typeof v === "string" && v.trim() !== "" ? Number(v) : NaN;
   return Number.isInteger(n) && n >= 0
     ? ok(n)
     : err(
@@ -93,6 +93,8 @@ const decide = (
 ): Result<CliError, string> => {
   if (cliExit === 2) return inconclusive("eval CLI exited 2 (invalid run)");
   if (!isRecord(doc)) return inconclusive("result is not a JSON object");
+  if (!Array.isArray(doc["cases"]))
+    return inconclusive("result is missing a cases array");
   const bad = invalidReasons(doc);
   if (bad.length > 0) return inconclusive(bad.join("; "));
   const warns = deltaWarnings(doc).join("");
