@@ -37,7 +37,7 @@ can also run it directly (also reachable as ./doctor.sh from the repo root).
                    install --user pyte), when the interpreter allows it.
   --fix            Also apply other known fixes for a problem this script
                    detects, instead of only reporting it (currently: adding
-                   "git" to rtk's own exclude_commands config when rtk's
+                   "git", prettier, eslint, vitest to rtk's own exclude_commands config when rtk's
                    PreToolUse hook would otherwise break git commands inside
                    a worktree-isolated session; merging the require-worktree
                    PreToolUse hook back into ~/.claude/settings.json when
@@ -444,13 +444,16 @@ check_rtk() {
 # anywhere else.
 #
 # Reads RTK_CONFIG_PATH and RTK_PARSE_MODE from the environment:
-#   RTK_PARSE_MODE=check  Prints "yes" if "git" is already in the array,
-#                          "no" otherwise (including when exclude_commands
-#                          isn't present under [hooks] at all). Always
-#                          exits 0; the file is never modified.
-#   RTK_PARSE_MODE=fix     Appends "git" to the array in place and prints
-#                          "fixed", or prints "noop" if it was already
-#                          there. Exits 1 (no output) if exclude_commands
+#   RTK_VERIFY_COMMANDS    Comma list of extra commands to exclude, besides
+#                          "git" (set below).
+#   RTK_PARSE_MODE=check  Prints "no" if "git" is missing from the array
+#                          (including when exclude_commands isn't present
+#                          under [hooks] at all), "partial" if git is there
+#                          but a verification command isn't, else "yes".
+#                          Always exits 0; the file is never modified.
+#   RTK_PARSE_MODE=fix     Appends the missing entries to the array in place
+#                          and prints "fixed", or prints "noop" if none are
+#                          missing. Exits 1 (no output) if exclude_commands
 #                          isn't present under [hooks] to append to.
 # Passed via `-c` (like claude_plugin_state's own python3 call above) rather
 # than piped to stdin: a test's fake python3 (shim_python3 in
@@ -516,17 +519,21 @@ inner = inner[1:] if inner.startswith("[") else inner
 inner = inner[:-1] if inner.endswith("]") else inner
 entries = [e.strip().strip("\"'") for e in inner.split(",") if e.strip()]
 has_git = "git" in entries
+# git is required; the rest are verification commands whose condensed output
+# can hide a failure signal (advisory). Appended in this order by fix mode.
+wanted = ["git"] + [w for w in os.environ.get("RTK_VERIFY_COMMANDS", "").split(",") if w]
+missing = [w for w in wanted if w not in entries]
 
 if mode == "check":
-    print("yes" if has_git else "no")
+    print("no" if not has_git else "partial" if missing else "yes")
     sys.exit(0)
 
 # mode == fix
-if has_git:
+if not missing:
     print("noop")
     sys.exit(0)
 
-entries.append("git")
+entries.extend(missing)
 new_array = "[" + ", ".join('"{}"'.format(e) for e in entries) + "]"
 prefix = re.match(r'^(\s*exclude_commands\s*=\s*)', lines[start]).group(1)
 lines[start : end + 1] = [prefix + new_array + "\n"]
@@ -536,8 +543,16 @@ print("fixed")
 PYEOF
 )
 
+# Verification commands that gate a push. rtk condenses output and can swallow
+# a failure signal (a falsely passing `npx prettier --check` once let a CI
+# format failure through), so --fix excludes them from rewriting too. Whether
+# rtk's matching also catches the `npx prettier` form is unverified, so the
+# docs still say to run these via node directly.
+RTK_VERIFY_COMMANDS="prettier,eslint,vitest"
+export RTK_VERIFY_COMMANDS
+
 # rtk_config_git_excluded CFG
-#   Prints "yes"/"no" — see RTK_HOOKS_PARSER's RTK_PARSE_MODE=check contract
+#   Prints "yes"/"partial"/"no" — see RTK_HOOKS_PARSER's RTK_PARSE_MODE=check contract
 #   above. CFG must already exist; callers check that first.
 rtk_config_git_excluded() {
   RTK_CONFIG_PATH="$1" RTK_PARSE_MODE=check python3 -c "$RTK_HOOKS_PARSER"
@@ -567,7 +582,7 @@ fix_rtk_git_exclusion() {
   fi
   [[ "$result" == "noop" ]] && return 0
 
-  echo "✓ Added \"git\" to rtk's exclude_commands in $cfg"
+  echo "✓ Added git, ${RTK_VERIFY_COMMANDS//,/, } to rtk's exclude_commands in $cfg"
   echo "  Verify with:"
   echo "    echo '{\"tool_name\":\"Bash\",\"tool_input\":{\"command\":\"git status\"}}' | rtk hook claude"
   echo "  (empty output means git is no longer being rewritten)"
@@ -614,7 +629,18 @@ check_rtk_git_exclusion() {
     return 0
   fi
 
-  if [[ "$(rtk_config_git_excluded "$cfg")" == "yes" ]]; then
+  local state
+  state="$(rtk_config_git_excluded "$cfg")"
+  [[ "$state" == "yes" ]] && return 0
+
+  if [[ "$state" == "partial" && "$FIX" != "1" ]]; then
+    {
+      echo
+      echo "⚠ rtk may condense the output of ${RTK_VERIFY_COMMANDS//,/, } and hide a"
+      echo "  failure (a false pass once reached CI). Add them to exclude_commands"
+      echo "  under [hooks] in $cfg, or re-run this script with --fix."
+      echo
+    } >&2
     return 0
   fi
 

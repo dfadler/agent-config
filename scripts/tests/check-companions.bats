@@ -626,8 +626,26 @@ EOF
   write_rtk_config 'exclude_commands = []'
   run_companions --fix
   assert_success
-  assert_output_contains "Added \"git\" to rtk's exclude_commands"
+  assert_output_contains "Added git, prettier, eslint, vitest to rtk's exclude_commands"
+  grep -q 'exclude_commands = \["git", "prettier", "eslint", "vitest"\]' "$FAKE_RTK_CONFIG"
+}
+
+@test "warns (advisory) when git is excluded but verification commands are not" {
+  shim_rtk
+  write_rtk_config 'exclude_commands = ["git"]'
+  run_companions
+  assert_success
+  assert_output_contains "rtk may condense the output of prettier, eslint, vitest"
+  refute_output_contains "rtk rewrites"
   grep -q 'exclude_commands = \["git"\]' "$FAKE_RTK_CONFIG"
+}
+
+@test "--fix adds only the missing verification commands when git is already excluded" {
+  shim_rtk
+  write_rtk_config 'exclude_commands = ["git", "eslint"]'
+  run_companions --fix
+  assert_success
+  grep -q 'exclude_commands = \["git", "eslint", "prettier", "vitest"\]' "$FAKE_RTK_CONFIG"
 }
 
 @test "--fix appends git to a non-empty exclude_commands rather than clobbering it" {
@@ -635,16 +653,16 @@ EOF
   write_rtk_config 'exclude_commands = ["npm"]'
   run_companions --fix
   assert_success
-  grep -q 'exclude_commands = \["npm", "git"\]' "$FAKE_RTK_CONFIG"
+  grep -q 'exclude_commands = \["npm", "git", "prettier", "eslint", "vitest"\]' "$FAKE_RTK_CONFIG"
 }
 
-@test "--fix is a silent no-op when git is already excluded" {
+@test "--fix is a silent no-op when everything is already excluded" {
   shim_rtk
-  write_rtk_config 'exclude_commands = ["git"]'
+  write_rtk_config 'exclude_commands = ["git", "prettier", "eslint", "vitest"]'
   run_companions --fix
   assert_success
-  refute_output_contains "Added \"git\""
-  grep -q 'exclude_commands = \["git"\]' "$FAKE_RTK_CONFIG"
+  refute_output_contains "Added"
+  grep -q 'exclude_commands = \["git", "prettier", "eslint", "vitest"\]' "$FAKE_RTK_CONFIG"
 }
 
 @test "--fix fails loudly when it can't find exclude_commands to edit" {
@@ -682,8 +700,8 @@ EOF
   write_rtk_config $'exclude_commands = [\n  "npm",\n]'
   run_companions --fix
   assert_success
-  assert_output_contains "Added \"git\""
-  grep -q 'exclude_commands = \["npm", "git"\]' "$FAKE_RTK_CONFIG"
+  assert_output_contains "Added git"
+  grep -q 'exclude_commands = \["npm", "git", "prettier", "eslint", "vitest"\]' "$FAKE_RTK_CONFIG"
 }
 
 @test "warns when rtk's config path is reported but the file doesn't exist yet" {
