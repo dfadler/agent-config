@@ -328,3 +328,9 @@ is. `check_rtk` (`scripts/check-companions.sh`) now warns when `git` is missing 
 `exclude_commands` — same advisory-only posture as the rest of this file: it reports
 the problem and the exact fix, never edits rtk's config on its own, since that's a
 companion tool's own persistent configuration, not this repo's.
+
+`--fix` also adds `prettier`, `eslint` and `vitest` to `exclude_commands`, and a bare
+run warns when they are missing: rtk's condensing once turned a failing
+`npx prettier --check` into a false pass (#586). Whether rtk's matching also catches the
+`npx prettier` form is unverified, so still run gating checks via `node` directly or
+`rtk proxy <cmd>`.
