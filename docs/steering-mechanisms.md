@@ -34,6 +34,16 @@ Not used yet — conventions are opted in wholesale per machine instead of scope
 file path. Candidates are tracked in #280 and #278. Details, sourcing:
 [research notes](https://github.com/dfadler/agent-config/issues/280#issuecomment-5783291566).
 
+### Path-scoped guidance from a plugin
+
+A plugin cannot ship `.claude/rules/`, and `setup.sh` does not install one: it only
+manages `~/.claude`, and a user-level rule would help only this machine. A plugin that
+wants guidance tied to a path ships a skill with `paths` frontmatter instead, keeps
+lint messages as the baseline, and does not add a hook just to inject static text.
+`paths` activation on plugin skills is documented but not yet verified; check with
+`/context` when the eval-authoring skill gains it. Decision record, sourcing:
+[#437](https://github.com/dfadler/agent-config/issues/437#issuecomment-5940286543).
+
 ## Stop vs. SessionEnd hooks
 
 `Stop` can block and reach Claude; `SessionEnd` can't and its output is discarded —
