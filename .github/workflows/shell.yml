@@ -11,14 +11,14 @@ name: Shell
 # To add a whole new language: write a new reusable workflow, call it from
 # ci.yml and add it to that sentinel's needs:.
 #
-# Checks and the make targets they invoke:
-#   shellcheck     make lint-shellcheck
-#   shfmt          make lint-shfmt
+# Checks and the scripts/ci.sh targets they invoke:
+#   shellcheck     bash scripts/ci.sh lint-shellcheck
+#   shfmt          bash scripts/ci.sh lint-shfmt
 #   set-flags      pnpm run lint-set-flags
 #   claude-md-size pnpm run lint-claude-md
-#   structure      make structure
-#   test-sh        make test-sh
-#   coverage       make coverage   (needs test-sh: guards the kcov build)
+#   structure      bash scripts/ci.sh structure
+#   test-sh        bash scripts/ci.sh test-sh
+#   coverage       bash scripts/ci.sh coverage   (needs test-sh: guards the kcov build)
 
 on:
   workflow_call:

@@ -7,7 +7,7 @@ name: Actionlint
 # of error, plus expression/type mistakes in ${{ }}, bad cron/glob syntax,
 # unknown runner labels, and (via shellcheck) bugs in embedded `run:` scripts.
 #
-# Runs through the same `make lint-actions` entry point humans use locally
+# Runs through the same `scripts/ci.sh lint-actions` entry point humans use locally
 # (`brew install actionlint`), matching shell.yml's pattern.
 #
 # shellcheck comes from the shared install-shellcheck composite action (same
@@ -66,4 +66,4 @@ jobs:
         uses: ./.github/actions/install-shellcheck
 
       - name: Lint workflows (actionlint)
-        run: make lint-actions
+        run: bash scripts/ci.sh lint-actions

@@ -45,7 +45,7 @@
    really are flat.
 3. Run `claude plugin validate plugins/dfadler-agent-config` — it checks the manifest
    and parses the frontmatter of every skill and agent inside.
-4. Run `make check` (see [Checks](#checks) below) before pushing.
+4. Run `bash scripts/ci.sh check` (see [Checks](#checks) below) before pushing.
 5. Commit and push. A new skill or agent inside an already-linked plugin needs no
    `setup.sh` re-run; anything under `claude/`, or a whole new plugin, does — see
    [`docs/setup.md`](./setup.md).
@@ -114,49 +114,62 @@ worth avoiding on those grounds even before the mechanism question above.
 
 ## Checks
 
-`make check` runs everything CI runs, and CI calls these same targets — so a green
-run locally means the same thing a green PR does.
+`scripts/ci.sh check` runs everything CI runs, and CI calls these same targets
+(`bash scripts/ci.sh <target>`, or `pnpm run <name>` for the Node-based ones) so a
+green run locally means the same thing a green PR does. `make <target>` and
+`pnpm run check` are thin delegates to the same script; `bash scripts/ci.sh --help`
+lists every target.
 
 ```bash
-make check          # lint + structure + typecheck + test + actionlint + coverage
+bash scripts/ci.sh check   # lint + structure + typecheck + test + actionlint + coverage
 ```
 
 | Target | What it does |
 | --- | --- |
-| `make lint-sh` | `shellcheck`, `shfmt -i 2 -ci -d`, the `set -uo pipefail` convention, and the `claude/CLAUDE.md` line-count ceiling (`scripts/ts/check-claude-md-lines.ts`) |
-| `make lint-py` | `ruff check` and `ruff format --check` |
-| `make typecheck` | `mypy --strict` over the Python sources |
-| `make structure` | Plugin manifests and skill/agent frontmatter agree with their directories |
-| `make test-sh` | `bats` suites under `scripts/tests/` |
-| `make test-py` | `pytest` suite under `scripts/tests/` |
-| `make coverage` | Re-runs the `bats` suites under `kcov` and enforces the coverage floor (Linux only) |
-| `make lint-ts` / `typecheck-ts` / `test-ts` / `coverage-ts` (`pnpm run lint` / `typecheck` / `test` / `coverage`) | `eslint`, `tsc --noEmit`, Vitest, and its coverage floor over `scripts/ts/` (see [`testing.md`](testing.md)) |
-| `make check-skills` (`pnpm run check-skills`) | A skill another skill references must have a `## Contract` (Input/Output), and references must resolve ([`docs/skill-composition.md`](./skill-composition.md)) |
-| `make fmt` | Rewrites sources to the repo's `shfmt` / `ruff` style |
-| `make lint-actions` | `actionlint` over `.github/workflows/` |
+| `lint-sh` | `shellcheck`, `shfmt -i 2 -ci -d`, the `set -uo pipefail` convention, and the `claude/CLAUDE.md` line-count ceiling (`scripts/ts/check-claude-md-lines.ts`) |
+| `lint-py` | `ruff check` and `ruff format --check` |
+| `typecheck` | `mypy --strict` over the Python sources |
+| `structure` | Plugin manifests and skill/agent frontmatter agree with their directories |
+| `test-sh` | `bats` suites under `scripts/tests/` |
+| `test-py` | `pytest` suite under `scripts/tests/` |
+| `coverage` | Re-runs the `bats` suites under `kcov` and enforces the coverage floor (Linux only) |
+| `coverage-py` | Re-runs `pytest` under `pytest-cov` and enforces its floor |
+| `lint-ts` / `typecheck-ts` / `test-ts` / `coverage-ts` (`pnpm run lint` / `typecheck` / `test` / `coverage`) | `eslint`, `tsc --noEmit`, Vitest, and its coverage floor over `scripts/ts/` (see [`testing.md`](testing.md)) |
+| `check-skills` (`pnpm run check-skills`) | A skill another skill references must have a `## Contract` (Input/Output), and references must resolve ([`docs/skill-composition.md`](./skill-composition.md)) |
+| `fmt` | Rewrites sources to the repo's `shfmt` / `ruff` style |
+| `lint-actions` | `actionlint` over `.github/workflows/` |
 
 ```bash
 brew install shellcheck shfmt bats-core actionlint
-make venv          # Python side: .venv from requirements-dev.txt
-nvm use            # TypeScript side: Node from .nvmrc, then `pnpm install --frozen-lockfile`
+nvm use            # TypeScript side: Node from .nvmrc
 ```
+
+The Python side needs `.venv`, and the Node side needs `node_modules`; `scripts/ci.sh`
+builds each on demand (stamp files `.venv/.installed` and `node_modules/.installed`
+skip the work until `requirements-dev.txt`, `package.json` or `pnpm-lock.yaml` change),
+and `bash scripts/ci.sh venv` / `node-modules` do it explicitly. Shell-only targets
+(`lint-shellcheck`, `lint-shfmt`, `structure`, `test-sh`, `coverage`, `lint-actions`)
+need neither. Python tools always run through `.venv`, never whatever `python3` is on
+`PATH`.
 
 The TypeScript targets need the Node in `.nvmrc` (22.18+ for native type
 stripping — the system Homebrew Node may not qualify), so run `nvm use` first.
 The package manager is pnpm, pinned by `packageManager` in `package.json`;
-dependencies are pinned by `pnpm-lock.yaml`, and `make node-modules` runs
-`pnpm install --frozen-lockfile`. The Node-based checks (the TypeScript ones, `lint-set-flags`, `lint-claude-md`, `check-links`) are `package.json` scripts: CI runs `pnpm run <name>` and the `make` targets delegate to the same scripts. The shell and Python checks stay `make`-only.
+dependencies are pinned by `pnpm-lock.yaml`. The Node-based checks (the TypeScript ones, `lint-set-flags`, `lint-claude-md`, `check-links`, `check-vitest-*`) are `package.json` scripts.
 
-`make check` uses `.venv` when it exists and otherwise falls back to whatever
-`python3` is on `PATH`, so a shell-only change doesn't require building one.
-
-`make coverage` needs `kcov` and `jq` on top of the tools above. It only measures
+`coverage` needs `kcov` and `jq` on top of the tools above. It only measures
 anything on Linux: kcov instruments bash by injecting a library into the traced
 shell, and macOS SIP strips that from `/bin/bash`, so on a Mac the target says so
 and skips rather than reporting a meaningless 0%. The floor it enforces is a
-measured baseline (see the `coverage` target in the `Makefile` for the number, how
+measured baseline (see `COVERAGE_MIN` in `scripts/ci.sh` for the number, how
 it was taken, and what is and isn't in the denominator) — a regression gate, not a
 target to design tests around.
+
+**Ported check** (adding a Node-based check): add `"lint-foo": "node scripts/ts/check-foo.ts"`
+to `package.json`, list `lint-foo` in `pnpm_name` and `check` in `scripts/ci.sh`, and add
+`pnpm run lint-foo` to the workflow that runs it (after the `./.github/actions/setup-node-pnpm`
+step). A plugin-owned check uses `plugins/<plugin>/scripts/ts/check-foo.ts`. See
+[`testing.md`](testing.md) for the script shape.
 
 Two checks exist because a linter can't express them. `scripts/ts/check-shell-set-flags.ts`
 enforces the `set -uo pipefail` opener from the global `CLAUDE.md`, which shellcheck
@@ -191,7 +204,7 @@ only its own run command and why its graders are shaped as they are.
   grant records its exact command in its header; a case without one needs only `Skill`.
   Add `--ablation with-without` where the header says to. Record the grant in
   `plugins/<name>/evals/grants.yaml` too (format: `plugins/eval-authoring/docs/grants-format.md`);
-  `make lint-plugin-evals` runs the eval-authoring lint over every plugin and CI fails on an
+  `bash scripts/ci.sh lint-plugin-evals` runs the eval-authoring lint over every plugin and CI fails on an
   error finding such as EVAL004, so a case with `Bash` in `allowed_tools` and no recorded grant
   does not merge.
 - **Adding a lint rule.** The lint is `plugins/eval-authoring/scripts/ts/lint/`; a rule is
@@ -199,7 +212,7 @@ only its own run command and why its graders are shaped as they are.
   auto-discovery with no registry to edit. Steps, the `Rule` interface and the sabotage
   check are in `plugins/eval-authoring/docs/lint-rules.md`; don't copy them here.
   `node plugins/eval-authoring/scripts/ts/lint/cli.ts --list-rules` prints the current set.
-- **Repo evals in CI.** `make lint-plugin-evals` (part of `make check`, run by the
+- **Repo evals in CI.** `bash scripts/ci.sh lint-plugin-evals` (part of `check`, run by the
   TypeScript workflow) lints every plugin's `evals/` for free. It never runs a paid
   eval; those are run by hand with the `run-evals` wrapper.
 - **Grader shape.** Prefer free `regex` graders where a literal string is reliable and

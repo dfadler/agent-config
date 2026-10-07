@@ -3,8 +3,8 @@ name: TypeScript
 # Lints, typechecks and tests the TypeScript scripts under scripts/ts/ (and,
 # as they land, plugin scripts — see #419, #420).
 #
-# Calls the package.json scripts (`pnpm run <name>`) that the matching `make`
-# targets delegate to, so `make check` and a green PR mean the same thing. The Node
+# Calls the package.json scripts (`pnpm run <name>`) that
+# `scripts/ci.sh check` delegates to, so a green local check and a green PR mean the same thing. The Node
 # version comes from .nvmrc, the pnpm version from `packageManager` in
 # package.json, and dependencies are pinned by pnpm-lock.yaml
 # (`--frozen-lockfile` fails on any drift).
@@ -44,10 +44,10 @@ jobs:
         run: pnpm run lint-plugin-evals
 
       - name: Vitest flag drift
-        run: make check-vitest-flags
+        run: pnpm run check-vitest-flags
 
       - name: Vitest 3 option names
-        run: make check-vitest-v3-names
+        run: pnpm run check-vitest-v3-names
 
       - name: Test (vitest)
         run: pnpm run test
