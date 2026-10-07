@@ -152,9 +152,9 @@ for the rtk conflict `--fix` currently resolves.
 
 Skills, agents, and slash commands each have a specific place to go, a naming
 convention (no `dfadler-agent-config-` prefix — the plugin namespace already prevents
-collisions), and a `make check` pass before pushing. See
+collisions), and a `bash scripts/ci.sh check` pass before pushing. See
 [`docs/contributing.md`](docs/contributing.md) for the full checklist, why skills
-here don't declare `allowed-tools`, the `make check` target reference, and this
+here don't declare `allowed-tools`, the `bash scripts/ci.sh check` target reference, and this
 repo's `gh`-only convention for GitHub operations.
 
 ## What belongs here vs. in a project
@@ -178,7 +178,7 @@ copy of something is a deliberate fork rather than drift to reconcile.
   anthropics/skills, AWS Agent Toolkit, rtk, ponytail) and the Linux-administration
   vendor-vs-build-it-here decision.
 - [`docs/contributing.md`](docs/contributing.md) — adding a skill/agent/command/hook,
-  the `allowed-tools` decision, `make check`, and GitHub operations via `gh`.
+  the `allowed-tools` decision, `bash scripts/ci.sh check`, and GitHub operations via `gh`.
 - [`docs/scope.md`](docs/scope.md) — what belongs in this repo vs. a project's own
   `.claude/`.
 - [`docs/steering-mechanisms.md`](docs/steering-mechanisms.md) — when to use a

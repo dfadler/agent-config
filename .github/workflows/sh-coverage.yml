@@ -50,4 +50,4 @@ jobs:
       - name: Verify kcov
         run: kcov --version
       - name: Coverage (kcov, 70% floor)
-        run: make coverage
+        run: bash scripts/ci.sh coverage

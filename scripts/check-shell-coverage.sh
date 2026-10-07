@@ -5,14 +5,14 @@
 # a subdirectory of the output dir it was given. That subdirectory is named for
 # the traced command plus a hash of the invocation (`coverage/bats.a1b2c3…/`),
 # so the caller locates the file rather than this script guessing at the name;
-# `make coverage` finds it and passes the path in. Both arguments are required
+# `scripts/ci.sh coverage` finds it and passes the path in. Both arguments are required
 # for the same reason: a defaulted path that silently misses is how a coverage
 # gate ends up reporting on a file nobody wrote.
 #
 # The floor is a MEASURED baseline, not an aspiration: see the comment above
-# the `coverage` target in the Makefile for the number and how it was taken.
+# COVERAGE_MIN in scripts/ci.sh for the number and how it was taken.
 # Lowering it should require a deliberate commit, which is why the value lives
-# in the Makefile rather than being inferred from a previous run.
+# in scripts/ci.sh rather than being inferred from a previous run.
 set -euo pipefail
 
 # Exit-code taxonomy — see the hygiene baseline in claude/CLAUDE.md.
@@ -27,7 +27,7 @@ usage() {
 Usage: check-shell-coverage.sh [-h|--help] <coverage.json> <min-threshold>
 
 Enforce a floor on kcov-measured bats coverage. Reads `.percent_covered` from
-the given coverage.json (as produced by `make coverage`) and fails if it is
+the given coverage.json (as produced by `scripts/ci.sh coverage`) and fails if it is
 below <min-threshold>, a percentage such as 70.
 
   -h, --help   Show this message and exit.

@@ -16,4 +16,4 @@ jobs:
           persist-credentials: false
       - uses: ./.github/actions/install-bats
       - name: Test (bats)
-        run: make test-sh
+        run: bash scripts/ci.sh test-sh

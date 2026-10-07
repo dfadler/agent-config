@@ -12,9 +12,9 @@
 # coverage gate ends up reporting on a file nobody wrote.
 #
 # The floor is a MEASURED baseline, not an aspiration: see the comment above
-# the `coverage-py` target in the Makefile for the number and how it was
+# COVERAGE_PY_MIN in scripts/ci.sh for the number and how it was
 # taken. Lowering it should require a deliberate commit, which is why the
-# value lives in the Makefile rather than being inferred from a previous run.
+# value lives in scripts/ci.sh rather than being inferred from a previous run.
 set -euo pipefail
 
 # Exit-code taxonomy — see the hygiene baseline in claude/CLAUDE.md.
@@ -30,7 +30,7 @@ Usage: check-python-coverage.sh [-h|--help] <coverage.json> <min-threshold>
 
 Enforce a floor on pytest-cov-measured line coverage. Reads
 `.totals.percent_covered` from the given coverage.py JSON report (as produced
-by `make coverage-py`) and fails if it is below <min-threshold>, a percentage
+by `scripts/ci.sh coverage-py`) and fails if it is below <min-threshold>, a percentage
 such as 33.
 
   -h, --help   Show this message and exit.

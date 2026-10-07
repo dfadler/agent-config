@@ -13,7 +13,7 @@ name: CI
 #   shell       shell.yml        shellcheck, shfmt, set-flags, claude-md-size,
 #                                structure, test-sh, coverage (sh-*.yml)
 #   typescript  typescript.yml   pnpm run lint / typecheck / test / coverage
-#   python      python.yml       make lint-py / typecheck / test-py / coverage-py
+#   python      python.yml       scripts/ci.sh lint-py / typecheck / test-py / coverage-py
 #
 # actionlint.yml (paths-filtered) and issue-bot.yml stay standalone: a
 # paths-filtered workflow cannot be gated here without leaving the required

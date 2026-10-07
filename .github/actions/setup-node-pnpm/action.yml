@@ -5,7 +5,7 @@ description: >
 
 # Run actions/checkout first: this reads .nvmrc and package.json from the
 # working directory. Any workflow that runs a TypeScript check (a
-# `pnpm run` script or `make` target) uses this one step instead of the
+# `pnpm run` script or `scripts/ci.sh` target) uses this one step instead of the
 # pnpm/action-setup + setup-node + install sequence, so the pins live in one
 # place. typescript.yml, sh-claude-md-size.yml and sh-set-flags.yml use it today; the other
 # sh-*.yml workflows add it as their checks move to TypeScript.

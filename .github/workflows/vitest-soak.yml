@@ -10,7 +10,7 @@ name: Vitest soak
 # an issue; it never blocks a merge.
 #
 # Flags are Vitest 5 CLI flags, checked against `vitest --help` on the pinned
-# version (see docs/testing.md; `make check-vitest-flags` guards the doc table):
+# version (see docs/testing.md; `pnpm run check-vitest-flags` guards the doc table):
 #   --repeats=N                 rerun every test N more times, any failure fails
 #   --sequence.shuffle.tests    shuffle test order within each file
 #   --sequence.seed=<n>         replayable shuffle order (we pin it to the run id)

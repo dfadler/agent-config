@@ -9,8 +9,8 @@ name: Python
 # own state. Replacing it with a purpose-built PTY holder removed that channel
 # but moved the code into Python, which the Shell workflow cannot check.
 #
-# Same contract as shell.yml: CI calls the `make` targets humans run locally,
-# so `make check` and a green PR mean the same thing. Dependencies are pinned
+# Same contract as shell.yml: CI calls the `scripts/ci.sh` targets humans run locally,
+# so `scripts/ci.sh check` and a green PR mean the same thing. Dependencies are pinned
 # in requirements-dev.txt.
 
 # Called from ci.yml, whose all-checks sentinel is the only required
@@ -38,25 +38,25 @@ jobs:
 
       - name: Install pinned dependencies
         run: |
-          make venv
+          bash scripts/ci.sh venv
           .venv/bin/pip list
 
       - name: Lint (ruff check + format)
-        run: make lint-py
+        run: bash scripts/ci.sh lint-py
 
       - name: Typecheck (mypy --strict)
-        run: make typecheck
+        run: bash scripts/ci.sh typecheck
 
       # The integration tests fork real PTYs and start real daemons. They are
       # hermetic — AGENT_TERM_STATE is redirected per test and torn down — but
       # they do need a working pty(4), which the ubuntu runner provides.
       - name: Test (pytest)
-        run: make test-py
+        run: bash scripts/ci.sh test-py
 
       # Mirrors shell.yml's kcov step: re-runs the same suite under
-      # pytest-cov and enforces a floor (see COVERAGE_PY_MIN in the
-      # Makefile for the number and how it was measured). Unlike kcov this
+      # pytest-cov and enforces a floor (see COVERAGE_PY_MIN in
+      # scripts/ci.sh for the number and how it was measured). Unlike kcov this
       # needs no Linux-only guard — coverage.py instruments Python
-      # identically on every platform `make coverage-py` runs on.
+      # identically on every platform `scripts/ci.sh coverage-py` runs on.
       - name: Coverage (pytest-cov, floor)
-        run: make coverage-py
+        run: bash scripts/ci.sh coverage-py

@@ -71,8 +71,8 @@ REPO_ROOT="$(cd -P "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 #
 # The detached-terminal skill's agent_term.py is `#!/usr/bin/env python3`, so
 # it runs under whatever python3 is FIRST ON PATH when an agent invokes it.
-# Nothing activates this repo's .venv (the one `make venv` builds for CI) on
-# the skill's behalf, so a green `make check` says nothing about whether the
+# Nothing activates this repo's .venv (the one `scripts/ci.sh venv` builds for CI) on
+# the skill's behalf, so a green `scripts/ci.sh check` says nothing about whether the
 # skill can actually start. pyte has to be importable by the ambient
 # interpreter, and setup time is the only moment that gap can surface before
 # an agent hits it mid-task.
@@ -114,7 +114,7 @@ report_missing_pyte() {
     echo "⚠ pyte is NOT installed for $exe"
     echo "  The detached-terminal skill will fail the first time an agent uses it."
     echo "  That skill runs under whatever python3 is first on PATH, so this repo's"
-    echo "  .venv (make venv) does not satisfy it."
+    echo "  .venv (scripts/ci.sh venv) does not satisfy it."
     echo
     if [[ "$managed" == "yes" ]]; then
       echo "  That interpreter is PEP 668 externally-managed, so pip will refuse to"

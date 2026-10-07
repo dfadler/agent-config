@@ -112,4 +112,4 @@ if (import.meta.main) run(main);
 ```
 
 Test `findTodos` directly and `main` with a fake `io.readFile`; no process, no
-files. Wiring it into CI: see the "Ported check" comment in the `Makefile`.
+files. Wiring it into CI: see the "Ported check" note in `docs/contributing.md`.

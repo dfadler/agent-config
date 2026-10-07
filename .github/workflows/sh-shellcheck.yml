@@ -17,4 +17,4 @@ jobs:
       - name: Install shellcheck
         uses: ./.github/actions/install-shellcheck
       - name: Lint (shellcheck)
-        run: make lint-shellcheck
+        run: bash scripts/ci.sh lint-shellcheck

@@ -30,4 +30,4 @@ jobs:
           rm -f /tmp/shfmt
           shfmt --version
       - name: Lint (shfmt)
-        run: make lint-shfmt
+        run: bash scripts/ci.sh lint-shfmt

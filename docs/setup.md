@@ -84,8 +84,8 @@ settings control whether an installed hook actually *does* anything in a given r
 
 The `detached-terminal` skill's `agent_term.py` is `#!/usr/bin/env python3`, so it runs
 under whatever `python3` is first on `PATH` when an agent invokes it. Nothing activates
-this repo's `.venv` (the one `make venv` builds for CI) on the skill's behalf, so a green
-`make check` says nothing about whether the skill can start — [`pyte`](https://github.com/selectel/pyte)
+this repo's `.venv` (the one `scripts/ci.sh venv` builds for CI) on the skill's behalf, so a green
+`scripts/ci.sh check` says nothing about whether the skill can start — [`pyte`](https://github.com/selectel/pyte)
 has to be importable by that *ambient* interpreter.
 
 `setup.sh` checks it at the end of a run. If it's missing, the run still succeeds (the

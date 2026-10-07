@@ -41,7 +41,7 @@ a CI failure here.
   pipeline exists (e.g. a release workflow several triggers need identically).
 - **Node setup is the `.github/actions/setup-node-pnpm` composite.** Node from
   `.nvmrc`, pnpm from `packageManager`, then `pnpm install --frozen-lockfile`. Any workflow
-  that runs a `pnpm run` script (or a `make` target that depends on `node-modules`) runs it right after checkout
+  that runs a `pnpm run` script (or a `scripts/ci.sh` target that needs `node_modules`) runs it right after checkout
   instead of repeating the three steps (`typescript.yml` and
   `sh-claude-md-size.yml` do; the other `sh-*.yml` files add it as their checks
   move to TypeScript). Its external actions are
@@ -87,7 +87,7 @@ a CI failure here.
   `shell / shellcheck / run`, `shell / coverage / run` and so on (a UI may add the
   workflow name as a prefix). Only `all-checks` is required.
 - **Every CI check should call the same command a human runs locally**
-  (a `make` target, a script) rather than reimplementing the check inline in
+  (a `scripts/ci.sh` target, a script) rather than reimplementing the check inline in
   YAML. That's what keeps "CI is green" and "the local check is green" from
   drifting apart, and it's what makes `act`/local reproduction close to free —
   there's no CI-only logic to fall back to Docker for.
@@ -194,7 +194,7 @@ increasing cost:
    For an in-progress run's actual runtime behavior: `act` doesn't guarantee
    parity with a real hosted runner (secrets handling and service containers
    are the usual divergence points) — lower value here, since every workflow
-   already delegates to a `make` target that runs identically outside CI, so
+   already delegates to a `scripts/ci.sh` target that runs identically outside CI, so
    there's rarely anything Docker-only to reproduce. `action-tmate`, if used:
    place it as its own step immediately after the one being diagnosed, guard
    it with `if: ${{ failure() }}` so a preceding-step failure doesn't skip it,
