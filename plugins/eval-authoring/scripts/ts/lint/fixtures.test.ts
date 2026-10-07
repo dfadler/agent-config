@@ -73,7 +73,7 @@ describe("fixture coverage", () => {
       const root = join(FIXTURES, id, fixture);
       const isBad = fixture.startsWith("bad-");
       it(isBad ? `fires ${id}` : `leaves ${id} quiet`, () => {
-        const outcome = lintPlugin(root, rules);
+        const outcome = lintPlugin(root, rules, { evalDir: "cases" });
         expect(outcome.ok).toBe(true);
         if (!outcome.ok) return;
         const { findings } = outcome.report;

@@ -7,7 +7,7 @@ import { rule } from "./eval014-scaffolds.ts";
 const FIXTURES = join(import.meta.dirname, "..", "..", "..", "..", "tests", "lint-fixtures", "EVAL014");
 
 const messages = (fixture: string): readonly string[] => {
-  const outcome = lintPlugin(join(FIXTURES, fixture), [rule]);
+  const outcome = lintPlugin(join(FIXTURES, fixture), [rule], { evalDir: "cases" });
   if (!outcome.ok) throw new Error(outcome.reason);
   return outcome.report.findings.map((f) => `${f.severity} ${f.ruleId} ${f.message} ${f.source}`);
 };

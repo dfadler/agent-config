@@ -7,7 +7,7 @@ import { rule } from "./eval018-plugin-dependencies.ts";
 const FIXTURES = join(import.meta.dirname, "..", "..", "..", "..", "tests", "lint-fixtures", "EVAL018");
 
 const findings = (fixture: string) => {
-  const outcome = lintPlugin(join(FIXTURES, fixture), [rule]);
+  const outcome = lintPlugin(join(FIXTURES, fixture), [rule], { evalDir: "cases" });
   if (!outcome.ok) throw new Error(outcome.reason);
   return outcome.report.findings.filter((f) => f.ruleId === "EVAL018");
 };

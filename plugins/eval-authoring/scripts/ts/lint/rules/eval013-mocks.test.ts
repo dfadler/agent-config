@@ -10,7 +10,7 @@ import { rule } from "./eval013-mocks.ts";
 const FIXTURES = join(import.meta.dirname, "..", "..", "..", "..", "tests", "lint-fixtures", "EVAL013");
 
 const messages = (fixture: string): readonly string[] => {
-  const outcome = lintPlugin(join(FIXTURES, fixture), [rule]);
+  const outcome = lintPlugin(join(FIXTURES, fixture), [rule], { evalDir: "cases" });
   if (!outcome.ok) throw new Error(outcome.reason);
   return outcome.report.findings.map((f) => `${f.ruleId} ${f.message}`);
 };
@@ -30,7 +30,7 @@ describe.each(["bad-case-yaml", "bad-prompt-md", "bad-suite"])("EVAL013 %s", (fi
 describe("EVAL013 with a relative plugin root", () => {
   /** Same lint, but the plugin root is a path relative to the working directory. */
   const relativeMessages = (fixture: string): readonly string[] => {
-    const outcome = lintPlugin(relative(process.cwd(), join(FIXTURES, fixture)), [rule]);
+    const outcome = lintPlugin(relative(process.cwd(), join(FIXTURES, fixture)), [rule], { evalDir: "cases" });
     if (!outcome.ok) throw new Error(outcome.reason);
     return outcome.report.findings.map((f) => `${f.ruleId} ${f.message}`);
   };
