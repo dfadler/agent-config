@@ -47,6 +47,7 @@ Full reasoning for each verdict, plus the duplication check and follow-up list:
 | `tooling-over-manual-scanning.md` | Opt-in include |
 | `why-question-shape.md` | Opt-in include |
 | `prefer-real-chrome.md` | Opt-in include (advisory; the deny rule it names is the enforced form) |
+| `context-preservation.md` | Opt-in include (threshold rule; mechanics in the `subagent-orchestration` skill) |
 | `visual-verification.md` | Merge into skill |
 | `concurrency.md` | Merge into skill |
 | `shell-script-hygiene.md` | Convert to skill |
