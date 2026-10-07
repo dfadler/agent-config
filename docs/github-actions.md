@@ -60,7 +60,9 @@ a CI failure here.
   A concurrency group inside a called workflow conflicts with the caller's, so
   `shell.yml`, `typescript.yml`, `python.yml` and the `sh-*.yml` files declare
   none. `actionlint.yml` (a `paths:` filter would leave a required check Pending
-  on PRs that don't match) and `issue-bot.yml` stay standalone.
+  on PRs that don't match) and `issue-bot.yml` stay standalone. So does
+  `vitest-soak.yml`, a scheduled/manual Vitest `--repeats` soak that is
+  deliberately non-gating: it opens an issue on failure and never blocks a PR.
 - **Sentinel job for branch protection.** When a thin orchestrator dispatches
   several reusable workflows in parallel, adding a dedicated `all-checks` job
   (with `if: always()` and `needs:` listing every other job) gives branch

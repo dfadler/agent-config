@@ -1,0 +1,128 @@
+name: Vitest soak
+
+# Optional scheduled soak of the Vitest suite (#481): every test repeated many
+# times in a shuffled order, to surface rare flakes and order dependence that a
+# single PR run never sees.
+#
+# STANDALONE and NON-GATING on purpose. It is not called from all-checks.yml
+# (every job called there feeds the `all-checks` sentinel and would block PRs),
+# and it only runs on a schedule or by hand. A red run opens (or comments on)
+# an issue; it never blocks a merge.
+#
+# Flags are Vitest 5 CLI flags, checked against `vitest --help` on the pinned
+# version (see docs/testing.md; `make check-vitest-flags` guards the doc table):
+#   --repeats=N                 rerun every test N more times, any failure fails
+#   --sequence.shuffle.tests    shuffle test order within each file
+#   --sequence.seed=<n>         replayable shuffle order (we pin it to the run id)
+#   --maxWorkers=N              cap worker count (v4+ name; poolOptions.* is v3)
+#   --logHeapUsage              heap size after each test, to spot growth
+#   --detectAsyncLeaks          opt-in via workflow_dispatch; slow, debugging only
+# To replay a failure locally, use the seed printed in the run summary:
+#   pnpm exec vitest run --repeats=<N> --sequence.shuffle.tests --sequence.seed=<seed>
+
+on:
+  schedule:
+    # 03:17 UTC daily; an off-the-hour minute avoids the top-of-hour queue.
+    - cron: "17 3 * * *"
+  workflow_dispatch:
+    inputs:
+      repeats:
+        description: Extra repetitions of every test (Vitest --repeats)
+        type: number
+        default: 50
+      detect_async_leaks:
+        description: Also pass --detectAsyncLeaks (much slower; debugging only)
+        type: boolean
+        default: false
+
+# One soak at a time; a manual dispatch queues behind a running one rather than
+# cancelling a half-finished soak.
+concurrency:
+  group: ${{ github.workflow }}
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+
+jobs:
+  soak:
+    name: soak
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    permissions:
+      contents: read
+      # Only to open or comment on the failure issue below.
+      issues: write
+    env:
+      REPEATS: ${{ inputs.repeats || 50 }}
+      DETECT_ASYNC_LEAKS: ${{ inputs.detect_async_leaks && 'true' || 'false' }}
+      SEED: ${{ github.run_id }}
+      RESULTS_DIR: soak-results
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - uses: ./.github/actions/setup-node-pnpm
+
+      - name: Soak (vitest --repeats, shuffled)
+        run: |
+          mkdir -p "$RESULTS_DIR"
+          args=(
+            run
+            "--repeats=$REPEATS"
+            --sequence.shuffle.tests
+            "--sequence.seed=$SEED"
+            --maxWorkers=2
+            --logHeapUsage
+            --reporter=default
+            --reporter=junit
+            --reporter=json
+            "--outputFile.junit=$RESULTS_DIR/junit.xml"
+            "--outputFile.json=$RESULTS_DIR/results.json"
+          )
+          if [ "$DETECT_ASYNC_LEAKS" = "true" ]; then
+            args+=(--detectAsyncLeaks)
+          fi
+          {
+            echo "### Vitest soak"
+            echo
+            echo "- seed: \`$SEED\`"
+            echo "- repeats: \`$REPEATS\`"
+            echo "- detectAsyncLeaks: \`$DETECT_ASYNC_LEAKS\`"
+            echo "- replay: \`pnpm exec vitest run --repeats=$REPEATS --sequence.shuffle.tests --sequence.seed=$SEED\`"
+          } >> "$GITHUB_STEP_SUMMARY"
+          pnpm exec vitest "${args[@]}" 2>&1 | tee "$RESULTS_DIR/vitest.log"
+          exit "${PIPESTATUS[0]}"
+
+      - name: Upload results
+        if: ${{ !cancelled() }}
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: vitest-soak-${{ github.run_id }}
+          path: soak-results/
+          if-no-files-found: warn
+          retention-days: 30
+
+      - name: Open or update failure issue
+        if: ${{ failure() }}
+        env:
+          GH_TOKEN: ${{ github.token }}
+          RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+        run: |
+          title="Vitest soak failed"
+          body="The scheduled Vitest soak failed: $RUN_URL
+
+          - seed: \`$SEED\`
+          - repeats: \`$REPEATS\`
+          - replay: \`pnpm exec vitest run --repeats=$REPEATS --sequence.shuffle.tests --sequence.seed=$SEED\`
+
+          JUnit/JSON results and the log are attached to the run as the \`vitest-soak-$SEED\` artifact. A failure here is a flaky or order-dependent test, not a blocked merge."
+          existing=$(gh issue list --repo "$GITHUB_REPOSITORY" --state open \
+            --search "\"$title\" in:title" --json number,title \
+            --jq "[.[] | select(.title == \"$title\")][0].number // empty")
+          if [ -n "$existing" ]; then
+            gh issue comment "$existing" --repo "$GITHUB_REPOSITORY" --body "$body"
+          else
+            gh issue create --repo "$GITHUB_REPOSITORY" --title "$title" --body "$body"
+          fi
