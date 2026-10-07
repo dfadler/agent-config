@@ -1,0 +1,51 @@
+# Run: claude plugin eval plugins/dfadler-agent-config --case changesets-authoring-writes-changeset-when-configured --runs 3 --trust-plugin --no-publish
+# Shared run/grant facts: docs/contributing.md, "Plugin evals". No grant: Skill only; inputs are
+# pasted and nothing runs.
+# Positive counterpart to the half-migrated and does-not-introduce cases (#489): with both
+# Changesets signals present and a user-facing bug fix, the reply writes a patch changeset in the
+# Step 3 format. Free regexes pin the frontmatter; no llm grader.
+# Can fail: skill_fired if the description stops matching; says_write if the reply starts ASK;
+# patch_frontmatter if the quoted package/bump pair is missing or the bump is not patch.
+# Skill phrases checked: "name every package whose published output actually changed",
+# "`patch` — a bug fix".
+schema_version: "1.1"
+name: changesets-authoring-writes-changeset-when-configured
+description: >
+    With `.changeset/config.json` and `@changesets/cli` both present and a user-facing bug fix, the
+    model invokes changesets-authoring and writes a patch changeset. expected_outcome: PASS when the
+    skill fires, the reply starts with WRITE and contains `"@acme/parser": patch` frontmatter; FAIL
+    otherwise.
+tags: [changesets-authoring, trigger, quick]
+
+execution:
+  prompt: |
+    I fixed a bug in `@acme/parser`: it dropped the last label when a diagram ended without a
+    trailing newline. The repo has a `.changeset/config.json` and `@changesets/cli` is in the root
+    `devDependencies`. Should you write a changeset for this PR now?
+
+    Start your reply with exactly one word on its own line: WRITE if you would write it now, or
+    ASK if you would ask me something first. Then show the changeset file you would write. Do not
+    run anything.
+  max_turns: 4
+  allowed_tools:
+    - Skill
+
+graders:
+  - name: skill_fired
+    type: tool_used
+    tool: Skill
+    input_match: '"skill"\s*:\s*"(?:[\w-]+:)?changesets-authoring"'
+    min: 1
+    arm: with-only
+
+  - name: says_write
+    type: regex
+    target: last_message
+    pattern: '^\W*WRITE\b'
+    match: contains
+
+  - name: patch_frontmatter
+    type: regex
+    target: last_message
+    pattern: '---\s*\n\s*"@acme/parser"\s*:\s*patch\s*\n---'
+    match: contains
