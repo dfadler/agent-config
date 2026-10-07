@@ -6,6 +6,10 @@
 #   uses_ephemeral_port, no_hardcoded_port   "port 0 for servers"
 #   unstubs_env                              "vi.unstubAllEnvs()" and "unstubEnvs"
 #   no_direct_env_assignment                 "Prefer scoped helpers over mutating"
+# The assignment grader once also matched `delete process.env.X` and failed a correct
+# reply that named it as a fallback for old Vitest in prose (#474); only assignment is checked.
+# A grader that the reply names a sabotage spot-check failed 6/6 with and without the skill
+# (the rule governs what Claude does, not what it prints), so it was dropped (#474).
 schema_version: "1.1"
 name: test-conventions-isolated-tests
 description: >
@@ -65,5 +69,5 @@ graders:
   - name: no_direct_env_assignment
     type: regex
     target: last_message
-    pattern: "process\\.env\\.\\w+\\s*=[^=]|delete process\\.env"
+    pattern: "process\\.env\\.\\w+\\s*=[^=]"
     match: not_contains
