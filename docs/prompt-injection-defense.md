@@ -229,13 +229,13 @@ PR review into a security audit.
   [#418](https://github.com/dfadler/agent-config/issues/418): the
   classifier stays out. The only sanitizing step is a deterministic,
   no-model-call wrapper around `gh` reads,
-  `plugins/dfadler-agent-config/scripts/ts/gh-untrusted.ts`: labeled JSON
+  the standalone `gh-untrusted` plugin (`plugins/gh-untrusted/`): labeled JSON
   fields (`source`, `author`, `author_association`, `url`, `body`), invisible
   characters shown as `\uXXXX`, and a `warnings` count for hidden characters,
   HTML comments, base64-looking blobs and homoglyph mixes. It never removes or
-  rewrites content, and it does not cover diffs. `pr-review-rubric`,
-  `pr-comments` and `pr-babysit` fetch through it and fall back to raw `gh`
-  when it can't run; ad hoc `gh` calls stay on the behavioral rules. A
+  rewrites content, and it does not cover diffs. Its skill tells the agent to
+  fetch issue and PR text through it and to fall back to raw `gh` when it can't
+  run; ad hoc `gh` calls stay on the behavioral rules. A
   `PostToolUse` hook (`updatedToolOutput`, per the
   [hooks reference](https://code.claude.com/docs/en/hooks)) is deferred
   until ad hoc `gh` fetches prove to be the common leak.

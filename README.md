@@ -34,6 +34,8 @@ automatically, with no per-project copy to keep in sync.
     before fetch-and-execute installs (`npx <pkg>@latest`, `curl | sh`).
   - `gh-attach-image/` — upload local images and videos to GitHub's
     user-attachments endpoint so they render inline in PR/issue bodies.
+  - `gh-untrusted/` — read GitHub issues, PRs and review threads as labeled JSON
+    with hidden-text warnings, so third-party text is treated as data. Needs Node 22.18+.
   - `gha-ci-audit/` — audit GitHub Actions usage for any repository: workflow
     volumes, critical-path analysis, cost/performance improvement opportunities.
   - `screen-capture/` — screenshot (PNG) and walkthrough video (MP4) capture,

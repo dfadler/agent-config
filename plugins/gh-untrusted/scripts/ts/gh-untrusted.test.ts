@@ -474,7 +474,7 @@ describe("scan", () => {
   it("is empty for ordinary text, hashes, paths and non-Latin words", () => {
     expect(
       scan(
-        "plain text 0123456789abcdef0123456789abcdef01234567 plugins/dfadler-agent-config/skills/x \u043f\u0440\u0438\u0432\u0435\u0442 \u03ba\u03b1\u03bb\u03b7\u03bc\u03ad\u03c1\u03b1",
+        "plain text 0123456789abcdef0123456789abcdef01234567 src/x \u043f\u0440\u0438\u0432\u0435\u0442 \u03ba\u03b1\u03bb\u03b7\u03bc\u03ad\u03c1\u03b1",
       ),
     ).toEqual({});
   });
