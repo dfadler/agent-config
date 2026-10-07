@@ -48,9 +48,10 @@ graders:
   - name: explains_isolation_tradeoff
     type: llm
     criteria: |
-      PASS if the response says that turning off test isolation (isolate: false
-      or --no-isolate) is unsafe or discouraged because test files then share
-      module state, or says plainly to keep isolation on.
+      PASS only if the response both discourages turning off test isolation
+      (isolate: false or --no-isolate) and gives the reason: test files then
+      share module state.
 
-      FAIL if the response never mentions isolation, or recommends disabling it
-      as a speed-up.
+      FAIL if the response never mentions isolation, recommends disabling it as a
+      speed-up, or says only to keep isolation on without the shared-module-state
+      reason.
