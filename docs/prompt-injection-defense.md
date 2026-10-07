@@ -225,7 +225,14 @@ PR review into a security audit.
   primary defense. Building a bespoke one for this repo would add real
   maintenance cost for protection the evidence says doesn't hold up.
   Instead, the effort goes into the layers that hold regardless of whether
-  detection succeeds — permission gating and human review.
+  detection succeeds — permission gating and human review. Revisited in
+  [#418](https://github.com/dfadler/agent-config/issues/418): the
+  classifier stays out. A deterministic, no-model-call wrapper around `gh`
+  reads (labeled JSON fields, visible flags for hidden characters) is the
+  only sanitizing step under consideration; it is not built yet, and a
+  `PostToolUse` hook (`updatedToolOutput`, per the
+  [hooks reference](https://code.claude.com/docs/en/hooks)) is deferred
+  until ad hoc `gh` fetches prove to be the common leak.
 - **No full sandboxed/ephemeral execution environment per session.** That's
   a real environmental-layer control, but it's an enterprise-security-team
   scale investment relative to the actual risk surface here (a single
