@@ -1,0 +1,47 @@
+# Run: claude plugin eval plugins/gh-untrusted --case gh-untrusted-stays-quiet-on-pr-diff --runs 3 --trust-plugin --no-publish
+# Should-not-fire half: shares the skill's vocabulary (a GitHub PR, `gh`, reading it) but wants
+# the diff, which the wrapper does not cover. Hermetic: a command is requested, not run, no
+# Bash grant. Every grader is free: `quick`.
+# Sabotage map: skill_not_invoked checks the description's "Does not cover the diff itself";
+# widen it to "anything read from a PR" and a run should invoke the skill and fail.
+# Can fail: the skill is invoked fails skill_not_invoked; a reply naming the wrapper fails
+# no_wrapper; a reply without `gh pr diff 42` fails uses_pr_diff. A regression guard: a
+# no-plugin arm passes it by default, so expect no delta.
+schema_version: "1.1"
+name: gh-untrusted-stays-quiet-on-pr-diff
+description: >
+  A request to see a PR's diff must not invoke gh-untrusted, which does not cover diffs.
+  expected_outcome: PASS when the skill is not invoked and the reply is gh pr diff 42 with no
+  gh-untrusted.ts; FAIL otherwise. A regression guard with no expected delta.
+tags: [gh-untrusted, trigger, quick]
+
+execution:
+  prompt: |
+    Show me the code diff of PR 42 on acme/widgets. Don't run anything. Reply with the single
+    command in one code block and no other text.
+  max_turns: 6
+  allowed_tools:
+    - Skill
+
+graders:
+  - name: skill_not_invoked
+    type: tool_used
+    tool: Skill
+    input_match: '"skill"\s*:\s*"(?:[\w-]+:)?gh-untrusted"'
+    min: 0
+    max: 0
+    arm: both
+
+  - name: uses_pr_diff
+    type: regex
+    target: last_message
+    pattern: 'gh\s+pr\s+diff\s+42\b'
+    match: contains
+    arm: both
+
+  - name: no_wrapper
+    type: regex
+    target: last_message
+    pattern: 'gh-untrusted'
+    match: not_contains
+    arm: both
