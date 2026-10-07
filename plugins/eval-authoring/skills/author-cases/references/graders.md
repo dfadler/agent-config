@@ -131,3 +131,14 @@ cap the calls (the `arm: both` here is correct: it is a "must not fire" check):
 - `env` keys must match `EVAL_[A-Z0-9_]*`.
 - To check that a build or test passed in the run: have the prompt write the outcome to a
   file, grade the file, and add a `tool_used` grader whose `input_match` names the command.
+
+## Action-based grading: pilot result (#474)
+
+Grading the commands Claude runs (`tool_used` on `Bash` plus `tool_order`) instead of its
+prose needs a `Bash` grant, changes the behavior under test, and added variance in the
+vitest pilot (3 runs: with 0.53 vs without 0.20; Bash never called in the without arm,
+so those scores were the vacuous `max: 0` pass). `tool_order` also failed when one
+command held both flags. Keep prose `regex` graders as the primary guard; add an
+action-based case only if its with-arm variance is no worse and its Δ at least as large.
+Also: a negative `regex` such as `not_contains "delete process.env"` fires on a correct
+reply that names the thing as advice; match the code form, not the bare phrase.
