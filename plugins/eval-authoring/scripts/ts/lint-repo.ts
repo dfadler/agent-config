@@ -1,6 +1,6 @@
 /**
  * Run the eval-authoring lint over every plugin in a repo that has an `evals/`
- * directory (#488): the CI/`make check` entrypoint, so an error finding such as
+ * directory (#488): the CI/`ci.sh check` entrypoint, so an error finding such as
  * EVAL004 fails the build. `node lint-repo.ts [ROOT]`. `main` takes the lint
  * as a parameter so tests can run it without the real rules.
  */

@@ -232,9 +232,17 @@ increasing cost:
   check here; a repo using squash or rebase merges has no such merge commit to
   check against, so the PR-state check is the one that generalizes.)
 
+- **A hang in a setup step runs to the 6-hour default job cap.** The kcov
+  `apt` install hung on PR #588 (`agent-config#594`) and held a runner for 6
+  hours, then showed as `cancelled`. Every job that runs on a runner sets
+  `timeout-minutes` (10 for lint, 15 for tests/TypeScript/Python, 20 for
+  coverage), so a hang fails fast as a normal red check; the usual rerun
+  budget applies. `issue-bot.yml` is a reusable-workflow caller, which can't
+  set `timeout-minutes`. A new job needs one too.
+
 ## What's deliberately not here
 
-No flaky-test-retry, dependency-drift, or timeout guidance yet — this repo has
+No flaky-test-retry or dependency-drift guidance yet — this repo has
 no real failure history for any of them, and the controls already in place
 mitigate specific causes rather than whole categories: every *shell-side*
 external tool (shellcheck, shfmt, bats, kcov, actionlint) is pinned by exact

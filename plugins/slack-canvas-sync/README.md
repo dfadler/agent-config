@@ -171,4 +171,4 @@ Verified against a live Pro workspace (#426), details in the issue:
 Not verified live: whether a read starts failing once Slack purges a deleted canvas,
 and rate limits on a large first sync (docs only: create is Tier 2, update Tier 3).
 
-Run with `make test-ts` (needs the Node from `.nvmrc`).
+Run with `pnpm test` (needs the Node from `.nvmrc`).

@@ -29,7 +29,7 @@ Decide pass / regression / inconclusive for a \`claude plugin eval\` run.
   RESULT.json      The run's aggregate-result.json.
 
 Inconclusive (exit 7, not a regression): CLI exit 2, \`partial: true\`, any
-\`skippedPaidGraders\`, any \`arms.with[].error\`, or an unreadable result.
+\`skippedPaidGraders\`, any \`arms.with[].error\` or \`arms.without[].error\`, or an unreadable result.
 Regression (exit 1): a valid run where the CLI exited non-zero.
 Delta is warn-only; a missing delta means no signal. Exit 2: bad arguments.
 
@@ -48,17 +48,19 @@ const invalidReasons = (doc: Record<string, unknown>): readonly string[] => [
     if (!isRecord(c)) return [];
     const name = String(c["name"]);
     const arms = isRecord(c["arms"]) ? c["arms"] : {};
-    return list(arms["with"]).flatMap((a) =>
-      !isRecord(a)
-        ? []
-        : [
-            ...(a["error"] != null
-              ? [`${name}: arm error: ${JSON.stringify(a["error"])}`]
-              : []),
-            ...(a["skippedPaidGraders"] === true
-              ? [`${name}: skippedPaidGraders`]
-              : []),
-          ],
+    return (["with", "without"] as const).flatMap((side) =>
+      list(arms[side]).flatMap((a) =>
+        !isRecord(a)
+          ? []
+          : [
+              ...(a["error"] != null
+                ? [`${name}: ${side} arm error: ${JSON.stringify(a["error"])}`]
+                : []),
+              ...(a["skippedPaidGraders"] === true
+                ? [`${name}: ${side} arm skippedPaidGraders`]
+                : []),
+            ],
+      ),
     );
   }),
 ];

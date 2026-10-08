@@ -9,7 +9,12 @@ const arm = (o: object = {}) => ({
   ...o,
 });
 const result = (
-  o: { partial?: boolean; delta?: number; withArm?: object } = {},
+  o: {
+    partial?: boolean;
+    delta?: number;
+    withArm?: object;
+    withoutArm?: object;
+  } = {},
 ) =>
   JSON.stringify({
     partial: o.partial ?? false,
@@ -17,7 +22,10 @@ const result = (
       {
         name: "c1",
         aggregates: o.delta === undefined ? {} : { delta: o.delta },
-        arms: { with: [arm(o.withArm)] },
+        arms: {
+          with: [arm(o.withArm)],
+          without: o.withoutArm === undefined ? [] : [arm(o.withoutArm)],
+        },
       },
     ],
   });
@@ -49,6 +57,11 @@ describe("check-plugin-eval", () => {
     ["partial", result({ partial: true })],
     ["skippedPaidGraders", result({ withArm: { skippedPaidGraders: true } })],
     ["arm error", result({ withArm: { error: "boom" } })],
+    ["without-arm error", result({ withoutArm: { error: "usage limit" } })],
+    [
+      "without-arm skippedPaidGraders",
+      result({ withoutArm: { skippedPaidGraders: true } }),
+    ],
     ["bad json", "{nope"],
   ])("treats %s as inconclusive even when the CLI failed", (_n, json) => {
     expect(codeOf(check("1", json))).toBe(7);

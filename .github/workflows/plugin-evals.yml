@@ -1,0 +1,147 @@
+name: Plugin evals
+
+# Paid `claude plugin eval` runs, per docs/plugin-eval-ci.md (#436, #582).
+#
+# STANDALONE and NON-GATING: not called from ci.yml. Triggers are manual and
+# weekly only. NEVER add `pull_request`: the job passes --trust-plugin next to a
+# subscription token, and this is a public repo.
+#
+# Runs go through the run-evals wrapper (plugins/eval-authoring/scripts/ts/run-evals),
+# which applies each case's grants.yaml grants, pins the models and tier ceiling,
+# and fixes the pass threshold at 1. Its exit code is 0 pass, 1 below threshold,
+# 7 partial/untrustworthy, other codes setup problems.
+#
+# Each per-case aggregate-result.json is then read by scripts/ts/check-plugin-eval.ts
+# (#583) for the extra validity checks (both arms) and the warn-only delta signal:
+#   check-plugin-eval.ts --cli-exit N --threshold T aggregate-result.json
+# exit 0 pass, 1 regression, 7 inconclusive, 2 bad args. Inconclusive fails the
+# job too, but is reported as inconclusive rather than as a regression.
+
+on:
+  schedule:
+    # Mondays 04:23 UTC; an off-the-hour minute avoids the top-of-hour queue.
+    - cron: "23 4 * * 1"
+  workflow_dispatch:
+    inputs:
+      plugin:
+        description: Plugin directory name under plugins/ (empty = every plugin with evals/)
+        type: string
+        default: ""
+
+# Evals are paid and slow; queue rather than cancel a half-finished run.
+concurrency:
+  group: plugin-evals
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+
+env:
+  CLAUDE_CODE_VERSION: 2.1.283
+
+jobs:
+  plan:
+    name: plan
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    outputs:
+      matrix: ${{ steps.list.outputs.matrix }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - id: list
+        env:
+          PLUGIN: ${{ inputs.plugin }}
+        run: |
+          set -euo pipefail
+          if [ -n "$PLUGIN" ]; then
+            [ -d "plugins/$PLUGIN/evals" ] || { echo "no plugins/$PLUGIN/evals" >&2; exit 1; }
+            names="$PLUGIN"
+          else
+            names=$(for d in plugins/*/evals; do basename "$(dirname "$d")"; done)
+          fi
+          echo "matrix=$(printf '%s\n' "$names" | jq -R . | jq -sc '{plugin: .}')" >> "$GITHUB_OUTPUT"
+
+  eval:
+    name: eval (${{ matrix.plugin }})
+    needs: plan
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    # Protected environment holds CLAUDE_CODE_OAUTH_TOKEN, a one-year token from
+    # `claude setup-token` (Pro/Max/Team/Enterprise). Runs count against that
+    # plan's usage limits; --max-cost-usd below is a list-price ceiling, not a
+    # hard spend cap. Rotate the secret before it expires.
+    environment: plugin-evals
+    permissions:
+      contents: read
+    strategy:
+      fail-fast: false
+      max-parallel: 1
+      matrix: ${{ fromJSON(needs.plan.outputs.matrix) }}
+    env:
+      PLUGIN: ${{ matrix.plugin }}
+      OUT_DIR: eval-results/${{ matrix.plugin }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - uses: ./.github/actions/setup-node-pnpm
+
+      # Bash-using eval cases need an OS sandbox backend.
+      - name: Install sandbox backend
+        run: sudo apt-get update && sudo apt-get install -y --no-install-recommends bubblewrap socat
+
+      - name: Install Claude Code
+        run: npm install -g "@anthropic-ai/claude-code@$CLAUDE_CODE_VERSION"
+
+      - name: Run evals
+        env:
+          CLAUDE_CODE_OAUTH_TOKEN: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
+        run: |
+          set -uo pipefail
+          mkdir -p "$OUT_DIR"
+          # Standard tier: every case, 3 runs, with and without the plugin, $5 ceiling.
+          node plugins/eval-authoring/scripts/ts/run-evals/run-evals.ts \
+            "plugins/$PLUGIN" \
+            --tier standard \
+            --output-dir "$OUT_DIR" 2>&1 | tee "$OUT_DIR/eval.log"
+          echo "${PIPESTATUS[0]}" > "$OUT_DIR/cli-exit"
+
+      # No secrets in this step: it only reads the result files.
+      - name: Check results
+        run: |
+          set -uo pipefail
+          wrapper_exit="$(cat "$OUT_DIR/cli-exit")"
+          # The checker takes 0 pass, 1 regression, 2 invalid run; the wrapper's
+          # other codes (7 partial, setup errors) mean the run is not trustworthy.
+          # The wrapper exit is one code for all cases, so on exit 1 every file is labelled
+          # a regression; eval.log (in the artifact) has the per-case verdicts.
+          case "$wrapper_exit" in 0) cli=0 ;; 1) cli=1 ;; *) cli=2 ;; esac
+          worst=0
+          found=0
+          while IFS= read -r f; do
+            found=1
+            node scripts/ts/check-plugin-eval.ts \
+              --cli-exit "$cli" --threshold 1 "$f" 2>&1 | tee -a "$GITHUB_STEP_SUMMARY"
+            rc="${PIPESTATUS[0]}"
+            [ "$rc" -gt "$worst" ] && worst="$rc"
+          done < <(find "$OUT_DIR" -name aggregate-result.json | sort)
+          if [ "$found" -eq 0 ]; then
+            echo "::error::No aggregate-result.json under $OUT_DIR (wrapper exit $wrapper_exit)"
+            exit 7
+          fi
+          if [ "$worst" -eq 7 ]; then
+            echo "::error::Eval run was inconclusive (not a regression); see the result summary"
+          fi
+          exit "$worst"
+
+      - name: Upload results
+        if: ${{ !cancelled() }}
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: plugin-eval-${{ matrix.plugin }}-${{ github.run_id }}
+          path: eval-results/${{ matrix.plugin }}/
+          if-no-files-found: warn
+          retention-days: 30

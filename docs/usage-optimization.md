@@ -110,7 +110,7 @@ Since then, the refactoring the audit recommended has been completed:
   moved to the `dfadler-agent-config:typescript-conventions` skill, which only loads
   on invocation, in TypeScript-containing repos.
 - A `lint-claude-md` ceiling (`package.json`, currently 350) enforced by
-  `scripts/ts/check-claude-md-lines.ts` as part of `make lint-sh` prevents the file
+  `scripts/ts/check-claude-md-lines.ts` as part of `scripts/ci.sh lint-sh` prevents the file
   from growing back.
 
 The current architecture is cache-friendly by design: `claude/CLAUDE.md` itself is
@@ -301,12 +301,12 @@ Confidence: mechanism Confirmed; quality impact on these agents Unmeasured.
 
 **Speculative, but grounded.** This repo's three workflows
 (`.github/workflows/{shell,python,actionlint}.yml`) contain no direct
-Claude or Anthropic invocation — they call pinned actions and `make`
+Claude or Anthropic invocation — they call pinned actions and `scripts/ci.sh`
 targets (shellcheck/shfmt/bats/pytest/actionlint), and grepping all three
 for "claude"/"anthropic" turns up nothing but a comment referencing the
 CLAUDE.md convention (`shell.yml:12`), not an actual invocation. That
 establishes no *direct* call; it doesn't rule out one of the pinned actions
-or `make` targets shelling out to Claude indirectly, which this audit
+or `ci.sh` targets shelling out to Claude indirectly, which this audit
 didn't trace.
 
 The exported skills are a different story: `pr-review-rubric` and
@@ -344,8 +344,8 @@ remaining items are open recommendations.
    under `claude/conventions/`; the TypeScript sections became the
    `dfadler-agent-config:typescript-conventions` skill (§2).
 
-2. ~~**Add a `claude/CLAUDE.md` line-count gate to `make check`.**~~ **Done.**
-   `make lint-sh` now runs `scripts/ts/check-claude-md-lines.ts` against a
+2. ~~**Add a `claude/CLAUDE.md` line-count gate to `scripts/ci.sh check`.**~~ **Done.**
+   `scripts/ci.sh lint-sh` now runs `scripts/ts/check-claude-md-lines.ts` against a
    `lint-claude-md` ceiling defined in `package.json` (§2).
 
 3. **Document why each agent is pinned to its model tier — one comment per

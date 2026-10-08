@@ -104,7 +104,7 @@ tests/lint-fixtures/EVAL900/
   fixture directory is not a rule ID.
 
 Run the harness: `node node_modules/vitest/vitest.mjs run plugins/eval-authoring`
-(`make test-ts` runs it too, and so does `make check`).
+(`pnpm test` runs it too, and so does `bash scripts/ci.sh check`).
 
 ## Sabotage check
 

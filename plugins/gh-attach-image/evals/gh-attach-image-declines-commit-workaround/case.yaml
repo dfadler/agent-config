@@ -7,15 +7,15 @@
 # no_commit_or_gist checks "What NOT to do" ("Don't fall back to committing the images") and the description's "alternative to both of those workarounds".
 # Empty SKILL.md's body (keep the description) and uses_upload_script should fail.
 # Can fail: a `git add`/`git commit`/`git push`, `gh gist`, or raw.githubusercontent link
-# fails no_commit_or_gist; no upload.sh fails uses_upload_script; skill_fired fails if the
+# fails no_commit_or_gist; no upload.ts fails uses_upload_script; skill_fired fails if the
 # skill never triggers on the workaround. The no-commit regex can false-fail on a code comment
 # that spells out `git commit`; the prompt asks for no other text to keep that unlikely.
 schema_version: "1.1"
 name: gh-attach-image-declines-commit-workaround
 description: >
   When the user plans to commit a screenshot and link its raw URL in a PR description, the model
-  invokes gh-attach-image and replies with upload.sh instead of commit, gist or raw-URL
-  commands. expected_outcome: PASS when the reply has scripts/upload.sh and no `git add|commit|
+  invokes gh-attach-image and replies with upload.ts instead of commit, gist or raw-URL
+  commands. expected_outcome: PASS when the reply has scripts/ts/upload.ts and no `git add|commit|
   push`, `gh gist` or raw.githubusercontent; FAIL otherwise. Without the plugin the model
   usually follows the user's plan, so a delta is expected.
 tags: [gh-attach-image, trigger, quick]
@@ -44,7 +44,7 @@ graders:
   - name: uses_upload_script
     type: regex
     target: last_message
-    pattern: 'scripts/upload\.sh'
+    pattern: 'scripts/ts/upload\.ts'
     match: contains
     arm: both
 

@@ -61,7 +61,7 @@ escalate through the Actions jobs API and a verbose debug rerun before reaching
 for local reproduction (`act`) or a guarded, temporary `action-tmate` step as a
 last resort — see the `dfadler-agent-config:pr-checks` skill (Step 2) for the
 exact order, flags, and safety guards, and `docs/github-actions.md` for the
-full rationale and incident history. `make lint-actions`/`actionlint` remain
+full rationale and incident history. `bash scripts/ci.sh lint-actions`/`actionlint` remain
 the required check for a workflow-*syntax* problem — none of the above can
 diagnose one, since a syntax error never reaches a runner.
 
