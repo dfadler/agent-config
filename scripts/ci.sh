@@ -1,7 +1,6 @@
 #!/usr/bin/env bash
 # Entry points for this repo's shell, Python and kcov checks. CI calls
-# `bash scripts/ci.sh <target>` and humans run the same command (or
-# `make <target>`, a thin delegate), so a green `scripts/ci.sh check` locally
+# `bash scripts/ci.sh <target>` and humans run the same command, so a green `scripts/ci.sh check` locally
 # means the same thing a green PR does. The Node-based checks are package.json
 # scripts (`pnpm run <name>`); this script reaches them for the `check`
 # aggregate and the Node targets, and installs node_modules on demand.

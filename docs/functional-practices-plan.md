@@ -123,7 +123,7 @@ refactors the script 2 tests); 5 needs 1 and 4; 6 comes last.
 ## Dependencies and open questions
 
 - **Skill-composition-contracts work is unmerged.** The `## Contract` lint,
-  `scripts/ts/skill-contracts.ts`, and `make check-skills` live uncommitted on
+  `scripts/ts/skill-contracts.ts`, and `pnpm run check-skills` live uncommitted on
   branch `worktree-skill-composition-contracts`. Phases 1 and 5 build on them,
   so they wait for that work to merge. Phases 2, 3, and 4 do not.
 - **Type notation for contracts.** Plain prose types cannot be compared. Options:
