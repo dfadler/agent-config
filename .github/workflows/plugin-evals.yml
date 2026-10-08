@@ -4,7 +4,7 @@ name: Plugin evals
 #
 # STANDALONE and NON-GATING: not called from ci.yml. Triggers are manual and
 # weekly only. NEVER add `pull_request`: the job passes --trust-plugin next to a
-# paid API key, and this is a public repo.
+# subscription token, and this is a public repo.
 #
 # Result handling is delegated to scripts/ts/check-plugin-eval.ts (#583, PR #587):
 #   check-plugin-eval.ts --cli-exit N --threshold T aggregate-result.json
@@ -70,7 +70,10 @@ jobs:
     needs: plan
     runs-on: ubuntu-latest
     timeout-minutes: 45
-    # Protected environment holds the spend-capped ANTHROPIC_API_KEY.
+    # Protected environment holds CLAUDE_CODE_OAUTH_TOKEN, a one-year token from
+    # `claude setup-token` (Pro/Max/Team/Enterprise). Runs count against that
+    # plan's usage limits; --max-cost-usd below is a list-price ceiling, not a
+    # hard spend cap. Rotate the secret before it expires.
     environment: plugin-evals
     permissions:
       contents: read
@@ -98,7 +101,7 @@ jobs:
 
       - name: Run evals
         env:
-          ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+          CLAUDE_CODE_OAUTH_TOKEN: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
         run: |
           set -uo pipefail
           mkdir -p "$OUT_DIR"
