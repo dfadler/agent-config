@@ -31,6 +31,10 @@ setup() {
   # Same reasoning for claude: default to already-installed-and-enabled so
   # unrelated tests aren't surprised by an advisory note they didn't ask for.
   shim_claude enabled
+  # And playwright-cli: default to already installed, so --install-deps tests
+  # for other dependencies never reach a real `npm install -g`.
+  shim_playwright_cli
+  export PATH="$PW_SHIM_BIN:$PATH"
 }
 
 teardown() {
@@ -768,6 +772,7 @@ shim_playwright_cli() {
 shim_node_npm() {
   PW_SHIM_BIN="$SANDBOX/pw-shim"
   mkdir -p "$PW_SHIM_BIN"
+  rm -f "$PW_SHIM_BIN/playwright-cli" # drop the default shim: the CLI starts absent
   printf '#!/usr/bin/env bash\necho "%s"\n' "$1" > "$PW_SHIM_BIN/node"
   cat > "$PW_SHIM_BIN/npm" <<EOF
 #!/usr/bin/env bash
