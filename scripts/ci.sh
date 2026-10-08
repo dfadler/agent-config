@@ -101,7 +101,7 @@ COVERAGE_MIN=70
 #     orchestration lines and sink the floor from 70% to 63% for no signal.
 #   * kcov's bash coverage is trace-based, so a script only enters the
 #     denominator once something EXECUTES it. A script no test ever runs
-#     (today, the gh-attach-image skill's upload.sh) is invisible rather than
+#     (historically, the gh-attach-image skill's upload script) is invisible rather than
 #     a 0, so this gate does not by itself catch an untested new script; and
 #     setup.sh is exercised only through a throwaway copy its suite makes
 #     under TMPDIR (see scripts/tests/setup.bats), which kcov attributes to

@@ -1,12 +1,12 @@
 # Run: claude plugin eval plugins/gh-attach-image --case gh-attach-image-uploads-video-as-comment --runs 3 --trust-plugin --no-publish
 # Should-fire half, video-as-comment form. Hermetic: the prompt asks for the commands, not for
 # a run, and the case grants no Bash, so nothing can reach GitHub; the graders read the reply.
-# Why this prompt: no-plugin, the model has no reason to name `upload.sh`, `--comment` or the
+# Why this prompt: no-plugin, the model has no reason to name `upload.ts`, `--comment` or the
 # user-attachments flow at all (gh has no attach flag), so these graders only pass when the skill
 # was read. The prompt does not name the skill or the script. Every grader is free, so the case
 # is tagged `quick`.
 # Sabotage map: uses_upload_script and has_expected_flags check the "Quick path: use the
-# bundled script" section of SKILL.md (`upload.sh --repo OWNER/NAME --issue 7 --comment`);
+# bundled script" section of SKILL.md (`upload.ts --repo OWNER/NAME --issue 7 --comment`);
 # no_workarounds checks "What NOT to do". Empty SKILL.md's body (keep the description) and
 # uses_upload_script should fail.
 # Can fail: a reply that uses gh alone, a gist, or a commit fails uses_upload_script or
@@ -16,10 +16,10 @@ schema_version: "1.1"
 name: gh-attach-image-uploads-video-as-comment
 description: >
   When asked to post a local video as a new comment on a GitHub issue so it plays inline, the
-  model invokes gh-attach-image and replies with the bundled upload.sh using --repo, --issue
+  model invokes gh-attach-image and replies with the bundled upload.ts using --repo, --issue
   and --comment, with no commit, gist or raw URL. expected_outcome: PASS when the reply has
-  scripts/upload.sh with all three flags and none of the workarounds; FAIL otherwise. Without
-  the plugin there is no upload.sh to name, so a delta is expected.
+  scripts/ts/upload.ts with all three flags and none of the workarounds; FAIL otherwise. Without
+  the plugin there is no upload.ts to name, so a delta is expected.
 tags: [gh-attach-image, trigger, quick]
 
 execution:
@@ -44,7 +44,7 @@ graders:
   - name: uses_upload_script
     type: regex
     target: last_message
-    pattern: 'scripts/upload\.sh'
+    pattern: 'scripts/ts/upload\.ts'
     match: contains
     arm: both
 
