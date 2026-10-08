@@ -10,17 +10,17 @@
 # in SKILL.md; saves_body_after_upload checks the sentences about saving the body with
 # `gh pr edit N --repo OWNER/NAME --body-file file.md` and "the save step isn't optional". Empty
 # SKILL.md's body and both should fail.
-# Can fail: `upload.sh --pr 42` (append mode) fails default_mode_not_append; no `gh pr edit
+# Can fail: `upload.ts --pr 42` (append mode) fails default_mode_not_append; no `gh pr edit
 # ... --body-file` after the upload fails saves_body_after_upload; skill_fired fails if the
 # skill never triggers. The order check is on text position, since there are no tool calls.
 schema_version: "1.1"
 name: gh-attach-image-places-images-in-table
 description: >
   When asked to get two screenshots into the empty cells of a table in an existing PR body, the
-  model invokes gh-attach-image, runs upload.sh without --pr or --issue, then saves the body
-  with `gh pr edit ... --body-file`. expected_outcome: PASS when upload.sh is called in default
+  model invokes gh-attach-image, runs upload.ts without --pr or --issue, then saves the body
+  with `gh pr edit ... --body-file`. expected_outcome: PASS when upload.ts is called in default
   mode and a `gh pr edit` with `--body-file` follows it; FAIL on append mode or no save step.
-  Without the plugin there is no upload.sh to name, so a delta is expected.
+  Without the plugin there is no upload.ts to name, so a delta is expected.
 tags: [gh-attach-image, trigger, quick]
 
 execution:
@@ -51,10 +51,10 @@ graders:
     match: not_contains
     arm: both
 
-  # A reply with no upload.sh at all fails this too, which is the point.
+  # A reply with no upload.ts at all fails this too, which is the point.
   - name: saves_body_after_upload
     type: regex
     target: last_message
-    pattern: 'upload\.sh[\s\S]*gh\s+pr\s+edit[\s\S]{0,160}--body-file'
+    pattern: 'upload\.ts[\s\S]*gh\s+pr\s+edit[\s\S]{0,160}--body-file'
     match: contains
     arm: both

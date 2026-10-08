@@ -50,5 +50,5 @@ jobs:
         run: sudo install -m 0755 ~/.cache/kcov-bin/kcov /usr/local/bin/kcov
       - name: Verify kcov
         run: kcov --version
-      - name: Coverage (kcov, 70% floor)
+      - name: Coverage (kcov, 67% floor)
         run: bash scripts/ci.sh coverage

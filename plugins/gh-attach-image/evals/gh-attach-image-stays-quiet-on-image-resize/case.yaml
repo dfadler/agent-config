@@ -13,7 +13,7 @@ name: gh-attach-image-stays-quiet-on-image-resize
 description: >
   A request to resize a local screenshot with ImageMagick must not invoke gh-attach-image.
   expected_outcome: PASS when the skill is not invoked and the reply is an ImageMagick command
-  with 800 and no `gh` or upload.sh; FAIL otherwise. A regression guard with no expected delta.
+  with 800 and no `gh` or upload.ts; FAIL otherwise. A regression guard with no expected delta.
 tags: [gh-attach-image, trigger, quick]
 
 execution:
@@ -48,6 +48,6 @@ graders:
   - name: no_github_upload
     type: regex
     target: last_message
-    pattern: '\bgh\s|upload\.sh'
+    pattern: '\bgh\s|upload\.ts'
     match: not_contains
     arm: both
