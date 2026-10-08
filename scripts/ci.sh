@@ -78,13 +78,15 @@ PY=$VENV/bin/python
 NODE_STAMP=node_modules/.installed
 
 # Coverage settings. The floor is a MEASURED baseline, not an aspiration: 70%
-# is the first honest measurement (70.24%) rounded DOWN — kcov line coverage
+# was the first honest measurement (70.24%); it was lowered to 67 after the
+# gh-attach-image upload script (well covered by bats) moved to TypeScript and
+# left the denominator, leaving 67.99%. Both are rounded DOWN — kcov line coverage
 # jitters by fractions of a point as scripts and tests change shape, so the
 # floor sits just under the measurement rather than exactly on it. Measured
 # on ubuntu-24.04 with kcov 42 and bats at the commit shell.yml pins. Lowering
 # this takes a deliberate commit; raising it as coverage improves is welcome.
 COVERAGE_DIR="${COVERAGE_DIR:-coverage}" # overridable so tests never delete a live kcov output dir
-COVERAGE_MIN=70
+COVERAGE_MIN=67
 
 # What lands in the denominator, and what doesn't:
 #
