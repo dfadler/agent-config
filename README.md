@@ -38,6 +38,9 @@ automatically, with no per-project copy to keep in sync.
     with hidden-text warnings, so third-party text is treated as data. Needs Node 22.18+.
   - `gha-ci-audit/` — audit GitHub Actions usage for any repository: workflow
     volumes, critical-path analysis, cost/performance improvement opportunities.
+  - `playwright/` — skill and agent for headless Playwright scripting: `.webm`
+    recording, real key presses, Storybook play functions, frame extraction.
+    Needs Node and the `playwright` package.
   - `screen-capture/` — screenshot (PNG) and walkthrough video (MP4) capture,
     before/after comparison, Lighthouse, and attach skills for PR/issue visual
     verification. Uses `gh-attach-image` to upload results.
