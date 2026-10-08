@@ -49,7 +49,7 @@ skills.
 
 ## What is enforced
 
-`make check-skills` runs `scripts/ts/check-skill-contracts.ts`. It fails when:
+`pnpm run check-skills` runs `scripts/ts/check-skill-contracts.ts`. It fails when:
 
 1. a skill references a skill that doesn't exist in this repo, or
 2. a skill that another skill references has no `## Contract` section with both

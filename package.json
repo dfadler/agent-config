@@ -2,7 +2,7 @@
   "name": "agent-config-scripts",
   "private": true,
   "type": "module",
-  "description": "TypeScript tooling for agent-config scripts. Not published; pins dev dependencies and exposes the Node-based checks (`pnpm run <name>`); CI calls these, and `scripts/ci.sh` (via `make`) delegates to them.",
+  "description": "TypeScript tooling for agent-config scripts. Not published; pins dev dependencies and exposes the Node-based checks (`pnpm run <name>`); CI calls these, and `scripts/ci.sh` delegates to them.",
   "packageManager": "pnpm@11.28.2",
   "engines": {
     "node": ">=22.18"
