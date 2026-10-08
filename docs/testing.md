@@ -19,9 +19,9 @@ for using them, and package-manager forwarding, is the `vitest:flaky-tests` skil
 | `--maxWorkers=N` / `--no-file-parallelism` | Limit worker count / run files serially |
 | `NODE_OPTIONS=--max-old-space-size=512` | Cap the V8 heap of the run and its workers |
 
-`make check-vitest-flags` fails when a flag documented here, in `.claude/rules/vitest.md`
+`pnpm run check-vitest-flags` fails when a flag documented here, in `.claude/rules/vitest.md`
 or in the `plugins/vitest` skills is missing from `vitest --help` on the pinned version;
-`make check-vitest-v3-names` fails on a Vitest 3 pool option or env name in `plugins/`,
+`pnpm run check-vitest-v3-names` fails on a Vitest 3 pool option or env name in `plugins/`,
 `docs/` or `.claude/` unless the same line says it was removed or renamed (the list is in
 `scripts/ts/vitest-guards.ts`). Both run in the typescript CI job.
 

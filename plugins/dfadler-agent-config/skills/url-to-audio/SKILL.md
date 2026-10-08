@@ -146,11 +146,11 @@ command that isn't logged back verbatim, per this repo's
 OpenAI's endpoint caps input length ([API
 reference](https://platform.openai.com/docs/api-reference/audio/createSpeech)):
 4096 characters for `tts-1`/`tts-1-hd`, 2000 tokens for `gpt-4o-mini-tts`.
-Chunk the article first with this skill's helper (stdlib-only, no install
+Chunk the article first with this skill's helper (Node 22, no install
 needed):
 
 ```sh
-python3 "$CLAUDE_PLUGIN_ROOT/skills/url-to-audio/scripts/chunk_text.py" \
+node "$CLAUDE_PLUGIN_ROOT/scripts/ts/url-to-audio/chunk-text.ts" \
   "$WORKDIR/article.txt" "$WORKDIR/chunks" --max-chars 4000 || {
   echo "No chunks produced — the extracted text was whitespace-only once blank paragraphs were dropped, even though it passed the non-empty check in Step 2. Stopping rather than calling the API with nothing to synthesize." >&2
   exit 1
@@ -187,7 +187,7 @@ CURLCFG
   printf "file '%s'\n" "$out" >> "$WORKDIR/concat.txt"
 done
 
-"$CLAUDE_PLUGIN_ROOT/skills/url-to-audio/scripts/assemble_audio.sh" \
+node "$CLAUDE_PLUGIN_ROOT/scripts/ts/url-to-audio/assemble-audio.ts" \
   "$WORKDIR" "$total" "$failed" || {
   echo "Assembly failed — do not proceed to Step 5, there is nothing to report." >&2
   exit 1
@@ -203,7 +203,7 @@ process could read via `ps`
 body goes through `-d @file` for the same reason, since a chunk is
 untrusted extracted content that could otherwise blow past `ARG_MAX`.
 
-`assemble_audio.sh` (stdlib-only, no install needed, has its own bats
+`assemble-audio.ts` (Node 22, no install needed, has its own vitest
 coverage) is where the actual assembly decision lives: it refuses to ship
 anything if `failed` is set (a mid-loop break no longer means quietly
 concatenating only the chunks that finished), copies the single chunk
@@ -219,10 +219,10 @@ untrusted extracted content, same as the raw HTML in Step 1.)
 [`man ffmpeg`](https://ffmpeg.org/ffmpeg-all.html#concat) documents this
 concat-demuxer approach for joining same-codec files without re-encoding.
 
-`chunk_text.py`'s own splitting logic (paragraph → sentence → hard-split
-fallback) has a self-test: `python3 scripts/chunk_text.py --self-test`
-checks chunks never exceed the limit, nothing is silently dropped, and a
-pathological input with no natural breaks still terminates.
+`chunk-text.ts`'s splitting logic (paragraph → sentence → hard-split
+fallback) is covered by `chunk-text.test.ts`: chunks never exceed the
+limit, nothing is silently dropped, and a pathological input with no
+natural breaks still terminates.
 
 ## Step 5 — report the result
 
