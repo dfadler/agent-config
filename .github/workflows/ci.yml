@@ -57,6 +57,7 @@ jobs:
   all-checks:
     name: all-checks
     runs-on: ubuntu-latest
+    timeout-minutes: 10
     if: always()
     needs: [shell, typescript, python]
     steps:

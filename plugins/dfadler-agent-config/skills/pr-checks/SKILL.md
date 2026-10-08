@@ -95,7 +95,7 @@ the order documented in `docs/github-actions.md` ("Debugging a failing run")
    with `limit-access-to-actor: true`, and removed once resolved.
 
 For a workflow-*syntax* problem specifically (a run that never reaches a
-runner at all), `actionlint` / `make lint-actions` is the required check —
+runner at all), `actionlint` / `bash scripts/ci.sh lint-actions` is the required check —
 none of the escalation steps above can diagnose a syntax error, since the
 run never gets far enough for them to help.
 
