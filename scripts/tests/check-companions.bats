@@ -737,3 +737,91 @@ EOF
   assert_success
   assert_output_contains "$expected"
 }
+
+# --- playwright-cli: advisory check and --install-deps ----------------------
+#
+# Every test controls PATH itself: a developer machine may really have
+# playwright-cli (or an old node) installed, and none of that may leak in.
+
+# PATH with every directory that provides playwright-cli, npm or node removed.
+path_without_playwright() {
+  local out="" d
+  local IFS=:
+  for d in $PATH; do
+    if [ -e "$d/playwright-cli" ] || [ -e "$d/npm" ] || [ -e "$d/node" ]; then
+      continue
+    fi
+    out="${out:+$out:}$d"
+  done
+  printf '%s' "$out"
+}
+
+shim_playwright_cli() {
+  PW_SHIM_BIN="$SANDBOX/pw-shim"
+  mkdir -p "$PW_SHIM_BIN"
+  printf '#!/usr/bin/env bash\necho "1.2.3"\n' > "$PW_SHIM_BIN/playwright-cli"
+  chmod +x "$PW_SHIM_BIN/playwright-cli"
+}
+
+# node reporting the major version in $1, plus an npm that records its args
+# and, like a real global install, puts playwright-cli on PATH.
+shim_node_npm() {
+  PW_SHIM_BIN="$SANDBOX/pw-shim"
+  mkdir -p "$PW_SHIM_BIN"
+  printf '#!/usr/bin/env bash\necho "%s"\n' "$1" > "$PW_SHIM_BIN/node"
+  cat > "$PW_SHIM_BIN/npm" <<EOF
+#!/usr/bin/env bash
+echo "\$*" >> "$SANDBOX/npm-calls"
+printf '#!/usr/bin/env bash\necho 1.2.3\n' > "$PW_SHIM_BIN/playwright-cli"
+chmod +x "$PW_SHIM_BIN/playwright-cli"
+EOF
+  chmod +x "$PW_SHIM_BIN/node" "$PW_SHIM_BIN/npm"
+}
+
+@test "playwright-cli absent: informational note, still succeeds" {
+  PATH="$(path_without_playwright)" run_companions
+  assert_success
+  assert_output_contains "playwright-cli (@playwright/cli) is not installed"
+  assert_output_contains "npm install -g @playwright/cli@latest"
+}
+
+@test "playwright-cli present: reports version and the missing global skill" {
+  shim_playwright_cli
+  PATH="$PW_SHIM_BIN:$PATH" run_companions
+  assert_success
+  assert_output_contains "playwright-cli is installed (1.2.3)"
+  assert_output_contains "playwright-cli install --skills -g"
+}
+
+@test "playwright-cli present with the global skill: no skill hint" {
+  shim_playwright_cli
+  mkdir -p "$HOME/.claude/skills/playwright-cli"
+  : > "$HOME/.claude/skills/playwright-cli/SKILL.md"
+  PATH="$PW_SHIM_BIN:$PATH" run_companions
+  assert_success
+  assert_output_contains "playwright-cli is installed"
+  refute_output_contains "install --skills -g"
+}
+
+@test "--install-deps refuses to install playwright-cli under node older than 22" {
+  shim_node_npm 20
+  PATH="$PW_SHIM_BIN:$(path_without_playwright)" run_companions --install-deps
+  assert_failure
+  assert_output_contains "this repo uses Node 22"
+  [ ! -e "$SANDBOX/npm-calls" ]
+}
+
+@test "--install-deps installs playwright-cli with npm under node 22" {
+  shim_node_npm 22
+  PATH="$PW_SHIM_BIN:$(path_without_playwright)" run_companions --install-deps
+  assert_success
+  assert_output_contains "@playwright/cli installed"
+  [ "$(cat "$SANDBOX/npm-calls")" = "install -g @playwright/cli@latest" ]
+}
+
+@test "a bare run never installs playwright-cli" {
+  shim_node_npm 22
+  PATH="$PW_SHIM_BIN:$(path_without_playwright)" run_companions
+  assert_success
+  [ ! -e "$SANDBOX/npm-calls" ]
+}

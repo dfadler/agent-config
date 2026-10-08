@@ -2,7 +2,7 @@
 # Advisory companion checks run by setup.sh after the core symlinking is done.
 # Checks: git identity, Python deps (pyte for the detached-terminal skill), and
 # recommended companion plugins/tools (mattpocock-skills, anthropics/skills,
-# vercel-labs react-skills, aws-core, rtk, ponytail, Aikido Safe Chain
+# vercel-labs react-skills, aws-core, rtk, playwright-cli, ponytail, Aikido Safe Chain
 # permission offer).
 #
 # Policy: every companion documented in docs/companion-plugins.md gets an
@@ -34,7 +34,9 @@ the symlinks setup.sh has already created. Run by setup.sh automatically; you
 can also run it directly (also reachable as ./doctor.sh from the repo root).
 
   --install-deps   Also install a missing pyte dependency (python3 -m pip
-                   install --user pyte), when the interpreter allows it.
+                   install --user pyte), when the interpreter allows it, and
+                   a missing playwright-cli (npm install -g @playwright/cli,
+                   Node 22 on PATH required).
   --fix            Also apply other known fixes for a problem this script
                    detects, instead of only reporting it (currently: adding
                    "git", prettier, eslint, vitest to rtk's own exclude_commands config when rtk's
@@ -1036,6 +1038,68 @@ check_convention_deps() {
   done <"$deps_file"
 }
 
+# Playwright CLI (@playwright/cli): an optional companion to the playwright
+# plugin, which scripts the `playwright` npm package per project and does not
+# call the CLI itself. The CLI matters only for its official skill (see
+# docs/companion-plugins.md), so a missing CLI is informational, like rtk.
+# `playwright` the npm package is deliberately not checked: it is a
+# per-project dependency and this script runs in the repo, not the project.
+# --install-deps installs the CLI (npm install -g) the same opt-in way it
+# installs pyte; it never installs the skill, which the user chooses to place
+# globally or per project.
+install_playwright_cli() {
+  local node_major
+  command -v npm >/dev/null 2>&1 || {
+    echo "Not installing @playwright/cli: npm is not on PATH." >&2
+    return 1
+  }
+  node_major="$(node -p 'process.versions.node.split(".")[0]' 2>/dev/null || echo 0)"
+  if [[ "$node_major" -lt 22 ]]; then
+    echo "Not installing @playwright/cli: node on PATH is v$node_major, this repo uses Node 22 (.nvmrc)." >&2
+    echo "  Put Node 22 first on PATH (e.g. nvm use 22) and re-run." >&2
+    return 1
+  fi
+  echo "Installing @playwright/cli: npm install -g @playwright/cli@latest"
+  npm install -g @playwright/cli@latest || {
+    echo "npm install failed." >&2
+    return 1
+  }
+  command -v playwright-cli >/dev/null 2>&1 || {
+    echo "npm reported success, but playwright-cli is not on PATH." >&2
+    return 1
+  }
+  echo "✓ @playwright/cli installed"
+}
+
+check_playwright_cli() {
+  if ! command -v playwright-cli >/dev/null 2>&1; then
+    if [[ "$INSTALL_DEPS" == "1" ]]; then
+      install_playwright_cli || return 1
+    else
+      {
+        echo
+        echo "ℹ playwright-cli (@playwright/cli) is not installed — an optional companion"
+        echo "  to the playwright plugin, not required by anything here. Install it with:"
+        echo "    npm install -g @playwright/cli@latest"
+        echo "  or re-run this script as: ./setup.sh --install-deps"
+        echo
+      } >&2
+      return 0
+    fi
+  fi
+  echo "✓ playwright-cli is installed ($(playwright-cli --version 2>/dev/null || echo "version unknown"))"
+  if [[ ! -e "$HOME/.claude/skills/playwright-cli/SKILL.md" ]]; then
+    {
+      echo
+      echo "ℹ The official playwright-cli skill is not installed globally. Install it with:"
+      echo "    playwright-cli install --skills -g"
+      echo "  (without -g it is installed into the current project's .claude/skills)."
+      echo "  Re-run after each @playwright/cli update to refresh it."
+      echo
+    } >&2
+  fi
+}
+
 check_convention_deps
 check_available_conventions
 check_git_identity
@@ -1074,6 +1138,7 @@ check_companion_plugin "aws-core@" "aws-core" "aws-core" "aws-core" \
   "claude plugin install aws-core@claude-plugins-official"
 
 check_rtk
+check_playwright_cli
 check_require_worktree_hook
 
 # ponytail: DietrichGebert/ponytail isn't in the official marketplace; its own

@@ -334,3 +334,27 @@ run warns when they are missing: rtk's condensing once turned a failing
 `npx prettier --check` into a false pass (#586). Whether rtk's matching also catches the
 `npx prettier` form is unverified, so still run gating checks via `node` directly or
 `rtk proxy <cmd>`.
+
+## microsoft/playwright-cli (official Playwright skill)
+
+[`@playwright/cli`](https://github.com/microsoft/playwright-cli) is Microsoft's
+Playwright command line. `playwright-cli install --skills` installs its official skill
+(`.claude/skills/playwright-cli`, or `~/.claude/skills` with `-g`), including a video
+recording guide ([docs](https://playwright.dev/agent-cli/skills)). The `playwright`
+plugin here is a thin layer on top of that: it adds recipes the official skill lacks
+(recording gotchas, Storybook play functions, frame extraction), and does not call the
+CLI itself, so nothing depends on this companion being installed. Research and the
+overlap comparison: PR #598.
+
+```bash
+npm install -g @playwright/cli@latest
+playwright-cli install --skills -g
+```
+
+`check_playwright_cli` (`scripts/check-companions.sh`) reports whether the CLI is on
+PATH, its version, and whether the skill is installed globally. `setup.sh
+--install-deps` also runs the `npm install -g` step, only when Node 22 is on PATH (this
+repo's `.nvmrc`); a bare run never installs it. The skill install is left to you, since
+it is either global or per project. The generated skill files are refreshed by
+re-running the install after each `@playwright/cli` update. The `playwright` npm package
+the plugin's scripts import is a per-project dependency and is not checked here.
