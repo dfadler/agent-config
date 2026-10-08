@@ -315,6 +315,7 @@ describe("the real fetch-execute-guide cases", () => {
     expect(suite.cases.map((c) => c.name.value)).toEqual([
       "fetch-execute-asks-first",
       "fetch-execute-runs-with-permission",
+      "fetch-execute-stays-quiet-on-lockfile-install",
     ]);
     suite.cases.forEach((c) => {
       expect(c.issues).toEqual([]);
