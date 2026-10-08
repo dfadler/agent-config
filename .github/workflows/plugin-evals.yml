@@ -83,7 +83,8 @@ jobs:
       matrix: ${{ fromJSON(needs.plan.outputs.matrix) }}
     env:
       PLUGIN: ${{ matrix.plugin }}
-      THRESHOLD: ${{ inputs.threshold || 0.8 }}
+      # `inputs.threshold || 0.8` would turn an explicit 0 into 0.8; only the schedule lacks inputs.
+      THRESHOLD: ${{ github.event_name == 'schedule' && 0.8 || inputs.threshold }}
       OUT_DIR: eval-results/${{ matrix.plugin }}
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
@@ -105,9 +106,11 @@ jobs:
         run: |
           set -uo pipefail
           mkdir -p "$OUT_DIR"
-          # Target first: it must precede --json or it is read as that option's value.
+          # Target first. --output-dir keeps aggregate-result.json and report.html
+          # together in the uploaded directory (the run-evals wrapper reads the
+          # same file from there).
           claude plugin eval "plugins/$PLUGIN" \
-            --json "$OUT_DIR/aggregate-result.json" \
+            --output-dir "$OUT_DIR" \
             --trust-plugin \
             --threshold "$THRESHOLD" \
             --model "$EVAL_MODEL" \
@@ -125,7 +128,7 @@ jobs:
           node scripts/ts/check-plugin-eval.ts \
             --cli-exit "$(cat "$OUT_DIR/cli-exit")" \
             --threshold "$THRESHOLD" \
-            "$OUT_DIR/aggregate-result.json" | tee -a "$GITHUB_STEP_SUMMARY"
+            "$OUT_DIR/aggregate-result.json" 2>&1 | tee -a "$GITHUB_STEP_SUMMARY"
           rc="${PIPESTATUS[0]}"
           if [ "$rc" -eq 7 ]; then
             echo "::error::Eval run was inconclusive (not a regression); see the result summary"
