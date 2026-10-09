@@ -13,7 +13,7 @@ schema_version: "1.1"
 name: memory-hygiene-topic-key-and-supersedes
 description: >
   Asked to record that a project moved from MySQL to Postgres, correcting an existing memory
-  named decision/database-choice, the model invokes memory-hygiene and the new memory has a
+  named database_choice.md, the model invokes memory-hygiene and the new memory has a
   family/description name and both supersession markers. expected_outcome: PASS when the skill
   fires, a name: line has a two-segment kebab-case slug and both markers appear; FAIL
   otherwise.
@@ -21,8 +21,8 @@ tags: [memory-hygiene, behavior, quick]
 
 execution:
   prompt: |
-    My auto-memory already has a file named `decision/database-choice` saying "the project
-    uses MySQL". That is now wrong: we migrated to Postgres. Write the corrected memory file
+    My auto-memory already has a file called database_choice.md saying "the project uses
+    MySQL". That is now wrong: we migrated to Postgres. Write the corrected memory file
     and show exactly what to add to the old file. Don't run anything. Reply with the new
     file's contents (front matter included) and the old file's one-line addition, nothing
     else.
@@ -43,7 +43,7 @@ graders:
   - name: topic_key_name
     type: regex
     target: last_message
-    pattern: '^name:\s*[a-z0-9]+(?:-[a-z0-9]+)*/[a-z0-9]+(?:-[a-z0-9]+)*\s*$'
+    pattern: '^name:\s*"?[a-z0-9]+(?:-[a-z0-9]+)*/[a-z0-9]+(?:-[a-z0-9]+)*"?\s*$'
     flags: m
     match: contains
 

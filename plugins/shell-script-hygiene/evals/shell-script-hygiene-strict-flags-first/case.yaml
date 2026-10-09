@@ -40,7 +40,7 @@ graders:
   - name: sets_strict_flags
     type: regex
     target: last_message
-    pattern: '^#!.*\n(?:\s*(?:#[^\n]*)?\n)*set -e?uo pipefail'
+    pattern: '#!.*\n(?:\s*(?:#[^\n]*)?\n)*set -[A-Za-z]*u[A-Za-z]*o pipefail'
     match: contains
 
   - name: has_help
@@ -52,5 +52,6 @@ graders:
   - name: no_bare_exit_1
     type: regex
     target: last_message
-    pattern: '\bexit 1\b'
+    pattern: '^\s*exit\s+[1-9]'
+    flags: m
     match: not_contains

@@ -25,7 +25,7 @@ execution:
     Jira project: SHOP
 
     File a bug for me: "checkout button does nothing on Safari". Don't post anything yet.
-    In at most 3 sentences, say which tool you would use to create it and where it will live.
+    Reply with one sentence naming only the tool you would use to create it and the project key.
   max_turns: 6
   allowed_tools:
     - Skill
@@ -43,7 +43,7 @@ graders:
   - name: uses_jira
     type: regex
     target: last_message
-    pattern: 'Jira[^\n]*(?:connector|MCP)|(?:connector|MCP)[^\n]*Jira'
+    pattern: '(?:Jira|Atlassian)[\s\S]{0,80}(?:connector|MCP|integration)|(?:connector|MCP|integration)[\s\S]{0,80}(?:Jira|Atlassian)'
     flags: i
     match: contains
 

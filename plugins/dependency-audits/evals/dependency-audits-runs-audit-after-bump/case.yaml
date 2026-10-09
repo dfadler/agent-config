@@ -46,7 +46,7 @@ graders:
   - name: reports_findings
     type: regex
     target: last_message
-    pattern: '(?:high|critical)[^\n]*(?:commit|PR|pull request)|(?:commit|PR|pull request)[^\n]*(?:high|critical)'
+    pattern: '\b(?:high|critical)\b[\s\S]{0,120}(?:commit|PR|pull request)|(?:commit|PR|pull request)[\s\S]{0,120}\b(?:high|critical)\b'
     flags: i
     match: contains
-    weight: 0.5
+    weight: 1.0

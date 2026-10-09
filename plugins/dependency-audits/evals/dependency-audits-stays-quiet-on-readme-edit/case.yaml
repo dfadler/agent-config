@@ -35,7 +35,7 @@ graders:
   - name: no_audit_command
     type: regex
     target: last_message
-    pattern: '\b(?:npm|pnpm|pip|cargo)[- ]audit\b'
+    pattern: '\b(?:npm|pnpm|pip|cargo|yarn)[- ]audit\b|govulncheck'
     match: not_contains
     arm: both
 
@@ -43,7 +43,7 @@ graders:
   - name: fixes_typo
     type: regex
     target: last_message
-    pattern: 'lodash'
+    pattern: 'lodash package'
     match: contains
     arm: both
     weight: 0.5

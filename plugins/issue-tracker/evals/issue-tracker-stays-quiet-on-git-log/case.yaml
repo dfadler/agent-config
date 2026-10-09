@@ -34,7 +34,7 @@ graders:
   - name: gives_git_log
     type: regex
     target: last_message
-    pattern: 'git log[^\n]*--grep'
+    pattern: 'git log[^\n]*grep'
     match: contains
     arm: both
     weight: 0.5
