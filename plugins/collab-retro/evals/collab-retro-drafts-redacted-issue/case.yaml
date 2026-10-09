@@ -1,4 +1,4 @@
-# Run: claude plugin eval plugins/dfadler-agent-config --case collab-retro-drafts-redacted-issue --runs 3 --trust-plugin --no-publish
+# Run: claude plugin eval plugins/collab-retro --case collab-retro-drafts-redacted-issue --runs 3 --trust-plugin --no-publish
 # Shared run/grant facts: docs/contributing.md, "Plugin evals". No grant: Skill only. The
 # skill's scanner script and `gh` are not offered; the scanner output and the memory contents
 # are pasted instead, and the issue is drafted, never created.

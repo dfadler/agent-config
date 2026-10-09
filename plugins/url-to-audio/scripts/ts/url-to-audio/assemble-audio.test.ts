@@ -2,8 +2,8 @@ import { spawnSync } from "node:child_process";
 import { chmodSync, existsSync, mkdirSync, mkdtempSync, readFileSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
-import { describe, expect, it } from "vitest";
-import { main, type Deps } from "./assemble-audio.ts";
+import { describe, expect, it, vi } from "vitest";
+import { main, realDeps, type Deps } from "./assemble-audio.ts";
 
 const SCRIPT = join(import.meta.dirname, "assemble-audio.ts");
 
@@ -116,5 +116,50 @@ describe("CLI against a PATH shim", () => {
     const r = run(bin, [work, "1", "0"]);
     expect(r.status).toBe(0);
     expect(readFileSync(join(work, "article.mp3"), "utf8")).toBe("fake-audio");
+  });
+});
+
+describe("realDeps (in-process, so coverage sees it)", () => {
+  const withPath = (path: string, fn: () => void) => {
+    const old = process.env.PATH;
+    process.env.PATH = path;
+    try {
+      fn();
+    } finally {
+      process.env.PATH = old;
+    }
+  };
+  const shim = (body: string) => {
+    const bin = mkdtempSync(join(tmpdir(), "assemble-audio-real-"));
+    const path = join(bin, "ffmpeg");
+    writeFileSync(path, `#!/bin/sh\n${body}\n`);
+    chmodSync(path, 0o755);
+    return bin;
+  };
+
+  it("ffmpeg reports missing when not on PATH", () => {
+    withPath(mkdtempSync(join(tmpdir(), "empty-")), () => {
+      expect(realDeps.ffmpeg([])).toEqual({ missing: true, status: 1 });
+    });
+  });
+
+  it("ffmpeg passes through the exit status of the real process", () => {
+    withPath(shim("exit 3"), () => {
+      expect(realDeps.ffmpeg([])).toEqual({ missing: false, status: 3 });
+    });
+  });
+
+  it("out and errOut write to the process streams", () => {
+    const o = vi.spyOn(process.stdout, "write").mockImplementation(() => true);
+    const e = vi.spyOn(process.stderr, "write").mockImplementation(() => true);
+    try {
+      realDeps.out("hello");
+      realDeps.errOut("oops");
+      expect(o).toHaveBeenCalledWith("hello");
+      expect(e).toHaveBeenCalledWith("oops");
+    } finally {
+      o.mockRestore();
+      e.mockRestore();
+    }
   });
 });

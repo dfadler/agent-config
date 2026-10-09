@@ -1,4 +1,4 @@
-# Run: claude plugin eval plugins/dfadler-agent-config --case collab-retro-stays-quiet-on-session-summary --runs 3 --trust-plugin --no-publish
+# Run: claude plugin eval plugins/collab-retro --case collab-retro-stays-quiet-on-session-summary --runs 3 --trust-plugin --no-publish
 # Shared run/grant facts: docs/contributing.md, "Plugin evals". No grant: Skill only.
 # Should-not-fire half of the collab-retro boundary: a request to summarize what happened in
 # the current conversation shares "how we worked" vocabulary with the retro but is not a

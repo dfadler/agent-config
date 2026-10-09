@@ -1,7 +1,7 @@
 import { mkdtempSync, readdirSync, readFileSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 import { chunkText, main } from "./chunk-text.ts";
 
 describe("chunkText", () => {
@@ -92,5 +92,22 @@ describe("main", () => {
     const { out, run } = setup();
     expect(run(["--help"])).toBe(0);
     expect(out.join("")).toContain("Usage:");
+  });
+
+  it("defaults to the process streams", () => {
+    const { dir } = setup();
+    const input = join(dir, "in.txt");
+    writeFileSync(input, "aa");
+    const o = vi.spyOn(process.stdout, "write").mockImplementation(() => true);
+    const e = vi.spyOn(process.stderr, "write").mockImplementation(() => true);
+    try {
+      expect(main([input, join(dir, "chunks")])).toBe(0);
+      expect(o).toHaveBeenCalledWith(join(dir, "chunks", "chunk_0001.txt") + "\n");
+      expect(main([])).not.toBe(0);
+      expect(e).toHaveBeenCalled();
+    } finally {
+      o.mockRestore();
+      e.mockRestore();
+    }
   });
 });

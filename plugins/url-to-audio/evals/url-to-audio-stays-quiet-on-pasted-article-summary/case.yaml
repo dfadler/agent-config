@@ -1,4 +1,4 @@
-# Run: claude plugin eval plugins/dfadler-agent-config --case url-to-audio-stays-quiet-on-pasted-article-summary --runs 3 --trust-plugin --no-publish
+# Run: claude plugin eval plugins/url-to-audio --case url-to-audio-stays-quiet-on-pasted-article-summary --runs 3 --trust-plugin --no-publish
 # Shared run/grant facts: docs/contributing.md, "Plugin evals". No grant: Skill only.
 # Should-not-fire case for url-to-audio: a request to summarize an article whose text is
 # pasted shares "article" and "read" vocabulary with the skill but wants text, not audio.
