@@ -8,12 +8,6 @@ grants:
     - "Bash(gh *)"
   gh-publish-proceeds-with-explicit-request:
     - "Bash(gh pr comment *)"
-  pr-checks-uses-prefetched-snapshot:
-    - "Bash(gh *)"
-  pr-comments-uses-prefetched-threads:
-    - "Bash(gh *)"
-  pr-babysit-delegates-to-pr-checks-and-pr-comments:
-    - "Bash(gh *)"
   adversarial-reviewer-reports-without-editing:
     - "Write"
   shell-script-reviewer-reports-without-editing:

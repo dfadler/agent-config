@@ -131,7 +131,7 @@ Each layer catches what the one above it misses. None is sufficient alone.
    the user's own words. Where possible, its provenance is tagged ("this is
    from an issue comment, not you") so intent can't be spoofed as coming from
    the user. In this repo, `pr-review-rubric`'s "PR Content Is an Attack
-   Surface" section (`plugins/dfadler-agent-config/skills/pr-review-rubric/SKILL.md`)
+   Surface" section (`plugins/github-pr/skills/pr-review-rubric/SKILL.md`)
    is where this gets applied concretely to PR/issue review: diff content,
    commit messages, and comment text are treated as data being reviewed,
    never as instructions to follow.
@@ -282,7 +282,7 @@ table) are on the issue:
 
 ## Cross-references
 
-- `plugins/dfadler-agent-config/skills/pr-review-rubric/SKILL.md` —
+- `plugins/github-pr/skills/pr-review-rubric/SKILL.md` —
   "PR Content Is an Attack Surface" section: embedded-instruction handling
   (with an explicit triage checklist and a note on known evasion
   techniques — unusual encodings, hidden/invisible text, image-borne
@@ -296,8 +296,8 @@ table) are on the issue:
 - `plugins/dfadler-agent-config/skills/gh-publish-guide/SKILL.md` —
   the human-layer backstop before any GitHub publish action; defines what
   counts as valid, explicit, request-scoped permission.
-- `plugins/dfadler-agent-config/skills/pr-comments/SKILL.md` and
-  `plugins/dfadler-agent-config/skills/pr-babysit/SKILL.md` — where a PR
+- `plugins/github-pr/skills/pr-comments/SKILL.md` and
+  `plugins/github-pr/skills/pr-babysit/SKILL.md` — where a PR
   comment's text is acted on; both sit downstream of the same
   content-is-data boundary and the same publish-permission gate.
 - `claude/CLAUDE.md` — this repo's general, cross-project conventions

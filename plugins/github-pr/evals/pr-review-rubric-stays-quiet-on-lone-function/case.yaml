@@ -1,0 +1,56 @@
+# Run: claude plugin eval plugins/github-pr --case pr-review-rubric-stays-quiet-on-lone-function --runs 3 --trust-plugin --no-publish
+# Shared run/grant facts: docs/contributing.md, "Plugin evals". No grant: Skill only.
+# Should-not-fire half of pr-review-rubric's boundary: the skill is for reviewing "a pull
+# request or diff" and posting findings as GitHub comments. A bare function pasted for a
+# quick "spot the bug" has no PR, no diff and nothing to post.
+# Sabotage map: pr_review_rubric_not_fired checks the description's closing line ("Use
+# whenever reviewing a diff or PR and producing findings meant to be posted as GitHub
+# comments"); replace it with "Use whenever reviewing any code" and a run should invoke the
+# skill and fail. finds_bug is a content check a default reply also passes.
+# Can fail: the skill firing fails pr_review_rubric_not_fired; a reply that never mentions
+# the loop bound fails finds_bug. The prompt deliberately omits any "not a PR" cue, so the
+# case probes the description's own boundary rather than obedience to a disclaimer.
+# Regression guard: a no-plugin arm passes by default, so
+# Delta is about 0 by design.
+schema_version: "1.1"
+name: pr-review-rubric-stays-quiet-on-lone-function
+description: >
+  A bare function pasted with "what is wrong with this loop" (no PR, no diff) must not invoke
+  pr-review-rubric. expected_outcome: regression guard, Delta about 0 by design. PASS when the
+  skill does not fire and the reply spots the off-by-one; FAIL when it fires.
+tags: [pr-review-rubric, trigger, quick]
+
+execution:
+  prompt: |
+    What is wrong with this loop? One sentence, no commands.
+
+    ```ts
+    function sum(items: number[]): number {
+      let total = 0;
+      for (let i = 0; i <= items.length; i++) {
+        total += items[i];
+      }
+      return total;
+    }
+    ```
+  max_turns: 4
+  allowed_tools:
+    - Skill
+
+graders:
+  - name: pr_review_rubric_not_fired
+    type: tool_used
+    tool: Skill
+    input_match: '"skill"\s*:\s*"(?:[\w-]+:)?pr-review-rubric"'
+    min: 0
+    max: 0
+    arm: both
+
+  - name: finds_bug
+    type: regex
+    target: last_message
+    pattern: 'off-by-one|<=\s*items\.length|(?:should|use|change)[^\n]*<\s*items\.length|out of (?:bounds|range)'
+    flags: i
+    match: contains
+    arm: both
+    weight: 0.5
