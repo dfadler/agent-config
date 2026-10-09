@@ -42,12 +42,8 @@ sh_find() { find scripts plugins setup.sh teardown.sh doctor.sh -type f -name '*
 PY_SOURCES=(
   plugins/detached-terminal/scripts/agent_term.py
   scripts/tests/test_agent_term.py
-  plugins/gha-ci-audit/scripts/aggregate.py
-  plugins/gha-ci-audit/scripts/grade.py
-  plugins/gha-ci-audit/scripts/write_assertions.py
-  plugins/gha-ci-audit/tests/test_gha_ci_audit.py
 )
-PY_TESTS=(scripts/tests plugins/gha-ci-audit/tests)
+PY_TESTS=(scripts/tests)
 
 # The non-test entries of PY_SOURCES, reduced to their containing directories,
 # is what `coverage-py` points pytest-cov at. Deliberately directory-based
@@ -58,7 +54,6 @@ PY_TESTS=(scripts/tests plugins/gha-ci-audit/tests)
 # filesystem. A new file in a DIFFERENT directory has to be added to
 # PY_SOURCES first, the same manual step lint-py and typecheck already need.
 py_coverage_dirs() {
-  printf '%s\n' "${PY_SOURCES[@]}" | grep -v -e '^scripts/tests/' -e '^plugins/gha-ci-audit/tests/' |
     xargs -n1 dirname | sort -u | sed 's|$|/|'
 }
 

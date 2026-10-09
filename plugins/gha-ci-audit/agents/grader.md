@@ -24,7 +24,7 @@ You review the report.html output and the agent's transcript, then determine whe
 Before reading the report with AI, run:
 
 ```
-python3 scripts/grade.py --output-dir {outputs_dir} --grading-out {grading_path}
+node scripts/ts/gha-ci-audit/grade.ts --output-dir {outputs_dir} --grading-out {grading_path}
 ```
 
 where `{grading_path}` is your intended output path (e.g. `{outputs_dir}/../grading.json`).
