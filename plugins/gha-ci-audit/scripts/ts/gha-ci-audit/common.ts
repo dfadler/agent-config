@@ -47,7 +47,22 @@ export const spanMinutes = (
   return d >= 0 ? d : null;
 };
 
-export const mean = (xs: readonly number[]): number =>
+/**
+ * Fixed-point format matching Python's `f"{x:.{d}f}"`: an exact tie rounds to
+ * even (4.25 -> "4.2"), whereas `toFixed` rounds it up (4.25 -> "4.3"). Ties
+ * are detected from the value's exact decimal expansion, so only true binary
+ * ties (4.25, 0.125) are affected. Non-negative inputs only.
+ */
+export const fmt = (x: number, d: number): string => {
+  const up = x.toFixed(d);
+  const exact = x.toFixed(100);
+  const cut = exact.indexOf(".") + d + 1;
+  if (!/^50*$/.test(exact.slice(cut))) return up;
+  const down = exact.slice(0, d === 0 ? cut - 1 : cut);
+  return Number(down.slice(-1)) % 2 === 0 ? down : up;
+};
+
+export const mean =(xs: readonly number[]): number =>
   xs.reduce((a, b) => a + b, 0) / xs.length;
 
 /** Median of a non-empty list (mean of the middle pair when even). */

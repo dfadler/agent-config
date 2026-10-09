@@ -7,6 +7,7 @@
 import { parseArgs } from "node:util";
 import {
   defaultIo,
+  fmt,
   isObject,
   parseDt,
   readJson,
@@ -70,16 +71,16 @@ export const analyzeJobs = (
 
   lines.push(
     `Jobs in run:  ${String(completed.length)} completed`,
-    `Wall-clock:   ${wallClock.toFixed(1)}m`,
+    `Wall-clock:   ${fmt(wallClock, 1)}m`,
     wallClock > 0
-      ? `Total job-min (billable estimate): ${totalJobMin.toFixed(1)}m  (parallelism factor: ${(totalJobMin / wallClock).toFixed(1)}x)`
+      ? `Total job-min (billable estimate): ${fmt(totalJobMin, 1)}m  (parallelism factor: ${fmt(totalJobMin / wallClock, 1)}x)`
       : "",
     "",
     `Critical path (${String(critical.length)} job(s) finishing last):`,
   );
   for (const j of [...critical].sort((a, b) => dur(b) - dur(a))) {
     const rt = classifyRunner(str(j.raw["runner_name"]) ?? "");
-    const d = j.dur === null ? "?" : j.dur.toFixed(1);
+    const d = j.dur === null ? "?" : fmt(j.dur, 1);
     lines.push(`  [${rt}] ${j.name}: ${d}m  conclusion=${(str(j.raw["conclusion"]) ?? "None")}`);
   }
   lines.push("");
@@ -91,14 +92,14 @@ export const analyzeJobs = (
   }
   lines.push("Runner types:");
   for (const [rt, ds] of [...byRunner].sort((a, b) => (a[0] < b[0] ? -1 : a[0] > b[0] ? 1 : 0))) {
-    lines.push(`  ${rt}: ${String(ds.length)} jobs, ${ds.reduce((a, b) => a + b, 0).toFixed(1)} job-min total`);
+    lines.push(`  ${rt}: ${String(ds.length)} jobs, ${fmt(ds.reduce((a, b) => a + b, 0), 1)} job-min total`);
   }
   lines.push("");
 
   const top = [...withDur].sort((a, b) => dur(b) - dur(a)).slice(0, opts.top);
   lines.push(`Top ${String(Math.min(opts.top, top.length))} longest jobs:`);
   for (const j of top) {
-    lines.push(`  ${dur(j).toFixed(1).padStart(6)}m  ${j.name}  ${critical.includes(j) ? "★ CRITICAL" : ""}`);
+    lines.push(`  ${fmt(dur(j), 1).padStart(6)}m  ${j.name}  ${critical.includes(j) ? "★ CRITICAL" : ""}`);
   }
   lines.push("");
 
@@ -112,7 +113,7 @@ export const analyzeJobs = (
       lines.push(`Steps for: ${j.name}`);
       for (const s of steps) {
         const sd = jobDurationMin(s);
-        const d = sd === null ? "—" : `${sd.toFixed(1)}m`;
+        const d = sd === null ? "—" : `${fmt(sd, 1)}m`;
         lines.push(`  ${d.padEnd(6)}  ${(str(s["name"]) ?? "None")}  (${str(s["conclusion"]) ?? "?"})`);
       }
       lines.push("");

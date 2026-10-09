@@ -6,6 +6,7 @@
 import { parseArgs } from "node:util";
 import {
   defaultIo,
+  fmt,
   mean,
   median,
   readJson,
@@ -61,7 +62,7 @@ export const analyzeRuns = (raw: unknown, groupBy: "conclusion" | "event"): stri
   // Largest group first; Map keeps insertion order for ties (stable sort).
   for (const [key, ds] of [...groups].sort((a, b) => b[1].length - a[1].length)) {
     lines.push(
-      `  ${key}: n=${String(ds.length)}, avg=${mean(ds).toFixed(1)}m, median=${median(ds).toFixed(1)}m, stdev=${stdev(ds).toFixed(1)}m`,
+      `  ${key}: n=${String(ds.length)}, avg=${fmt(mean(ds), 1)}m, median=${fmt(median(ds), 1)}m, stdev=${fmt(stdev(ds), 1)}m`,
     );
   }
   if (noDuration > 0) lines.push(`  (skipped ${String(noDuration)} runs with missing timestamps)`);
@@ -74,7 +75,7 @@ export const analyzeRuns = (raw: unknown, groupBy: "conclusion" | "event"): stri
   const p99 = n >= 100 ? at(Math.floor(n * 0.99)) : at(n - 1);
   lines.push(
     "Duration percentiles (all conclusions):",
-    `  p50=${at(n >> 1).toFixed(1)}m  p90=${at(Math.floor(n * 0.9)).toFixed(1)}m  p99=${p99.toFixed(1)}m  max=${at(n - 1).toFixed(1)}m`,
+    `  p50=${fmt(at(n >> 1), 1)}m  p90=${fmt(at(Math.floor(n * 0.9)), 1)}m  p99=${fmt(p99, 1)}m  max=${fmt(at(n - 1), 1)}m`,
     "",
     "Duration buckets:",
   );
@@ -82,7 +83,7 @@ export const analyzeRuns = (raw: unknown, groupBy: "conclusion" | "event"): stri
     const count = all.filter((d) => d >= lo && d < hi).length;
     const pct = (count / n) * 100;
     lines.push(
-      `  ${label.padEnd(8)}: ${String(count).padStart(4)} (${pct.toFixed(1).padStart(4)}%) ${"█".repeat(Math.floor(pct / 2))}`,
+      `  ${label.padEnd(8)}: ${String(count).padStart(4)} (${fmt(pct, 1).padStart(4)}%) ${"█".repeat(Math.floor(pct / 2))}`,
     );
   }
   return lines.join("\n") + "\n";

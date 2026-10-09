@@ -3,7 +3,7 @@
 // Reads a JSON array of {s, e} runs from stdin (as produced by
 // `gh api .../runs --jq '[.workflow_runs[] | ...]'`).
 // Output: one line, "<avg_min>  <p90_min>", or "?  ?" if there is no data.
-import { defaultIo, isObject, mean, spanMinutes, str, type Io } from "./common.ts";
+import { defaultIo, fmt, isObject, mean, spanMinutes, str, type Io } from "./common.ts";
 
 export const computeWorkflowTiming = (runs: unknown): string => {
   const durs = (Array.isArray(runs) ? runs : [])
@@ -13,7 +13,7 @@ export const computeWorkflowTiming = (runs: unknown): string => {
     .sort((a, b) => a - b);
   if (durs.length === 0) return "?  ?";
   const p90 = durs[Math.floor(durs.length * 0.9)] ?? 0;
-  return `${mean(durs).toFixed(1)}  ${p90.toFixed(1)}`;
+  return `${fmt(mean(durs), 1)}  ${fmt(p90, 1)}`;
 };
 
 /** Unparseable stdin is "no data", not an error: the caller is a shell pipeline. */

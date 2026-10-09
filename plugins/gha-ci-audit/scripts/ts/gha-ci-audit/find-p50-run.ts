@@ -6,7 +6,7 @@
 //
 // Output (one line): <run_id>  <duration_min>m  <created_at>
 // Use the run_id with analyze-jobs.ts for critical-path analysis.
-import { defaultIo, median, readJson, spanMinutes, str, unwrapList, type Io } from "./common.ts";
+import { defaultIo, fmt, median, readJson, spanMinutes, str, unwrapList, type Io } from "./common.ts";
 
 export interface P50Result {
   readonly runId: number;
@@ -49,8 +49,8 @@ export const main = (argv: string[], io: Io = defaultIo): number => {
       io.err("No successful runs with duration data found.\n");
       return 1;
     }
-    io.out(`${String(result.runId)}  ${result.durationMin.toFixed(1)}m  ${result.createdAt}\n`);
-    io.err(`# p50=${result.p50.toFixed(1)}m  n=${String(result.n)} successful runs\n`);
+    io.out(`${String(result.runId)}  ${fmt(result.durationMin, 1)}m  ${result.createdAt}\n`);
+    io.err(`# p50=${fmt(result.p50, 1)}m  n=${String(result.n)} successful runs\n`);
     return 0;
   } catch (e) {
     io.err(`error: ${e instanceof Error ? e.message : String(e)}\n`);

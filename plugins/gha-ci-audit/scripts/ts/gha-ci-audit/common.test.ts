@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import {
   durationMinutes,
+  fmt,
   mean,
   median,
   parseDt,
@@ -52,6 +53,23 @@ describe("stats", () => {
     expect(median([1, 2, 3, 10])).toBe(2.5);
     expect(stdev([1])).toBe(0);
     expect(stdev([2, 4, 4, 4, 5, 5, 7, 9])).toBeCloseTo(2.138, 3);
+  });
+});
+
+describe("fmt", () => {
+  // Expected values are Python's f"{x:.{d}f}" (round-half-even on the exact value).
+  it.each([
+    [4.25, 1, "4.2"],
+    [4.35, 1, "4.3"],
+    [4.75, 1, "4.8"],
+    [0.125, 2, "0.12"],
+    [0.375, 2, "0.38"],
+    [12.5, 0, "12"],
+    [13.5, 0, "14"],
+    [0, 1, "0.0"],
+    [40, 1, "40.0"],
+  ])("fmt(%f, %i) is %s", (x, d, want) => {
+    expect(fmt(x, d)).toBe(want);
   });
 });
 
