@@ -1,0 +1,28 @@
+# Run: claude plugin eval plugins/github-pr --case issue-triage-stays-quiet-on-pr-review-reply --runs 3 --trust-plugin --no-publish
+# Shared run/grant facts: docs/contributing.md, "Plugin evals". No grant: Skill only.
+# Should-not-fire: PR review comments belong to pr-comments, not issue triage.
+# Regression guard: a no-plugin arm passes by default, so the Delta is about 0 by design.
+# Can fail: triage_not_fired fails if issue-triage over-triggers.
+schema_version: "1.1"
+name: issue-triage-stays-quiet-on-pr-review-reply
+description: >
+  A request to reply to review comments on a PR must not invoke issue-triage.
+  expected_outcome: regression guard, Delta about 0 by design. PASS when it does not fire.
+tags: [issue-triage, trigger, quick]
+
+execution:
+  prompt: |
+    Reply to the review comments on PR 87 of dfadler/example-app. Do not run commands or
+    post anything; just say how you would approach it.
+  max_turns: 4
+  allowed_tools:
+    - Skill
+
+graders:
+  - name: triage_not_fired
+    type: tool_used
+    tool: Skill
+    input_match: '"skill"\s*:\s*"(?:[\w-]+:)?issue-triage"'
+    min: 0
+    max: 0
+    arm: both

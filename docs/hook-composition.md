@@ -37,10 +37,10 @@ explicitly turns it on. Exit 0 with nothing configured means "no opinion" —
 the hook did not run at all.
 
 The three `worktree-core` hooks below share one mechanism for this: each
-calls `resolve_enable_mode <env_var> <settings_key> <default> <valid_values...>`
-in `worktree-hook-lib.sh`, which resolves env var override → settings.json
-value → default, validating against the hook's own `valid_values`. See that
-function's own header comment in `worktree-hook-lib.sh` for the exact
+calls `resolveEnableMode(ctx, { envVar, fromSettings, fallback, valid })`
+in `plugins/worktree-core/scripts/ts/worktree-hook-lib.ts`, which resolves env var override → settings.json
+value → default, validating against the hook's own `valid` list. See that
+function's own doc comment for the exact
 precedence and validation rules — this table documents only the values each
 hook passes in, not the mechanism itself.
 
@@ -48,13 +48,13 @@ hook passes in, not the mechanism itself.
 
 | Hook | Event | Env var | settings.json key | Default |
 |---|---|---|---|---|
-| `require-worktree-hook.sh` | `PreToolUse` (Edit/Write) | `WORKTREE_ENFORCE=block\|warn\|off` | `worktree.enforce: "block"\|"warn"\|"off"` | off (no block, no warn) |
-| `prune-merged-worktrees-hook.sh` | `SessionStart` | `WORKTREE_AUTO_PRUNE=on\|off` | `worktree.autoPrune: true\|false` | off (skipped entirely) |
-| `check-worktree-symlinks-hook.sh` | `SessionStart` | `WORKTREE_SYMLINK_CHECK=on\|off` | `worktree.symlinkCheck: "on"\|"off"` | off (skipped entirely) |
+| `require-worktree-hook.ts` | `PreToolUse` (Edit/Write) | `WORKTREE_ENFORCE=block\|warn\|off` | `worktree.enforce: "block"\|"warn"\|"off"` | off (no block, no warn) |
+| `prune-merged-worktrees-hook.ts` | `SessionStart` | `WORKTREE_AUTO_PRUNE=on\|off` | `worktree.autoPrune: true\|false` | off (skipped entirely) |
+| `check-worktree-symlinks-hook.ts` | `SessionStart` | `WORKTREE_SYMLINK_CHECK=on\|off` | `worktree.symlinkCheck: "on"\|"off"` | off (skipped entirely) |
 | `memory-hygiene-stop-hook.ts` | `Stop` | `MEMORY_HYGIENE_REMINDER=on\|off` | `env.MEMORY_HYGIENE_REMINDER: "on"` (settings.json's built-in `env` key — no bespoke key; see below) | off (skipped entirely) |
 
 `memory-hygiene-stop-hook.ts` belongs to a different plugin (`memory-hygiene`,
-not `worktree-core`) and does not call `resolve_enable_mode` — it hand-rolls its
+not `worktree-core`) and does not use the worktree hook lib — it hand-rolls its
 own on/off check. `Stop` fires once per turn, not once per session
 ([hooks docs](https://code.claude.com/docs/en/hooks#stop)), so the hook
 throttles itself to at most one reminder per session (a marker file keyed on
@@ -66,17 +66,23 @@ rejects unrecognized top-level keys (confirmed while building this hook — a
 project-level opt-in instead sets the env var through settings.json's own
 `env` field.
 
-For `require-worktree-hook.sh`, `warn` is a middle ground: it prints an
+The `worktree-core` hooks run as `node <script>.ts` in exec form (`"command":
+"node", "args": [...]`; [hooks docs](https://code.claude.com/docs/en/hooks)).
+`require-worktree-hook` is a guard: an internal failure exits 2 (blocks) so a
+crashed guard cannot silently stop enforcing. The two `SessionStart` hooks are
+informational and fail open (exit 0).
+
+For `require-worktree-hook.ts`, `warn` is a middle ground: it prints an
 advisory instead of blocking (see the hook script's own header for the full
 mode table). For the other two, `off` isn't a distinct third state from the
 default — an explicit `off`/`false` still means "don't run", same as leaving
-it unconfigured; `prune-merged-worktrees-hook.sh`'s lighter "nudge, don't
+it unconfigured; `prune-merged-worktrees-hook.ts`'s lighter "nudge, don't
 act" mode (its `--hook` flag) is reached via the env var's or settings'
 `0`/`false`/`no`/`off` values specifically, distinct from leaving the signal
 unset entirely (which skips the prune script altogether — see that hook's
 own header for why "unconfigured" and "off" are different outcomes there).
 
-`prune-merged-worktrees-hook.sh` also reads one settings.json key that isn't
+`prune-merged-worktrees-hook.ts` also reads one settings.json key that isn't
 an on/off signal at all and so isn't in the table above:
 `worktree.autoPruneCruftMarkers`, an array of `{"path", "beginMarker",
 "endMarker"}` entries naming tracked files some tool regenerates a

@@ -6,7 +6,8 @@
         "hooks": [
           {
             "type": "command",
-            "command": "\"${CLAUDE_PLUGIN_ROOT}\"/skills/git-worktree-usage/scripts/require-worktree-hook.sh"
+            "command": "node",
+            "args": ["${CLAUDE_PLUGIN_ROOT}/scripts/ts/require-worktree-hook.ts"]
           }
         ]
       }
@@ -16,11 +17,17 @@
         "hooks": [
           {
             "type": "command",
-            "command": "\"${CLAUDE_PLUGIN_ROOT}\"/skills/git-worktree-usage/scripts/check-worktree-symlinks-hook.sh"
+            "command": "node",
+            "args": [
+              "${CLAUDE_PLUGIN_ROOT}/scripts/ts/check-worktree-symlinks-hook.ts"
+            ]
           },
           {
             "type": "command",
-            "command": "\"${CLAUDE_PLUGIN_ROOT}\"/skills/git-worktree-usage/scripts/prune-merged-worktrees-hook.sh"
+            "command": "node",
+            "args": [
+              "${CLAUDE_PLUGIN_ROOT}/scripts/ts/prune-merged-worktrees-hook.ts"
+            ]
           }
         ]
       }

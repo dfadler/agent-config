@@ -20,8 +20,8 @@
 # whatever `python3` happens to resolve to on PATH) — a stray, unpinned global
 # ruff install produced a confusing false "would reformat" failure once
 # because it disagreed with the ruff==0.9.6 pinned in requirements-dev.txt.
-# The shell targets (lint-shellcheck, lint-shfmt, structure, test-sh,
-# coverage) need no Python at all, so a shell-only contributor never triggers
+# The shell targets (lint-shellcheck, lint-shfmt, test-sh, coverage) need no
+# Python at all, so a shell-only contributor never triggers
 # the venv build.
 set -euo pipefail
 
@@ -43,15 +43,11 @@ PY_SOURCES=(
   plugins/detached-terminal/scripts/agent_term.py
   scripts/tests/test_agent_term.py
   plugins/gha-ci-audit/scripts/aggregate.py
-  plugins/gha-ci-audit/scripts/analyze_jobs.py
-  plugins/gha-ci-audit/scripts/analyze_runs.py
   plugins/gha-ci-audit/scripts/check_failures.py
   plugins/gha-ci-audit/scripts/check_status.py
   plugins/gha-ci-audit/scripts/collect_pipeline.py
   plugins/gha-ci-audit/scripts/compute_workflow_timing.py
-  plugins/gha-ci-audit/scripts/find_p50_run.py
   plugins/gha-ci-audit/scripts/grade.py
-  plugins/gha-ci-audit/scripts/merge_timing.py
   plugins/gha-ci-audit/scripts/timing.py
   plugins/gha-ci-audit/scripts/write_assertions.py
   plugins/gha-ci-audit/scripts/utils.py
@@ -80,8 +76,9 @@ NODE_STAMP=node_modules/.installed
 # Coverage settings. The floor is a MEASURED baseline, not an aspiration: 70%
 # was the first honest measurement (70.24%); it was lowered to 67 after the
 # gh-attach-image upload script (well covered by bats) moved to TypeScript and
-# left the denominator, leaving 67.99%; lowered to 65 after the memory-hygiene stop
-# hook and collab-retro scan script moved to TypeScript too (66.00%). All are rounded DOWN — kcov line coverage
+# left the denominator, leaving 67.99%; to 66 after the worktree-core hooks and
+# prune/verify scripts moved to TypeScript (66.38%); and to 65 after the
+# memory-hygiene stop hook and collab-retro scan script moved too. All are rounded DOWN — kcov line coverage
 # jitters by fractions of a point as scripts and tests change shape, so the
 # floor sits just under the measurement rather than exactly on it. Measured
 # on ubuntu-24.04 with kcov 42 and bats at the commit shell.yml pins. Lowering
@@ -145,7 +142,7 @@ Run one of this repo's checks. CI runs the same targets.
 Shell (no Python or Node needed):
   lint-shellcheck   shellcheck over every shell script
   lint-shfmt        shfmt -i 2 -ci -d (check only)
-  structure         validate plugin manifests and skill/agent frontmatter
+  structure         validate plugin manifests and skill/agent frontmatter (Node: pnpm run check-plugin-structure)
   test-sh           bats suites under scripts/tests
   coverage          bats under kcov, enforce the floor (Linux only; skips elsewhere)
   lint-actions      actionlint over .github/workflows
@@ -305,6 +302,7 @@ pnpm_name() {
     typecheck-ts) echo typecheck ;;
     test-ts) echo test ;;
     coverage-ts) echo coverage ;;
+    structure) echo check-plugin-structure ;;
     lint-set-flags | lint-claude-md | check-skills | lint-plugin-evals | check-vitest-flags | check-vitest-v3-names | check-links) echo "$1" ;;
     *) return 1 ;;
   esac
@@ -327,7 +325,6 @@ run_target() {
     typecheck) typecheck ;;
     fmt) fmt ;;
     fmt-py) fmt_py ;;
-    structure) bash scripts/check-plugin-structure.sh ;;
     test-sh) bats scripts/tests ;;
     test-py) test_py ;;
     test) bats scripts/tests && test_py ;;

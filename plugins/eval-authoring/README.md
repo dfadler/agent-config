@@ -22,9 +22,9 @@ checks what a script can; the rest needs a paid run.
 | [`skills/author-cases`](skills/author-cases/SKILL.md) | Writing cases: graders (free first), mocks, fixtures, should-fire and should-not-fire prompts. |
 | [`skills/run-evals`](skills/run-evals/SKILL.md) | Slash command only (paid). Lints, shows the planned commands, then runs the wrapper. |
 | [`scripts/ts/run-evals/`](scripts/ts/run-evals/run-evals.ts) | The wrapper: cost tiers `quick` / `standard` / `thorough`, one CLI invocation per case (each under its own grants), a cumulative cost ceiling, preflight checks, never `--scaffold`. |
-| [`skills/diagnose-scores`](skills/diagnose-scores/SKILL.md) | Finds the result file and dispatches the diagnoser. |
+| [`skills/diagnose-scores`](skills/diagnose-scores/SKILL.md) | Finds the result file, runs the script and interprets each verdict (cause, evidence, next step). |
 | [`scripts/ts/diagnose/`](scripts/ts/diagnose/diagnose.ts) | Free per-case verdict from an `aggregate-result.json` (delta, variance, run errors, split judge votes). |
-| [`agents/`](agents/) | `case-reviewer` (runs the lint, then judges wording and boundary coverage) and `score-diagnoser` (interprets the script's verdict). Both read-only. |
+| [`agents/`](agents/) | `case-reviewer` (runs the lint, then judges wording and boundary coverage). Read-only. The score diagnoser was demoted to the `diagnose-scores` skill: the script's output is short, so isolation saved no context ([#465](https://github.com/dfadler/agent-config/issues/465)). |
 | [`docs/`](docs/) | [Grants file format](docs/grants-format.md), [adding a lint rule](docs/lint-rules.md). |
 | `evals/`, `tests/lint-fixtures/` | The plugin's own model-behavior cases and the lint's free fixtures. |
 

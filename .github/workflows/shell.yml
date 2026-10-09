@@ -16,7 +16,7 @@ name: Shell
 #   shfmt          bash scripts/ci.sh lint-shfmt
 #   set-flags      pnpm run lint-set-flags
 #   claude-md-size pnpm run lint-claude-md
-#   structure      bash scripts/ci.sh structure
+#   structure      pnpm run check-plugin-structure
 #   test-sh        bash scripts/ci.sh test-sh
 #   coverage       bash scripts/ci.sh coverage   (needs test-sh: guards the kcov build)
 

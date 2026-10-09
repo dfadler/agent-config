@@ -77,51 +77,6 @@ make_git_sandbox() {
   git -C "$REPO" push -q -u origin main
 }
 
-# Build a throwaway plugin tree for the structure checker, so tests never
-# depend on the repo's real plugin layout (which changes as skills are added).
-# Usage: make_plugin_fixture <root> <plugin-name>
-make_plugin_fixture() {
-  local root="$1" plugin="$2"
-  mkdir -p "$root/plugins/$plugin/.claude-plugin"
-  cat > "$root/plugins/$plugin/.claude-plugin/plugin.json" <<EOF
-{
-  "name": "$plugin",
-  "version": "0.1.0",
-  "description": "fixture plugin"
-}
-EOF
-}
-
-# add_skill <root> <plugin> <skill> [name-override]
-add_skill() {
-  local root="$1" plugin="$2" skill="$3" name="${4:-$3}"
-  local dir="$root/plugins/$plugin/skills/$skill"
-  mkdir -p "$dir"
-  cat > "$dir/SKILL.md" <<EOF
----
-name: $name
-description: fixture skill
----
-
-# $skill
-EOF
-}
-
-# add_agent <root> <plugin> <agent> [name-override]
-add_agent() {
-  local root="$1" plugin="$2" agent="$3" name="${4:-$3}"
-  local dir="$root/plugins/$plugin/agents"
-  mkdir -p "$dir"
-  cat > "$dir/$agent.md" <<EOF
----
-name: $name
-description: fixture agent
----
-
-Body.
-EOF
-}
-
 # Extends make_git_sandbox with worktree-pruning fixtures: a `gh` shim that
 # answers `gh auth status` / `gh pr list` from a local merged-heads file
 # instead of the standard network-blocker default, plus helpers to create
