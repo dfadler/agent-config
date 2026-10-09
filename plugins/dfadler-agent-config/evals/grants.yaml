@@ -14,9 +14,3 @@ grants:
     - "Bash(gh *)"
   pr-babysit-delegates-to-pr-checks-and-pr-comments:
     - "Bash(gh *)"
-  adversarial-reviewer-reports-without-editing:
-    - "Write"
-  shell-script-reviewer-reports-without-editing:
-    - "Write"
-  docs-staleness-checker-reports-without-editing:
-    - "Write"

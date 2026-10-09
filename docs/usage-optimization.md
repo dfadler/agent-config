@@ -40,9 +40,9 @@ see the PR this ships in for why.
 `model:` overrides now exist in the plugin, one per agent (`grep -rn
 '^model:' plugins/dfadler-agent-config/agents/*.md`):
 
-- `plugins/dfadler-agent-config/agents/adversarial-reviewer.md:12` — `model: opus`
-- `plugins/dfadler-agent-config/agents/docs-staleness-checker.md:17` — `model: sonnet`
-- `plugins/dfadler-agent-config/agents/shell-script-reviewer.md:13` — `model: haiku`
+- `plugins/adversarial-reviewer/agents/adversarial-reviewer.md:12` — `model: opus`
+- `plugins/docs-staleness-checker/agents/docs-staleness-checker.md:17` — `model: sonnet`
+- `plugins/shell-script-reviewer/agents/shell-script-reviewer.md:13` — `model: haiku`
 
 No skill sets a model — only agents carry a `model:` field in this plugin.
 The original version of this finding said "exactly one override" and "the

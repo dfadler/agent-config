@@ -1,4 +1,4 @@
-# Run: node plugins/eval-authoring/scripts/ts/run-evals/run-evals.ts --tier quick plugins/dfadler-agent-config
+# Run: node plugins/eval-authoring/scripts/ts/run-evals/run-evals.ts --tier quick plugins/shell-script-reviewer
 # (quick tier: one run, plugin arm only, `--ablation none`, which this case needs because the
 # no-plugin arm cannot dispatch a plugin agent: "Agent type ... not found".)
 # Grant: Write, recorded in grants.yaml, so the run can create the script the agent reads (the
