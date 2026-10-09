@@ -7,7 +7,7 @@
 
 load helpers
 
-SCAN_SCRIPT="$REPO_ROOT/plugins/dfadler-agent-config/skills/collab-retro/scripts/scan-feedback-memories.sh"
+SCAN_SCRIPT="$REPO_ROOT/plugins/collab-retro/scripts/scan-feedback-memories.sh"
 
 setup() {
   make_sandbox

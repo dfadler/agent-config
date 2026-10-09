@@ -38,7 +38,7 @@ a change to this repo rather than something that just sits in memory forever.
 Run the scanner:
 
 ```bash
-plugins/dfadler-agent-config/skills/collab-retro/scripts/scan-feedback-memories.sh
+plugins/collab-retro/scripts/scan-feedback-memories.sh
 ```
 
 This lists every `feedback`-type memory file across all projects on this
