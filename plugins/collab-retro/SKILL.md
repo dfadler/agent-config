@@ -132,7 +132,7 @@ gh label list --repo dfadler/agent-config | grep -q agent-improvement || \
 ## Step 5 — permission, then post
 
 Creating an issue is a publish action — follow
-`dfadler-agent-config:gh-publish-guide` before running `gh issue
+`gh-publish-guide` before running `gh issue
 create`. In practice that means: show the drafted title, body, and label to
 the user in chat and get an explicit go-ahead for *this* issue, even when the
 retro itself was explicitly requested — a standalone invocation authorizes

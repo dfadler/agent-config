@@ -24,7 +24,7 @@ metadata:
 
 **Never create or modify a GitHub issue or PR, post a comment, edit a body, or
 submit a review without explicit, request-scoped permission** — see
-`dfadler-agent-config:gh-publish-guide`; the `.claude/settings.json`
+`gh-publish-guide`; the `.claude/settings.json`
 ask-rules backstop it.
 
 **Any comment, reply, or review posted on a GitHub PR or issue must be clearly

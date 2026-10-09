@@ -152,7 +152,7 @@ Each layer catches what the one above it misses. None is sufficient alone.
    looks at suggested commands and public-facing actions (a comment, a
    merge, a post) before they happen. This is the layer that catches
    whatever the first three miss. In this repo, `gh-publish-guide`
-   (`plugins/dfadler-agent-config/skills/gh-publish-guide/SKILL.md`)
+   (`plugins/gh-publish-guide/SKILL.md`)
    is exactly this backstop for GitHub publish actions: it requires
    explicit, request-scoped, specific permission before creating or posting
    anything publicly visible, and it stays mandatory even when injected
@@ -293,7 +293,7 @@ table) are on the issue:
   edit, or unusual encoding (pointing to `docs/github-actions.md` for the
   workflow-file case specifically), and the fixed tool-authority boundary,
   all specific to reviewing a diff or PR.
-- `plugins/dfadler-agent-config/skills/gh-publish-guide/SKILL.md` —
+- `plugins/gh-publish-guide/SKILL.md` —
   the human-layer backstop before any GitHub publish action; defines what
   counts as valid, explicit, request-scoped permission.
 - `plugins/dfadler-agent-config/skills/pr-comments/SKILL.md` and

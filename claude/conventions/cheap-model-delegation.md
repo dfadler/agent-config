@@ -21,7 +21,7 @@ first place.
 - When it's unclear which bucket a task falls into, default to the parent's
   model rather than guessing down a tier.
 - This repo already has a working example of tiered selection across its own
-  agent definitions (`plugins/dfadler-agent-config/agents/`):
+  agent definitions (`plugins/*/agents/`):
   `shell-script-reviewer.md` runs a fixed shellcheck/shfmt checklist and is
   pinned to `model: haiku`; `docs-staleness-checker.md` has to judge whether
   prose is still true against code and runs `model: sonnet`;
