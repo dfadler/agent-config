@@ -1,0 +1,39 @@
+# Run: claude plugin eval plugins/subagent-orchestration --case orchestration-serial-for-dependent-task-list --runs 3 --trust-plugin --no-publish
+# Shared run/grant facts: docs/contributing.md, "Plugin evals". No grant; reply-only.
+# Negative half of the unordered-task-list rule: dependent items must not fan out.
+# Run with --ablation with-without; no skill_fired grader (reply-only).
+# Can fail: keeps_serial fails unless the reply says to work in order/in the main context;
+# names_dependency (half weight) fails if it never mentions the ordering dependency.
+schema_version: "1.1"
+name: orchestration-serial-for-dependent-task-list
+description: >
+  For a list where each step needs the previous step's output on the same files, the reply
+  keeps the work serial. expected_outcome: PASS when the reply says to do them in order and
+  cites the dependency; FAIL when it plans parallel subagents.
+tags: [subagent-orchestration, trigger, quick]
+
+execution:
+  prompt: |
+    Please do all of these in src/api.ts: (1) rename the function fetchUser to loadUser,
+    (2) update every caller of it to use the new name, (3) then change loadUser's return
+    type, which depends on the renamed function, and (4) update the tests that call it. How
+    will you approach them? Three sentences, no commands.
+  max_turns: 4
+  allowed_tools:
+    - Skill
+
+graders:
+  - name: keeps_serial
+    type: regex
+    target: last_message
+    pattern: '(?:in order|sequential|serial|one (?:at a time|by one)|step by step|myself|main context)'
+    flags: i
+    match: contains
+
+  - name: names_dependency
+    type: regex
+    target: last_message
+    pattern: 'depend|same file|shared file|each step|builds on|needs the (?:previous|prior)|conflict'
+    flags: i
+    match: contains
+    weight: 0.5

@@ -1,0 +1,40 @@
+# Run: claude plugin eval plugins/subagent-orchestration --case orchestration-parallelizes-independent-task-list --runs 3 --trust-plugin --no-publish
+# Shared run/grant facts: docs/contributing.md, "Plugin evals". No grant; reply-only.
+# Positive half of the unordered-task-list rule: disjoint items go to parallel subagents.
+# Run with --ablation with-without; no skill_fired grader (reply-only).
+# Can fail: plans_parallel fails if the reply never proposes parallel/subagent dispatch;
+# names_disjoint (half weight) fails if it never ties that to separate files/independence.
+schema_version: "1.1"
+name: orchestration-parallelizes-independent-task-list
+description: >
+  For an unordered list of independent tasks touching different files, the reply plans
+  parallel subagents. expected_outcome: PASS when the reply proposes running the items in
+  parallel via subagents and cites independence or disjoint files; FAIL when it plans to
+  work through them one by one.
+tags: [subagent-orchestration, trigger, quick]
+
+execution:
+  prompt: |
+    Please do all of these: (1) fix the typo in README.md, (2) add a unit test for
+    src/date.ts, (3) update the changelog in docs/CHANGELOG.md, (4) bump the lint config in
+    .eslintrc. They are unrelated to each other. How will you approach them? Three
+    sentences, no commands.
+  max_turns: 4
+  allowed_tools:
+    - Skill
+
+graders:
+  - name: plans_parallel
+    type: regex
+    target: last_message
+    pattern: '(?:parallel|concurrent|simultaneous|fan[- ]out|at once).{0,200}(?:sub-?agents?|agents?)|(?:sub-?agents?|agents?).{0,200}(?:parallel|concurrent|simultaneous|at once)'
+    flags: is
+    match: contains
+
+  - name: names_disjoint
+    type: regex
+    target: last_message
+    pattern: 'independent|unrelated|disjoint|separate files|different files|no (?:shared|overlapping)'
+    flags: i
+    match: contains
+    weight: 0.5

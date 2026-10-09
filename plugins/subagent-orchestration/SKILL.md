@@ -6,7 +6,8 @@ description: |
   main context. Routes the work to the main context, a single Agent call, or a
   Workflow; defines the compact handback a delegated agent should return; and picks
   the model tier. Use for "should I delegate this", "which agent do I use", or
-  "keep my context small".
+  "keep my context small". Also use when handed a list of several independent tasks,
+  to decide which can run in parallel.
 license: MIT
 metadata:
   version: "1.0.0"
@@ -33,6 +34,23 @@ metadata:
 
 Open-ended search that will sweep many files goes to an `Agent` (the `Explore` agent
 fits); a targeted `grep` for a known symbol can stay in the main context.
+
+## Fan out an unordered task list
+
+Applies to a list of two or more distinct items ("fix X, add Y, update docs for Z"),
+not to one task with substeps.
+
+1. **Triage.** For each item note its file surface and whether it needs another
+   item's output.
+2. **Group.** Disjoint file surfaces and no ordering dependency make items parallel
+   candidates. Items that share files or depend on each other stay serial or go to one
+   agent. File-surface rules: the `git-worktree-usage` skill.
+3. **State the plan** in a line or two (what runs in parallel, what stays serial, why)
+   before dispatching.
+4. **Dispatch** the independent `Agent` calls in a single message, each in its own
+   worktree if it edits files, with the handback below and a model tier from below.
+5. **Cap the count.** Fan out only a few agents; batch small items into one agent
+   rather than one agent each. Trivial items stay in the main context.
 
 ## Ask for a compact handback
 
