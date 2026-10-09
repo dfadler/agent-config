@@ -38,6 +38,11 @@ reply terse.
 
 ## Opening and sizing a PR
 
+- **Always open PRs as drafts** (`gh pr create --draft`) unless the user
+  explicitly asks for a ready-for-review PR. A draft prevents an
+  unreviewed PR from landing in someone's review queue before it's been
+  looked at. To mark one ready: `gh pr ready <number>` — but only do so
+  with explicit user confirmation, not autonomously after CI passes.
 - Size a PR by whether it would be mergeable and valuable standing alone, not by
   line count. Split when a piece is independently useful on its own; keep pieces
   together when they only make sense as one concern.
