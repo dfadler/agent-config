@@ -108,7 +108,7 @@ worktrees, they gate on being inside a git repo, and they run only locally
 (a cloud/remote session has no worktrees to check). Neither can fail a
 session — both catch their own errors and always exit 0.
 
-- **`check-worktree-symlinks-hook.sh`** runs `verify-worktree-symlinks.sh
+- **`check-worktree-symlinks-hook.ts`** runs `verify-worktree-symlinks.sh
   --fix`: for a project that has adopted the `worktree.symlinkDirectories`
   convention described above, confirms each configured directory's symlink
   in the current worktree still resolves to the main checkout, and repairs
@@ -122,7 +122,7 @@ session — both catch their own errors and always exit 0.
   `worktree.symlinkDirectories` — the underlying script reads that key
   separately and exits clean when it's empty. Prints a `🔗`-prefixed summary
   only when it actually found (and fixed) something.
-- **`prune-merged-worktrees-hook.sh`** runs `prune-merged-worktrees.sh
+- **`prune-merged-worktrees-hook.ts`** runs `prune-merged-worktrees.sh
   --auto`: removes any worktree under `.claude/worktrees/` (on a
   `worktree-*` or `claude/*` branch) whose pull request has already merged,
   as long as it's unlocked, isn't the current session's own worktree, has no
@@ -177,7 +177,7 @@ session — both catch their own errors and always exit 0.
   a configured file touched either. Empty/absent by default — inert for
   every project that hasn't opted in.
 
-- **`require-worktree-hook.sh`** is a `PreToolUse` hook that enforces an
+- **`require-worktree-hook.ts`** is a `PreToolUse` hook that enforces an
   edit policy when the current working directory is the main git checkout
   rather than a linked worktree. It checks `git rev-parse --git-dir`: a
   path ending in `.git/worktrees/<name>` is a linked worktree (always
@@ -187,8 +187,8 @@ session — both catch their own errors and always exit 0.
   priority first): the `WORKTREE_ENFORCE` env var (`0`/`false`/`no`/`off` →
   off; `warn` → warn; `block` → block; anything else → from settings);
   `worktree.enforce` in `.claude/settings.json` (`"block"` / `"warn"` /
-  `"off"`); default `"off"`. In `"block"` mode the hook exits 1 with an
-  explanation so the model can recover by calling `EnterWorktree` first. In
+  `"off"`); default `"off"`. In `"block"` mode the hook exits 2 (the only
+  blocking code) with an explanation so the model can recover by calling `EnterWorktree` first. In
   `"warn"` mode it prints a notice and allows the edit through — useful for
   repos where occasional main-checkout edits are acceptable but a reminder
   is still wanted. Skipped entirely in cloud/remote sessions and in non-git
