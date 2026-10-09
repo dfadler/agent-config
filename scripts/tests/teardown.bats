@@ -356,7 +356,7 @@ assert '$PRUNE_CMD' not in cmds, 'auto-prune hook still present after teardown'
 }
 
 @test "hook deregistration: removes the memory-hygiene Stop hook from settings.json" {
-  HOOK_CMD="$HOME/.claude/skills/dfadler-agent-config/hooks/scripts/memory-hygiene-stop-hook.sh"
+  HOOK_CMD="$HOME/.claude/skills/memory-hygiene/hooks/scripts/memory-hygiene-stop-hook.sh"
   mkdir -p "$HOME/.claude"
   python3 -c "
 import json

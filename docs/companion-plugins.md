@@ -161,8 +161,8 @@ the full research trail.
 
 Issue #238 followed up by writing this repo's own Linux administration
 skill from scratch instead, to the bar the third-party bundles above
-failed: `dfadler-agent-config:linux-administration`
-(`plugins/dfadler-agent-config/skills/linux-administration/`). It sorts
+failed: `linux-administration`
+(`plugins/linux-administration/`). It sorts
 package management, systemd service management, filesystem operations,
 user/permission management, disk partitioning, and firewall/network
 configuration into three mechanical tiers (safe / needs-confirmation /

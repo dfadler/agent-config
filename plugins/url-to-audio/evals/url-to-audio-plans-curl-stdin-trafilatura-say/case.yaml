@@ -1,0 +1,62 @@
+# Run: claude plugin eval plugins/url-to-audio --case url-to-audio-plans-curl-stdin-trafilatura-say --runs 3 --trust-plugin --no-publish
+# Shared run/grant facts: docs/contributing.md, "Plugin evals". No grant: Skill only; the
+# commands are listed in the reply and never run, so nothing touches the network or audio.
+# Should-fire case for url-to-audio Steps 1 to 4a: fetch with curl (not WebFetch), pipe the
+# downloaded file into trafilatura on stdin (not `-u`, which refetches, nor `-i`, which reads
+# a URL list), and synthesize with `say` to an .m4a. The prompt says trafilatura is
+# installed so the install gate is not in play. The gotchas are not named in the prompt.
+# Can fail: skill_fired fails if the description stops matching "convert this URL to audio";
+# fetches_with_curl, extracts_via_stdin and says_to_m4a fail if the command list lacks that
+# step; no_wrong_trafilatura_flag fails if it uses `-u`, `-i` or `--URL`. A no-skill model
+# tends to use `trafilatura -u` or write an `.aiff`, which is where the Delta should come from.
+# Skill phrases checked: "feed it the already-downloaded local file's contents on stdin",
+# "`say` ... -o \"$WORKDIR/article.m4a\"", "Use `curl`, not `WebFetch`".
+schema_version: "1.1"
+name: url-to-audio-plans-curl-stdin-trafilatura-say
+description: >
+  Asked to turn an article URL into audio on a Mac with trafilatura installed, the model
+  invokes url-to-audio and lists a curl fetch, trafilatura reading the file on stdin and a
+  `say` call writing an .m4a. expected_outcome: PASS when the skill fires and all three steps
+  are present without `trafilatura -u` or `-i`; FAIL otherwise.
+tags: [url-to-audio, trigger, quick]
+
+execution:
+  prompt: |
+    Read this article to me: https://example.com/posts/launch-notes. I'm on a Mac, and
+    trafilatura is already installed and on my PATH. Do not run anything. Reply with the exact
+    shell commands you would run, in order, in one bash code block and no other text.
+  max_turns: 6
+  allowed_tools:
+    - Skill
+
+graders:
+  - name: skill_fired
+    type: tool_used
+    tool: Skill
+    input_match: '"skill"\s*:\s*"(?:[\w-]+:)?url-to-audio"'
+    min: 1
+    arm: with-only
+
+  - name: fetches_with_curl
+    type: regex
+    target: last_message
+    pattern: '\bcurl\b[^\n]*(?:\s-[a-zA-Z]*L|\s--location)\b'
+    match: contains
+
+  - name: extracts_via_stdin
+    type: regex
+    target: last_message
+    pattern: 'trafilatura\s*<[^\n>]*>\s*(\S+)[\s\S]*?\bsay\b[\s\S]*?(?:-f\s+|<\s*)\1'
+    match: contains
+
+  - name: says_to_m4a
+    type: regex
+    target: last_message
+    pattern: '\bsay\b[^\n]*(?:\\\n[^\n]*)?\.m4a'
+    match: contains
+
+  - name: no_wrong_trafilatura_flag
+    type: regex
+    target: last_message
+    pattern: 'trafilatura\s+(?:-u|-i|--URL|--input-file)\b'
+    match: not_contains

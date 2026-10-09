@@ -1,0 +1,71 @@
+# Run: claude plugin eval plugins/url-to-audio --case url-to-audio-uses-say-defaults-when-key-missing --runs 3 --trust-plugin --no-publish
+# Shared run/grant facts: docs/contributing.md, "Plugin evals". No grant: Skill only; inputs are
+# pasted and nothing runs.
+# Delta case for url-to-audio Steps 3 and 4a: with the OpenAI key missing it falls back to
+# `say` with the skill's own defaults (voice Samantha, 190 wpm), reading the whole text file
+# with `-f` and writing the `.m4a` the extension names. A default model picks another voice or
+# no rate and writes `.aiff`.
+# Can fail: skill_fired if the description stops matching; says_f_and_m4a if `-f` or the `.m4a`
+# output is missing; default_voice / default_rate if Samantha or 190 are absent;
+# names_the_missing_key (half weight) if the reply does not mention the unset key.
+# Skill phrases checked: "`TTS_VOICE` ... Default `Samantha` for `say`", "`TTS_RATE` ... Default
+# `190`", "if it's requested but missing, say so and fall back to `say`".
+schema_version: "1.1"
+name: url-to-audio-uses-say-defaults-when-key-missing
+description: >
+    With the OpenAI backend requested and no key, the model invokes url-to-audio and gives the
+    `say` command using the skill's defaults. expected_outcome: PASS when the skill fires and the
+    command reads the file with `-f`, writes the `.m4a`, and uses `-v Samantha` and `-r 190`; FAIL
+    otherwise.
+tags: [url-to-audio, trigger, quick]
+
+execution:
+  prompt: |
+    I asked for an audio version of an article with `TTS_BACKEND=openai`, but on this Mac
+    `OPENAI_API_KEY` is not set. The extracted text is already at `/tmp/w/article.txt`, and I have
+    not asked for any particular voice or speed. Reply with the one `say` command you will run to
+    write `/tmp/w/article.m4a`, in a code block, then one sentence about the backend. Do not run
+    anything.
+  max_turns: 4
+  allowed_tools:
+    - Skill
+
+graders:
+  - name: skill_fired
+    type: tool_used
+    tool: Skill
+    input_match: '"skill"\s*:\s*"(?:[\w-]+:)?url-to-audio"'
+    min: 1
+    arm: with-only
+
+  - name: reads_file
+    type: regex
+    target: last_message
+    pattern: '-f\s+"?\S*article\.txt'
+    match: contains
+
+  - name: writes_m4a
+    type: regex
+    target: last_message
+    pattern: '-o\s+"?\S*article\.m4a'
+    match: contains
+
+  - name: default_voice
+    type: regex
+    target: last_message
+    pattern: '-v\s+"?Samantha\b'
+    match: contains
+
+  - name: default_rate
+    type: regex
+    target: last_message
+    pattern: '-r\s+"?190\b'
+    match: contains
+
+  - name: names_the_missing_key
+    type: regex
+    target: last_message
+    pattern: 'OPENAI_API_KEY[^\n]{0,40}(?:not set|n.t set|unset|missing|absent)|(?:no|missing|without)[^\n]{0,20}(?:API key|OPENAI_API_KEY)'
+    flags: i
+    match: contains
+    weight: 0.5

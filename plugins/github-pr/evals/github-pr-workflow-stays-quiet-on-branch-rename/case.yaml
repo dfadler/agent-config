@@ -1,0 +1,46 @@
+# Run: claude plugin eval plugins/github-pr --case github-pr-workflow-stays-quiet-on-branch-rename --runs 3 --trust-plugin --no-publish
+# Shared run/grant facts: docs/contributing.md, "Plugin evals". No grant: Skill only.
+# Should-not-fire half of github-pr-workflow's boundary: renaming a local branch is plain git
+# and shares "branch" and "before I open my PR" vocabulary with the skill, but drafts no PR
+# body, posts no comment, runs no `gh pr` command and merges nothing.
+# Scope: only github-pr-workflow is checked; another PR skill firing is out of scope here.
+# Sabotage map: github_pr_workflow_not_fired checks the description's closing line ("Load
+# whenever doing PR work in any repo"); replace it with "Load whenever working with git
+# branches" and a run should invoke the skill and fail. gives_rename_command is a content
+# check a default reply also passes.
+# Can fail: the skill firing fails github_pr_workflow_not_fired; a reply without
+# `git branch -m` (or `--move`) fails gives_rename_command. Regression guard: a no-plugin arm
+# passes by default, so Delta is about 0 by design.
+schema_version: "1.1"
+name: github-pr-workflow-stays-quiet-on-branch-rename
+description: >
+  A request for the git command that renames the current local branch, mentioning a PR will
+  follow, must not invoke github-pr-workflow. expected_outcome: regression guard, Delta about
+  0 by design. PASS when the skill does not fire and the reply gives git branch -m; FAIL when
+  it fires.
+tags: [github-pr-workflow, trigger, quick]
+
+execution:
+  prompt: |
+    I typo'd my local branch name before opening a PR. What git command renames the branch I
+    am on to `fix-retry-delay`? Reply with the command only. Do not run it.
+  max_turns: 4
+  allowed_tools:
+    - Skill
+
+graders:
+  - name: github_pr_workflow_not_fired
+    type: tool_used
+    tool: Skill
+    input_match: '"skill"\s*:\s*"(?:[\w-]+:)?github-pr-workflow"'
+    min: 0
+    max: 0
+    arm: both
+
+  - name: gives_rename_command
+    type: regex
+    target: last_message
+    pattern: 'git branch (?:-m|--move)\b'
+    match: contains
+    arm: both
+    weight: 0.5
