@@ -14,7 +14,7 @@
 # runs on any platform pytest itself does — coverage.py has no macOS SIP
 # restriction the way kcov's bash instrumentation does.
 #
-# The Python side (the detached-terminal skill and the gha-ci-audit plugin)
+# The Python side (the detached-terminal skill)
 # needs a virtualenv. Every target that shells out to ruff/mypy/pytest builds
 # `venv` first and always runs through .venv's pinned interpreter (never
 # whatever `python3` happens to resolve to on PATH) — a stray, unpinned global
