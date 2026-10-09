@@ -1,8 +1,8 @@
 {
   "$schema": "https://json.schemastore.org/claude-code-plugin-manifest.json",
-  "name": "typescript-gotchas",
-  "version": "1.1.0",
-  "description": "TypeScript/JS gotchas: patterns that compile but cause runtime bugs or are better expressed with a safer API. Covers preferring .at() for indexed reads, plus conventions for type assertions and comment syntax.",
+  "name": "dependency-audits",
+  "version": "1.0.0",
+  "description": "Run the ecosystem's audit tool whenever a manifest or lockfile is touched, before calling a dependency change done.",
   "author": {
     "name": "Dustin Fadler",
     "url": "https://github.com/dfadler"

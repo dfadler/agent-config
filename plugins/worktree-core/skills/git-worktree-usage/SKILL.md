@@ -310,3 +310,19 @@ three a conflict lands in.
   changing," not "safe to snapshot" (dfadler/agent-config#65 shipped a
   known leak this way). Use the diff-against-claimed-source check above to
   confirm a claimed range landed intact.
+
+## Concurrency: how many parallel sessions to run
+
+Parallel sessions need their own budget, not just their own worktree. Pick a number;
+don't default to "as many as fit."
+
+- **Default to roughly 2-5 concurrent agents.** Review bandwidth binds first: past that
+  range, diffs arrive faster than they can be reviewed well. Go higher only with a
+  concrete plan for who reviews the extra output.
+- **Usage/rate-limit quota scales roughly with concurrent sessions**
+  ([docs](https://code.claude.com/docs/en/agents)). Burst rate-limiting, distinct from
+  monthly quota exhaustion, has hit users on the highest-paid tier when 5-10 sessions
+  were launched in quick succession (`anthropics/claude-code#53922`, `#62426`). Stagger
+  session starts.
+- **Cost scales with concurrency too.** A dated ballpark: ~$50-130/day for 5-10
+  parallel agents at 2026 pricing. An order-of-magnitude estimate, not a live quote.

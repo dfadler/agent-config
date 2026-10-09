@@ -1,8 +1,8 @@
 {
   "$schema": "https://json.schemastore.org/claude-code-plugin-manifest.json",
-  "name": "typescript-gotchas",
-  "version": "1.1.0",
-  "description": "TypeScript/JS gotchas: patterns that compile but cause runtime bugs or are better expressed with a safer API. Covers preferring .at() for indexed reads, plus conventions for type assertions and comment syntax.",
+  "name": "shell-script-hygiene",
+  "version": "1.0.0",
+  "description": "Baseline for non-trivial bash scripts: strict flags, shellcheck/shfmt, justified disables, --help, named exit codes, hermetic tests.",
   "author": {
     "name": "Dustin Fadler",
     "url": "https://github.com/dfadler"

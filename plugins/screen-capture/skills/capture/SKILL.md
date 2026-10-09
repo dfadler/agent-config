@@ -249,3 +249,16 @@ Write to `output_dir` (default: this session's scratchpad directory) as
 `capture.png` or `capture.mp4` unless the caller names a specific filename.
 Confirm the file is non-empty before reporting success — an interrupted
 capture can leave a zero-byte or partial file.
+
+## When visual verification is required
+
+When a PR or issue changes what gets visually rendered (UI components, generated
+images or diagrams, styled documents, anything a human looks at rather than reads as
+code), provide before/after screenshots in its description, not just prose. Skip it
+for backend logic, config, migrations, scripts, tests, types, docs, and tooling. Do
+this proactively, as part of finishing the PR, then run `compare` and `attach`.
+
+For a change to layout, CSS, or responsive behavior, one fixed width is not proof:
+overflow, clipping, or dead space shows up at other widths. Do a manual resize pass
+across representative breakpoints plus a Lighthouse mobile/desktop pass (see
+`screen-capture:lighthouse`).

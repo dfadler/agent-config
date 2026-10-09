@@ -61,7 +61,7 @@ A command is a pure function plus one tiny entrypoint:
 
 - `exit-codes.ts`: `EXIT_OK` 0, `EXIT_FAILURE` 1, `EXIT_USAGE` 2, `EXIT_CONFIG` 3,
   `EXIT_DEPENDENCY` 4, `EXIT_NETWORK` 5, `EXIT_TIMEOUT` 6, `EXIT_PARTIAL` 7, `EXIT_INTERNAL` 20, `EXIT_INTERRUPTED` 130,
-  `EXIT_TERMINATED` 143, the same taxonomy as `claude/conventions/shell-script-hygiene.md`.
+  `EXIT_TERMINATED` 143, the same taxonomy as `plugins/shell-script-hygiene/SKILL.md`.
 - `args.ts`: `parseArgs(spec, argv)` returns `Result<CliError, Parsed>`; `-h`/`--help`
   anywhere before `--` yields `{ kind: "help" }` before anything else is validated.
 - `fs.ts`: `readTextFile(path)` returns `Result<CliError, string>`.

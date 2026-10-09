@@ -3,7 +3,7 @@ set -uo pipefail
 
 # Stop hook: reminds Claude to write a memory update before ending a turn
 # that leaves uncommitted git changes behind — the session-close habit
-# documented in claude/conventions/memory-hygiene.md.
+# documented in the memory-hygiene skill.
 #
 # Off by default — a project or session must opt in via the MEMORY_HYGIENE_REMINDER
 # env var (1/true/yes/on to enable). A project can set this for every session by
@@ -57,6 +57,6 @@ jq -n '{
     hookEventName: "Stop",
     decision: "block",
     reason: "Uncommitted changes exist and no memory update has been noted yet this session.",
-    additionalContext: "Before finishing: if anything durable happened this session (a decision, a fix, a gotcha worth remembering), write or update a memory now, per claude/conventions/memory-hygiene.md. Skip this if nothing durable happened."
+    additionalContext: "Before finishing: if anything durable happened this session (a decision, a fix, a gotcha worth remembering), write or update a memory now, per the memory-hygiene skill. Skip this if nothing durable happened."
   }
 }'

@@ -1,8 +1,8 @@
 {
   "$schema": "https://json.schemastore.org/claude-code-plugin-manifest.json",
-  "name": "typescript-gotchas",
-  "version": "1.1.0",
-  "description": "TypeScript/JS gotchas: patterns that compile but cause runtime bugs or are better expressed with a safer API. Covers preferring .at() for indexed reads, plus conventions for type assertions and comment syntax.",
+  "name": "issue-tracker",
+  "version": "1.0.0",
+  "description": "Pick the right issue tracker (GitHub Issues or Jira) for a repo before creating or referencing an issue.",
   "author": {
     "name": "Dustin Fadler",
     "url": "https://github.com/dfadler"

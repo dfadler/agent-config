@@ -547,9 +547,8 @@ PYEOF
 
 # Verification commands that gate a push. rtk condenses output and can swallow
 # a failure signal (a falsely passing `npx prettier --check` once let a CI
-# format failure through), so --fix excludes them from rewriting too. Whether
-# rtk's matching also catches the `npx prettier` form is unverified, so the
-# docs still say to run these via node directly.
+# format failure through), so --fix excludes them from rewriting too. Verified
+# (rtk 0.50.0): exclude_commands also covers the `npx`/`pnpm exec` forms.
 RTK_VERIFY_COMMANDS="prettier,eslint,vitest"
 export RTK_VERIFY_COMMANDS
 

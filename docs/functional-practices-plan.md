@@ -118,7 +118,7 @@ refactors the script 2 tests); 5 needs 1 and 4; 6 comes last.
 - Skill behavior changes get an eval case, not only a lint.
 - Dependency additions (`fast-check`, `eslint-plugin-functional`, a parser
   library) get an audit per
-  [`dependency-audits.md`](../claude/conventions/dependency-audits.md).
+  [`dependency-audits`](../plugins/dependency-audits/SKILL.md).
 
 ## Dependencies and open questions
 

@@ -11,7 +11,7 @@ tools: Read, Grep, Glob, Bash
 # Parent tier (inherit), not sonnet/haiku: choosing between "the judge is wrong",
 # "the skill never triggered" and "the run was rate-limited" means weighing
 # evidence, which the cheap-model convention keeps off a cheaper tier
-# (claude/conventions/cheap-model-delegation.md). `tools` is an allowlist; Edit and
+# (plugins/subagent-orchestration/SKILL.md). `tools` is an allowlist; Edit and
 # Write are absent on purpose. Supported plugin-agent fields:
 # https://code.claude.com/docs/en/sub-agents
 model: inherit

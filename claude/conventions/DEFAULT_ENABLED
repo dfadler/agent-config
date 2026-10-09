@@ -18,16 +18,8 @@ vite-plugin.md
 # Opt-in only (not included by default) — personal workflow preferences,
 # not safety/hygiene baseline:
 #   git-worktree-usage.md
-#   concurrency.md
-#   visual-verification.md
 #   why-question-shape.md
 #   prefer-real-chrome.md
-#   shell-script-hygiene.md
 #   testing-sabotage-check.md
 #   tooling-over-manual-scanning.md
-#   dependency-audits.md
-#   issue-tracker.md
-#   cheap-model-delegation.md
-#   heavy-workflow-cost.md
 #   context-preservation.md
-#   memory-hygiene.md

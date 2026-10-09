@@ -83,7 +83,7 @@ _clean_repo_json() {
   [ "$status" -eq 0 ]
   assert_glob "$output" '*"hookEventName": "Stop"*'
   assert_glob "$output" '*"decision": "block"*'
-  assert_glob "$output" '*memory-hygiene.md*'
+  assert_glob "$output" '*memory-hygiene skill*'
   [ -e "$TMPDIR/agent-config-memory-hygiene/session-a" ]
 }
 

@@ -107,7 +107,7 @@ Since then, the refactoring the audit recommended has been completed:
   `claude/conventions/DEFAULT_ENABLED` — a short, low-controversy default set.
   Additional conventions are opt-in per machine, not globally forced.
 - The TypeScript sections (`CLAUDE.md:95-109`, `:111-143` in the original file) were
-  moved to the `dfadler-agent-config:typescript-conventions` skill, which only loads
+  moved to the `typescript-gotchas:typescript-conventions` skill, which only loads
   on invocation, in TypeScript-containing repos.
 - A `lint-claude-md` ceiling (`package.json`, currently 350) enforced by
   `scripts/ts/check-claude-md-lines.ts` as part of `scripts/ci.sh lint-sh` prevents the file
@@ -342,7 +342,7 @@ remaining items are open recommendations.
    TypeScript sections into a TS-specific skill.**~~ **Done.** `claude/CLAUDE.md`
    is now 20 lines; all topic sections were moved to per-file convention includes
    under `claude/conventions/`; the TypeScript sections became the
-   `dfadler-agent-config:typescript-conventions` skill (§2).
+   `typescript-gotchas:typescript-conventions` skill (§2).
 
 2. ~~**Add a `claude/CLAUDE.md` line-count gate to `scripts/ci.sh check`.**~~ **Done.**
    `scripts/ci.sh lint-sh` now runs `scripts/ts/check-claude-md-lines.ts` against a
