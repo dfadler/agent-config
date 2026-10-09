@@ -331,6 +331,9 @@ companion tool's own persistent configuration, not this repo's.
 
 `--fix` also adds `prettier`, `eslint` and `vitest` to `exclude_commands`, and a bare
 run warns when they are missing: rtk's condensing once turned a failing
-`npx prettier --check` into a false pass (#586). Whether rtk's matching also catches the
-`npx prettier` form is unverified, so still run gating checks via `node` directly or
-`rtk proxy <cmd>`.
+`npx prettier --check` into a false pass (#586). Checked empirically (rtk 0.50.0, `rtk hook
+claude` dry-run against a scratch config with `exclude_commands = ["prettier", "eslint",
+"vitest"]`): the exclusion also covers the `npx prettier`, `npx vitest run`, `npx eslint` and
+`pnpm exec eslint` forms (no rewrite), while without it each is rewritten (`rtk prettier`,
+`rtk vitest`, `rtk lint`). Matching is on the underlying tool, not just the bare command.
+Re-run a result that still looks wrong as `rtk proxy <cmd>`.
