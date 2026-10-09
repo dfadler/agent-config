@@ -1,0 +1,38 @@
+# Run: claude plugin eval plugins/playwright --case playwright-reports-webkit-is-not-safari --runs 3 --trust-plugin --no-publish
+# Shared run/grant facts: docs/contributing.md, "Plugin evals". No grant: Skill only.
+# Delta case for the skill's "Limits to state in any report": a WebKit recording is
+# Playwright's WebKit, not Safari. A default model tends to call it a Safari check.
+# Can fail: skill_fired if the description stops matching; says_not_safari if the reply does
+# not say the recording is not Safari; Delta is only known after a two-arm run.
+# Skill phrase checked: "Playwright's WebKit is not Safari".
+schema_version: "1.1"
+name: playwright-reports-webkit-is-not-safari
+description: >
+  Asked to report on a Playwright WebKit recording of keyboard focus, the model invokes the
+  playwright skill and states that Playwright's WebKit is not Safari. expected_outcome: PASS
+  when the skill fires and the reply says WebKit here is not Safari; FAIL otherwise.
+tags: [playwright, trigger, quick]
+
+execution:
+  prompt: |
+    I recorded my page tabbing through a menu using Playwright's WebKit, and every item showed
+    a focus ring in the video. Write the two-sentence summary for my PR description about what
+    this shows for Safari users. Reply with the summary only. Do not run anything.
+  max_turns: 4
+  allowed_tools:
+    - Skill
+
+graders:
+  - name: skill_fired
+    type: tool_used
+    tool: Skill
+    input_match: '"skill"\s*:\s*"(?:[\w-]+:)?playwright"'
+    min: 1
+    arm: with-only
+
+  - name: says_not_safari
+    type: regex
+    target: last_message
+    pattern: '(?:not|isn.t|n.t)\s+(?:the same as\s+|equivalent to\s+|real\s+)?Safari|differs? from Safari|Safari.{0,40}(?:may|might|can) differ'
+    flags: i
+    match: contains
