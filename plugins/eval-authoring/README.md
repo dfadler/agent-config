@@ -40,7 +40,7 @@ node plugins/eval-authoring/scripts/ts/diagnose/diagnose.ts <results-dir>/aggreg
 ```
 
 Every script takes `--help` (flags, output, exit codes). CI today runs only the free lint
-(`make lint-plugin-evals`); a gate on paid runs is an open investigation in
+(`pnpm run lint-plugin-evals`); a gate on paid runs is an open investigation in
 [#436](https://github.com/dfadler/agent-config/issues/436), not a finished recipe.
 
 Stable-signal checklist: explicit PASS and FAIL conditions in `llm` criteria, free graders

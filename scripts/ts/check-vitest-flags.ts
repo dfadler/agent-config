@@ -51,7 +51,7 @@ export const nodeFlagEnv: FlagEnv = {
       : err(
           cliError(
             EXIT_DEPENDENCY,
-            `could not run \`pnpm exec vitest --help\` (run \`make node-modules\` first): ${r.stderr}`,
+            `could not run \`pnpm exec vitest --help\` (run \`pnpm install\` first): ${r.stderr}`,
           ),
         );
   },

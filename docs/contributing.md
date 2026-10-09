@@ -116,8 +116,7 @@ worth avoiding on those grounds even before the mechanism question above.
 
 `scripts/ci.sh check` runs everything CI runs, and CI calls these same targets
 (`bash scripts/ci.sh <target>`, or `pnpm run <name>` for the Node-based ones) so a
-green run locally means the same thing a green PR does. `make <target>` and
-`pnpm run check` are thin delegates to the same script; `bash scripts/ci.sh --help`
+green run locally means the same thing a green PR does. `pnpm run check` is a thin delegate to the same script; `bash scripts/ci.sh --help`
 lists every target.
 
 ```bash

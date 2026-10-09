@@ -16,6 +16,7 @@ jobs:
   run:
     name: run
     runs-on: ubuntu-latest
+    timeout-minutes: 20
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
@@ -49,5 +50,5 @@ jobs:
         run: sudo install -m 0755 ~/.cache/kcov-bin/kcov /usr/local/bin/kcov
       - name: Verify kcov
         run: kcov --version
-      - name: Coverage (kcov, 70% floor)
+      - name: Coverage (kcov, 67% floor)
         run: bash scripts/ci.sh coverage
