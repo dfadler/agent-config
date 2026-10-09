@@ -1,0 +1,42 @@
+# Run: claude plugin eval plugins/subagent-orchestration --case orchestration-stays-quiet-on-small-edit --runs 3 --trust-plugin --no-publish
+# Shared run/grant facts: docs/contributing.md, "Plugin evals". No grant needed (Skill only).
+# Should-not-fire case: a one-file rename with "agent"/"model" free vocabulary near-miss is
+# a main-context task. Regression guard; Delta 0 by design.
+# Can fail: skill_not_invoked fails if subagent-orchestration fires; answers_rename fails if
+# the reply lacks the renamed identifier.
+schema_version: "1.1"
+name: orchestration-stays-quiet-on-small-edit
+description: >
+  A small single-file rename with the code pasted inline must not invoke
+  subagent-orchestration. expected_outcome: PASS when the skill is not invoked and the reply
+  shows the renamed function; FAIL when the skill is invoked or the rename is missing.
+tags: [subagent-orchestration, trigger, quick]
+
+execution:
+  prompt: |
+    Should I spawn a subagent for this, or just do it myself? Either way, rename `getUsr`
+    to `getUser` in this file and show me the result:
+
+    ```js
+    function getUsr(id) { return db.find(id); }
+    export const name = (id) => getUsr(id).name;
+    ```
+  max_turns: 4
+  allowed_tools:
+    - Skill
+
+graders:
+  - name: skill_not_invoked
+    type: tool_used
+    tool: Skill
+    input_match: '"skill"\s*:\s*"(?:[\w-]+:)?subagent-orchestration"'
+    min: 0
+    max: 0
+    arm: both
+
+  - name: answers_rename
+    type: regex
+    target: last_message
+    pattern: 'function getUser\(id\)'
+    match: contains
+    arm: both

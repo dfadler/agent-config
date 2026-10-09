@@ -1,0 +1,38 @@
+# Run: claude plugin eval plugins/subagent-orchestration --case orchestration-parent-tier-for-security-review --runs 3 --trust-plugin --no-publish
+# Shared run/grant facts: docs/contributing.md, "Plugin evals". No grant; reply-only.
+# Other half of "Pick the model tier": judgment work keeps the parent (or stronger) tier.
+# Run with --ablation with-without; no skill_fired grader (reply-only).
+# Can fail: keeps_strong_tier fails if the reply never says to keep the parent/full-capability
+# tier; no_cheap_pick fails if the reply recommends Haiku or a cheaper model.
+schema_version: "1.1"
+name: orchestration-parent-tier-for-security-review
+description: >
+  Asked which model to give a subagent doing a security review of an auth change across many
+  files, the reply keeps the parent-tier model and does not recommend a cheap one.
+  expected_outcome: PASS when the reply keeps the parent or a stronger model; FAIL when it
+  picks Haiku or a cheaper tier.
+tags: [subagent-orchestration, trigger, quick]
+
+execution:
+  prompt: |
+    I'm going to spawn a subagent through the Agent tool to review a change to our auth
+    middleware for security flaws; the change touches a dozen files. Which model should I give
+    it, my current one or a cheaper one to save tokens? Two or three sentences, no commands.
+  max_turns: 4
+  allowed_tools:
+    - Skill
+
+graders:
+  - name: keeps_strong_tier
+    type: regex
+    target: last_message
+    pattern: '(?:keep|stay|use|stick)\b.{0,40}(?:parent|current|same|stronger|full)'
+    flags: i
+    match: contains
+
+  - name: no_cheap_pick
+    type: regex
+    target: last_message
+    pattern: '(?<!not )(?<!n.t )(?:use|pick|choose|go with|recommend|switch to)\s+(?:a\s+)?(?:haiku|cheaper|smaller)'
+    flags: i
+    match: not_contains

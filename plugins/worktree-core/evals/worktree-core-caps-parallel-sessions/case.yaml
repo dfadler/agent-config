@@ -1,0 +1,37 @@
+# Run: claude plugin eval plugins/worktree-core --case worktree-core-caps-parallel-sessions --runs 3 --trust-plugin --no-publish
+# Shared run/grant facts: docs/contributing.md, "Plugin evals". No grant; reply-only.
+# Should-fire case for the concurrency guidance ("Default to roughly 2-5 concurrent agents",
+# "Stagger session starts"). Run with --ablation with-without; no skill_fired grader because
+# the skill rarely fires on a reply-only prompt but its description still shapes the reply.
+# Can fail: gives_range fails without a 2-5 style range; staggers fails without staggered starts.
+# The prompt names neither number nor stagger.
+schema_version: "1.1"
+name: worktree-core-caps-parallel-sessions
+description: >
+  Asked how many Claude Code sessions to run at once on ten independent tickets, the reply gives
+  a small range of roughly 2 to 5 and advises staggering starts. expected_outcome: PASS when the
+  reply names a 2-5 range and staggered launches; FAIL when it says to launch all ten at once.
+tags: [worktree-core, trigger, quick]
+
+execution:
+  prompt: |
+    I have ten independent tickets and a worktree for each. Should I just start ten Claude
+    Code sessions at once to knock them all out? Answer in a short paragraph, no commands.
+  max_turns: 4
+  allowed_tools:
+    - Skill
+
+graders:
+  - name: gives_range
+    type: regex
+    target: last_message
+    pattern: '\b(?:[2-3]|two|three)\s*(?:-|–|—|to)\s*(?:[4-6]|four|five|six)\b'
+    flags: i
+    match: contains
+
+  - name: staggers
+    type: regex
+    target: last_message
+    pattern: 'stagger'
+    flags: i
+    match: contains

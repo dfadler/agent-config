@@ -1,0 +1,40 @@
+# Run: claude plugin eval plugins/subagent-orchestration --case orchestration-fans-out-when-high-stakes-and-uncertain --runs 3 --trust-plugin --no-publish
+# Shared run/grant facts: docs/contributing.md, "Plugin evals". No grant; reply-only.
+# Positive half of the heavy-workflow rule: high-stakes AND high-uncertainty justifies fan-out.
+# Run with --ablation with-without; no skill_fired grader (reply-only).
+# Can fail: justifies_fanout fails if the reply recommends no multi-agent/Workflow route;
+# names_both fails (half weight) if it never ties the choice to stakes and uncertainty.
+schema_version: "1.1"
+name: orchestration-fans-out-when-high-stakes-and-uncertain
+description: >
+  For a costly, gating, unresolved decision (database engine for a multi-year platform
+  rewrite), the reply accepts a multi-agent fan-out and ties it to stakes and uncertainty.
+  expected_outcome: PASS when the reply recommends a multi-agent route citing both; FAIL when
+  it insists on a single direct answer.
+tags: [subagent-orchestration, trigger, quick]
+
+execution:
+  prompt: |
+    We must pick the database engine for a multi-year platform rewrite. It gates every other
+    team's work, is very expensive to reverse, and nobody on the team knows the tradeoffs for
+    our workload. Is it worth running a heavy multi-agent research workflow on this, or
+    should I just answer directly? Three sentences, no commands.
+  max_turns: 4
+  allowed_tools:
+    - Skill
+
+graders:
+  - name: justifies_fanout
+    type: regex
+    target: last_message
+    pattern: '(?<!not )(?<!n.t )(?:worth (?:it|running|the)|recommend|go ahead|yes)\b.{0,60}(?:multi-agent|workflow|fan|research)'
+    flags: i
+    match: contains
+
+  - name: names_both
+    type: regex
+    target: last_message
+    pattern: '(?:high[- ]stakes|stakes|expensive|costly|gat).*(?:uncertain|unknown|unclear|not knowable)|(?:uncertain|unknown|unclear).*(?:high[- ]stakes|stakes|expensive|costly|gat)'
+    flags: is
+    match: contains
+    weight: 0.5

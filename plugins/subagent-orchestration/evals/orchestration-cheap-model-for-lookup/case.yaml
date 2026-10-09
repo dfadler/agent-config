@@ -1,0 +1,29 @@
+# Run: claude plugin eval plugins/subagent-orchestration --case orchestration-cheap-model-for-lookup --runs 3 --trust-plugin --no-publish
+# Shared run/grant facts: docs/contributing.md, "Plugin evals". No grant; reply-only.
+# Should-fire case for "Pick the model tier": a mechanical lookup goes to a cheaper tier.
+# Run with --ablation with-without; no skill_fired grader (reply-only).
+# Can fail: cheap_tier fails if the reply names no cheaper tier; the prompt does not mention models.
+schema_version: "1.1"
+name: orchestration-cheap-model-for-lookup
+description: >
+  Asked how to delegate a mechanical find-all-usages sweep to a subagent, the reply picks a
+  cheaper model tier. expected_outcome: PASS when the reply names Haiku or a cheaper/smaller
+  model; FAIL when it keeps the parent model.
+tags: [subagent-orchestration, trigger, quick]
+
+execution:
+  prompt: |
+    I need to list every file in a large repo that still calls the deprecated function
+    `legacyFetch()`. I plan to hand this to a subagent through the Agent tool. How should I
+    configure that subagent? Two or three sentences, no commands.
+  max_turns: 4
+  allowed_tools:
+    - Skill
+
+graders:
+  - name: cheap_tier
+    type: regex
+    target: last_message
+    pattern: 'haiku|cheaper|smaller model|lower[- ]tier|lightweight model'
+    flags: i
+    match: contains
