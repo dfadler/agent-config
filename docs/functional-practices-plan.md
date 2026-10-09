@@ -110,7 +110,9 @@ refactors the script 2 tests); 5 needs 1 and 4; 6 comes last.
    small plugin scripts. `setup.sh`, `doctor.sh` and `check-companions.sh` are
    bootstrap tooling and exempt from the migration: they stay bash because they
    run before Node exists (see
-   [#605](https://github.com/dfadler/agent-config/issues/605)). Still undecided:
+   [#605](https://github.com/dfadler/agent-config/issues/605)). So do the helpers
+   only they call: `claude-md-lib.sh`, `git-identity.sh` and
+   `offer-safe-chain-permission.sh`. Still undecided:
    whether `teardown.sh`, the hooks, and `agent_term.py` move at all, and whether
    plugins require Node.
 
