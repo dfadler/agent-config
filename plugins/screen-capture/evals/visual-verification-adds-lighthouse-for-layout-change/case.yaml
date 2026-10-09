@@ -1,0 +1,53 @@
+# Run: claude plugin eval plugins/screen-capture --case visual-verification-adds-lighthouse-for-layout-change --runs 3 --trust-plugin --no-publish
+# Shared run/grant facts: docs/contributing.md, "Plugin evals". No grant: Skill only; nothing runs.
+# Should-fire half of the visual-verification boundary. For a layout change the skill asks for
+# before/after screenshots, a manual resize pass across breakpoints, and a Lighthouse CLI pass; a
+# no-plugin reply usually stops at screenshots and responsive testing.
+# Can fail: skill_fired if the description stops matching a rendered-output PR;
+# before_after, resize_pass or lighthouse if the matching check is missing.
+schema_version: "1.1"
+name: visual-verification-adds-lighthouse-for-layout-change
+description: >
+  Asked what to verify before opening a layout-changing PR, the model invokes
+  visual-verification and lists before/after screenshots, a resize pass and Lighthouse.
+  expected_outcome: PASS when the skill fires and all three free checks match; FAIL otherwise.
+tags: [screen-capture, visual-verification, trigger, quick]
+
+execution:
+  prompt: |
+    My PR rewrites the CSS grid of our dashboard page so the cards reflow into one column on
+    narrow screens. I am about to open it. List the verification steps you do first and what the
+    PR description must contain. Reply with a short bullet list and no other text. Do not run
+    anything.
+  max_turns: 4
+  allowed_tools:
+    - Skill
+
+graders:
+  - name: skill_fired
+    type: tool_used
+    tool: Skill
+    input_match: '"skill"\s*:\s*"(?:[\w-]+:)?visual-verification"'
+    min: 1
+    arm: with-only
+
+  - name: before_after
+    type: regex
+    target: last_message
+    pattern: 'before[\s/-]*(?:and|&)?[\s/-]*after'
+    flags: i
+    match: contains
+
+  - name: resize_pass
+    type: regex
+    target: last_message
+    pattern: 'resize|breakpoint|viewport'
+    flags: i
+    match: contains
+
+  - name: lighthouse
+    type: regex
+    target: last_message
+    pattern: 'lighthouse'
+    flags: i
+    match: contains

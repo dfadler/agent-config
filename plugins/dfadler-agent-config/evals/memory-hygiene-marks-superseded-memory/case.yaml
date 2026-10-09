@@ -1,0 +1,38 @@
+# Run: claude plugin eval plugins/dfadler-agent-config --case memory-hygiene-marks-superseded-memory --runs 3 --trust-plugin --no-publish
+# Shared run/grant facts: docs/contributing.md, "Plugin evals". No grant: Skill only; nothing runs.
+# Should-fire half of the memory-hygiene boundary (staleness). The skill keeps the old file and
+# adds `**Superseded by:** [[new-name]]` to it and `**Supersedes:** [[old-name]]` to the new
+# one; a no-plugin reply usually just edits or deletes the old memory.
+# Can fail: skill_fired if the description stops matching a stale-memory fix; both markers if
+# either marker line is missing.
+schema_version: "1.1"
+name: memory-hygiene-marks-superseded-memory
+description: >
+  Given a stale memory that a decision has replaced, the model invokes memory-hygiene and gives
+  both supersedes markers. expected_outcome: PASS when the skill fires and the reply holds both
+  marker lines with [[links]]; FAIL otherwise.
+tags: [memory-hygiene, trigger, quick]
+
+execution:
+  prompt: |
+    My auto-memory file `decision/database-choice` says we use MySQL for the orders service. We
+    have since moved to Postgres, and I am writing a new memory `decision/postgres-migration`
+    for that. What exact line do I add to each of the two files so the correction stays
+    visible? Reply with one code block and no other text. Do not run anything.
+  max_turns: 4
+  allowed_tools:
+    - Skill
+
+graders:
+  - name: skill_fired
+    type: tool_used
+    tool: Skill
+    input_match: '"skill"\s*:\s*"(?:[\w-]+:)?memory-hygiene"'
+    min: 1
+    arm: with-only
+
+  - name: both_markers
+    type: regex
+    target: last_message
+    pattern: '\*\*Superseded by:\*\*\s*\[\[[^\]]+\]\][\s\S]*\*\*Supersedes:\*\*\s*\[\[[^\]]+\]\]|\*\*Supersedes:\*\*\s*\[\[[^\]]+\]\][\s\S]*\*\*Superseded by:\*\*\s*\[\[[^\]]+\]\]'
+    match: contains

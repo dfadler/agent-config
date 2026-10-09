@@ -1,0 +1,37 @@
+# Run: claude plugin eval plugins/dfadler-agent-config --case memory-hygiene-uses-topic-key-slug --runs 3 --trust-plugin --no-publish
+# Shared run/grant facts: docs/contributing.md, "Plugin evals". No grant: Skill only; nothing runs.
+# Should-fire half of the memory-hygiene boundary (naming). The skill wants a two-segment
+# `family/description` slug in lowercase kebab-case, such as `decision/database-choice`; a
+# no-plugin reply usually gives a flat slug like `postgres-over-mysql`.
+# Can fail: skill_fired if the description stops matching memory writing; family_slug if the
+# reply has no `family/description` slug.
+schema_version: "1.1"
+name: memory-hygiene-uses-topic-key-slug
+description: >
+  Asked for the name slug of a new memory about a technology decision, the model invokes
+  memory-hygiene and gives a family/description slug. expected_outcome: PASS when the skill fires
+  and the reply holds a lowercase kebab-case slug with one slash; FAIL on a flat slug.
+tags: [memory-hygiene, trigger, quick]
+
+execution:
+  prompt: |
+    I am about to write an auto-memory file recording that we chose Postgres over MySQL for the
+    orders service. What should the `name:` slug in its frontmatter be? Reply with the slug alone
+    in one code block and no other text. Do not run anything.
+  max_turns: 4
+  allowed_tools:
+    - Skill
+
+graders:
+  - name: skill_fired
+    type: tool_used
+    tool: Skill
+    input_match: '"skill"\s*:\s*"(?:[\w-]+:)?memory-hygiene"'
+    min: 1
+    arm: with-only
+
+  - name: family_slug
+    type: regex
+    target: last_message
+    pattern: '`{3}[a-z]*\s*[a-z]+(?:-[a-z]+)*/[a-z0-9]+(?:-[a-z0-9]+)*\s*`{3}'
+    match: contains

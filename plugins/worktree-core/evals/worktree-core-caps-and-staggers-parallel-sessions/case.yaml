@@ -1,0 +1,41 @@
+# Run: claude plugin eval plugins/worktree-core --case worktree-core-caps-and-staggers-parallel-sessions --runs 3 --trust-plugin --no-publish
+# Shared run/grant facts: docs/contributing.md, "Plugin evals". No grant: Skill only; nothing runs.
+# Should-fire case for the "Concurrency budget" section added to git-worktree-usage (#608). The
+# skill says to default to roughly 2-5 concurrent agents and to stagger session starts; a
+# no-plugin reply tends to endorse the requested number or give a different cap.
+# No skill_fired grader: as in worktree-core-creates-with-enterworktree, the skill rarely fires on
+# a reply-only prompt, yet its description still shapes the reply. Measure with the with/without
+# delta (run with --ablation with-without).
+# Can fail: default_cap if the reply does not give 2-5 as the default; staggers if it does not
+# say to stagger the starts.
+schema_version: "1.1"
+name: worktree-core-caps-and-staggers-parallel-sessions
+description: >
+  Asked about launching ten parallel Claude Code sessions at once, the model recommends a default
+  of two to five and staggering the starts. expected_outcome: PASS when the reply gives a 2-5
+  default and says to stagger; FAIL when it endorses ten at once.
+tags: [worktree-core, trigger, quick]
+
+execution:
+  prompt: |
+    I plan to start ten Claude Code sessions at the same moment, each in its own git worktree,
+    for a big refactor. How many should I run at once, and how should I start them? Answer in at
+    most three sentences. Do not run anything.
+  max_turns: 4
+  allowed_tools:
+    - Skill
+
+graders:
+  - name: default_cap
+    type: regex
+    target: last_message
+    pattern: '\b(?:2|two)\s*(?:-|–|to)\s*(?:5|five)\b'
+    flags: i
+    match: contains
+
+  - name: staggers
+    type: regex
+    target: last_message
+    pattern: 'stagger'
+    flags: i
+    match: contains

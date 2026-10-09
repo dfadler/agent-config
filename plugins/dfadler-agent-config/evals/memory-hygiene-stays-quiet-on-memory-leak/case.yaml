@@ -1,0 +1,40 @@
+# Run: claude plugin eval plugins/dfadler-agent-config --case memory-hygiene-stays-quiet-on-memory-leak --runs 3 --trust-plugin --no-publish
+# Shared run/grant facts: docs/contributing.md, "Plugin evals". No grant: Skill only.
+# Should-not-fire half: a Node.js memory-leak question shares the word "memory" with the skill
+# but has nothing to do with auto-memory files. Regression guard: a no-plugin arm passes by
+# default, Delta about 0 by design.
+# Can fail: skill_not_fired if memory-hygiene over-triggers on the word "memory"; answers if the
+# reply does not discuss a leak.
+schema_version: "1.1"
+name: memory-hygiene-stays-quiet-on-memory-leak
+description: >
+  A Node.js memory-leak question must not invoke memory-hygiene. expected_outcome: regression
+  guard, Delta about 0 by design. PASS when the skill does not fire and the reply discusses a
+  leak; FAIL when it fires.
+tags: [memory-hygiene, trigger, quick]
+
+execution:
+  prompt: |
+    My Node.js service's memory keeps growing until it is killed. Name the single most common
+    cause of a memory leak in a long-running Node process, in one or two sentences. Do not run
+    anything.
+  max_turns: 4
+  allowed_tools:
+    - Skill
+
+graders:
+  - name: skill_not_fired
+    type: tool_used
+    tool: Skill
+    input_match: '"skill"\s*:\s*"(?:[\w-]+:)?memory-hygiene"'
+    min: 0
+    max: 0
+    arm: both
+
+  - name: answers
+    type: regex
+    target: last_message
+    pattern: 'leak|listener|closure|cache|retain|reference'
+    flags: i
+    match: contains
+    arm: both
