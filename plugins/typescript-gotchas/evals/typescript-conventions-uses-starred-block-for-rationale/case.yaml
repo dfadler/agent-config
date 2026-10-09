@@ -1,4 +1,4 @@
-# Run: claude plugin eval plugins/dfadler-agent-config --case typescript-conventions-uses-starred-block-for-rationale --runs 3 --trust-plugin --no-publish
+# Run: claude plugin eval plugins/typescript-gotchas --case typescript-conventions-uses-starred-block-for-rationale --runs 3 --trust-plugin --no-publish
 # Shared run/grant facts: docs/contributing.md, "Plugin evals". No grant: Skill only.
 # Should-fire case for typescript-conventions "Comment syntax": a multi-line rationale that
 # sits between statements, above an `if` rather than documenting a declaration, is a starred

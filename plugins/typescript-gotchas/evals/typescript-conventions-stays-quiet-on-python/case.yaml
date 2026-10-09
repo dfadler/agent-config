@@ -1,4 +1,4 @@
-# Run: claude plugin eval plugins/dfadler-agent-config --case typescript-conventions-stays-quiet-on-python --runs 3 --trust-plugin --no-publish
+# Run: claude plugin eval plugins/typescript-gotchas --case typescript-conventions-stays-quiet-on-python --runs 3 --trust-plugin --no-publish
 # Shared run/grant facts: docs/contributing.md, "Plugin evals". No grant: Skill only.
 # Should-not-fire case for typescript-conventions: a Python `typing.cast` question shares
 # "type assertion", "cast" and "comment" vocabulary with the skill but is not TypeScript or
