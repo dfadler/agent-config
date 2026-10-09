@@ -6,7 +6,8 @@
 # section is the single source of truth and Jira means the connector, never `gh issue`.
 # Sabotage map: uses_jira checks "Jira: use the Jira MCP connector"; no_gh_issue checks
 # "never `gh issue`".
-# Can fail: any `gh issue` in the reply fails no_gh_issue; skill_fired fails if the
+# Can fail: any non-negated `gh issue` in the reply fails no_gh_issue ("not `gh issue`" is the
+# skill's own wording and passes); skill_fired fails if the
 # description stops matching issue creation.
 schema_version: "1.1"
 name: issue-tracker-uses-declared-jira
@@ -50,5 +51,5 @@ graders:
   - name: no_gh_issue
     type: regex
     target: last_message
-    pattern: 'gh\s+issue'
+    pattern: '(?<!not\s)(?<!not\s`)(?<!never\s)(?<!never\s`)gh\s+issue'
     match: not_contains
