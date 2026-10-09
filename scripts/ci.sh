@@ -43,14 +43,8 @@ PY_SOURCES=(
   plugins/detached-terminal/scripts/agent_term.py
   scripts/tests/test_agent_term.py
   plugins/gha-ci-audit/scripts/aggregate.py
-  plugins/gha-ci-audit/scripts/check_failures.py
-  plugins/gha-ci-audit/scripts/check_status.py
-  plugins/gha-ci-audit/scripts/collect_pipeline.py
-  plugins/gha-ci-audit/scripts/compute_workflow_timing.py
   plugins/gha-ci-audit/scripts/grade.py
-  plugins/gha-ci-audit/scripts/timing.py
   plugins/gha-ci-audit/scripts/write_assertions.py
-  plugins/gha-ci-audit/scripts/utils.py
   plugins/gha-ci-audit/tests/test_gha_ci_audit.py
 )
 PY_TESTS=(scripts/tests plugins/gha-ci-audit/tests)

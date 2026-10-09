@@ -29,7 +29,7 @@ If you find yourself writing HTML or interpreting findings, stop — that belong
 ## Step 1: Run the collector script
 
 ```bash
-bash {scripts_dir}/collect.sh \
+node {scripts_dir}/ts/gha-ci-audit/collect.ts \
   --repo {repo} \
   --output-dir {outputs_dir}
 ```
@@ -41,9 +41,9 @@ failure check, secondary stats, collect_summary) and writes `collect_timing.json
 
 ## Step 2: Handle ambiguous primary workflow (exit code 2 only)
 
-Skip this step if `collect.sh` exited with code 0.
+Skip this step if `collect.ts` exited with code 0.
 
-If `collect.sh` exits with code **2**, the primary CI workflow could not be auto-detected.
+If `collect.ts` exits with code **2**, the primary CI workflow could not be auto-detected.
 Read `{outputs_dir}/workflow_candidates.json` (a list of `{id, name, path}` objects).
 Review each entry and select the workflow most likely to be the primary CI — it runs on
 every PR push, is often named "CI", "Build", or "Test", and is triggered on
@@ -52,7 +52,7 @@ every PR push, is often named "CI", "Build", or "Test", and is triggered on
 Re-run with the chosen workflow ID:
 
 ```bash
-bash {scripts_dir}/collect.sh \
+node {scripts_dir}/ts/gha-ci-audit/collect.ts \
   --repo {repo} \
   --output-dir {outputs_dir} \
   --workflow-id {chosen_id}

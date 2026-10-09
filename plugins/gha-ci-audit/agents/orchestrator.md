@@ -30,7 +30,7 @@ SKILL=$PLUGIN/skills/gha-ci-audit/SKILL.md
 Before doing any setup, run:
 
 ```bash
-python3 $SCRIPTS/check_status.py $ITER 2>/dev/null || echo "not started"
+node $SCRIPTS/ts/gha-ci-audit/check-status.ts $ITER 2>/dev/null || echo "not started"
 ```
 
 If `$ITER` doesn't exist yet, proceed to Step 2.
@@ -132,7 +132,7 @@ If a renderer notification indicates failure (no `report.html`), flag the eval a
 After all renderers complete:
 
 ```bash
-python3 $SCRIPTS/check_status.py $ITER
+node $SCRIPTS/ts/gha-ci-audit/check-status.ts $ITER
 ```
 
 All three should show `✓` for Report and `✓` for Timing. If any eval is missing `report.html`, do not proceed to grading — report the failure with the eval name and ask whether to retry the renderer or skip.
@@ -155,7 +155,7 @@ Grade the outputs and write grading.json to:
   /Volumes/Development/agent-config/plugins/gha-ci-audit-workspace/iteration-N/<eval_name>/with_skill/grading.json
 ```
 
-After all graders complete, run `check_status.py` again and confirm all three show `✓` for Graded.
+After all graders complete, run `check-status.ts` again and confirm all three show `✓` for Graded.
 
 ---
 
@@ -221,7 +221,7 @@ Keep it concise — one paragraph per eval, then a one-line verdict.
 | Collector produces no `collect_summary.json` | Report to user; ask retry or skip — do not spawn renderer for that eval |
 | Renderer produces no `report.html` | Data files are intact — re-spawn renderer only (no re-fetch needed) |
 | A grader fails to write `grading.json` | Re-spawn the grader for that eval only |
-| `aggregate.py` finds no graded runs | At least one `grading.json` is missing — run `check_status.py` and fix before re-running |
+| `aggregate.py` finds no graded runs | At least one `grading.json` is missing — run `check-status.ts` and fix before re-running |
 | Viewer port 3117 already in use | The launch script handles this by killing the previous viewer; if it still fails, report the PID conflict |
 | Notification arrives with no `duration_ms` | Record `duration_ms: null` in the phase timing file rather than omitting it; note the gap in the summary |
 | Skill improver fails | Non-blocking — report the error but do not delay the summary; proposals can be generated separately |
