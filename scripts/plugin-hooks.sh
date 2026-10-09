@@ -54,12 +54,12 @@ PLUGIN_HOOK_FEATURES=(
   "worktree-core"
   "worktree-core"
   "worktree-core"
-  "dfadler-agent-config"
+  "memory-hygiene"
 )
 # shellcheck disable=SC2034
 PLUGIN_HOOK_CMDS=(
   "$HOME/.claude/skills/worktree-core/skills/git-worktree-usage/scripts/require-worktree-hook.sh"
   "$HOME/.claude/skills/worktree-core/skills/git-worktree-usage/scripts/check-worktree-symlinks-hook.sh"
   "$HOME/.claude/skills/worktree-core/skills/git-worktree-usage/scripts/prune-merged-worktrees-hook.sh"
-  "$HOME/.claude/skills/dfadler-agent-config/hooks/scripts/memory-hygiene-stop-hook.sh"
+  "$HOME/.claude/skills/memory-hygiene/hooks/scripts/memory-hygiene-stop-hook.sh"
 )

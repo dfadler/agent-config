@@ -49,7 +49,7 @@ Claude's context, so Claude has no way to act on it. `Stop` fires while Claude c
 still act — it can block (exit code 2 or `decision: "block"`) to keep the
 conversation going, and its `additionalContext` output does reach Claude.
 
-Implemented as `memory-hygiene-stop-hook.sh` in `dfadler-agent-config`'s
+Implemented as `memory-hygiene-stop-hook.sh` in the `memory-hygiene` plugin's
 `hooks/hooks.json` (see [`docs/hook-composition.md`](../../docs/hook-composition.md)
 for the enable signals). `Stop` fires once per turn, not once per session, so a
 blanket "always remind" hook would nag constantly; this one throttles to at most

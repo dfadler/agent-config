@@ -1,0 +1,72 @@
+# Run: claude plugin eval plugins/github-pr --case issue-reporter-etiquette-narrates-scope-split --runs 3 --trust-plugin --no-publish
+# Shared run/grant facts: docs/contributing.md, "Plugin evals". No grant: Skill only; the
+# comment is drafted, not posted.
+# Should-fire case for Steps 1 and 2: before starting substantial work, post a short
+# acknowledgment that says which part is taken on and which is deferred, with the reason,
+# led by the AI marker.
+# Can fail: skill_fired fails if the description stops matching "post a status update on
+# issue N"; marker fails if the draft lacks it (a no-skill draft usually does); names_deferred
+# fails if the deferred part (the config format rewrite) is not named; gives_reason fails if
+# no reason for deferring appears; no_timeline (half weight) fails if the draft promises a
+# date, which the skill says not to do.
+# Skill phrases checked: "Which parts are being deferred or declined, and why", "Don't
+# over-promise a timeline".
+schema_version: "1.1"
+name: issue-reporter-etiquette-narrates-scope-split
+description: >
+  Asked to draft the first comment on an issue with two separable asks of which only one is
+  being done now, the model invokes issue-reporter-etiquette and drafts a marked
+  acknowledgment that names the deferred part and why. expected_outcome: PASS when the skill
+  fires and the draft has the marker, names the deferred part, gives a reason and promises no
+  date; FAIL otherwise.
+tags: [issue-reporter-etiquette, trigger, quick]
+
+execution:
+  prompt: |
+    Issue 77 on dfadler/example-app asks for two things: (A) add a `--json` flag to the
+    `report` command, and (B) rewrite the config file format from INI to TOML. I am taking
+    on A now. B needs a product decision about migrating existing users, so I am deferring
+    it. Write the comment you would post on issue 77 before starting work, as the exact
+    comment body in one code block and no other text. Do not run commands.
+  max_turns: 6
+  allowed_tools:
+    - Skill
+
+graders:
+  - name: skill_fired
+    type: tool_used
+    tool: Skill
+    input_match: '"skill"\s*:\s*"(?:[\w-]+:)?issue-reporter-etiquette"'
+    min: 1
+    arm: with-only
+
+  - name: marker
+    type: regex
+    target: last_message
+    pattern: '🤖 \*\*Claude:\*\*'
+    match: contains
+
+  - name: names_deferred
+    type: regex
+    target: last_message
+    pattern: '(?=[\s\S]*TOML)(?=[\s\S]*(?:defer|hold off|on hold|later|separately|not (?:taking|doing)))'
+    flags: i
+    match: contains
+
+  # Completion check: the reason words come from the prompt, so a default reply passes too.
+  - name: gives_reason
+    type: regex
+    target: last_message
+    pattern: 'product decision|migrat'
+    flags: i
+    match: contains
+    weight: 0.5
+
+  # Wording check: a date or "by <day>" promise. Half weight: phrasing varies.
+  - name: no_timeline
+    type: regex
+    target: last_message
+    pattern: '\bby (?:tomorrow|end of|next week|monday|tuesday|wednesday|thursday|friday)\b|\bwithin (?:a|an|\d+) (?:day|hour|week)s?\b|\bETA\b'
+    flags: i
+    match: not_contains
+    weight: 0.5

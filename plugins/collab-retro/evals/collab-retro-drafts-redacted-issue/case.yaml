@@ -1,0 +1,87 @@
+# Run: claude plugin eval plugins/collab-retro --case collab-retro-drafts-redacted-issue --runs 3 --trust-plugin --no-publish
+# Shared run/grant facts: docs/contributing.md, "Plugin evals". No grant: Skill only. The
+# skill's scanner script and `gh` are not offered; the scanner output and the memory contents
+# are pasted instead, and the issue is drafted, never created.
+# Should-fire case for collab-retro Steps 2 to 4: a friction that recurs across two projects
+# and is fixable in this repo becomes a draft issue in the skill's template, with the other
+# projects' names redacted (the repo is public). The prompt does not name the template.
+# Can fail: skill_fired fails if the description stops matching "retro"; marker and
+# template_sections fail if the draft lacks the AI marker or the `## Pattern observed` /
+# `## Suggested change` headings (a no-skill draft has its own structure); no_project_names
+# fails if the draft leaks either invented project name.
+# Skill phrases checked: "Step 3 - redact before drafting", "Step 4 - draft the issue".
+schema_version: "1.1"
+name: collab-retro-drafts-redacted-issue
+description: >
+  Given feedback memories where the same friction recurs in two projects, the model invokes
+  collab-retro and drafts an issue in the skill's template that names neither project.
+  expected_outcome: PASS when the skill fires and the draft has the AI marker, both template
+  headings and no project name; FAIL otherwise.
+tags: [collab-retro, trigger, quick]
+
+execution:
+  prompt: |
+    Do a collaboration retro. I can't run the scanner here, so this is what it listed and
+    what is in the files. Assume no open issue already covers any of this.
+
+    ```
+    2026-09-30  -Users-dfadler-Development-globex-api  feedback_worktree_first
+    2026-09-12  -Users-dfadler-Development-acme-web    feedback_no_commits_on_main
+    2026-08-02  -Users-dfadler-Development-acme-web    feedback_prefers_tabs
+    ```
+
+    feedback_worktree_first (globex-api): "Don't edit in the main checkout. The assistant
+    started editing files in globex-api's main working copy again. Told it to use a worktree,
+    third time."
+
+    feedback_no_commits_on_main (acme-web): "The assistant committed straight to main in
+    acme-web instead of making a worktree first. Same correction as in globex-api."
+
+    feedback_prefers_tabs (acme-web): "Use tabs in the legacy Makefile only."
+
+    Reply with only the issue you would draft (a title line, then the body). Do not run
+    commands or post anything.
+  max_turns: 6
+  allowed_tools:
+    - Skill
+
+graders:
+  - name: skill_fired
+    type: tool_used
+    tool: Skill
+    input_match: '"skill"\s*:\s*"(?:[\w-]+:)?collab-retro"'
+    min: 1
+    arm: with-only
+
+  - name: marker
+    type: regex
+    target: last_message
+    pattern: '🤖 \*\*Claude:\*\*'
+    match: contains
+
+  - name: template_sections
+    type: regex
+    target: last_message
+    pattern: '##\s*Pattern observed[\s\S]*##\s*Suggested change'
+    match: contains
+
+  # The reply is a title line, then the template body: marker, Pattern observed, Why it's
+  # worth fixing here, Suggested change, in that order.
+  - name: why_section
+    type: regex
+    target: last_message
+    pattern: '##\s*Pattern observed[\s\S]*##\s*Why it.s worth fixing here[\s\S]*##\s*Suggested change'
+    match: contains
+
+  - name: title_line
+    type: regex
+    target: last_message
+    pattern: '^\W*(?:Title:?\W*)?[A-Za-z][^\n]{8,}\n[\s\S]*🤖 \*\*Claude:\*\*'
+    match: contains
+
+  - name: no_project_names
+    type: regex
+    target: last_message
+    pattern: 'globex|acme'
+    flags: i
+    match: not_contains

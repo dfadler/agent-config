@@ -1,0 +1,78 @@
+# Run: claude plugin eval plugins/github-pr --case pr-review-rubric-formats-findings --runs 3 --trust-plugin --no-publish
+# Shared run/grant facts: docs/contributing.md, "Plugin evals". No grant: Skill only; the
+# diff is pasted and nothing is posted.
+# Should-fire case for pr-review-rubric's output contract on a diff with one planted bug
+# (an off-by-one in a pagination loop). The prompt does not name the format. Also the
+# boundary against the reply-side skills: reviewing a diff is not responding to feedback,
+# sweeping PRs or checking CI.
+# Can fail: skill_fired fails if the description stops matching "reviewing a diff";
+# reply_side_skills_not_fired fails if pr-comments, pr-babysit or pr-checks fire on a review
+# request (arm both); tag_line, how_verified and ai_marker fail if the reply lacks the
+# skill's output contract; a no-skill review has none of the three.
+# Skill phrases checked: "Format the tag line as: **Category:** <category> · **Severity:**
+# <severity> · **Effort:** <effort>", "How verified:", "🤖 **Claude:**".
+schema_version: "1.1"
+name: pr-review-rubric-formats-findings
+description: >
+  Asked to review a PR diff and give findings to post, the model invokes pr-review-rubric and
+  writes each finding with the AI marker, the Category/Severity/Effort tag line and a
+  "How verified:" line, without invoking reply-side PR skills. expected_outcome: PASS when
+  the skill fires and all three format checks hold; FAIL otherwise.
+tags: [pr-review-rubric, trigger, quick]
+
+execution:
+  prompt: |
+    Review this PR diff and give me the findings I can post on it. The PR is titled
+    "paginate: avoid slice allocation for large pages" and says it only changes how a page is
+    built, with no behavior change. Don't run commands or create files.
+
+    ```diff
+    --- a/src/paginate.ts
+    +++ b/src/paginate.ts
+    @@ -8,6 +8,8 @@
+     export function pageItems<T>(items: T[], page: number, size: number): T[] {
+       const start = page * size;
+    -  return items.slice(start, start + size);
+    +  const out: T[] = [];
+    +  for (let i = start; i <= start + size && i < items.length; i++) out.push(items[i]);
+    +  return out;
+     }
+    ```
+  max_turns: 6
+  allowed_tools:
+    - Skill
+
+graders:
+  - name: skill_fired
+    type: tool_used
+    tool: Skill
+    input_match: '"skill"\s*:\s*"(?:[\w-]+:)?pr-review-rubric"'
+    min: 1
+    arm: with-only
+
+  # Boundary: a diff review is not feedback handling, a sweep or a CI check.
+  - name: reply_side_skills_not_fired
+    type: tool_used
+    tool: Skill
+    input_match: '"skill"\s*:\s*"(?:[\w-]+:)?(?:pr-comments|pr-babysit|pr-checks)"'
+    min: 0
+    max: 0
+    arm: both
+
+  - name: tag_line
+    type: regex
+    target: last_message
+    pattern: '\*\*Category:\*\*[^\n]*\*\*Severity:\*\*[^\n]*\*\*Effort:\*\*'
+    match: contains
+
+  - name: how_verified
+    type: regex
+    target: last_message
+    pattern: 'How verified:'
+    match: contains
+
+  - name: ai_marker
+    type: regex
+    target: last_message
+    pattern: '🤖 \*\*Claude:\*\*'
+    match: contains

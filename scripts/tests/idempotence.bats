@@ -35,18 +35,19 @@ setup() {
   printf '# comment\n\none.md\n' >"$FAKE_REPO/claude/conventions/DEFAULT_ENABLED"
   _add_plugin dfadler-agent-config
   _add_plugin worktree-core
+  _add_plugin memory-hygiene
   # Hook scripts for every row in scripts/plugin-hooks.sh, so setup registers
   # (and teardown deregisters) the full hook set in settings.json.
   local wt="$FAKE_REPO/plugins/worktree-core/skills/git-worktree-usage/scripts"
-  mkdir -p "$wt" "$FAKE_REPO/plugins/dfadler-agent-config/hooks/scripts"
+  mkdir -p "$wt" "$FAKE_REPO/plugins/memory-hygiene/hooks/scripts"
   local s
   for s in require-worktree-hook.sh check-worktree-symlinks-hook.sh prune-merged-worktrees-hook.sh; do
     printf '#!/usr/bin/env bash\nexit 0\n' >"$wt/$s"
     chmod +x "$wt/$s"
   done
   printf '#!/usr/bin/env bash\nexit 0\n' \
-    >"$FAKE_REPO/plugins/dfadler-agent-config/hooks/scripts/memory-hygiene-stop-hook.sh"
-  chmod +x "$FAKE_REPO/plugins/dfadler-agent-config/hooks/scripts/memory-hygiene-stop-hook.sh"
+    >"$FAKE_REPO/plugins/memory-hygiene/hooks/scripts/memory-hygiene-stop-hook.sh"
+  chmod +x "$FAKE_REPO/plugins/memory-hygiene/hooks/scripts/memory-hygiene-stop-hook.sh"
 }
 
 teardown() {

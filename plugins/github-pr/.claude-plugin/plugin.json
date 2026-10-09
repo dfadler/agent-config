@@ -1,0 +1,12 @@
+{
+  "$schema": "https://json.schemastore.org/claude-code-plugin-manifest.json",
+  "name": "github-pr",
+  "version": "1.0.0",
+  "description": "GitHub PR workflow skills: opening and merging PRs, babysitting open PRs, CI check triage, review-comment replies, a review rubric, and issue-reporter etiquette.",
+  "author": {
+    "name": "Dustin Fadler",
+    "url": "https://github.com/dfadler"
+  },
+  "homepage": "https://github.com/dfadler/agent-config",
+  "repository": "https://github.com/dfadler/agent-config"
+}
