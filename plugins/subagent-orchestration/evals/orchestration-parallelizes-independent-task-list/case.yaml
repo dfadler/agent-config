@@ -1,5 +1,6 @@
 # Run: claude plugin eval plugins/subagent-orchestration --case orchestration-parallelizes-independent-task-list --runs 3 --trust-plugin --no-publish
 # Shared run/grant facts: docs/contributing.md, "Plugin evals". No grant; reply-only.
+# Prompt uses three substantial tasks: for four trivial edits the skill rightly says do it yourself.
 # Positive half of the unordered-task-list rule: disjoint items go to parallel subagents.
 # Run with --ablation with-without; no skill_fired grader (reply-only).
 # Can fail: plans_parallel fails if the reply never proposes parallel/subagent dispatch;
@@ -15,10 +16,11 @@ tags: [subagent-orchestration, trigger, quick]
 
 execution:
   prompt: |
-    Please do all of these: (1) fix the typo in README.md, (2) add a unit test for
-    src/date.ts, (3) update the changelog in docs/CHANGELOG.md, (4) bump the lint config in
-    .eslintrc. They are unrelated to each other. How will you approach them? Three
-    sentences, no commands.
+    Please do all of these: (1) audit the ~40 files in src/api/ for every call to the
+    deprecated fetchLegacy and list what each needs to migrate, (2) investigate why this
+    month's CI runs got slower than last month's, (3) rewrite docs/CONTRIBUTING.md from what
+    the repo actually uses. They are unrelated to each other and touch different files. How
+    will you approach them? Three sentences, no commands.
   max_turns: 4
   allowed_tools:
     - Skill
@@ -34,7 +36,7 @@ graders:
   - name: names_disjoint
     type: regex
     target: last_message
-    pattern: 'independent|unrelated|disjoint|separate files|different files|no (?:shared|overlapping)'
+    pattern: 'independent|unrelated|disjoint|separate|distinct|different (?:files|areas)|isolated|(?:no|not|none)\b.{0,30}\b(?:shared|overlap|depend|conflict)|(?:don.t|doesn.t|do not|does not|won.t|never) (?:touch|share|overlap|depend|conflict)'
     flags: i
     match: contains
     weight: 0.5
