@@ -95,3 +95,10 @@ write_memory() {
   assert_failure
   assert_output_contains "unexpected argument"
 }
+
+@test "exits 4 when find is not on PATH" {
+  mkdir -p "$BATS_TEST_TMPDIR/emptybin"
+  run env PATH="$BATS_TEST_TMPDIR/emptybin" "$(command -v bash)" "$SCAN_SCRIPT"
+  [ "$status" -eq 4 ]
+  assert_output_contains "find is required"
+}
