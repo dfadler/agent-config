@@ -26,7 +26,7 @@ This agent is the second half of the collector/renderer split. The collector fet
 ## Step 0: Start render timing
 
 ```bash
-python3 {scripts_dir}/timing.py --start {outputs_dir}
+node {scripts_dir}/ts/gha-ci-audit/timing.ts --start {outputs_dir}
 ```
 
 ---
@@ -54,12 +54,12 @@ Run the analysis scripts against the saved data. Read their output — this is t
 
 ```bash
 # Run timing analysis (by conclusion and by event)
-python3 {scripts_dir}/analyze_runs.py {outputs_dir}/runs.json
-python3 {scripts_dir}/analyze_runs.py {outputs_dir}/runs.json --group-by event
+node {scripts_dir}/ts/gha-ci-audit/analyze-runs.ts {outputs_dir}/runs.json
+node {scripts_dir}/ts/gha-ci-audit/analyze-runs.ts {outputs_dir}/runs.json --group-by event
 
 # Run job analysis with step breakdown
-python3 {scripts_dir}/analyze_jobs.py {outputs_dir}/jobs.json
-python3 {scripts_dir}/analyze_jobs.py {outputs_dir}/jobs.json --steps
+node {scripts_dir}/ts/gha-ci-audit/analyze-jobs.ts {outputs_dir}/jobs.json
+node {scripts_dir}/ts/gha-ci-audit/analyze-jobs.ts {outputs_dir}/jobs.json --steps
 ```
 
 Read `{outputs_dir}/collect_summary.json` for repo name, primary workflow name, p50 run ID, and 30-day run count.
@@ -100,11 +100,11 @@ Every number in the report must trace back to a script output or a file in `outp
 ## Step 5: Finalize render timing and merge
 
 ```bash
-python3 {scripts_dir}/timing.py --end {outputs_dir}
-python3 {scripts_dir}/merge_timing.py {outputs_dir}
+node {scripts_dir}/ts/gha-ci-audit/timing.ts --end {outputs_dir}
+node {scripts_dir}/ts/gha-ci-audit/merge-timing.ts {outputs_dir}
 ```
 
-`merge_timing.py` writes `timing.json` one level up from `outputs/` (the eval root).
+`merge-timing.ts` writes `timing.json` one level up from `outputs/` (the eval root).
 
 ---
 

@@ -534,71 +534,6 @@ class TestGradeAssertion:
 
 
 # ---------------------------------------------------------------------------
-# merge_timing.py
-# ---------------------------------------------------------------------------
-
-
-class TestMergeTiming:
-    def setup_method(self) -> None:
-        self.mod = _load("merge_timing")
-
-    def _run_main(self, outputs_dir: Path) -> None:
-        """Invoke the script's main() with sys.argv patched."""
-        with patch.object(sys, "argv", ["merge_timing.py", str(outputs_dir)]):
-            self.mod.main()
-
-    def test_both_files(self, tmp_path: Path) -> None:
-        outputs_dir = tmp_path / "outputs"
-        outputs_dir.mkdir()
-        eval_root = tmp_path  # one level up from outputs_dir
-
-        collect = {
-            "duration_seconds": 30,
-            "start_iso": "2025-01-01T10:00:00Z",
-            "end_iso": "2025-01-01T10:00:30Z",
-        }
-        render = {
-            "duration_seconds": 20,
-            "start_iso": "2025-01-01T10:01:00Z",
-            "end_iso": "2025-01-01T10:01:20Z",
-        }
-        (outputs_dir / "collect_timing.json").write_text(json.dumps(collect))
-        (outputs_dir / "render_timing.json").write_text(json.dumps(render))
-
-        self._run_main(outputs_dir)
-
-        timing = json.loads((eval_root / "timing.json").read_text())
-        assert timing["collect_duration_seconds"] == 30
-        assert timing["render_duration_seconds"] == 20
-        assert timing["total_duration_seconds"] == 50
-        assert timing["collect_start_iso"] == "2025-01-01T10:00:00Z"
-
-    def test_collect_only(self, tmp_path: Path) -> None:
-        outputs_dir = tmp_path / "outputs"
-        outputs_dir.mkdir()
-        collect = {
-            "duration_seconds": 45,
-            "start_iso": "2025-01-01T10:00:00Z",
-            "end_iso": "2025-01-01T10:00:45Z",
-        }
-        (outputs_dir / "collect_timing.json").write_text(json.dumps(collect))
-
-        self._run_main(outputs_dir)
-
-        timing = json.loads((tmp_path / "timing.json").read_text())
-        assert timing["collect_duration_seconds"] == 45
-        assert timing["render_duration_seconds"] is None
-        assert timing["total_duration_seconds"] == 45
-
-    def test_no_files_exits_1(self, tmp_path: Path) -> None:
-        outputs_dir = tmp_path / "outputs"
-        outputs_dir.mkdir()
-        with pytest.raises(SystemExit) as exc:
-            self._run_main(outputs_dir)
-        assert exc.value.code == 1
-
-
-# ---------------------------------------------------------------------------
 # detect_primary_workflow.py
 # ---------------------------------------------------------------------------
 
@@ -727,61 +662,6 @@ class TestComputeWorkflowTiming:
             self.mod.main()
         out = capsys.readouterr().out.strip()
         assert out == "?  ?"
-
-
-# ---------------------------------------------------------------------------
-# find_p50_run.py
-# ---------------------------------------------------------------------------
-
-
-class TestFindP50Run:
-    def setup_method(self) -> None:
-        self.mod = _load("find_p50_run")
-
-    def test_picks_closest_to_median(
-        self, tmp_path: Path, capsys: pytest.CaptureFixture[str]
-    ) -> None:
-        runs = [
-            {
-                "id": 1,
-                "conclusion": "success",
-                "run_started_at": "2025-01-01T10:00:00Z",
-                "updated_at": "2025-01-01T10:02:00Z",
-                "created_at": "2025-01-01T10:00:00Z",
-            },
-            {
-                "id": 2,
-                "conclusion": "success",
-                "run_started_at": "2025-01-01T10:00:00Z",
-                "updated_at": "2025-01-01T10:04:00Z",
-                "created_at": "2025-01-01T10:00:00Z",
-            },
-            {
-                "id": 3,
-                "conclusion": "success",
-                "run_started_at": "2025-01-01T10:00:00Z",
-                "updated_at": "2025-01-01T10:06:00Z",
-                "created_at": "2025-01-01T10:00:00Z",
-            },
-        ]
-        f = tmp_path / "runs.json"
-        f.write_text(json.dumps(runs))
-        with patch.object(sys, "argv", ["find_p50_run.py", str(f)]):
-            self.mod.main()
-        out = capsys.readouterr().out.strip()
-        # median is 4 min → run id 2
-        assert "2" in out
-
-    def test_no_successful_runs_exits_1(self, tmp_path: Path) -> None:
-        runs = [{"id": 1, "conclusion": "failure"}]
-        f = tmp_path / "runs.json"
-        f.write_text(json.dumps(runs))
-        with (
-            patch.object(sys, "argv", ["find_p50_run.py", str(f)]),
-            pytest.raises(SystemExit) as exc,
-        ):
-            self.mod.main()
-        assert exc.value.code == 1
 
 
 # ---------------------------------------------------------------------------
