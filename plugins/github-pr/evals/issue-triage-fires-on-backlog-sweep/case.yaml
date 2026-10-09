@@ -1,0 +1,35 @@
+# Run: claude plugin eval plugins/github-pr --case issue-triage-fires-on-backlog-sweep --runs 3 --trust-plugin --no-publish
+# Shared run/grant facts: docs/contributing.md, "Plugin evals". No grant: Skill only.
+# Should-fire case: a sweep over open issues rather than one number.
+# Can fail: skill_fired fails if the description stops matching the sweep wording.
+schema_version: "1.1"
+name: issue-triage-fires-on-backlog-sweep
+description: >
+  Asked which open issues are ready, need info, or look like duplicates, the model invokes
+  issue-triage. expected_outcome: PASS when the skill fires; FAIL otherwise.
+tags: [issue-triage, trigger, quick]
+
+execution:
+  prompt: |
+    Which open issues on dfadler/example-app are ready, need info, or look like duplicates?
+    Do not run commands or post anything.
+  max_turns: 4
+  allowed_tools:
+    - Skill
+
+graders:
+  - name: skill_fired
+    type: tool_used
+    tool: Skill
+    input_match: '"skill"\s*:\s*"(?:[\w-]+:)?issue-triage"'
+    min: 1
+    arm: with-only
+
+  - name: addresses_ask
+    type: regex
+    target: last_message
+    pattern: 'duplicate'
+    flags: i
+    match: contains
+    arm: both
+    weight: 0.5

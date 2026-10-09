@@ -22,15 +22,15 @@ Collect workflow run data from the GitHub API, find patterns that cost time or m
 > - `scripts/launch_viewer.sh` — start the eval viewer
 
 > **Bundled analysis scripts** — **never write inline Python or ad-hoc shell analysis. Always call these scripts.** Every data-analysis step in this skill has a corresponding script; if you find yourself writing `python3 -c "..."` or a custom bash loop, stop and use the matching script instead.
-> - `scripts/analyze_runs.py` — duration stats + conclusion/event breakdown from runs JSON
-> - `scripts/analyze_jobs.py` — critical path, billable minutes, top jobs, optional step breakdown
+> - `scripts/ts/gha-ci-audit/analyze-runs.ts` — duration stats + conclusion/event breakdown from runs JSON
+> - `scripts/ts/gha-ci-audit/analyze-jobs.ts` — critical path, billable minutes, top jobs, optional step breakdown
 > - `scripts/fetch_workflow_stats.sh` — counts + avg/p90 for multiple workflow IDs in one pass
-> - `scripts/find_p50_run.py` — print the run ID of the successful run closest to median duration (use before analyze_jobs.py)
+> - `scripts/ts/gha-ci-audit/find-p50-run.ts` — print the run ID of the successful run closest to median duration (use before analyze-jobs.ts)
 > - `scripts/check_failures.py` — detect chronic failure patterns; writes `failure_check.json` (`chronic`/`failure_rate`/`details`) via `--output` (use in Step 6 pre-check)
 > - `scripts/write_assertions.py` — populate assertions from evals.json into eval_metadata.json (use in orchestrator Step 2; never use a heredoc or inline Python for this)
 > - `scripts/compute_workflow_timing.py` — read workflow runs JSON from stdin, output avg and p90 duration in minutes (used internally by fetch_workflow_stats.sh)
-> - `scripts/collect_pipeline.py` — the collect phase's implementation (workflow detection, p50 selection, chronic-failure check, collect_summary.json); `collect.sh` calls it once in-process rather than shelling out to it step by step. `find_p50_run.py`/`check_failures.py` above are thin CLI wrappers over this module's functions, kept as separate files because they're also called directly, outside `collect.sh`, by this skill's Steps 5/6. Not run directly otherwise.
-> - `scripts/timing.py` — shared `start()`/`end()` timing helpers used by both the collect phase (in-process) and the render phase (`--start`/`--end <outputs_dir>` CLI, see `agents/renderer.md`)
+> - `scripts/collect_pipeline.py` — the collect phase's implementation (workflow detection, p50 selection, chronic-failure check, collect_summary.json); `collect.sh` calls it once in-process rather than shelling out to it step by step. `check_failures.py` above is a thin CLI wrapper over this module's function, kept as a separate file because it's also called directly, outside `collect.sh`, by this skill's Step 6. Not run directly otherwise.
+> - `scripts/ts/gha-ci-audit/timing.ts` — render-phase `--start`/`--end <outputs_dir>` timing CLI (see `agents/renderer.md`); `scripts/ts/gha-ci-audit/merge-timing.ts <outputs_dir>` then folds collect and render timing into `timing.json`. `scripts/timing.py` is the Python counterpart `collect_pipeline.py` still imports for the collect phase (not run directly)
 > - `scripts/utils.py` — shared `parse_dt`/`duration_minutes`/`thirty_days_ago` helpers imported by the scripts above (not run directly)
 > - `scripts/common.sh` — shared `thirty_days_ago_iso` shell helper; sourced by `fetch_workflow_stats.sh` (not run directly)
 
@@ -78,12 +78,12 @@ For each other workflow, get counts the same way. This gives you the true volume
 
 ## Step 4: Sample recent runs for timing and outcome data
 
-Save runs to `outputs/runs.json` first, then analyze. **Always save to this path** — later steps (`find_p50_run.py`, `check_failures.py`) read it from there:
+Save runs to `outputs/runs.json` first, then analyze. **Always save to this path** — later steps (`find-p50-run.ts`, `check_failures.py`) read it from there:
 
 ```bash
 gh api "repos/{owner}/{repo}/actions/workflows/{id}/runs?per_page=100" > outputs/runs.json
-python3 /path/to/scripts/analyze_runs.py outputs/runs.json
-python3 /path/to/scripts/analyze_runs.py outputs/runs.json --group-by event
+node /path/to/scripts/ts/gha-ci-audit/analyze-runs.ts outputs/runs.json
+node /path/to/scripts/ts/gha-ci-audit/analyze-runs.ts outputs/runs.json --group-by event
 ```
 
 The script outputs: by-conclusion counts, avg/median/stdev per conclusion, p50/p90/p99/max percentiles, and duration buckets. **Use this output directly — never write inline Python to compute these numbers.**
@@ -101,15 +101,15 @@ Key metrics to capture from the output:
 
 ## Step 5: Find the critical path
 
-Use `find_p50_run.py` to pick the representative run — **do not write custom Python to find it**:
+Use `find-p50-run.ts` to pick the representative run — **do not write custom Python to find it**:
 
 ```bash
 # If you saved runs.json in Step 4:
-RUN_ID=$(python3 /path/to/scripts/find_p50_run.py outputs/runs.json | awk '{print $1}')
+RUN_ID=$(node /path/to/scripts/ts/gha-ci-audit/find-p50-run.ts outputs/runs.json | awk '{print $1}')
 
 # Or pipe directly:
 RUN_ID=$(gh api "repos/{owner}/{repo}/actions/workflows/{id}/runs?per_page=100" \
-  | python3 /path/to/scripts/find_p50_run.py | awk '{print $1}')
+  | node /path/to/scripts/ts/gha-ci-audit/find-p50-run.ts | awk '{print $1}')
 ```
 
 Then fetch jobs and analyze:
@@ -118,14 +118,14 @@ Then fetch jobs and analyze:
 gh api "repos/{owner}/{repo}/actions/runs/${RUN_ID}/jobs?per_page=100" > outputs/jobs.json
 
 # Standard analysis: critical path, billable minutes, top 10 jobs
-python3 /path/to/scripts/analyze_jobs.py outputs/jobs.json
+node /path/to/scripts/ts/gha-ci-audit/analyze-jobs.ts outputs/jobs.json
 
 # Include step-level breakdown for the critical-path job
-python3 /path/to/scripts/analyze_jobs.py outputs/jobs.json --steps
+node /path/to/scripts/ts/gha-ci-audit/analyze-jobs.ts outputs/jobs.json --steps
 
 # Filter to jobs matching a name pattern (e.g. find all shard jobs)
-python3 /path/to/scripts/analyze_jobs.py outputs/jobs.json --filter "Flow check"
-python3 /path/to/scripts/analyze_jobs.py outputs/jobs.json --filter "yarn build" --top 20
+node /path/to/scripts/ts/gha-ci-audit/analyze-jobs.ts outputs/jobs.json --filter "Flow check"
+node /path/to/scripts/ts/gha-ci-audit/analyze-jobs.ts outputs/jobs.json --filter "yarn build" --top 20
 ```
 
 The script outputs: wall-clock time, total billable job-minutes, parallelism factor, critical path job(s), runner type breakdown, and top N longest jobs. Use this output directly — no need to write your own Python.

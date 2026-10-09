@@ -3,10 +3,10 @@
 ## Adding something new
 
 1. Put it in the right place:
-   - A **skill** → a new directory under `plugins/dfadler-agent-config/skills/`,
+   - A **skill** → a new directory under `plugins/<plugin>/skills/`,
      containing a `SKILL.md`. A skill that another skill will call needs a
      `## Contract` section; see [`docs/skill-composition.md`](./skill-composition.md).
-   - An **agent** → a new `.md` file under `plugins/dfadler-agent-config/agents/`.
+   - An **agent** → a new `.md` file under `plugins/<plugin>/agents/`.
    - A **slash command** → a new `.md` file under `claude/commands/`.
    - A **convention** (global guidance for `CLAUDE.md`) → first check
      [`claude/conventions/README.md`](../claude/conventions/README.md). Most
@@ -34,16 +34,16 @@
      a plugin with an unmet dependency is silently dropped ([#450](https://github.com/dfadler/agent-config/issues/450)),
      so a plugin that needs evals must also load the dependency from inside its own
      directory through the case's `plugins:` field. If the plugin only pairs with
-     another (as `dfadler-agent-config` does with `worktree-core`), don't declare it:
+     another (as `github-pr` does with `worktree-core`), don't declare it:
      document the pairing in the plugin's README and, if hooks are involved, in
      `docs/hook-composition.md`.
-2. Name skills and agents plainly — `pr-babysit`, not `dfadler-agent-config-pr-babysit`
+2. Name skills and agents plainly — `pr-babysit`, not `github-pr-pr-babysit`
    — in both the directory/filename and the frontmatter `name:`. The plugin namespace
    already prevents collisions with a project's own skills, so a prefix here would just
    repeat it. Commands stay unprefixed for a different reason: `claude/commands/` is
    linked entry-by-entry into `~/.claude/commands/`, outside any plugin, so those names
    really are flat.
-3. Run `claude plugin validate plugins/dfadler-agent-config` — it checks the manifest
+3. Run `claude plugin validate plugins/<plugin>` — it checks the manifest
    and parses the frontmatter of every skill and agent inside.
 4. Run `bash scripts/ci.sh check` (see [Checks](#checks) below) before pushing.
 5. Commit and push. A new skill or agent inside an already-linked plugin needs no
@@ -75,7 +75,7 @@ places, and nothing enforces that they stay in sync:
 ### Why skills here don't declare `allowed-tools`
 
 An automated reviewer (SkillSpector, via CodeRabbit on #51) flags every `SKILL.md`
-under `plugins/dfadler-agent-config/skills/` for "unrestricted tool access" and
+under `plugins/*/skills/` for "unrestricted tool access" and
 recommends adding `allowed-tools` frontmatter as a remediation. This was decided
 deliberately in #63, not overlooked — recorded here so it isn't re-litigated by the
 next bot or reviewer that runs the same check.
@@ -172,7 +172,7 @@ step). A plugin-owned check uses `plugins/<plugin>/scripts/ts/check-foo.ts`. See
 
 Two checks exist because a linter can't express them. `scripts/ts/check-shell-set-flags.ts`
 enforces the `set -uo pipefail` opener from the global `CLAUDE.md`, which shellcheck
-has no rule for. `check-plugin-structure.sh` is the closest thing to a typechecker a
+has no rule for. `scripts/ts/check-plugin-structure.ts` is the closest thing to a typechecker a
 shell-and-Markdown repo can have: this repo's *product* is declarative metadata, and a
 skill whose `name:` drifts from its directory fails silently at load time rather than
 loudly in review — which is exactly what the plugin rename could have caused.

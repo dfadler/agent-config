@@ -1,13 +1,15 @@
 ---
 name: subagent-orchestration
 description: |
-  Use when about to spawn a sub-agent, fan out with the Workflow tool, or run a task
+  Use FIRST whenever the user hands over a list of two or more separate tasks ("do A, B
+  and C", numbered or in no order) that each need real exploration: it triages which
+  can run as parallel sub-agents and which must stay serial. Also use when about to
+  spawn a sub-agent, fan out with the Workflow tool, or run a task
   that would put large tool output (more than ~50 lines, or ~3 file reads) into the
   main context. Routes the work to the main context, a single Agent call, or a
   Workflow; defines the compact handback a delegated agent should return; and picks
   the model tier. Use for "should I delegate this", "which agent do I use", or
-  "keep my context small". Also use when handed a list of several independent tasks,
-  to decide which can run in parallel.
+  "keep my context small".
 license: MIT
 metadata:
   version: "1.0.0"
@@ -35,22 +37,24 @@ metadata:
 Open-ended search that will sweep many files goes to an `Agent` (the `Explore` agent
 fits); a targeted `grep` for a known symbol can stay in the main context.
 
-## Fan out an unordered task list
+## Parallelize an unordered task list
 
-Applies to a list of two or more distinct items ("fix X, add Y, update docs for Z"),
-not to one task with substeps.
+When the user hands over several separate things to do ("fix X, add Y, update docs for
+Z"), triage before starting item one:
 
-1. **Triage.** For each item note its file surface and whether it needs another
-   item's output.
-2. **Group.** Disjoint file surfaces and no ordering dependency make items parallel
-   candidates. Items that share files or depend on each other stay serial or go to one
-   agent. File-surface rules: the `git-worktree-usage` skill.
-3. **State the plan** in a line or two (what runs in parallel, what stays serial, why)
-   before dispatching.
-4. **Dispatch** the independent `Agent` calls in a single message, each in its own
-   worktree if it edits files, with the handback below and a model tier from below.
-5. **Cap the count.** Fan out only a few agents; batch small items into one agent
-   rather than one agent each. Trivial items stay in the main context.
+1. **Classify each item** by the files it touches and whether it needs another item's
+   output.
+2. **Parallel set:** items with disjoint file surfaces and no ordering dependency. Send
+   one `Agent` call per item in a single message, each in its own worktree if it edits
+   files. Items that share a file, or one that feeds another, stay serial or go to one
+   agent together.
+3. **Say the split in a line or two** (which run in parallel, which wait, why), then
+   dispatch. Don't ask permission for the obvious split.
+4. **Tier each agent** per "Pick the model tier"; a long list is not a reason to
+   upgrade them. Cap the fan-out at a handful of agents; batch the rest.
+
+Tiny items (a one-line edit) stay in the main context: spawning costs more than doing.
+A single task with substeps is not a task list; use the routing table above.
 
 ## Ask for a compact handback
 

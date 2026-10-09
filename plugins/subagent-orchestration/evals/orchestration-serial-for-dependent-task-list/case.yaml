@@ -37,6 +37,7 @@ graders:
     match: contains
     weight: 0.5
 
+
   # Polarity: keeps_serial also matches "in order ... then spawn parallel subagents".
   - name: no_parallel_plan
     type: regex
