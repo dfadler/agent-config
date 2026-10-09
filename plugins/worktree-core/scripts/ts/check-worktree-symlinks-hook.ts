@@ -1,4 +1,4 @@
-// SessionStart hook: run verify-worktree-symlinks.sh --fix and surface its
+// SessionStart hook: run verify-worktree-symlinks.ts --fix and surface its
 // output. Off by default (WORKTREE_SYMLINK_CHECK=on or worktree.symlinkCheck
 // "on"). Informational: always exits 0, even on internal failure.
 import { existsSync } from "node:fs";
@@ -13,12 +13,7 @@ import {
 
 const VERIFY = join(
   import.meta.dirname,
-  "..",
-  "..",
-  "skills",
-  "git-worktree-usage",
-  "scripts",
-  "verify-worktree-symlinks.sh",
+  "verify-worktree-symlinks.ts",
 );
 
 export const checkSymlinks = (ctx: HookCtx, script: string = VERIFY): number => {
@@ -30,7 +25,7 @@ export const checkSymlinks = (ctx: HookCtx, script: string = VERIFY): number => 
     valid: ["on", "off"],
   });
   if (mode !== "on" || !existsSync(script)) return 0;
-  const r = ctx.bash(script, ["--fix"]);
+  const r = ctx.script(script, ["--fix"]);
   const output = (r.stdout + r.stderr).trim();
   if (output !== "") ctx.out(`🔗 ${output}\n`);
   return 0;

@@ -20,8 +20,8 @@ export interface HookCtx {
   readonly readFile: ReadFile;
   readonly out: (text: string) => void;
   readonly err: (text: string) => void;
-  /** Run `bash <script> <args>`; stdout and stderr come back separately. */
-  readonly bash: (
+  /** Run `node <script.ts> <args>`; stdout and stderr come back separately. */
+  readonly script: (
     script: string,
     args: readonly string[],
   ) => { readonly stdout: string; readonly stderr: string };
@@ -37,8 +37,10 @@ export const realCtx = (): HookCtx => ({
   readFile: (path) => readFileSync(path, "utf8"),
   out: (text) => process.stdout.write(text),
   err: (text) => process.stderr.write(text),
-  bash: (script, args) => {
-    const r = spawnSync("bash", [script, ...args], { encoding: "utf8" });
+  script: (script, args) => {
+    const r = spawnSync(process.execPath, [script, ...args], {
+      encoding: "utf8",
+    });
     return { stdout: r.stdout, stderr: r.stderr };
   },
 });

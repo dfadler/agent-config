@@ -47,7 +47,7 @@ const makeCtx = (f: Fake) => {
     },
     out: (t) => out.push(t),
     err: (t) => err.push(t),
-    bash: (script, args) => {
+    script: (script, args) => {
       bashCalls.push([script, ...args]);
       return f.bashOut ?? { stdout: "", stderr: "" };
     },
@@ -262,10 +262,14 @@ describe("realCtx", () => {
     const c = realCtx();
     expect(c.git(["--version"]).status).toBe(0);
     expect(c.git(["no-such-subcommand"]).status).not.toBe(0);
-    expect(c.bash("-c", ["echo hi; echo oops >&2"])).toEqual({
-      stdout: "hi\n",
-      stderr: "oops\n",
-    });
+    const dir = mkdtempSync(join(tmpdir(), "wt-script-"));
+    const js = join(dir, "s.js");
+    writeFileSync(
+      js,
+      'console.log(process.argv[2]); console.error("oops");',
+    );
+    expect(c.script(js, ["hi"])).toEqual({ stdout: "hi\n", stderr: "oops\n" });
+    rmSync(dir, { recursive: true, force: true });
     expect(c.readFile(import.meta.filename)).toMatch(/realCtx/);
   });
 });

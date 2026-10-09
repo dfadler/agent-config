@@ -2,7 +2,7 @@
 //
 // Mode: WORKTREE_AUTO_PRUNE env var (0/false/no/off = nudge only, 1/true/yes/on
 // = auto-remove), then worktree.autoPrune (true/false) in settings, else do
-// nothing. See prune-merged-worktrees.sh for the safety envelope.
+// nothing. See prune-merged-worktrees.ts for the safety envelope.
 // Informational: always exits 0, even on internal failure.
 import { existsSync } from "node:fs";
 import { join } from "node:path";
@@ -14,15 +14,7 @@ import {
   type HookCtx,
 } from "./worktree-hook-lib.ts";
 
-const PRUNE = join(
-  import.meta.dirname,
-  "..",
-  "..",
-  "skills",
-  "git-worktree-usage",
-  "scripts",
-  "prune-merged-worktrees.sh",
-);
+const PRUNE = join(import.meta.dirname, "prune-merged-worktrees.ts");
 
 /** A JSON boolean becomes "on"/"off"; absent or any other value is "unset". */
 const boolSetting = (settings: unknown): string => {
@@ -43,7 +35,7 @@ export const pruneMerged = (ctx: HookCtx, script: string = PRUNE): number => {
     valid: ["on", "off"],
   });
   if (mode === "" || !existsSync(script)) return 0;
-  const r = ctx.bash(script, [mode === "on" ? "--auto" : "--hook"]);
+  const r = ctx.script(script, [mode === "on" ? "--auto" : "--hook"]);
   ctx.out(r.stdout);
   return 0;
 };
