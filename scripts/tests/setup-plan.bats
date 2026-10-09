@@ -30,13 +30,13 @@ setup() {
   echo "## Convention one" >"$FAKE_REPO/claude/conventions/one.md"
   printf '# comment\n\none.md\n' >"$FAKE_REPO/claude/conventions/DEFAULT_ENABLED"
   local p
-  for p in dfadler-agent-config worktree-core; do
+  for p in memory-hygiene worktree-core; do
     mkdir -p "$FAKE_REPO/plugins/$p/.claude-plugin"
     printf '{"name":"%s"}\n' "$p" >"$FAKE_REPO/plugins/$p/.claude-plugin/plugin.json"
   done
   CLAUDE="$HOME/.claude"
   WT_HOOKS="$CLAUDE/skills/worktree-core/skills/git-worktree-usage/scripts"
-  MH_HOOK="$CLAUDE/skills/dfadler-agent-config/hooks/scripts/memory-hygiene-stop-hook.sh"
+  MH_HOOK="$CLAUDE/skills/memory-hygiene/hooks/scripts/memory-hygiene-stop-hook.sh"
 }
 
 teardown() {
@@ -97,7 +97,7 @@ hook_lines() {
     printf 'link\t%s\t%s\n' "$FAKE_REPO/claude/commands/demo.md" "$CLAUDE/commands/demo.md"
     printf 'link\t%s\t%s\n' "$FAKE_REPO/claude/commands/other.md" "$CLAUDE/commands/other.md"
     printf 'mkdir\t%s\n' "$CLAUDE/skills"
-    printf 'link\t%s\t%s\n' "$FAKE_REPO/plugins/dfadler-agent-config" "$CLAUDE/skills/dfadler-agent-config"
+    printf 'link\t%s\t%s\n' "$FAKE_REPO/plugins/memory-hygiene" "$CLAUDE/skills/memory-hygiene"
     printf 'link\t%s\t%s\n' "$FAKE_REPO/plugins/worktree-core" "$CLAUDE/skills/worktree-core"
     hook_lines
   )"
@@ -149,19 +149,19 @@ hook_lines() {
   lacks "link${T}$FAKE_REPO/claude/commands/demo.md"
   lacks "link${T}$FAKE_REPO/plugins/worktree-core"
   has "link${T}$FAKE_REPO/claude/commands/other.md"
-  has "link${T}$FAKE_REPO/plugins/dfadler-agent-config"
+  has "link${T}$FAKE_REPO/plugins/memory-hygiene"
   # Hooks of the skipped plugin are not registered; the other plugin's are.
   lacks "register-hook${T}PreToolUse"
   has "register-hook${T}Stop${T}$MH_HOOK"
 }
 
 @test "plan: --include keeps only what it names and says 'not in --include'" {
-  plan --include=other,dfadler-agent-config
+  plan --include=other,memory-hygiene
   [ "$status" -eq 0 ]
   has "skip-plugin${T}worktree-core${T}not in --include"
   has "skip-command${T}$CLAUDE/commands/demo.md${T}not in --include${T}demo"
   has "link${T}$FAKE_REPO/claude/commands/other.md"
-  has "link${T}$FAKE_REPO/plugins/dfadler-agent-config"
+  has "link${T}$FAKE_REPO/plugins/memory-hygiene"
   lacks "link${T}$FAKE_REPO/claude/commands/demo.md"
   lacks "link${T}$FAKE_REPO/plugins/worktree-core"
 }
@@ -169,7 +169,7 @@ hook_lines() {
 @test "plan: --include and --skip selections are the complement of each other" {
   plan --skip=demo,worktree-core
   skip_plan="$output"
-  plan --include=other,dfadler-agent-config
+  plan --include=other,memory-hygiene
   # Same actions; only the wording of the informational reason differs.
   [ "${output//not in --include/--skip}" = "$skip_plan" ]
 }
@@ -189,7 +189,7 @@ hook_lines() {
 
 @test "plan: a hook that is already registered is not planned again" {
   install
-  rm "$CLAUDE/skills/dfadler-agent-config"
+  rm "$CLAUDE/skills/memory-hygiene"
   python3 - "$CLAUDE/settings.json" "$MH_HOOK" <<'PY'
 import json, sys
 path, cmd = sys.argv[1], sys.argv[2]
@@ -201,7 +201,7 @@ PY
   [ "$status" -eq 0 ]
   has "register-hook${T}Stop${T}$MH_HOOK"
   lacks "register-hook${T}PreToolUse"
-  has "link${T}$FAKE_REPO/plugins/dfadler-agent-config${T}$CLAUDE/skills/dfadler-agent-config"
+  has "link${T}$FAKE_REPO/plugins/memory-hygiene${T}$CLAUDE/skills/memory-hygiene"
 }
 
 @test "plan: a stale symlink this repo owns is replaced; a foreign or real one is only warned about" {
@@ -220,11 +220,11 @@ PY
 
 @test "plan: a superseded plugin link is unlinked and then linked fresh, not 'relinked'" {
   mkdir -p "$CLAUDE/skills"
-  ln -s "$FAKE_REPO/plugins/worktree-core" "$CLAUDE/skills/dfadler-agent-config"
+  ln -s "$FAKE_REPO/plugins/worktree-core" "$CLAUDE/skills/memory-hygiene"
   plan
   [ "$status" -eq 0 ]
-  has "unlink${T}superseded${T}$CLAUDE/skills/dfadler-agent-config${T}$FAKE_REPO/plugins/worktree-core"
-  has "link${T}$FAKE_REPO/plugins/dfadler-agent-config${T}$CLAUDE/skills/dfadler-agent-config"
+  has "unlink${T}superseded${T}$CLAUDE/skills/memory-hygiene${T}$FAKE_REPO/plugins/worktree-core"
+  has "link${T}$FAKE_REPO/plugins/memory-hygiene${T}$CLAUDE/skills/memory-hygiene"
   lacks "relink"
 }
 

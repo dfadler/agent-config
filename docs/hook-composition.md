@@ -53,7 +53,7 @@ hook passes in, not the mechanism itself.
 | `check-worktree-symlinks-hook.sh` | `SessionStart` | `WORKTREE_SYMLINK_CHECK=on\|off` | `worktree.symlinkCheck: "on"\|"off"` | off (skipped entirely) |
 | `memory-hygiene-stop-hook.sh` | `Stop` | `MEMORY_HYGIENE_REMINDER=on\|off` | `env.MEMORY_HYGIENE_REMINDER: "on"` (settings.json's built-in `env` key — no bespoke key; see below) | off (skipped entirely) |
 
-`memory-hygiene-stop-hook.sh` belongs to a different plugin (`dfadler-agent-config`,
+`memory-hygiene-stop-hook.sh` belongs to a different plugin (`memory-hygiene`,
 not `worktree-core`) and does not call `resolve_enable_mode` — it hand-rolls its
 own on/off check. `Stop` fires once per turn, not once per session
 ([hooks docs](https://code.claude.com/docs/en/hooks#stop)), so the hook
