@@ -1,0 +1,44 @@
+# Run: claude plugin eval plugins/fetch-execute-guide --case fetch-execute-stays-quiet-on-lockfile-install --runs 3 --trust-plugin --no-publish
+# Shared run/grant facts: docs/contributing.md, "Plugin evals". No grant; reply-only.
+# Should-not-fire near-miss: adding a dependency to the project's own manifest and lockfile.
+# SKILL.md "What does NOT count" names this: it shares the npm/pnpm vocabulary with a fetch-and-
+# execute install but is an already-reviewed dependency change. Regression guard, delta 0 by
+# design. All free, quick.
+# Can fail: no_fetch_execute_skill_fired fails if the skill over-triggers on a package-manager
+# command; names_the_command fails if the reply does not give an install command.
+schema_version: "1.1"
+name: fetch-execute-stays-quiet-on-lockfile-install
+description: >
+  Adding date-fns to a project's package.json and committed lockfile is an ordinary dependency
+  change, so fetch-execute-guide must not fire; the reply gives the install command.
+  expected_outcome: PASS when the skill is not invoked and the reply names a package-manager
+  add or install command; FAIL when the skill is invoked or the reply gives no such command.
+  Regression guard: Delta 0 by design.
+tags: [fetch-execute-guide, trigger, quick]
+
+execution:
+  prompt: |
+    This project already lists its dependencies in package.json and commits pnpm-lock.yaml.
+    I want to add date-fns as a normal dependency. Don't run anything; answer in one or two
+    sentences with the exact command I should use.
+  max_turns: 6
+  allowed_tools:
+    - Skill
+
+graders:
+  - name: no_fetch_execute_skill_fired
+    type: tool_used
+    tool: Skill
+    input_match: '"skill"\s*:\s*"(?:[\w-]+:)?fetch-execute-guide"'
+    min: 0
+    max: 0
+    arm: both
+
+  # Completion check: a baseline also answers this, so it is a guard, not a delta.
+  - name: names_the_command
+    type: regex
+    target: last_message
+    pattern: '(pnpm add|pnpm install|npm install|npm i|yarn add)\s+date-fns'
+    flags: i
+    match: contains
+    arm: both
