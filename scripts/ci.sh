@@ -99,16 +99,16 @@ KCOV_EXCLUDE=/scripts/tests,/scripts/ci.sh
 
 # Python's own coverage floor, the sibling of COVERAGE_MIN (dfadler/
 # agent-config#208). Same discipline: the first honest measurement rounded
-# DOWN. 52 is `coverage-py` measured on macOS (Python 3.14.7, pytest==9.0.3,
-# pytest-cov==7.1.0 pinned in requirements-dev.txt) after the gha-ci-audit
-# scripts and their tests were wired in; the measurement is
+# DOWN. 33 is `coverage-py` (33.95%) now that detached-terminal is the only
+# Python left under test (it was 52 while the gha-ci-audit scripts, since
+# ported to TypeScript, were measured too); the measurement is
 # platform-independent (coverage.py, unlike kcov, instruments Python
 # everywhere). It is low because agent_term.py's CLI/daemon dispatch
 # (cmd_start, serve, bind_control_socket, the socket loop) is exercised only
 # by real usage, not by the unit tests — a real gap, not a measurement error.
 # Lowering this takes a deliberate commit; raising it is welcome.
 COVERAGE_PY_DIR=coverage-py
-COVERAGE_PY_MIN=49
+COVERAGE_PY_MIN=33
 
 # What lands in the denominator — the Python mirror of the kcov comment:
 #
