@@ -1,0 +1,4 @@
+schema_version: "1"
+grants:
+  shell-script-reviewer-reports-without-editing:
+    - "Write"
