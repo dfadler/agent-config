@@ -138,7 +138,7 @@ only via the generic Agent-tool selection a session makes from their
 descriptions, one at a time, not fanned out from a command. This finding
 still holds with three agents in the repo instead of one. The issue's own text names
 `pr-review-rubric` as an example to check for fan-out, but
-`plugins/dfadler-agent-config/skills/pr-review-rubric/SKILL.md` is a
+`plugins/github-pr/skills/pr-review-rubric/SKILL.md` is a
 **methodology/rubric skill**, not an orchestrator — it explicitly says "This
 skill is the rubric and the output contract — it does not decide *when* to
 run or *where* to post comments; the orchestrating prompt that invoked you
@@ -232,7 +232,7 @@ such repo's CI config is in scope here.
 
 **Confirmed: nothing found that polls needlessly.** The only skill in this
 repo that mentions `/loop` or polling-style operation is `pr-babysit`
-(`plugins/dfadler-agent-config/skills/pr-babysit/SKILL.md`), and it's
+(`plugins/github-pr/skills/pr-babysit/SKILL.md`), and it's
 designed against exactly the waste this section of the issue asks about: it
 runs **one pass and stops** (`SKILL.md:20-22`, "a single invocation is
 exactly one pass"), and it ends every pass with an explicit pacing hint for

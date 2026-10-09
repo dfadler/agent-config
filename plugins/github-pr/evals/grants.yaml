@@ -1,0 +1,8 @@
+schema_version: "1"
+grants:
+  pr-checks-uses-prefetched-snapshot:
+    - "Bash(gh *)"
+  pr-comments-uses-prefetched-threads:
+    - "Bash(gh *)"
+  pr-babysit-delegates-to-pr-checks-and-pr-comments:
+    - "Bash(gh *)"

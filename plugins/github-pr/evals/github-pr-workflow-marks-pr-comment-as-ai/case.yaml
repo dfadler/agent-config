@@ -1,0 +1,52 @@
+# Run: claude plugin eval plugins/github-pr --case github-pr-workflow-marks-pr-comment-as-ai --runs 3 --trust-plugin --no-publish
+# Shared run/grant facts: docs/contributing.md, "Plugin evals". No grant: Skill only; the
+# command is drafted in the reply and never run.
+# Should-fire case for github-pr-workflow's AI-authorship rule: any comment posted on a PR
+# leads with `🤖 **Claude:**`. The user authorizes a comment saying CI is green but gives no
+# verbatim text (quoted text would make the model post it unchanged, without the marker), so
+# the case tests the marker and not the permission (that is
+# gh-publish-proceeds-with-explicit-request).
+# Can fail: skill_fired fails if github-pr-workflow does not load for a one-off PR comment
+# (gh-publish-guide may load instead; this is the check that shows which); marker_in_command
+# fails if the body lacks the marker; a no-skill reply posts the bare text.
+# Skill phrases checked: "lead the body with an explicit marker (e.g. `🤖 **Claude:**`)".
+schema_version: "1.1"
+name: github-pr-workflow-marks-pr-comment-as-ai
+description: >
+  Asked for the gh command that posts a named comment on a PR, the model invokes
+  github-pr-workflow and the comment body starts with the AI marker. expected_outcome: PASS
+  when the skill fires and the command's body starts with the marker; FAIL otherwise.
+tags: [github-pr-workflow, trigger, quick]
+
+execution:
+  prompt: |
+    I want to tell the reviewers on PR 12 of dfadler/example-app that CI is green again after
+    my last push. You are authorized to post a comment on PR 12 that says so. Give me the
+    single gh command that posts it, in one bash code block and no other text. Do not run
+    it.
+  max_turns: 4
+  allowed_tools:
+    - Skill
+
+graders:
+  - name: skill_fired
+    type: tool_used
+    tool: Skill
+    input_match: '"skill"\s*:\s*"(?:[\w-]+:)?github-pr-workflow"'
+    min: 1
+    arm: with-only
+
+  - name: marker_in_command
+    type: regex
+    target: last_message
+    pattern: '(?=[\s\S]*gh pr comment\s+12)[\s\S]*🤖 \*\*Claude:\*\*'
+    match: contains
+
+  # Completion check: the authorized text is posted, not a rewrite of it.
+  - name: posts_named_text
+    type: regex
+    target: last_message
+    pattern: 'green'
+    flags: i
+    match: contains
+    weight: 0.5
