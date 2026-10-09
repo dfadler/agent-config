@@ -1,8 +1,10 @@
 ---
 name: subagent-orchestration
 description: |
-  Use when the user gives several separate things to do at once (decide which can run
-  as parallel sub-agents), when about to spawn a sub-agent, fan out with the Workflow tool, or run a task
+  Use FIRST whenever the user hands over a list of two or more separate tasks ("do A, B
+  and C", numbered or in no order) that each need real exploration: it triages which
+  can run as parallel sub-agents and which must stay serial. Also use when about to
+  spawn a sub-agent, fan out with the Workflow tool, or run a task
   that would put large tool output (more than ~50 lines, or ~3 file reads) into the
   main context. Routes the work to the main context, a single Agent call, or a
   Workflow; defines the compact handback a delegated agent should return; and picks
