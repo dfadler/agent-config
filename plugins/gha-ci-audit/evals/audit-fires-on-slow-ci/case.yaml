@@ -8,7 +8,7 @@
 # Can fail: skill_fired fails if the description stops matching a plain "CI is slow" prompt.
 # Without the skill a generic plan names `gh run list` or the Actions UI, not the skill's
 # bundled scripts, so bundled_scripts_named scores 0. Skill phrases checked: "Bundled analysis
-# scripts" (analyze_runs.py, analyze_jobs.py, find_p50_run.py, fetch_workflow_stats.sh),
+# scripts" (analyze-runs.ts, analyze-jobs.ts, find-p50-run.ts, fetch_workflow_stats.sh),
 # Step 5 "billable minutes". The prompt says "money", not "billable minutes", so the reply has
 # to introduce that term. Unverified: whether a no-plugin reply says it by habit; if it does,
 # names_billable_minutes is a weak signal and the first run should show it.
@@ -44,7 +44,7 @@ graders:
   - name: bundled_scripts_named
     type: regex
     target: last_message
-    pattern: 'analyze_jobs\.py|analyze_runs\.py|find_p50_run\.py|fetch_workflow_stats\.sh'
+    pattern: 'analyze[-_]jobs\.(ts|py)|analyze[-_]runs\.(ts|py)|find[-_]p50[-_]run\.(ts|py)|fetch_workflow_stats\.sh'
     match: contains
 
   # Result: Step 5 separates wall-clock time from billable job-minutes.
