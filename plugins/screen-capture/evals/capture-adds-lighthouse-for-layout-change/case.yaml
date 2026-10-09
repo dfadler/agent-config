@@ -1,0 +1,49 @@
+# Run: claude plugin eval plugins/screen-capture --case capture-adds-lighthouse-for-layout-change --runs 3 --trust-plugin --no-publish
+# Shared run/grant facts: docs/contributing.md, "Plugin evals". No grant; reply-only.
+# Should-fire case for capture's responsive-change rule (SKILL.md: a manual resize pass across
+# breakpoints plus a Lighthouse pass, see screen-capture:lighthouse). Complements
+# capture-wants-before-after-for-ui-change, which pins the screenshots and widths but not
+# Lighthouse. Ported from closed PR 609; measured there at with 1.00 / without 0.67, Delta +0.33.
+# Run with --ablation with-without; no skill_fired grader (reply-only prompt, description still
+# shapes the reply).
+# Can fail: before_after, resize_pass or lighthouse fail when the matching check is missing.
+# The prompt names none of them.
+schema_version: "1.1"
+name: capture-adds-lighthouse-for-layout-change
+description: >
+  Asked what to verify before opening a PR that makes a dashboard grid reflow on narrow screens,
+  the reply lists before/after screenshots, a resize pass and a Lighthouse pass.
+  expected_outcome: PASS when all three free checks match; FAIL when any is missing.
+tags: [screen-capture, capture, trigger, quick]
+
+execution:
+  prompt: |
+    My PR rewrites the CSS grid of our dashboard page so the cards reflow into one column on
+    narrow screens. I am about to open it. List the verification steps you do first and what the
+    PR description must contain. Reply with a short bullet list and no other text. Do not run
+    anything.
+  max_turns: 4
+  allowed_tools:
+    - Skill
+
+graders:
+  - name: before_after
+    type: regex
+    target: last_message
+    pattern: 'before[\s/-]*(?:and|&)?[\s/-]*after'
+    flags: i
+    match: contains
+
+  - name: resize_pass
+    type: regex
+    target: last_message
+    pattern: 'resize|breakpoint|viewport'
+    flags: i
+    match: contains
+
+  - name: lighthouse
+    type: regex
+    target: last_message
+    pattern: 'lighthouse'
+    flags: i
+    match: contains
