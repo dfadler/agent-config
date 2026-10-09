@@ -1,6 +1,6 @@
 /**
  * The repo's shell exit-code taxonomy, as typed constants. Same numbers and
- * meanings as claude/conventions/shell-script-hygiene.md so a TypeScript check
+ * meanings as plugins/shell-script-hygiene/SKILL.md so a TypeScript check
  * and the shell script it replaces are interchangeable to callers. The gap
  * between 7 and 20 is deliberate headroom; do not invent codes without
  * extending that list first.

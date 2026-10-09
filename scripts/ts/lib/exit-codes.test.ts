@@ -15,7 +15,7 @@ import {
 } from "./exit-codes.ts";
 
 describe("exit codes", () => {
-  it("match the shell taxonomy in shell-script-hygiene.md", () => {
+  it("match the shell taxonomy in the shell-script-hygiene skill", () => {
     expect([
       EXIT_OK,
       EXIT_FAILURE,

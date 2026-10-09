@@ -11,7 +11,7 @@ tools: Read, Grep, Glob, Bash
 # Parent tier (inherit), not sonnet/haiku: judging whether a rubric is concrete or
 # a prompt set covers a trigger boundary is interpretation, and a cheaper model
 # missing a real finding costs a paid eval run. See
-# claude/conventions/cheap-model-delegation.md. `tools` is an allowlist; Edit and
+# plugins/subagent-orchestration/SKILL.md. `tools` is an allowlist; Edit and
 # Write are absent on purpose. Supported plugin-agent fields:
 # https://code.claude.com/docs/en/sub-agents
 model: inherit

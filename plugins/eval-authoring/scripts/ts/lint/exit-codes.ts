@@ -1,5 +1,5 @@
 /**
- * The repo's exit-code taxonomy (claude/conventions/shell-script-hygiene.md),
+ * The repo's exit-code taxonomy (plugins/shell-script-hygiene/SKILL.md),
  * restated here because a plugin is installed on its own and must not import
  * from the repo's `scripts/ts/lib/` (docs/testing.md). Same numbers, only the
  * codes this CLI uses.

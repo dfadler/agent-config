@@ -37,5 +37,5 @@ now.
 
 **Recommendation:** borrow engram's conventions (topic-style `name:` slugs, the
 end-of-session summary habit — see
-[`claude/conventions/memory-hygiene.md`](../claude/conventions/memory-hygiene.md)),
+[`memory-hygiene` skill](../plugins/memory-hygiene/skills/memory-hygiene/SKILL.md)),
 don't adopt engram itself — pending the user's call on a hands-on trial.

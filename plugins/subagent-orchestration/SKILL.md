@@ -58,9 +58,31 @@ passed steps, progress noise, and repeated lines.
 - **Parent tier:** judgment, synthesis, cross-file reasoning, open-ended
   investigation. Default when unsure.
 
-The fuller reasoning lives in the opt-in `cheap-model-delegation.md` and
-`heavy-workflow-cost.md` conventions, which this skill is meant to absorb in a
-follow-up; until then they stay as they are.
+Cheap-model overrides go through the `Agent` tool's `model` parameter (or an agent
+definition's `model:` field). What qualifies: Explore-style lookups ("find where X is
+defined"), mechanical formatting or lint-style checks against a fixed checklist, and
+other work with objective, pattern-matchable success criteria. Keep the parent tier for
+security/architecture review, debugging, and design decisions: a cheaper model missing a
+real finding costs more than the tokens saved. When unclear, default to the parent's
+model. This repo's own reviewer agents show the spread: `shell-script-reviewer` (fixed
+checklist, `haiku`), `docs-staleness-checker` (judges prose against code, `sonnet`),
+`adversarial-reviewer` (deep cross-file reasoning, `opus`).
+
+## When a heavy fan-out is worth its cost
+
+A multi-agent fan-out (`Workflow`, `/code-review ultra`, a cloud multi-agent review) is
+an order of magnitude or more expensive than a direct answer or one `Agent` call; one
+`deep-research` run has burned 8.1M subagent tokens across 105 agent calls. Reserve it
+for questions that are both high-stakes (expensive to get wrong, or gating other work)
+and high-uncertainty (not knowable from existing knowledge, a targeted search, or one
+agent's read of the files). Breadth across many independent sources, or a review that
+needs several angles reconciled, are the concrete shapes.
+
+Default lighter when the answer is findable (a file, a doc, a grep), the task is bounded
+to known files or one sub-problem, or "run deep-research" is a reflex. Scale the cost
+tier to what is riding on the answer; when unsure, start cheap and escalate only if it
+comes back insufficient. This is a judgment call, not a hard gate (cost audit:
+`docs/usage-optimization.md`).
 
 The opt-in `context-preservation.md` convention carries the delegation threshold
 (40%, with a turn-count fallback) that triggers this skill.

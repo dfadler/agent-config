@@ -1,0 +1,12 @@
+{
+  "$schema": "https://json.schemastore.org/claude-code-plugin-manifest.json",
+  "name": "shell-script-hygiene",
+  "version": "1.0.0",
+  "description": "Baseline for non-trivial bash scripts: strict flags, shellcheck/shfmt, justified disables, --help, named exit codes, hermetic tests.",
+  "author": {
+    "name": "Dustin Fadler",
+    "url": "https://github.com/dfadler"
+  },
+  "homepage": "https://github.com/dfadler/agent-config",
+  "repository": "https://github.com/dfadler/agent-config"
+}

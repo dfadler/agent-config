@@ -48,17 +48,17 @@ Full reasoning for each verdict, plus the duplication check and follow-up list:
 | `why-question-shape.md` | Opt-in include |
 | `prefer-real-chrome.md` | Opt-in include (advisory; the deny rule it names is the enforced form) |
 | `context-preservation.md` | Opt-in include (threshold rule; mechanics in the `subagent-orchestration` skill) |
-| `visual-verification.md` | Merge into skill |
-| `concurrency.md` | Merge into skill |
-| `shell-script-hygiene.md` | Convert to skill |
-| `dependency-audits.md` | Convert to skill |
-| `issue-tracker.md` | Convert to skill |
+| `visual-verification.md` (removed) | Merged into skill `screen-capture:capture` |
+| `concurrency.md` (removed) | Merged into skill `git-worktree-usage` |
+| `shell-script-hygiene.md` (removed) | Now the `shell-script-hygiene` skill |
+| `dependency-audits.md` (removed) | Now the `dependency-audits` skill |
+| `issue-tracker.md` (removed) | Now the `issue-tracker` skill |
 | `testing-sabotage-check.md` | Folded into `vitest:test-conventions`; stays an opt-in include for non-Vitest repos |
-| `cheap-model-delegation.md` + `heavy-workflow-cost.md` | Merge into one skill |
-| `memory-hygiene.md` | Convert to skill |
+| `cheap-model-delegation.md` + `heavy-workflow-cost.md` (removed) | Merged into skill `subagent-orchestration` |
+| `memory-hygiene.md` (removed) | Now the `memory-hygiene` skill |
 
-The conversions and merges are tracked as follow-ups, not done yet. A file keeps
-working as an opt-in include until its skill exists.
+The conversions and merges are done (#608). Rows marked "removed" no longer exist as
+include files; their content lives in the named skill.
 
 `vite-plugin.md` was added after the classification above was first written and
 was missed. Its trigger is a code *shape* (an object literal with a `name` field

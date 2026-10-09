@@ -10,7 +10,7 @@ there's no way to tell which one did it. So:
   also verified. Same rule for anything that shells out to a GUI: pass the flag that
   keeps it in the background, or use the headless mode if it has one.
 - Prefer tooling that never draws a window at all. `qlmanage -t` and
-  `chrome --headless` already take no focus, so the visual-verification flow above is
+  `chrome --headless` already take no focus, so the visual-verification flow (`screen-capture:capture`) is
   fine as written — the rule is about not regressing it.
 - **Never `open -a Terminal` (or drive Terminal.app via `osascript`) to get a shell.**
   For an interactive TUI/REPL an agent must drive and read back, use the
