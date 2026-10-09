@@ -1,0 +1,38 @@
+# Run: claude plugin eval plugins/playwright --case playwright-stays-quiet-on-api-explanation --runs 3 --trust-plugin --no-publish
+# Shared run/grant facts: docs/contributing.md, "Plugin evals". No grant: Skill only.
+# Should-not-fire case for the playwright skill: a conceptual question about a Playwright API
+# shares its vocabulary but asks for no script or recording.
+# Regression guard: a no-plugin arm passes by default, Delta about 0 by design.
+# Can fail: skill_not_fired fails if playwright loads for a one-sentence explanation;
+# explains_goto fails if the reply does not say goto navigates to a URL.
+schema_version: "1.1"
+name: playwright-stays-quiet-on-api-explanation
+description: >
+  A one-sentence question about what Playwright's page.goto does must not invoke the
+  playwright skill. expected_outcome: regression guard, Delta about 0 by design. PASS when
+  the skill does not fire and the reply says it navigates to a URL; FAIL when it fires.
+tags: [playwright, trigger, quick]
+
+execution:
+  prompt: |
+    In one sentence, what does Playwright's page.goto(url) do? Reply with the sentence only.
+  max_turns: 4
+  allowed_tools:
+    - Skill
+
+graders:
+  - name: skill_not_fired
+    type: tool_used
+    tool: Skill
+    input_match: '"skill"\s*:\s*"(?:[\w-]+:)?playwright"'
+    min: 0
+    max: 0
+    arm: both
+
+  - name: explains_goto
+    type: regex
+    target: last_message
+    pattern: 'navigat|load|open'
+    flags: i
+    match: contains
+    arm: both

@@ -20,9 +20,6 @@ automatically, with no per-project copy to keep in sync.
   - `commands/` — slash commands, symlinked individually into `~/.claude/commands/`.
 - `plugins/` — one directory per plugin. Each plugin's directory name matches its
   manifest `name`, which is what makes skills resolve as `<plugin-name>:<skill>`.
-  - `dfadler-agent-config/` — the main plugin: cross-project agents and skills
-    (PR shepherding, PR review rubric, adversarial code reviewer). Pairs with
-    `worktree-core` for git-worktree-usage (a companion, not a declared dependency).
   - `accessibility-skills/` — WCAG 2.2 code review for web markup and CSS, graded
     with an evidence-basis/severity system.
   - `detached-terminal/` — run and drive an interactive terminal (TUI, REPL,
@@ -38,6 +35,9 @@ automatically, with no per-project copy to keep in sync.
     with hidden-text warnings, so third-party text is treated as data. Needs Node 22.18+.
   - `gha-ci-audit/` — audit GitHub Actions usage for any repository: workflow
     volumes, critical-path analysis, cost/performance improvement opportunities.
+  - `playwright/` — skill and agent for headless Playwright scripting: `.webm`
+    recording, real key presses, Storybook play functions, frame extraction.
+    Needs Node and the `playwright` package.
   - `screen-capture/` — screenshot (PNG) and walkthrough video (MP4) capture,
     before/after comparison, Lighthouse, and attach skills for PR/issue visual
     verification. Uses `gh-attach-image` to upload results.
@@ -89,7 +89,7 @@ Install everything **except** specific features (`--skip`):
 Install **only** specific features, leaving everything else out (`--include`):
 
 ```bash
-./setup.sh --include=dfadler-agent-config,worktree-core
+./setup.sh --include=github-pr,worktree-core
 ```
 
 Preview what a run would do, without changing anything (`--dry-run` is an alias; it
@@ -153,7 +153,7 @@ for the rtk conflict `--fix` currently resolves.
 ## Adding something new
 
 Skills, agents, and slash commands each have a specific place to go, a naming
-convention (no `dfadler-agent-config-` prefix — the plugin namespace already prevents
+convention (no `<plugin>-` prefix — the plugin namespace already prevents
 collisions), and a `bash scripts/ci.sh check` pass before pushing. See
 [`docs/contributing.md`](docs/contributing.md) for the full checklist, why skills
 here don't declare `allowed-tools`, the `bash scripts/ci.sh check` target reference, and this

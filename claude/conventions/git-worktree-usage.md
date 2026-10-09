@@ -11,5 +11,5 @@ parallelize by file surface, the repo-wide `git stash` collision hazard,
 branch naming, CI/coverage gotchas after a merge, catching a branch that
 already has an open PR up to a moved `main` via merge (not rebase), how to
 escalate a merge conflict, and how to split an already-written PR — see the
-`dfadler-agent-config:git-worktree-usage` skill.
+`worktree-core:git-worktree-usage` skill.
 

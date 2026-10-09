@@ -35,7 +35,8 @@ two are opposite selections over the same names, so combining them in one
 run is rejected rather than guessing which one wins.
 
   --install-deps     Also install a missing dependency (python3 -m pip
-                     install --user pyte), when the interpreter allows it.
+                     install --user pyte), when the interpreter allows it, and
+                     playwright-cli (npm install -g @playwright/cli, Node 22).
   --fix              Also apply other known fixes the companion checks
                      detect, instead of only reporting them (currently: rtk's
                      exclude_commands config — see docs/companion-plugins.md).
@@ -45,8 +46,8 @@ run is rejected rather than guessing which one wins.
                      to unlink if a previous run linked them). A feature is
                      either a slash command's basename (e.g. "adversarial-
                      review", from claude/commands/adversarial-review.md)
-                     or a plugin directory name (e.g. "dfadler-agent-config",
-                     from plugins/dfadler-agent-config/) — skipping a plugin
+                     or a plugin directory name (e.g. "worktree-core",
+                     from plugins/worktree-core/) — skipping a plugin
                      removes it as a whole (skills, agents, and hooks
                      together; hooks also stay off by default per-project
                      regardless — see docs/hook-composition.md). Run with

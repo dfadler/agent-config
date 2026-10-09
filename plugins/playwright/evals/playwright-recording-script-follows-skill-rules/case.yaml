@@ -1,0 +1,57 @@
+# Run: claude plugin eval plugins/playwright --case playwright-recording-script-follows-skill-rules --runs 3 --trust-plugin --no-publish
+# Shared run/grant facts: docs/contributing.md, "Plugin evals". No grant: Skill only; inputs are
+# pasted and nothing runs.
+# Delta case for the playwright skill's recording rules: close the context before saveAs,
+# a real keyboard press, and a userAgent override for a UA-sniffing app. A default model often
+# saves the video before closing the context, or dispatches a synthetic event.
+# Can fail: skill_fired if the description stops matching; close_before_save if saveAs comes
+# before the context close; real_key_press if no keyboard.press; sets_user_agent if no
+# userAgent option; Delta is only known after a two-arm run.
+# Skill phrases checked: "`await ctx.close()` first, then `await video.saveAs(path)`",
+# "`page.keyboard.press('Tab')` sends a real browser key event", "set `userAgent` on
+# `browser.newContext`".
+schema_version: "1.1"
+name: playwright-recording-script-follows-skill-rules
+description: >
+  A request for a Playwright script that records a UA-sniffing page in headless Chromium
+  makes the model invoke the playwright skill and follow its recording rules.
+  expected_outcome: PASS when the skill fires and the script closes the context before
+  saveAs, presses Tab with page.keyboard.press and sets userAgent; FAIL otherwise.
+tags: [playwright, trigger, quick]
+
+execution:
+  prompt: |
+    Write me a Node ESM script using Playwright that records a video of my app at
+    http://localhost:3000 in headless Chromium: load the page, wait a moment, press Tab once,
+    wait again, then save the recording to ./out/chromium.webm. The app only renders its
+    real UI for a normal Chrome user agent. Reply with the script in one code block and no
+    other text. Do not run anything.
+  max_turns: 4
+  allowed_tools:
+    - Skill
+
+graders:
+  - name: skill_fired
+    type: tool_used
+    tool: Skill
+    input_match: '"skill"\s*:\s*"(?:[\w-]+:)?playwright"'
+    min: 1
+    arm: with-only
+
+  - name: close_before_save
+    type: regex
+    target: last_message
+    pattern: '(?:ctx|context)\.close\(\)[\s\S]*\.saveAs\('
+    match: contains
+
+  - name: real_key_press
+    type: regex
+    target: last_message
+    pattern: 'keyboard\.press\(\s*["'']Tab["'']'
+    match: contains
+
+  - name: sets_user_agent
+    type: regex
+    target: last_message
+    pattern: 'userAgent\s*:'
+    match: contains
