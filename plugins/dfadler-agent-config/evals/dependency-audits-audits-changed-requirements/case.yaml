@@ -1,0 +1,37 @@
+# Run: claude plugin eval plugins/dfadler-agent-config --case dependency-audits-audits-changed-requirements --runs 3 --trust-plugin --no-publish
+# Shared run/grant facts: docs/contributing.md, "Plugin evals". No grant: Skill only; nothing runs.
+# Should-fire half of the dependency-audits boundary. The skill's Python row points pip-audit at
+# the changed file (`-r requirements.txt`, `.`, `--locked`); a bare `pip-audit` audits the active
+# environment instead, which is the common no-plugin answer.
+# Can fail: skill_fired if the description stops matching a manifest change; names_input if the
+# reply gives a bare `pip-audit`.
+schema_version: "1.1"
+name: dependency-audits-audits-changed-requirements
+description: >
+  After bumping a pin in requirements.txt the model invokes dependency-audits and names a
+  pip-audit command that targets the changed file. expected_outcome: PASS when the skill fires and
+  the command carries -r requirements.txt, `.` or --locked; FAIL on a bare pip-audit.
+tags: [dependency-audits, trigger, quick]
+
+execution:
+  prompt: |
+    In a Python repo I just bumped `requests==2.31.0` to `requests==2.32.3` in `requirements.txt`
+    and nothing else changed. Before I call the change done, which exact command do you run to
+    audit it? Reply with one code block holding that command and no other text. Do not run it.
+  max_turns: 4
+  allowed_tools:
+    - Skill
+
+graders:
+  - name: skill_fired
+    type: tool_used
+    tool: Skill
+    input_match: '"skill"\s*:\s*"(?:[\w-]+:)?dependency-audits"'
+    min: 1
+    arm: with-only
+
+  - name: names_input
+    type: regex
+    target: last_message
+    pattern: 'pip-audit\s+(?:-r\s+requirements\.txt|--locked\s+\.|\.)(?:\s|`|$)'
+    match: contains

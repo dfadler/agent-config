@@ -1,0 +1,38 @@
+# Run: claude plugin eval plugins/dfadler-agent-config --case testing-sabotage-check-stays-quiet-on-matcher-question --runs 3 --trust-plugin --no-publish
+# Shared run/grant facts: docs/contributing.md, "Plugin evals". No grant: Skill only.
+# Should-not-fire half: a Vitest matcher question shares "test" and "Vitest" vocabulary with the
+# skill but asks nothing about whether a test would catch a regression. Regression guard: a
+# no-plugin arm passes by default, Delta about 0 by design.
+# Can fail: skill_not_fired if testing-sabotage-check over-triggers on a matcher question;
+# answers if the reply does not contrast the two matchers.
+schema_version: "1.1"
+name: testing-sabotage-check-stays-quiet-on-matcher-question
+description: >
+  A toBe versus toEqual question must not invoke testing-sabotage-check. expected_outcome:
+  regression guard, Delta about 0 by design. PASS when the skill does not fire and the reply
+  mentions both matchers; FAIL when it fires.
+tags: [testing-sabotage-check, trigger, quick]
+
+execution:
+  prompt: |
+    In one or two sentences, what is the difference between `toBe` and `toEqual` in Vitest? Do
+    not run anything.
+  max_turns: 4
+  allowed_tools:
+    - Skill
+
+graders:
+  - name: skill_not_fired
+    type: tool_used
+    tool: Skill
+    input_match: '"skill"\s*:\s*"(?:[\w-]+:)?testing-sabotage-check"'
+    min: 0
+    max: 0
+    arm: both
+
+  - name: answers
+    type: regex
+    target: last_message
+    pattern: 'toBe[\s\S]*toEqual|toEqual[\s\S]*toBe'
+    match: contains
+    arm: both

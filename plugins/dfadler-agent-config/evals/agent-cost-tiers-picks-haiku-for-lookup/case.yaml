@@ -1,0 +1,40 @@
+# Run: claude plugin eval plugins/dfadler-agent-config --case agent-cost-tiers-picks-haiku-for-lookup --runs 3 --trust-plugin --no-publish
+# Shared run/grant facts: docs/contributing.md, "Plugin evals". No grant: Skill only; nothing runs.
+# Should-fire half of the agent-cost-tiers boundary. A pure file/symbol lookup is the skill's
+# first "qualifies for a cheap-model override" example, so the answer is haiku. A no-plugin model
+# may reach the same answer, so Delta can be small; the Skill check is an unscored indicator.
+# Can fail: skill_fired if the description stops matching a model-override decision; picks_haiku
+# if the reply names another tier.
+schema_version: "1.1"
+name: agent-cost-tiers-picks-haiku-for-lookup
+description: >
+  Choosing a model override for a pure symbol-lookup subagent makes the model invoke
+  agent-cost-tiers and pick haiku. expected_outcome: PASS when the skill fires and the reply
+  starts HAIKU; FAIL otherwise.
+tags: [agent-cost-tiers, trigger, quick]
+
+execution:
+  prompt: |
+    I am defining a subagent whose only job is to find every file that references the function
+    `parseConfig` and list the paths. No analysis, no edits. Which `model:` override should I
+    set on it?
+
+    Start your reply with exactly one word on its own line: HAIKU, SONNET or OPUS. Then one
+    sentence of reason. Do not run anything.
+  max_turns: 4
+  allowed_tools:
+    - Skill
+
+graders:
+  - name: skill_fired
+    type: tool_used
+    tool: Skill
+    input_match: '"skill"\s*:\s*"(?:[\w-]+:)?agent-cost-tiers"'
+    min: 1
+    arm: with-only
+
+  - name: picks_haiku
+    type: regex
+    target: last_message
+    pattern: '^\W*HAIKU\b'
+    match: contains

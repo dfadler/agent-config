@@ -1,0 +1,37 @@
+# Run: claude plugin eval plugins/dfadler-agent-config --case issue-tracker-labels-before-creating-github-issue --runs 3 --trust-plugin --no-publish
+# Shared run/grant facts: docs/contributing.md, "Plugin evals". No grant: Skill only; nothing runs.
+# Should-fire half of the issue-tracker boundary. The skill's GitHub Issues branch says to check
+# `gh label list` before `gh issue create`; a no-plugin reply usually goes straight to create.
+# Can fail: skill_fired if the description stops matching issue creation; label_before_create if
+# the label check is missing or comes after the create command.
+schema_version: "1.1"
+name: issue-tracker-labels-before-creating-github-issue
+description: >
+  Filing a bug in a user-owned repo with no Issue tracker section makes the model invoke
+  issue-tracker and check labels before creating the issue. expected_outcome: PASS when the skill
+  fires and `gh label list` precedes `gh issue create`; FAIL otherwise.
+tags: [issue-tracker, trigger, quick]
+
+execution:
+  prompt: |
+    I want to file a bug in my repo `dfadler/tinyqueue`: `pop()` raises IndexError on an empty
+    queue. The repo is owned by my personal user account, and its CLAUDE.md has no
+    `## Issue tracker` section. List the exact shell commands you would run, in order, to file it.
+    Reply with one code block and no other text. Do not run anything.
+  max_turns: 4
+  allowed_tools:
+    - Skill
+
+graders:
+  - name: skill_fired
+    type: tool_used
+    tool: Skill
+    input_match: '"skill"\s*:\s*"(?:[\w-]+:)?issue-tracker"'
+    min: 1
+    arm: with-only
+
+  - name: label_before_create
+    type: regex
+    target: last_message
+    pattern: 'gh label list[\s\S]*gh issue create'
+    match: contains

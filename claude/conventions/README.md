@@ -49,7 +49,7 @@ Skill conversions completed in [issue #608](https://github.com/dfadler/agent-con
 | `why-question-shape.md` | Opt-in include |
 | `prefer-real-chrome.md` | Opt-in include (advisory; the deny rule it names is the enforced form) |
 | `context-preservation.md` | Opt-in include (threshold rule; mechanics in the `subagent-orchestration` skill) |
-| `testing-sabotage-check.md` | Opt-in include for non-Vitest repos; also `dfadler-agent-config:testing-sabotage-check` |
+| `testing-sabotage-check.md` | Converted → `dfadler-agent-config:testing-sabotage-check` |
 | `visual-verification.md` | Converted → `screen-capture:visual-verification` |
 | `concurrency.md` | Converted → `worktree-core:git-worktree-usage` (appended) |
 | `shell-script-hygiene.md` | Converted → `dfadler-agent-config:shell-script-hygiene` |

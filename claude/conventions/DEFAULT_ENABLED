@@ -22,9 +22,9 @@ vite-plugin.md
 #   prefer-real-chrome.md
 #   tooling-over-manual-scanning.md
 #   context-preservation.md
-#   testing-sabotage-check.md  (opt-in for non-Vitest repos; also see dfadler-agent-config:testing-sabotage-check)
 #
 # Converted to skills (no longer opt-in includes — use the skill instead):
+#   testing-sabotage-check.md → dfadler-agent-config:testing-sabotage-check
 #   shell-script-hygiene.md   → dfadler-agent-config:shell-script-hygiene
 #   dependency-audits.md      → dfadler-agent-config:dependency-audits
 #   issue-tracker.md          → dfadler-agent-config:issue-tracker

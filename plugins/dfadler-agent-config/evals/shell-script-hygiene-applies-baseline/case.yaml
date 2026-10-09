@@ -1,0 +1,50 @@
+# Run: claude plugin eval plugins/dfadler-agent-config --case shell-script-hygiene-applies-baseline --runs 3 --trust-plugin --no-publish
+# Shared run/grant facts: docs/contributing.md, "Plugin evals". No grant: Skill only; the script
+# is written in the reply and never run.
+# Should-fire half of the shell-script-hygiene boundary. Pins three skill-specific rules a
+# no-plugin script usually misses: `set -uo pipefail` first, `-h/--help` handled before other
+# arguments, and a named EXIT_* constant instead of a bare `exit 1`.
+# Can fail: skill_fired if the description stops matching a new script; strict_flags,
+# help_flag or named_exit if the matching rule is missing.
+schema_version: "1.1"
+name: shell-script-hygiene-applies-baseline
+description: >
+  Asked for a small bash script, the model invokes shell-script-hygiene and writes strict flags,
+  a --help handler and a named exit code. expected_outcome: PASS when the skill fires and all
+  three free checks match; FAIL otherwise.
+tags: [shell-script-hygiene, trigger, quick]
+
+execution:
+  prompt: |
+    Write `backup.sh`, a bash script that takes one argument, a directory, and tars it into
+    `/tmp/backup.tar.gz`. If the directory does not exist it must fail with an error message.
+    Reply with one bash code block and no other text. Do not run anything.
+  max_turns: 4
+  allowed_tools:
+    - Skill
+
+graders:
+  - name: skill_fired
+    type: tool_used
+    tool: Skill
+    input_match: '"skill"\s*:\s*"(?:[\w-]+:)?shell-script-hygiene"'
+    min: 1
+    arm: with-only
+
+  - name: strict_flags
+    type: regex
+    target: last_message
+    pattern: 'set -e?uo pipefail'
+    match: contains
+
+  - name: help_flag
+    type: regex
+    target: last_message
+    pattern: '-h\|--help|--help\|-h|-h\)|--help\)'
+    match: contains
+
+  - name: named_exit
+    type: regex
+    target: last_message
+    pattern: 'EXIT_(?:USAGE|FAILURE|CONFIG|DEPENDENCY)'
+    match: contains

@@ -1,0 +1,41 @@
+# Run: claude plugin eval plugins/dfadler-agent-config --case dependency-audits-stays-quiet-on-readme-edit --runs 3 --trust-plugin --no-publish
+# Shared run/grant facts: docs/contributing.md, "Plugin evals". No grant: Skill only.
+# Should-not-fire half: a README typo fix in a repo full of manifests shares "dependency" and
+# "audit" vocabulary with the skill but touches no manifest or lockfile. Regression guard: a
+# no-plugin arm passes by default, Delta about 0 by design.
+# Can fail: skill_not_fired if dependency-audits over-triggers on a docs-only change; says_no if
+# the reply asks for an audit anyway.
+schema_version: "1.1"
+name: dependency-audits-stays-quiet-on-readme-edit
+description: >
+  A README typo fix must not invoke dependency-audits. expected_outcome: regression guard, Delta
+  about 0 by design. PASS when the skill does not fire and the reply starts NO; FAIL when it fires.
+tags: [dependency-audits, trigger, quick]
+
+execution:
+  prompt: |
+    My Node repo has a package.json and a package-lock.json, but my only change in this PR is
+    fixing the typo "recieve" to "receive" in README.md. Do I need to run a dependency audit
+    before calling it done?
+
+    Start your reply with exactly one word on its own line: YES or NO. Then one sentence of
+    reason. Do not run anything.
+  max_turns: 4
+  allowed_tools:
+    - Skill
+
+graders:
+  - name: skill_not_fired
+    type: tool_used
+    tool: Skill
+    input_match: '"skill"\s*:\s*"(?:[\w-]+:)?dependency-audits"'
+    min: 0
+    max: 0
+    arm: both
+
+  - name: says_no
+    type: regex
+    target: last_message
+    pattern: '^\W*NO\b'
+    match: contains
+    arm: both
