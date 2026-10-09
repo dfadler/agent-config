@@ -1,0 +1,49 @@
+# Run: claude plugin eval plugins/subagent-orchestration --case orchestration-parallelizes-independent-task-list --runs 3 --trust-plugin --no-publish
+# Shared run/grant facts: docs/contributing.md, "Plugin evals". No grant; reply-only.
+# Positive half of the task-list rule (#621): independent items on disjoint files run in parallel.
+# Run with --ablation with-without. skill_fired is with-arm only and not scored (diagnostic).
+# Tasks are deliberately large: small edits are done in the main context by design, so tiny
+# tasks make this case fail for the right reason. Baseline already parallelizes big tasks, so
+# Delta is small (+0.08 at 8 runs); the with arm is the signal.
+# Can fail: plans_parallel fails if the reply never proposes parallel/concurrent subagents;
+# names_independence (half weight) fails if it never ties that to independence/disjoint files.
+schema_version: "1.1"
+name: orchestration-parallelizes-independent-task-list
+description: >
+  Given an unordered list of three independent tasks on different files, the reply plans
+  parallel subagents and says why. expected_outcome: PASS when it proposes parallel
+  agents citing independence; FAIL when it plans to work through them one by one.
+tags: [subagent-orchestration, trigger, quick]
+
+execution:
+  prompt: |
+    Here's what I'd like done, in no particular order: (1) audit every call site of the
+    deprecated `fetchLegacy` API across src/api/ (about 40 files) and list what needs
+    migrating, (2) investigate why the CI pipeline got 3x slower this month using the
+    workflow logs, (3) rewrite docs/CONTRIBUTING.md from scratch based on how the repo is
+    actually used. How will you tackle these? Three sentences, no commands.
+  max_turns: 4
+  allowed_tools:
+    - Skill
+
+graders:
+  - name: skill_fired
+    type: tool_used
+    tool: Skill
+    input_match: '"skill"\s*:\s*"(?:[\w-]+:)?subagent-orchestration"'
+    min: 1
+
+  - name: plans_parallel
+    type: regex
+    target: last_message
+    pattern: '(?=.*(?:parallel|concurrent|simultaneous|at the same time|at once|launched together|together))(?=.*agent)'
+    flags: is
+    match: contains
+
+  - name: names_independence
+    type: regex
+    target: last_message
+    pattern: 'independent|disjoint|unrelated|separate|different (?:files|things|parts)|no (?:dependenc|overlap)|none (?:of them )?(?:needs|depends)|don.t (?:touch|share|depend|overlap|need)'
+    flags: i
+    match: contains
+    weight: 0.5
