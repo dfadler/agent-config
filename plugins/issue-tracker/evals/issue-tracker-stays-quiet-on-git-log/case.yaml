@@ -1,0 +1,40 @@
+# Run: claude plugin eval plugins/issue-tracker --case issue-tracker-stays-quiet-on-git-log --trust-plugin --no-publish
+# Shared run/grant facts: docs/contributing.md, "Plugin evals". No grant needed (Skill only).
+# Should-not-fire near-miss: mentions "issue" only as a word inside a commit message and
+# asks for a plain git command; no issue is created, referenced or commented on.
+# Regression guard: delta 0 by design.
+# Can fail: the skill firing fails no_tracker_skill; a reply without git log fails
+# gives_git_log.
+schema_version: "1.1"
+name: issue-tracker-stays-quiet-on-git-log
+description: >
+  A request for the git command that lists commits whose message mentions "issue" must not
+  invoke issue-tracker. expected_outcome: PASS when the skill is not invoked and the reply
+  gives a git log command; FAIL otherwise. Regression guard: Delta 0 by design.
+tags: [issue-tracker, trigger, quick]
+
+execution:
+  prompt: |
+    Give me the single git command that lists the commits on this branch whose message
+    contains the word "issue". Don't run anything; reply with only the command.
+  max_turns: 6
+  allowed_tools:
+    - Skill
+
+graders:
+  - name: no_tracker_skill
+    type: tool_used
+    tool: Skill
+    input_match: '"skill"\s*:\s*"(?:[\w-]+:)?issue-tracker"'
+    min: 0
+    max: 0
+    arm: both
+
+  # Completion check, tautological for a baseline.
+  - name: gives_git_log
+    type: regex
+    target: last_message
+    pattern: 'git log[^\n]*grep'
+    match: contains
+    arm: both
+    weight: 0.5

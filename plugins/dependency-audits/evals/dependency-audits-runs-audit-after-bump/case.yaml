@@ -1,0 +1,52 @@
+# Run: claude plugin eval plugins/dependency-audits --case dependency-audits-runs-audit-after-bump --runs 3 --trust-plugin --no-publish
+# Shared run/grant facts: docs/contributing.md, "Plugin evals". No grant needed (Skill only,
+# the user asks for the plan, nothing is run).
+# Should-fire behavior case: a lockfile-touching bump. A no-plugin model tends to run tests
+# and commit; the skill adds the ecosystem audit (`npm audit` / `pnpm audit`) before "done" and
+# a note about high/critical findings in the commit/PR (delta expected).
+# Sabotage map: names_audit_tool checks "run the audit tool ... `npm audit`"; reports_findings
+# checks "say so in the commit/PR".
+# Can fail: a plan with no audit command fails names_audit_tool; skill_fired fails if the
+# description stops matching package.json / lockfile.
+schema_version: "1.1"
+name: dependency-audits-runs-audit-after-bump
+description: >
+  Asked to bump lodash in a Node project and finish, the model invokes dependency-audits and
+  its plan includes an npm/pnpm/yarn audit step and says new high or critical findings go in
+  the commit or PR. expected_outcome: PASS when the skill fires and the plan names an audit
+  command; FAIL otherwise.
+tags: [dependency-audits, behavior, quick]
+
+execution:
+  prompt: |
+    In this Node project (npm, package-lock.json) I bumped lodash from 4.17.15 to 4.17.21 in
+    package.json and ran npm install, so both files changed. Don't run anything. List, as
+    numbered commands, every step you would take before telling me this change is done and
+    committing it.
+  max_turns: 6
+  allowed_tools:
+    - Skill
+
+graders:
+  # Steps. Indicator in a two-arm run, scored only with the plugin.
+  - name: skill_fired
+    type: tool_used
+    tool: Skill
+    input_match: '"skill"\s*:\s*"(?:[\w-]+:)?dependency-audits"'
+    min: 1
+    arm: with-only
+
+  # Result.
+  - name: names_audit_tool
+    type: regex
+    target: last_message
+    pattern: '(?:npm|pnpm|yarn(?: npm)?)\s+audit'
+    match: contains
+
+  - name: reports_findings
+    type: regex
+    target: last_message
+    pattern: '\b(?:high|critical)\b[\s\S]{0,120}(?:commit|PR|pull request)|(?:commit|PR|pull request)[\s\S]{0,120}\b(?:high|critical)\b'
+    flags: i
+    match: contains
+    weight: 1.0

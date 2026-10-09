@@ -1,0 +1,49 @@
+# Run: claude plugin eval plugins/dependency-audits --case dependency-audits-stays-quiet-on-readme-edit --trust-plugin --no-publish
+# Shared run/grant facts: docs/contributing.md, "Plugin evals". No grant needed (Skill only).
+# Should-not-fire near-miss: the prompt mentions "dependencies" and package.json as prose, but
+# only README text changes; no manifest or lockfile is touched ("only fires when a dependency
+# file is actually touched"). Regression guard: delta 0 by design.
+# Can fail: the skill firing fails no_audit_skill; an audit command in the reply fails
+# no_audit_command.
+schema_version: "1.1"
+name: dependency-audits-stays-quiet-on-readme-edit
+description: >
+  Fixing a typo in the README's dependencies section, with package.json untouched, must not
+  invoke dependency-audits or add an audit step. expected_outcome: PASS when the skill is not
+  invoked and the reply has no audit command; FAIL otherwise. Regression guard: Delta 0 by
+  design.
+tags: [dependency-audits, trigger, quick]
+
+execution:
+  prompt: |
+    The Dependencies section of README.md says "Requires Node 22 and the lodsh package".
+    Fix the typo (it should be lodash) in the README only; package.json and the lockfile are
+    unchanged. Don't run anything; reply with only the corrected sentence.
+  max_turns: 6
+  allowed_tools:
+    - Skill
+
+graders:
+  - name: no_audit_skill
+    type: tool_used
+    tool: Skill
+    input_match: '"skill"\s*:\s*"(?:[\w-]+:)?dependency-audits"'
+    min: 0
+    max: 0
+    arm: both
+
+  - name: no_audit_command
+    type: regex
+    target: last_message
+    pattern: '\b(?:npm|pnpm|pip|cargo|yarn)[- ]audit\b|govulncheck'
+    match: not_contains
+    arm: both
+
+  # Completion check, tautological for a baseline.
+  - name: fixes_typo
+    type: regex
+    target: last_message
+    pattern: 'lodash package'
+    match: contains
+    arm: both
+    weight: 0.5

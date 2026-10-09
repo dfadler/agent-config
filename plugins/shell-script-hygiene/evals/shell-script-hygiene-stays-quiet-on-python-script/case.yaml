@@ -1,0 +1,40 @@
+# Run: claude plugin eval plugins/shell-script-hygiene --case shell-script-hygiene-stays-quiet-on-python-script --trust-plugin --no-publish
+# Shared run/grant facts: docs/contributing.md, "Plugin evals". No grant needed (Skill only).
+# Should-not-fire near-miss: "script" and "backup" vocabulary, but the request is Python, not
+# bash. Regression guard: delta 0 by design.
+# Sabotage map: no_shell_skill checks the description scope ("bash scripts", `*.sh`).
+# Can fail: the skill firing on a Python request fails no_shell_skill; a reply that is not
+# Python fails is_python.
+schema_version: "1.1"
+name: shell-script-hygiene-stays-quiet-on-python-script
+description: >
+  A request for a Python script that copies a directory must not invoke shell-script-hygiene.
+  expected_outcome: PASS when the skill is not invoked and the reply is Python (shutil);
+  FAIL otherwise. Regression guard: Delta 0 by design.
+tags: [shell-script-hygiene, trigger, quick]
+
+execution:
+  prompt: |
+    Write backup.py: a Python script that takes a directory path as its only argument and
+    copies it to /var/backups/. Print the complete script in one code block and nothing else.
+  max_turns: 6
+  allowed_tools:
+    - Skill
+
+graders:
+  - name: no_shell_skill
+    type: tool_used
+    tool: Skill
+    input_match: '"skill"\s*:\s*"(?:[\w-]+:)?shell-script-hygiene"'
+    min: 0
+    max: 0
+    arm: both
+
+  # Completion check, tautological for a baseline.
+  - name: is_python
+    type: regex
+    target: last_message
+    pattern: 'shutil|import '
+    match: contains
+    arm: both
+    weight: 0.5
