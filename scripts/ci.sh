@@ -77,7 +77,7 @@ NODE_STAMP=node_modules/.installed
 # was the first honest measurement (70.24%); it was lowered to 67 after the
 # gh-attach-image upload script (well covered by bats) moved to TypeScript and
 # left the denominator, leaving 67.99%; and to 66 after the worktree-core hooks
-# (also well covered by bats) moved to TypeScript, leaving 66.38%. All are rounded DOWN — kcov line coverage
+# and prune/verify scripts (also well covered by bats) moved to TypeScript, leaving 66.38%. All are rounded DOWN — kcov line coverage
 # jitters by fractions of a point as scripts and tests change shape, so the
 # floor sits just under the measurement rather than exactly on it. Measured
 # on ubuntu-24.04 with kcov 42 and bats at the commit shell.yml pins. Lowering

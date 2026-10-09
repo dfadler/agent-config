@@ -108,7 +108,7 @@ worktrees, they gate on being inside a git repo, and they run only locally
 (a cloud/remote session has no worktrees to check). Neither can fail a
 session — both catch their own errors and always exit 0.
 
-- **`check-worktree-symlinks-hook.ts`** runs `verify-worktree-symlinks.sh
+- **`check-worktree-symlinks-hook.ts`** runs `verify-worktree-symlinks.ts
   --fix`: for a project that has adopted the `worktree.symlinkDirectories`
   convention described above, confirms each configured directory's symlink
   in the current worktree still resolves to the main checkout, and repairs
@@ -122,7 +122,7 @@ session — both catch their own errors and always exit 0.
   `worktree.symlinkDirectories` — the underlying script reads that key
   separately and exits clean when it's empty. Prints a `🔗`-prefixed summary
   only when it actually found (and fixed) something.
-- **`prune-merged-worktrees-hook.ts`** runs `prune-merged-worktrees.sh
+- **`prune-merged-worktrees-hook.ts`** runs `prune-merged-worktrees.ts
   --auto`: removes any worktree under `.claude/worktrees/` (on a
   `worktree-*` or `claude/*` branch) whose pull request has already merged,
   as long as it's unlocked, isn't the current session's own worktree, has no
@@ -194,9 +194,10 @@ session — both catch their own errors and always exit 0.
   is still wanted. Skipped entirely in cloud/remote sessions and in non-git
   directories.
 
-Both underlying scripts (`verify-worktree-symlinks.sh`,
-`prune-merged-worktrees.sh`) are also usable standalone — real exit codes,
-`--help`, no hook-only quieting — for a human running them by hand or a
+Both underlying scripts (`scripts/ts/verify-worktree-symlinks.ts`,
+`scripts/ts/prune-merged-worktrees.ts` under the plugin root; run with
+`node <script>.ts`, Node 22.18 or newer) are also usable standalone — real exit
+codes, `--help`, no hook-only quieting — for a human running them by hand or a
 project wiring its own automation around them instead of the shipped hook.
 
 ## The `git stash` collision hazard
