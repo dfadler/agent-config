@@ -33,5 +33,5 @@ graders:
   - name: label_before_create
     type: regex
     target: last_message
-    pattern: 'gh label list[\s\S]*gh issue create'
+    pattern: '(?:^|\n)[ \t]*gh label list\b[\s\S]*\n[ \t]*gh issue create\b'
     match: contains
