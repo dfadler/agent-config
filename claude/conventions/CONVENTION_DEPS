@@ -10,6 +10,6 @@
 #
 # Format: convention-filename:plugin-name-or-pipe-separated-alternatives
 
-focus-stealing.md:dfadler-agent-config|detached-terminal
+focus-stealing.md:detached-terminal
 vite-plugin.md:vite
-git-worktree-usage.md:dfadler-agent-config|worktree-core
+git-worktree-usage.md:worktree-core
