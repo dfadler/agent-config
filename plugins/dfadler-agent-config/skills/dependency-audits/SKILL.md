@@ -24,7 +24,7 @@ dependency is safe just because it installed cleanly.
 |-----------|---------|
 | npm | `npm audit` |
 | Yarn | `yarn npm audit --all` |
-| Python | `pip-audit` |
+| Python | `pip-audit .` for project files; `pip-audit --locked .` for supported lockfiles; `pip-audit -r <requirements-file>` for requirements files |
 | Rust | `cargo audit` |
 | Go | `govulncheck ./...` |
 

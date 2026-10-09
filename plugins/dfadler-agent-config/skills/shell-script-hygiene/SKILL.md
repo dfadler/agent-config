@@ -3,8 +3,8 @@ name: shell-script-hygiene
 description: |
   Shell script hygiene baseline: `set -uo pipefail`, shellcheck/shfmt,
   justification-required shellcheck disables, hermetic tests, `-h`/`--help`
-  support, and a shared named-exit-code taxonomy. Load before writing or
-  reviewing any non-trivial bash script, adding a shellcheck disable, or
+  support, and a shared named-exit-code taxonomy. Load before writing,
+  editing, or reviewing any non-trivial bash script or `*.sh` file, adding a shellcheck disable, or
   writing script tests.
 license: MIT
 metadata:

@@ -55,8 +55,9 @@ session — skip what the diff, commit messages, or issue already record.
 
 ## Revisit-engram trigger
 
-`MEMORY.md` caps at 200 lines. If it approaches ~160 lines (~80%), that's
-the signal to reopen the engram evaluation in
+Auto memory loads only the first 200 lines or 25 KB of `MEMORY.md`, whichever
+comes first. If it approaches ~160 lines or ~20 KB, whichever comes first,
+that's the signal to reopen the engram evaluation in
 [agent-config#273](https://github.com/dfadler/agent-config/issues/273) — a
 pull-based store (engram, Cognee) solves the indexing/retrieval problem
 structurally. Check this during any memory review pass.

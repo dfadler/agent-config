@@ -33,8 +33,9 @@ layout, CSS, or responsive behavior — it can look fine while missing overflow,
 clipping, or dead space that only shows up at a different viewport width.
 
 Do a manual resize pass across representative breakpoints **plus** a Lighthouse
-mobile/desktop CLI pass as part of the verification; see the
-`screen-capture:lighthouse` skill for the Lighthouse CLI invocation.
+CLI pass (when `lighthouse_enabled` is on, for the configured form factors) as
+part of the verification; see the `screen-capture:lighthouse` skill for the
+invocation and config.
 
 ## Capture pipeline
 
