@@ -42,6 +42,8 @@ per recording, `recordVideo`, a real key press, and the close-then-save order.
   synthetic: fine for logic, wrong for anything keyboard-modality-sensitive.
 - **User agent.** Headless Chromium reports `HeadlessChrome`. If the app sniffs the
   UA, set `userAgent` on `browser.newContext` to a normal Chrome string.
+- **Dialog focus.** After a click opens a dialog, focus may not be inside it. Click
+  inside the dialog before pressing Tab, or the Tab order recorded is the page's.
 - **Waits.** `waitForTimeout` pauses are fixed, so a slow machine can record a
   mid-transition frame. Prefer waiting on a condition (`locator.waitFor`). Where a
   pause is unavoidable, use at least 300 ms after a transition-bearing action and
