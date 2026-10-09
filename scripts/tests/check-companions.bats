@@ -830,3 +830,27 @@ EOF
   assert_success
   [ ! -e "$SANDBOX/npm-calls" ]
 }
+
+@test "--install-deps fails when npm is not on PATH" {
+  shim_node_npm 22
+  rm "$PW_SHIM_BIN/npm"
+  PATH="$PW_SHIM_BIN:$(path_without_playwright)" run_companions --install-deps
+  assert_failure
+  assert_output_contains "npm is not on PATH"
+}
+
+@test "--install-deps fails when npm install -g fails" {
+  shim_node_npm 22
+  printf '#!/usr/bin/env bash\nexit 1\n' > "$PW_SHIM_BIN/npm"
+  PATH="$PW_SHIM_BIN:$(path_without_playwright)" run_companions --install-deps
+  assert_failure
+  assert_output_contains "npm install failed"
+}
+
+@test "--install-deps fails when npm succeeds but playwright-cli is still not on PATH" {
+  shim_node_npm 22
+  printf '#!/usr/bin/env bash\nexit 0\n' > "$PW_SHIM_BIN/npm"
+  PATH="$PW_SHIM_BIN:$(path_without_playwright)" run_companions --install-deps
+  assert_failure
+  assert_output_contains "playwright-cli is not on PATH"
+}
