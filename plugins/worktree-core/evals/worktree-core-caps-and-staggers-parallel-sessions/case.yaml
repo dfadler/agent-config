@@ -7,7 +7,8 @@
 # a reply-only prompt, yet its description still shapes the reply. Measure with the with/without
 # delta (run with --ablation with-without).
 # Can fail: default_cap if the reply does not give 2-5 as the default; staggers if it does not
-# say to stagger the starts.
+# say to stagger the starts. The skill-side reply words this as "a few at a time rather than
+# all at the same moment" (seen in a 2026-10-09 trace), so the regex accepts that phrasing too.
 schema_version: "1.1"
 name: worktree-core-caps-and-staggers-parallel-sessions
 description: >
@@ -36,6 +37,6 @@ graders:
   - name: staggers
     type: regex
     target: last_message
-    pattern: 'stagger'
+    pattern: 'stagger|a few at a time|one at a time|rather than all at|not all at (?:once|the same)|space(?:d)? (?:them |the starts )?out|ramp'
     flags: i
     match: contains
