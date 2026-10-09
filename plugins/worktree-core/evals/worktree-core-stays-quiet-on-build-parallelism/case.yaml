@@ -1,0 +1,37 @@
+# Run: claude plugin eval plugins/worktree-core --case worktree-core-stays-quiet-on-build-parallelism --runs 3 --trust-plugin --no-publish
+# Shared run/grant facts: docs/contributing.md, "Plugin evals". No grant; reply-only.
+# Should-not-fire near-miss on the concurrency guidance: "parallel" and "how many" vocabulary,
+# but about make job count, not agent sessions. Regression guard; Delta 0 by design.
+# Can fail: skill_not_invoked fails if git-worktree-usage fires; answers_with_j fails if the
+# reply never mentions make's -j flag.
+schema_version: "1.1"
+name: worktree-core-stays-quiet-on-build-parallelism
+description: >
+  A question about how many parallel make jobs to run on an 8-core machine must not invoke
+  git-worktree-usage. expected_outcome: PASS when the skill is not invoked and the reply uses
+  make -j; FAIL when the skill is invoked or -j is missing.
+tags: [worktree-core, trigger, quick]
+
+execution:
+  prompt: |
+    I have an 8-core laptop. How many parallel jobs should I run for my C build with make?
+    One short paragraph, no commands to run.
+  max_turns: 4
+  allowed_tools:
+    - Skill
+
+graders:
+  - name: skill_not_invoked
+    type: tool_used
+    tool: Skill
+    input_match: '"skill"\s*:\s*"(?:[\w-]+:)?git-worktree-usage"'
+    min: 0
+    max: 0
+    arm: both
+
+  - name: answers_with_j
+    type: regex
+    target: last_message
+    pattern: '-j'
+    match: contains
+    arm: both

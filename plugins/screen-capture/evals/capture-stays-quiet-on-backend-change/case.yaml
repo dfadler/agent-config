@@ -1,0 +1,40 @@
+# Run: claude plugin eval plugins/screen-capture --case capture-stays-quiet-on-backend-change --runs 3 --trust-plugin --no-publish
+# Shared run/grant facts: docs/contributing.md, "Plugin evals". No grant needed (Skill only).
+# Should-not-fire half of the before/after policy: a PR that changes no rendered output (retry
+# config + a migration) needs no screenshots. The Skill check names all four skills.
+# Can fail: any screen-capture skill invoked fails skill_not_invoked; a reply that asks for
+# screenshots fails no_screenshots_needed. Regression guard: Delta 0 by design.
+schema_version: "1.1"
+name: capture-stays-quiet-on-backend-change
+description: >
+  A PR that only moves a component file, changes an HTTP retry config and adds a database
+  migration must not trigger screen-capture skills or a screenshot requirement. Delta 0 by design. expected_outcome: PASS when no skill is
+  invoked and the reply says screenshots are not needed; FAIL otherwise.
+tags: [screen-capture, capture, trigger, quick]
+
+execution:
+  prompt: |
+    My PR moves the OrdersTable component into a new folder, updates its imports, bumps the
+    HTTP client's retry count in config.yaml and adds a database migration for a new index.
+    Do I need screenshots in the PR description?
+    Answer in one or two sentences, no commands.
+  max_turns: 4
+  allowed_tools:
+    - Skill
+
+graders:
+  - name: skill_not_invoked
+    type: tool_used
+    tool: Skill
+    input_match: '"skill"\s*:\s*"(?:screen-capture:)?(?:capture|compare|attach|lighthouse)"'
+    min: 0
+    max: 0
+    arm: both
+
+  - name: no_screenshots_needed
+    type: regex
+    target: last_message
+    pattern: "\\bno\\b[^.\\n]{0,40}screenshots?|screenshots?[^.\\n]{0,40}(?:not|n.t)\\s+(?:needed|required|necessary)|(?:don.t|do not|doesn.t|does not)\\s+need|unnecessary|skip"
+    flags: i
+    match: contains
+    arm: both

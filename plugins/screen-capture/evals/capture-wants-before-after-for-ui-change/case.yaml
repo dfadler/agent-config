@@ -1,0 +1,39 @@
+# Run: claude plugin eval plugins/screen-capture --case capture-wants-before-after-for-ui-change --runs 3 --trust-plugin --no-publish
+# Shared run/grant facts: docs/contributing.md, "Plugin evals". No grant; reply-only.
+# Should-fire case for capture's visual-verification policy: a CSS layout change needs
+# before/after screenshots in the PR, plus more than one width. Run with --ablation
+# with-without; no skill_fired grader (reply-only prompt, description still shapes the reply).
+# Can fail: before_after fails without both words near "screenshot"; multiple_widths (half
+# weight) fails without a breakpoint/width/resize mention. The prompt names neither.
+schema_version: "1.1"
+name: capture-wants-before-after-for-ui-change
+description: >
+  Asked what to include in a PR that changes a navbar's CSS layout, the reply asks for
+  before/after screenshots and a check at more than one width. expected_outcome: PASS when the
+  reply calls for before/after screenshots; FAIL when it offers prose or tests only.
+tags: [screen-capture, capture, trigger, quick]
+
+execution:
+  prompt: |
+    I'm about to open a PR that changes the navbar's CSS: it switches from flex to grid and
+    changes the spacing. The tests pass. What should the PR description include besides a
+    summary? Answer in a short list, no commands.
+  max_turns: 4
+  allowed_tools:
+    - Skill
+
+graders:
+  - name: before_after
+    type: regex
+    target: last_message
+    pattern: '(?:before.{0,40}after|after.{0,40}before).{0,80}screenshot|screenshot.{0,80}(?:before.{0,40}after|after.{0,40}before)'
+    flags: is
+    match: contains
+
+  - name: multiple_widths
+    type: regex
+    target: last_message
+    pattern: 'breakpoint|resize|widths?\b|viewport.{0,20}(?:sizes?|widths?)'
+    flags: i
+    match: contains
+    weight: 0.5

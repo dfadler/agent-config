@@ -1,0 +1,36 @@
+# Run: claude plugin eval plugins/subagent-orchestration --case orchestration-no-fanout-for-findable-answer --runs 3 --trust-plugin --no-publish
+# Shared run/grant facts: docs/contributing.md, "Plugin evals". No grant; reply-only.
+# Should-fire case for "When a heavy fan-out is worth its cost": a findable answer gets a
+# direct search or one Agent, not deep-research. Run with --ablation with-without.
+# Can fail: lighter_route fails without grep/direct/single-agent language; no_fanout_pick fails
+# if the reply recommends deep-research or a Workflow.
+schema_version: "1.1"
+name: orchestration-no-fanout-for-findable-answer
+description: >
+  Asked whether to run a deep-research workflow to find where a config key is read in a known
+  repo, the reply recommends a direct grep or a single Agent. expected_outcome: PASS when the
+  reply picks the lighter route; FAIL when it recommends the heavy fan-out.
+tags: [subagent-orchestration, trigger, quick]
+
+execution:
+  prompt: |
+    I want to know where the `MAX_RETRIES` setting is read in our repo. Should I kick off a
+    deep-research multi-agent workflow for this? Two or three sentences, no commands.
+  max_turns: 4
+  allowed_tools:
+    - Skill
+
+graders:
+  - name: lighter_route
+    type: regex
+    target: last_message
+    pattern: 'grep|ripgrep|\brg\b|directly|single (?:Agent|agent|subagent)|one (?:Agent|agent|subagent)|overkill|not worth'
+    flags: i
+    match: contains
+
+  - name: no_fanout_pick
+    type: regex
+    target: last_message
+    pattern: '(?<!not )(?<!n.t )(?<!no need to )(?:yes|go ahead|recommend|kick off|run)\b[^.\n]{0,30}deep-research'
+    flags: i
+    match: not_contains
