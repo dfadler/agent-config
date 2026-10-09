@@ -54,6 +54,7 @@ PY_TESTS=(scripts/tests)
 # filesystem. A new file in a DIFFERENT directory has to be added to
 # PY_SOURCES first, the same manual step lint-py and typecheck already need.
 py_coverage_dirs() {
+  printf '%s\n' "${PY_SOURCES[@]}" | grep -v -e '^scripts/tests/' |
     xargs -n1 dirname | sort -u | sed 's|$|/|'
 }
 
