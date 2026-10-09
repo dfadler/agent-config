@@ -48,8 +48,9 @@ per recording, `recordVideo`, a real key press, and the close-then-save order.
   mid-transition frame. Prefer waiting on a condition (`locator.waitFor`). Where a
   pause is unavoidable, use at least 300 ms after a transition-bearing action and
   about 1000 ms before the first and after the last action.
-- **Local HTML.** `page.setContent` with a `file://` source is blocked in Chromium;
-  use `page.goto('file:///abs/path.html')`.
+- **Local HTML.** A page built with `page.setContent` has an `about:blank` origin, so
+  Chromium blocks its `file://` subresources (images, scripts, CSS); use
+  `page.goto('file:///abs/path.html')`.
 - **Parallel.** One context per story and browser, started together with
   `await Promise.all(jobs.map(runOne))`. Never share a context between recordings.
 

@@ -14,22 +14,25 @@ mkdirSync(OUT_DIR, { recursive: true });
 
 async function record(name, launcher) {
   const browser = await launcher.launch();
-  const ctx = await browser.newContext({
-    viewport: VIEWPORT,
-    recordVideo: { dir: OUT_DIR, size: VIEWPORT },
-    ...(name === "chromium" && CHROMIUM_UA ? { userAgent: CHROMIUM_UA } : {}),
-  });
-  const page = await ctx.newPage();
-  const video = page.video();
-  await page.goto(URL);
-  await page.waitForTimeout(1000); // lead-in
-  await page.keyboard.press("Tab"); // real key event, not synthetic
-  await page.waitForTimeout(500);
-  await ctx.close(); // must precede saveAs: finalizes the file
-  const path = `${OUT_DIR}/${name}.webm`;
-  await video.saveAs(path);
-  await browser.close();
-  return path;
+  try {
+    const ctx = await browser.newContext({
+      viewport: VIEWPORT,
+      recordVideo: { dir: OUT_DIR, size: VIEWPORT },
+      ...(name === "chromium" && CHROMIUM_UA ? { userAgent: CHROMIUM_UA } : {}),
+    });
+    const page = await ctx.newPage();
+    const video = page.video();
+    await page.goto(URL);
+    await page.waitForTimeout(1000); // lead-in
+    await page.keyboard.press("Tab"); // real key event, not synthetic
+    await page.waitForTimeout(500);
+    await ctx.close(); // must precede saveAs: finalizes the file
+    const path = `${OUT_DIR}/${name}.webm`;
+    await video.saveAs(path);
+    return path;
+  } finally {
+    await browser.close(); // also on failure, so no browser process is left running
+  }
 }
 
 // One context per browser, in parallel.
