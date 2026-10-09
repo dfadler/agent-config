@@ -1,0 +1,39 @@
+# Run: claude plugin eval plugins/linux-administration --case linux-administration-stays-quiet-on-macos-service --runs 3 --trust-plugin --no-publish
+# Shared run/grant facts: docs/contributing.md, "Plugin evals". No grant: Skill only.
+# Should-not-fire case for linux-administration: restarting a service on macOS shares
+# "restart a service" with the skill but the skill's scope excludes macOS and non-systemd
+# hosts. Regression guard: a no-plugin arm passes by default, Delta about 0 by design.
+# Can fail: skill_not_fired fails if the skill loads for a macOS request; answers_with_brew
+# fails if the reply has no `brew services` command.
+schema_version: "1.1"
+name: linux-administration-stays-quiet-on-macos-service
+description: >
+  A request to restart PostgreSQL on a Mac installed with Homebrew must not invoke
+  linux-administration. expected_outcome: regression guard, Delta about 0 by design. PASS
+  when the skill does not fire and the reply uses `brew services`; FAIL when it fires.
+tags: [linux-administration, trigger, quick]
+
+execution:
+  prompt: |
+    On my Mac, PostgreSQL 16 was installed with Homebrew and it is hung. Which command
+    restarts it? Reply with the single command in one bash code block and no other text. Do
+    not run it.
+  max_turns: 4
+  allowed_tools:
+    - Skill
+
+graders:
+  - name: skill_not_fired
+    type: tool_used
+    tool: Skill
+    input_match: '"skill"\s*:\s*"(?:[\w-]+:)?linux-administration"'
+    min: 0
+    max: 0
+    arm: both
+
+  - name: answers_with_brew
+    type: regex
+    target: last_message
+    pattern: 'brew services restart postgresql'
+    match: contains
+    arm: both

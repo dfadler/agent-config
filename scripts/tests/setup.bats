@@ -534,10 +534,12 @@ _add_worktree_core_fixture() {
 }
 
 _add_memory_hygiene_hook_fixture() {
-  mkdir -p "$FAKE_REPO/plugins/dfadler-agent-config/hooks/scripts"
+  mkdir -p "$FAKE_REPO/plugins/memory-hygiene/.claude-plugin"
+  echo '{"name":"memory-hygiene"}' >"$FAKE_REPO/plugins/memory-hygiene/.claude-plugin/plugin.json"
+  mkdir -p "$FAKE_REPO/plugins/memory-hygiene/hooks/scripts"
   printf '#!/usr/bin/env bash\nexit 0\n' \
-    >"$FAKE_REPO/plugins/dfadler-agent-config/hooks/scripts/memory-hygiene-stop-hook.sh"
-  chmod +x "$FAKE_REPO/plugins/dfadler-agent-config/hooks/scripts/memory-hygiene-stop-hook.sh"
+    >"$FAKE_REPO/plugins/memory-hygiene/hooks/scripts/memory-hygiene-stop-hook.sh"
+  chmod +x "$FAKE_REPO/plugins/memory-hygiene/hooks/scripts/memory-hygiene-stop-hook.sh"
 }
 
 @test "hook registration: worktree-core installs PreToolUse hook in settings.json" {
@@ -623,11 +625,11 @@ assert '$PRUNE_CMD' not in cmds, 'auto-prune hook still present after skip'
   [ "$status" -eq 0 ]
 }
 
-@test "hook registration: dfadler-agent-config installs the memory-hygiene Stop hook, without a matcher key" {
+@test "hook registration: memory-hygiene installs the memory-hygiene Stop hook, without a matcher key" {
   _add_memory_hygiene_hook_fixture
   run_setup
   assert_success
-  HOOK_CMD="$HOME/.claude/skills/dfadler-agent-config/hooks/scripts/memory-hygiene-stop-hook.sh"
+  HOOK_CMD="$HOME/.claude/skills/memory-hygiene/hooks/scripts/memory-hygiene-stop-hook.sh"
   run python3 -c "
 import json, sys
 d = json.load(open('$HOME/.claude/settings.json'))
@@ -639,13 +641,13 @@ assert all('matcher' not in e for e in entries), 'Stop entry should have no matc
   [ "$status" -eq 0 ]
 }
 
-@test "hook registration: --skip=dfadler-agent-config deregisters the memory-hygiene Stop hook" {
+@test "hook registration: --skip=memory-hygiene deregisters the memory-hygiene Stop hook" {
   _add_memory_hygiene_hook_fixture
   run_setup
   assert_success
-  run_setup_with --skip=dfadler-agent-config
+  run_setup_with --skip=memory-hygiene
   assert_success
-  HOOK_CMD="$HOME/.claude/skills/dfadler-agent-config/hooks/scripts/memory-hygiene-stop-hook.sh"
+  HOOK_CMD="$HOME/.claude/skills/memory-hygiene/hooks/scripts/memory-hygiene-stop-hook.sh"
   run python3 -c "
 import json
 d = json.load(open('$HOME/.claude/settings.json'))

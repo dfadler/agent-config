@@ -1,6 +1,6 @@
 #!/usr/bin/env bats
 #
-# Tests for plugins/dfadler-agent-config/hooks/scripts/memory-hygiene-stop-hook.sh
+# Tests for plugins/memory-hygiene/hooks/scripts/memory-hygiene-stop-hook.sh
 # — the Stop hook that reminds Claude to write a memory update when a turn
 # ends with uncommitted git changes and nobody has opted out.
 #
@@ -14,7 +14,7 @@
 
 bats_require_minimum_version 1.5.0 # for `run --separate-stderr`
 
-REAL_HOOK="$BATS_TEST_DIRNAME/../../plugins/dfadler-agent-config/hooks/scripts/memory-hygiene-stop-hook.sh"
+REAL_HOOK="$BATS_TEST_DIRNAME/../../plugins/memory-hygiene/hooks/scripts/memory-hygiene-stop-hook.sh"
 
 load helpers
 

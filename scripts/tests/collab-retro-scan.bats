@@ -7,7 +7,7 @@
 
 load helpers
 
-SCAN_SCRIPT="$REPO_ROOT/plugins/dfadler-agent-config/skills/collab-retro/scripts/scan-feedback-memories.sh"
+SCAN_SCRIPT="$REPO_ROOT/plugins/collab-retro/scripts/scan-feedback-memories.sh"
 
 setup() {
   make_sandbox
@@ -94,4 +94,11 @@ write_memory() {
   run bash "$SCAN_SCRIPT" bogus
   assert_failure
   assert_output_contains "unexpected argument"
+}
+
+@test "exits 4 when find is not on PATH" {
+  mkdir -p "$BATS_TEST_TMPDIR/emptybin"
+  run env PATH="$BATS_TEST_TMPDIR/emptybin" "$(command -v bash)" "$SCAN_SCRIPT"
+  [ "$status" -eq 4 ]
+  assert_output_contains "find is required"
 }
