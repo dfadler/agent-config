@@ -30,7 +30,7 @@ definition; links pointing anywhere else are left alone.
 
 See [`docs/plugin-loading.md`](./plugin-loading.md) for how the linked plugin
 directory actually gets picked up by Claude Code and why its contents load
-under the `dfadler-agent-config:<name>` namespace.
+under the `<plugin>:<name>` namespace.
 
 ### Installing a subset of features
 
@@ -38,7 +38,7 @@ By default `setup.sh` installs everything — every slash command under `claude/
 and every plugin under `plugins/` — the same all-or-nothing behavior it has always had.
 Two flags narrow that, over the same flat namespace of feature names: a slash command's
 basename (`adversarial-review`, from `claude/commands/adversarial-review.md`) or a
-plugin's directory name (`dfadler-agent-config`, `accessibility-skills`, from
+plugin's directory name (`worktree-core`, `accessibility-skills`, from
 `plugins/`). `./setup.sh --list-features` prints the exact names available on this
 checkout without linking anything. `./setup.sh --plan` (alias `--dry-run`) prints what
 a run would do, one tab-separated action per line, without changing anything; the line
@@ -55,7 +55,7 @@ To install *only* specific features and leave everything else out, pass `--inclu
 instead:
 
 ```bash
-./setup.sh --include=adversarial-review,dfadler-agent-config
+./setup.sh --include=adversarial-review,worktree-core
 ```
 
 After a run that used either flag, setup.sh prints the exact `./setup.sh --skip=...` or
@@ -74,7 +74,7 @@ whatever the change affects. All directions are idempotent: a repeated run with 
 flags changes nothing.
 
 This is a separate mechanism from the per-project hook toggles described in
-`docs/hook-composition.md` — every hook in `dfadler-agent-config` already ships off by
+`docs/hook-composition.md` — every plugin hook already ships off by
 default and stays off until a project's own `.claude/settings.json` (or a session env
 var) opts it in, regardless of `--skip`/`--include`. Those flags control whether this
 machine gets the plugin (and therefore its hooks' *code*) at all; the per-project

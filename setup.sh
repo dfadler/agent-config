@@ -46,8 +46,8 @@ run is rejected rather than guessing which one wins.
                      to unlink if a previous run linked them). A feature is
                      either a slash command's basename (e.g. "adversarial-
                      review", from claude/commands/adversarial-review.md)
-                     or a plugin directory name (e.g. "dfadler-agent-config",
-                     from plugins/dfadler-agent-config/) — skipping a plugin
+                     or a plugin directory name (e.g. "worktree-core",
+                     from plugins/worktree-core/) — skipping a plugin
                      removes it as a whole (skills, agents, and hooks
                      together; hooks also stay off by default per-project
                      regardless — see docs/hook-composition.md). Run with
