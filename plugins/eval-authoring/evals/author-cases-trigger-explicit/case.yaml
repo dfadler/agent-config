@@ -1,0 +1,34 @@
+# Run: claude plugin eval plugins/eval-authoring --case author-cases-trigger-explicit --runs 10 --ablation none --trust-plugin --no-publish
+# Phrasing-variant probe for the author-cases description. All author-cases-trigger-* cases share one
+# plugin context and one grader and differ only in the request sentence, so the skill_fired
+# rate per case compares phrasings. Variant here: explicit: names the tool, the strong-trigger baseline
+# A single skill_fired grader (free; `arm: both` only to satisfy EVAL008, the run uses --ablation none so no no-plugin arm is paid for); no task-quality grader, so the case measures trigger
+# rate only. It is an indicator, not a pass/fail gate: expect a rate, read it across --runs.
+# Can fail: skill_fired fails on any run where the description does not match this phrasing.
+# Likely delta: none to read; compare the rate against the sibling trigger-* cases. Near-miss boundary: author-cases-stays-quiet-on-unit-tests. EVAL009 info is intentional (one grader, trigger rate only).
+schema_version: "1.1"
+name: author-cases-trigger-explicit
+description: >
+  Phrasing probe: "Use `claude plugin eval` to write eval cases for the skill and the agent." against a plugin with one skill and one agent.
+  expected_outcome: PASS when the model invokes author-cases; FAIL when it answers without it.
+tags: [eval-authoring, author-cases, trigger, phrasing-probe]
+
+execution:
+  prompt: |
+    My plugin has one skill, `release-notes` ("Turn a git changelog into release notes"),
+    and one agent, `changelog-checker` (reviews a CHANGELOG for missing entries).
+    Use `claude plugin eval` to write eval cases for the skill and the agent.
+    Don't create files or run any commands.
+  max_turns: 4
+  allowed_tools:
+    - Skill
+    - Read
+    - Glob
+
+graders:
+  - name: skill_fired
+    type: tool_used
+    tool: Skill
+    input_match: '"skill"\s*:\s*"(?:[\w-]+:)?author-cases"'
+    min: 1
+    arm: both
