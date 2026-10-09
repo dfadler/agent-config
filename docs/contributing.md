@@ -172,7 +172,7 @@ step). A plugin-owned check uses `plugins/<plugin>/scripts/ts/check-foo.ts`. See
 
 Two checks exist because a linter can't express them. `scripts/ts/check-shell-set-flags.ts`
 enforces the `set -uo pipefail` opener from the global `CLAUDE.md`, which shellcheck
-has no rule for. `check-plugin-structure.sh` is the closest thing to a typechecker a
+has no rule for. `scripts/ts/check-plugin-structure.ts` is the closest thing to a typechecker a
 shell-and-Markdown repo can have: this repo's *product* is declarative metadata, and a
 skill whose `name:` drifts from its directory fails silently at load time rather than
 loudly in review — which is exactly what the plugin rename could have caused.

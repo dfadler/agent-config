@@ -20,8 +20,8 @@
 # whatever `python3` happens to resolve to on PATH) — a stray, unpinned global
 # ruff install produced a confusing false "would reformat" failure once
 # because it disagreed with the ruff==0.9.6 pinned in requirements-dev.txt.
-# The shell targets (lint-shellcheck, lint-shfmt, structure, test-sh,
-# coverage) need no Python at all, so a shell-only contributor never triggers
+# The shell targets (lint-shellcheck, lint-shfmt, test-sh, coverage) need no
+# Python at all, so a shell-only contributor never triggers
 # the venv build.
 set -euo pipefail
 
@@ -140,7 +140,7 @@ Run one of this repo's checks. CI runs the same targets.
 Shell (no Python or Node needed):
   lint-shellcheck   shellcheck over every shell script
   lint-shfmt        shfmt -i 2 -ci -d (check only)
-  structure         validate plugin manifests and skill/agent frontmatter
+  structure         validate plugin manifests and skill/agent frontmatter (Node: pnpm run check-plugin-structure)
   test-sh           bats suites under scripts/tests
   coverage          bats under kcov, enforce the floor (Linux only; skips elsewhere)
   lint-actions      actionlint over .github/workflows
@@ -300,6 +300,7 @@ pnpm_name() {
     typecheck-ts) echo typecheck ;;
     test-ts) echo test ;;
     coverage-ts) echo coverage ;;
+    structure) echo check-plugin-structure ;;
     lint-set-flags | lint-claude-md | check-skills | lint-plugin-evals | check-vitest-flags | check-vitest-v3-names | check-links) echo "$1" ;;
     *) return 1 ;;
   esac
@@ -322,7 +323,6 @@ run_target() {
     typecheck) typecheck ;;
     fmt) fmt ;;
     fmt-py) fmt_py ;;
-    structure) bash scripts/check-plugin-structure.sh ;;
     test-sh) bats scripts/tests ;;
     test-py) test_py ;;
     test) bats scripts/tests && test_py ;;
