@@ -310,3 +310,22 @@ three a conflict lands in.
   changing," not "safe to snapshot" (dfadler/agent-config#65 shipped a
   known leak this way). Use the diff-against-claimed-source check above to
   confirm a claimed range landed intact.
+
+## Concurrency budget
+
+Multiple Claude Code sessions in parallel need their own budget, not just
+their own worktree — pick a number, don't default to "as many as fit."
+
+- **Default to roughly 2–5 concurrent agents.** Review bandwidth is the
+  constraint that binds first for most reported use — past that range, diffs
+  arrive faster than they can be reviewed well. Only go higher with a
+  concrete plan for who reviews the extra output.
+- **Usage/rate-limit quota scales roughly with concurrent sessions.**
+  Burst/concurrency rate-limiting — distinct from monthly quota exhaustion —
+  has hit users on even the highest-paid tier when 5–10 sessions were launched
+  in quick succession. Stagger session starts instead of bulk-launching many
+  at once.
+- **Cost scales with concurrency too.** A rough, dated ballpark: ~$50–130/day
+  for 5–10 parallel agents at current (2026) pricing — an order-of-magnitude
+  planning estimate, not a live quote; check current pricing before budgeting
+  against it.

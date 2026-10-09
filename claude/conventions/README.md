@@ -34,6 +34,7 @@ Two patterns fall out of this:
 
 Full reasoning for each verdict, plus the duplication check and follow-up list:
 [issue #278 comment](https://github.com/dfadler/agent-config/issues/278#issuecomment-5783274884).
+Skill conversions completed in [issue #608](https://github.com/dfadler/agent-config/issues/608).
 
 | File | Verdict |
 |---|---|
@@ -48,17 +49,14 @@ Full reasoning for each verdict, plus the duplication check and follow-up list:
 | `why-question-shape.md` | Opt-in include |
 | `prefer-real-chrome.md` | Opt-in include (advisory; the deny rule it names is the enforced form) |
 | `context-preservation.md` | Opt-in include (threshold rule; mechanics in the `subagent-orchestration` skill) |
-| `visual-verification.md` | Merge into skill |
-| `concurrency.md` | Merge into skill |
-| `shell-script-hygiene.md` | Convert to skill |
-| `dependency-audits.md` | Convert to skill |
-| `issue-tracker.md` | Convert to skill |
-| `testing-sabotage-check.md` | Folded into `vitest:test-conventions`; stays an opt-in include for non-Vitest repos |
-| `cheap-model-delegation.md` + `heavy-workflow-cost.md` | Merge into one skill |
-| `memory-hygiene.md` | Convert to skill |
-
-The conversions and merges are tracked as follow-ups, not done yet. A file keeps
-working as an opt-in include until its skill exists.
+| `testing-sabotage-check.md` | Opt-in include for non-Vitest repos; also `dfadler-agent-config:testing-sabotage-check` |
+| `visual-verification.md` | Converted → `screen-capture:visual-verification` |
+| `concurrency.md` | Converted → `worktree-core:git-worktree-usage` (appended) |
+| `shell-script-hygiene.md` | Converted → `dfadler-agent-config:shell-script-hygiene` |
+| `dependency-audits.md` | Converted → `dfadler-agent-config:dependency-audits` |
+| `issue-tracker.md` | Converted → `dfadler-agent-config:issue-tracker` |
+| `cheap-model-delegation.md` + `heavy-workflow-cost.md` | Converted → `dfadler-agent-config:agent-cost-tiers` |
+| `memory-hygiene.md` | Converted → `dfadler-agent-config:memory-hygiene` |
 
 `vite-plugin.md` was added after the classification above was first written and
 was missed. Its trigger is a code *shape* (an object literal with a `name` field
