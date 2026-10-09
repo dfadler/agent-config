@@ -1,7 +1,8 @@
 ---
 name: subagent-orchestration
 description: |
-  Use when about to spawn a sub-agent, fan out with the Workflow tool, or run a task
+  Use when the user gives several separate things to do at once (decide which can run
+  as parallel sub-agents), when about to spawn a sub-agent, fan out with the Workflow tool, or run a task
   that would put large tool output (more than ~50 lines, or ~3 file reads) into the
   main context. Routes the work to the main context, a single Agent call, or a
   Workflow; defines the compact handback a delegated agent should return; and picks
@@ -33,6 +34,25 @@ metadata:
 
 Open-ended search that will sweep many files goes to an `Agent` (the `Explore` agent
 fits); a targeted `grep` for a known symbol can stay in the main context.
+
+## Parallelize an unordered task list
+
+When the user hands over several separate things to do ("fix X, add Y, update docs for
+Z"), triage before starting item one:
+
+1. **Classify each item** by the files it touches and whether it needs another item's
+   output.
+2. **Parallel set:** items with disjoint file surfaces and no ordering dependency. Send
+   one `Agent` call per item in a single message, each in its own worktree if it edits
+   files. Items that share a file, or one that feeds another, stay serial or go to one
+   agent together.
+3. **Say the split in a line or two** (which run in parallel, which wait, why), then
+   dispatch. Don't ask permission for the obvious split.
+4. **Tier each agent** per "Pick the model tier"; a long list is not a reason to
+   upgrade them. Cap the fan-out at a handful of agents; batch the rest.
+
+Tiny items (a one-line edit) stay in the main context: spawning costs more than doing.
+A single task with substeps is not a task list; use the routing table above.
 
 ## Ask for a compact handback
 

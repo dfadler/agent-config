@@ -1,0 +1,38 @@
+# Run: claude plugin eval plugins/subagent-orchestration --case orchestration-parallelizes-independent-task-list --runs 3 --trust-plugin --no-publish
+# Shared run/grant facts: docs/contributing.md, "Plugin evals". No grant; reply-only.
+# Positive half of the task-list rule (#621): independent items on disjoint files run in parallel.
+# Run with --ablation with-without; no skill_fired grader (reply-only).
+# Can fail: plans_parallel fails if the reply never proposes parallel/concurrent subagents;
+# names_independence (half weight) fails if it never ties that to independence/disjoint files.
+schema_version: "1.1"
+name: orchestration-parallelizes-independent-task-list
+description: >
+  Given an unordered list of three independent tasks on different files, the reply plans
+  parallel subagents and says why. expected_outcome: PASS when it proposes parallel
+  agents citing independence; FAIL when it plans to work through them one by one.
+tags: [subagent-orchestration, trigger, quick]
+
+execution:
+  prompt: |
+    Here's what I'd like done, in no particular order: (1) fix the off-by-one in
+    src/pager.ts, (2) update the install section of README.md, (3) add a unit test for
+    src/slugify.ts. How will you tackle these? Three sentences, no commands.
+  max_turns: 4
+  allowed_tools:
+    - Skill
+
+graders:
+  - name: plans_parallel
+    type: regex
+    target: last_message
+    pattern: '(?:parallel|concurrent|simultaneous|at the same time|fan(?:ned)? out).{0,80}(?:sub-?agent|agent)|(?:sub-?agent|agent).{0,80}(?:parallel|concurrent|simultaneous|at the same time)'
+    flags: is
+    match: contains
+
+  - name: names_independence
+    type: regex
+    target: last_message
+    pattern: 'independent|disjoint|different files|separate files|no dependenc|don.t (?:touch|share|depend)'
+    flags: i
+    match: contains
+    weight: 0.5
