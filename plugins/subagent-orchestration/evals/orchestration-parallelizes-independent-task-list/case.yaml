@@ -38,3 +38,11 @@ graders:
     flags: i
     match: contains
     weight: 0.5
+
+  # Polarity: the keyword graders above also match "I won't use parallel agents".
+  - name: no_serial_plan
+    type: regex
+    target: last_message
+    pattern: "one (?:at a time|by one)|sequential|serial(?:ly)?\\b|(?:not|n't|rather than|instead of)\\s+(?:(?:use|run|spawn|launch|need)\\w*\\s+)?(?:\\w+\\s+)?(?:in )?(?:parallel|sub-?agents?)"
+    flags: i
+    match: not_contains
