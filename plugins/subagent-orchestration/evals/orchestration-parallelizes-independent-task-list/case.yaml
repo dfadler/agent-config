@@ -1,42 +1,49 @@
 # Run: claude plugin eval plugins/subagent-orchestration --case orchestration-parallelizes-independent-task-list --runs 3 --trust-plugin --no-publish
 # Shared run/grant facts: docs/contributing.md, "Plugin evals". No grant; reply-only.
-# Prompt uses three substantial tasks: for four trivial edits the skill rightly says do it yourself.
-# Positive half of the unordered-task-list rule: disjoint items go to parallel subagents.
-# Run with --ablation with-without; no skill_fired grader (reply-only).
-# Can fail: plans_parallel fails if the reply never proposes parallel/subagent dispatch;
-# names_disjoint (half weight) fails if it never ties that to separate files/independence.
+# Positive half of the task-list rule (#621): independent items on disjoint files run in parallel.
+# Run with --ablation with-without. skill_fired is with-arm only and not scored (diagnostic).
+# Tasks are deliberately large: small edits are done in the main context by design, so tiny
+# tasks make this case fail for the right reason. Baseline already parallelizes big tasks, so
+# Delta is small (+0.08 at 8 runs); the with arm is the signal.
+# Can fail: plans_parallel fails if the reply never proposes parallel/concurrent subagents;
+# names_independence (half weight) fails if it never ties that to independence/disjoint files.
 schema_version: "1.1"
 name: orchestration-parallelizes-independent-task-list
 description: >
-  For an unordered list of independent tasks touching different files, the reply plans
-  parallel subagents. expected_outcome: PASS when the reply proposes running the items in
-  parallel via subagents and cites independence or disjoint files; FAIL when it plans to
-  work through them one by one.
+  Given an unordered list of three independent tasks on different files, the reply plans
+  parallel subagents and says why. expected_outcome: PASS when it proposes parallel
+  agents citing independence; FAIL when it plans to work through them one by one.
 tags: [subagent-orchestration, trigger, quick]
 
 execution:
   prompt: |
-    Please do all of these: (1) audit the ~40 files in src/api/ for every call to the
-    deprecated fetchLegacy and list what each needs to migrate, (2) investigate why this
-    month's CI runs got slower than last month's, (3) rewrite docs/CONTRIBUTING.md from what
-    the repo actually uses. They are unrelated to each other and touch different files. How
-    will you approach them? Three sentences, no commands.
+    Here's what I'd like done, in no particular order: (1) audit every call site of the
+    deprecated `fetchLegacy` API across src/api/ (about 40 files) and list what needs
+    migrating, (2) investigate why the CI pipeline got 3x slower this month using the
+    workflow logs, (3) rewrite docs/CONTRIBUTING.md from scratch based on how the repo is
+    actually used. How will you tackle these? Three sentences, no commands.
   max_turns: 4
   allowed_tools:
     - Skill
 
 graders:
+  - name: skill_fired
+    type: tool_used
+    tool: Skill
+    input_match: '"skill"\s*:\s*"(?:[\w-]+:)?subagent-orchestration"'
+    min: 1
+
   - name: plans_parallel
     type: regex
     target: last_message
-    pattern: '(?:parallel|concurrent|simultaneous|fan[- ]out|at once).{0,200}(?:sub-?agents?|agents?)|(?:sub-?agents?|agents?).{0,200}(?:parallel|concurrent|simultaneous|at once)'
+    pattern: '(?=.*(?:parallel|concurrent|simultaneous|at the same time|at once|launched together|together))(?=.*agent)'
     flags: is
     match: contains
 
-  - name: names_disjoint
+  - name: names_independence
     type: regex
     target: last_message
-    pattern: 'independent|unrelated|disjoint|separate|distinct|different (?:files|areas)|isolated|(?:no|not|none)\b.{0,30}\b(?:shared|overlap|depend|conflict)|(?:don.t|doesn.t|do not|does not|won.t|never) (?:touch|share|overlap|depend|conflict)'
+    pattern: 'independent|disjoint|unrelated|separate|different (?:files|things|parts)|no (?:dependenc|overlap)|none (?:of them )?(?:needs|depends)|don.t (?:touch|share|depend|overlap|need)'
     flags: i
     match: contains
     weight: 0.5
@@ -45,6 +52,6 @@ graders:
   - name: no_serial_plan
     type: regex
     target: last_message
-    pattern: "one (?:at a time|by one)|sequential|serial(?:ly)?\\b|(?:not|n't|rather than|instead of)\\s+(?:(?:use|run|spawn|launch|need)\\w*\\s+)?(?:\\w+\\s+)?(?:in )?(?:parallel|sub-?agents?)"
+    pattern: "(?:I.ll|I will|will|going to|just|simply|myself)\\b[^.;,]{0,40}(?:one (?:at a time|by one)|sequentially|serially)|(?:not|n't|rather than|instead of)\\s+(?:(?:use|run|spawn|launch|need)\\w*\\s+)?(?:\\w+\\s+)?(?:in )?(?:parallel|sub-?agents?)"
     flags: i
     match: not_contains
