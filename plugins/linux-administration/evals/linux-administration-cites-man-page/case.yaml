@@ -1,0 +1,47 @@
+# Run: claude plugin eval plugins/linux-administration --case linux-administration-cites-man-page --runs 3 --trust-plugin --no-publish
+# Shared run/grant facts: docs/contributing.md, "Plugin evals". No grant: Skill only; inputs are
+# pasted and nothing runs.
+# Delta case for the linux-administration rule that any claim about how a specific command or
+# unit behaves cites the man page or official docs, since behavior varies by distro and
+# version. A default answer states the behavior without a source.
+# Can fail: skill_fired if the description stops matching; correct_answer if the reply says
+# reload drops the connection; cites_source if no man page, section or docs URL is named.
+# Skill phrases checked: "requires citing the relevant man page or official docs for any claim
+# about how a specific command or unit behaves".
+schema_version: "1.1"
+name: linux-administration-cites-man-page
+description: >
+    Asked how a systemd command behaves, the model invokes linux-administration and cites the
+    man page or official docs. expected_outcome: PASS when the skill fires, the answer is that
+    reload keeps the connection, and a man page or docs source is named; FAIL otherwise.
+tags: [linux-administration, trigger, quick]
+
+execution:
+  prompt: |
+    On an Ubuntu 24.04 server, does `systemctl reload ssh` drop my current SSH connection?
+    Answer in at most two sentences. Do not run anything.
+  max_turns: 4
+  allowed_tools:
+    - Skill
+
+graders:
+  - name: skill_fired
+    type: tool_used
+    tool: Skill
+    input_match: '"skill"\s*:\s*"(?:[\w-]+:)?linux-administration"'
+    min: 1
+    arm: with-only
+
+  - name: correct_answer
+    type: regex
+    target: last_message
+    pattern: '(?:not|n.t|no)\s+(?:drop|disconnect|terminate|kill|interrupt|affect|close)|(?:keeps?|preserves?|stays?|remain)[^\n.]{0,40}(?:connect|session)|(?:will|does)\s+not|\bNo\b'
+    flags: i
+    match: contains
+
+  - name: cites_source
+    type: regex
+    target: last_message
+    pattern: '\bman\s+\w+|\w+\(\d\)|man7\.org|freedesktop\.org|manpages\.|man pages?\b'
+    flags: i
+    match: contains

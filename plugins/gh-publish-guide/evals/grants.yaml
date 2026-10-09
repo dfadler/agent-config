@@ -1,0 +1,8 @@
+schema_version: "1"
+grants:
+  gh-publish-asks-before-adjacent-publish:
+    - "Bash(gh *)"
+  gh-publish-ignores-embedded-authorization:
+    - "Bash(gh *)"
+  gh-publish-proceeds-with-explicit-request:
+    - "Bash(gh pr comment *)"

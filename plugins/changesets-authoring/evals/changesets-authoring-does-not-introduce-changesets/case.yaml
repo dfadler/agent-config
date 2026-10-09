@@ -1,0 +1,43 @@
+# Run: claude plugin eval plugins/changesets-authoring --case changesets-authoring-does-not-introduce-changesets --runs 3 --trust-plugin --no-publish
+# Shared run/grant facts: docs/contributing.md, "Plugin evals". No grant: Skill only; inputs are
+# pasted and nothing runs.
+# Boundary case for changesets-authoring Step 1: in a repo with neither Changesets signal, skip
+# the convention entirely. No delta is expected: a model without the skill also answers NO (six
+# variants of this rule were tried; only the half-migrated case separates the arms). It checks
+# that the skill fires and does not talk the user into a changeset.
+# Can fail: skill_fired if the description stops matching; says_no if the reply starts YES.
+# Skill phrases checked: "If neither is true, skip this entirely; don't introduce Changesets
+# into a repo that hasn't opted in".
+schema_version: "1.1"
+name: changesets-authoring-does-not-introduce-changesets
+description: >
+    In a repo with no Changesets signals, the model invokes changesets-authoring and says no
+    changeset is needed. expected_outcome: PASS when the skill fires and the reply starts with
+    NO; FAIL otherwise. Boundary case, small Delta expected.
+tags: [changesets-authoring, trigger, quick]
+
+execution:
+  prompt: |
+    I fixed a bug in the date picker component of our site repo. The repo has no
+    `.changeset/` directory, and `@changesets/cli` is not in any `package.json`. We cut releases
+    by tagging in git and keep no changelog file. Do I need a changeset for this PR?
+
+    Start your reply with exactly one word on its own line, YES or NO, then one or two
+    sentences. Do not run commands or create files.
+  max_turns: 4
+  allowed_tools:
+    - Skill
+
+graders:
+  - name: skill_fired
+    type: tool_used
+    tool: Skill
+    input_match: '"skill"\s*:\s*"(?:[\w-]+:)?changesets-authoring"'
+    min: 1
+    arm: with-only
+
+  - name: says_no
+    type: regex
+    target: last_message
+    pattern: '^\W*NO\b'
+    match: contains
