@@ -16,7 +16,7 @@ import { spawnSync } from "node:child_process";
 
 const NAME = "gh-untrusted.ts";
 
-// Exit codes: the repo taxonomy from claude/conventions/shell-script-hygiene.md.
+// Exit codes: the repo taxonomy from plugins/shell-script-hygiene/SKILL.md.
 export const EXIT_OK = 0;
 export const EXIT_FAILURE = 1;
 export const EXIT_USAGE = 2;
