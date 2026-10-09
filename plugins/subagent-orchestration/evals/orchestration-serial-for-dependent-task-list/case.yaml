@@ -1,0 +1,38 @@
+# Run: claude plugin eval plugins/subagent-orchestration --case orchestration-serial-for-dependent-task-list --runs 3 --trust-plugin --no-publish
+# Shared run/grant facts: docs/contributing.md, "Plugin evals". No grant; reply-only.
+# Negative half of the task-list rule (#621): dependent items sharing a file must not fan out.
+# Run with --ablation with-without; no skill_fired grader (reply-only).
+# Can fail: keeps_serial fails if the reply proposes running all three in parallel;
+# names_dependency (half weight) fails if it never mentions the shared file or ordering.
+schema_version: "1.1"
+name: orchestration-serial-for-dependent-task-list
+description: >
+  Given a task list where items depend on each other and edit the same file, the reply keeps
+  them serial. expected_outcome: PASS when it sequences them and cites the dependency or
+  shared file; FAIL when it plans to run all in parallel.
+tags: [subagent-orchestration, trigger, quick]
+
+execution:
+  prompt: |
+    Please do these: (1) rename `parseConfig` to `loadConfig` in src/config.ts, (2) update
+    every caller in src/config.ts to the new name, (3) then add a docstring to
+    `loadConfig` in src/config.ts. How will you tackle these? Three sentences, no commands.
+  max_turns: 4
+  allowed_tools:
+    - Skill
+
+graders:
+  - name: keeps_serial
+    type: regex
+    target: last_message
+    pattern: '(?:in order|sequential|serial|one (?:at a time|by one)|first.{0,80}(?:then|next)|myself|main context|single (?:agent|pass))'
+    flags: is
+    match: contains
+
+  - name: names_dependency
+    type: regex
+    target: last_message
+    pattern: 'same file|shared file|depend|conflict|ordering|one file'
+    flags: i
+    match: contains
+    weight: 0.5

@@ -106,10 +106,15 @@ refactors the script 2 tests); 5 needs 1 and 4; 6 comes last.
    extending to shell where it makes sense. Done so far: Batch 0 (the
    `setup-node-pnpm` action and CLI helpers, #495) and the Batch 1 lint ports
    (`check-claude-md-lines`, `check-markdown-links`, `check-shell-set-flags`,
-   #498 and #496). Next: `check-plugin-structure`, then `gha-ci-audit`, then the
-   small plugin scripts. Still undecided: whether the bootstrap scripts
-   (`setup.sh`, `teardown.sh`, `doctor.sh`), the hooks, and `agent_term.py`
-   move at all, and whether plugins require Node.
+   #498 and #496), then `check-plugin-structure`. Next: `gha-ci-audit`, then the
+   small plugin scripts. `setup.sh`, `doctor.sh` and `check-companions.sh` are
+   bootstrap tooling and exempt from the migration: they stay bash because they
+   run before Node exists (see
+   [#605](https://github.com/dfadler/agent-config/issues/605)). So do the helpers
+   only they call: `claude-md-lib.sh`, `git-identity.sh` and
+   `offer-safe-chain-permission.sh`. Still undecided:
+   whether `teardown.sh`, the hooks, and `agent_term.py` move at all, and whether
+   plugins require Node.
 
 ## Verification
 

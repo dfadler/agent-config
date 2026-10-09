@@ -7,38 +7,38 @@ contains a `plugin.json` file into `~/.claude/skills/<name>`, and the plugin loa
 straight out of this working copy. Edits here are live in the next session; there's
 nothing to commit, push, or update first.
 
-This repo currently ships fifteen plugins under `plugins/`:
-`accessibility-skills`, `detached-terminal`, `dfadler-agent-config`, `eval-authoring`,
+This repo currently ships many plugins under `plugins/`:
+`accessibility-skills`, `detached-terminal`, `eval-authoring`,
 `fetch-execute-guide`, `gh-attach-image`, `gh-untrusted`, `gha-ci-audit`, `playwright`, `screen-capture`, `second-brain`,
 `typescript-gotchas`, `vite`, `vitest`, and `worktree-core`. Six single-skill plugins (`accessibility-skills`,
 `detached-terminal`, `fetch-execute-guide`, `gh-attach-image`, `gh-untrusted`, `typescript-gotchas`) keep
 `SKILL.md` at the plugin root and load under a bare name.
 Each gets its own `~/.claude/skills/<name>` link and loads under its own namespace.
-The sections below use `dfadler-agent-config` as the concrete example; the mechanics
+The sections below use `github-pr` as the concrete example; the mechanics
 apply identically to every plugin in the list.
 
 Linking the plugin as a unit (rather than fanning its skills and agents out as
 individual symlinks, which is what `setup.sh` used to do) is what buys the plugin an
 identity — `claude plugin list` shows it with a version, `claude plugin disable` turns
-it off, `claude plugin details dfadler-agent-config` prints its component inventory and
-projected token cost, and `claude plugin validate plugins/dfadler-agent-config` checks
+it off, `claude plugin details github-pr` prints its component inventory and
+projected token cost, and `claude plugin validate plugins/github-pr` checks
 the manifest and every skill/agent it contains. The plugin's `agents/` are discovered from
 inside it, so they don't get linked separately.
 
 Loading it this way *does* namespace what it contains: the plugin's skills and agents
-are exposed as `dfadler-agent-config:<name>`, not under bare names — in a live session
-that's `dfadler-agent-config:pr-babysit`, and the agent as
-`dfadler-agent-config:adversarial-reviewer`. What decides this is the `skills/`
+are exposed as `github-pr:<name>`, not under bare names — in a live session
+that's `github-pr:pr-babysit`, and the agent as
+`adversarial-reviewer:adversarial-reviewer`. What decides this is the `skills/`
 subdirectory, not the manifest: a directory that keeps its `SKILL.md` at its own root
 loads as a single skill under a bare name even when it does carry a
 `.claude-plugin/plugin.json`. Only a `skills/` subdirectory produces the
 `<plugin>:<skill>` form.
 
 The namespace is the whole collision story, which is why skills and agents here are
-named plainly — `pr-babysit`, not `dfadler-agent-config-pr-babysit`. They used to carry
+named plainly — `pr-babysit`, not `github-pr-pr-babysit`. They used to carry
 that prefix, from back when they were linked in individually and shared a flat namespace
 with every project's own skills; inside a namespaced plugin it only produced
-`generic-tools:dfadler-agent-config-pr-babysit`, saying the same thing twice.
+`github-pr:github-pr-pr-babysit`, saying the same thing twice.
 
 ## Single-skill plugins: bare skill vs. plugin
 
