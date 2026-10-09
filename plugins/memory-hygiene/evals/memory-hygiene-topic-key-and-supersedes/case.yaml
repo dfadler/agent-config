@@ -1,0 +1,60 @@
+# Run: claude plugin eval plugins/memory-hygiene --case memory-hygiene-topic-key-and-supersedes --runs 3 --trust-plugin --no-publish
+# Shared run/grant facts: docs/contributing.md, "Plugin evals". No grant needed (Skill only,
+# the memory file is written in the reply).
+# Should-fire behavior case: a memory that corrects an older one. A no-plugin model names it
+# freely (e.g. `database_choice_postgres`) and edits in place; the skill wants a
+# `family/description` slug, a **Supersedes:** marker on the new file and a **Superseded by:**
+# marker on the old (delta expected).
+# Sabotage map: topic_key_name checks "Topic-key style names" (two lowercase kebab-case
+# segments); supersedes_marker and superseded_by_marker check "Supersedes / superseded-by".
+# Can fail: a snake_case or one-segment name fails topic_key_name; a missing marker fails the
+# matching grader; skill_fired fails if the description stops matching.
+schema_version: "1.1"
+name: memory-hygiene-topic-key-and-supersedes
+description: >
+  Asked to record that a project moved from MySQL to Postgres, correcting an existing memory
+  named decision/database-choice, the model invokes memory-hygiene and the new memory has a
+  family/description name and both supersession markers. expected_outcome: PASS when the skill
+  fires, a name: line has a two-segment kebab-case slug and both markers appear; FAIL
+  otherwise.
+tags: [memory-hygiene, behavior, quick]
+
+execution:
+  prompt: |
+    My auto-memory already has a file named `decision/database-choice` saying "the project
+    uses MySQL". That is now wrong: we migrated to Postgres. Write the corrected memory file
+    and show exactly what to add to the old file. Don't run anything. Reply with the new
+    file's contents (front matter included) and the old file's one-line addition, nothing
+    else.
+  max_turns: 6
+  allowed_tools:
+    - Skill
+
+graders:
+  # Steps. Indicator in a two-arm run, scored only with the plugin.
+  - name: skill_fired
+    type: tool_used
+    tool: Skill
+    input_match: '"skill"\s*:\s*"(?:[\w-]+:)?memory-hygiene"'
+    min: 1
+    arm: with-only
+
+  # Result.
+  - name: topic_key_name
+    type: regex
+    target: last_message
+    pattern: '^name:\s*[a-z0-9]+(?:-[a-z0-9]+)*/[a-z0-9]+(?:-[a-z0-9]+)*\s*$'
+    flags: m
+    match: contains
+
+  - name: supersedes_marker
+    type: regex
+    target: last_message
+    pattern: '\*\*Supersedes:\*\*\s*\[\[[^\]]+\]\]'
+    match: contains
+
+  - name: superseded_by_marker
+    type: regex
+    target: last_message
+    pattern: '\*\*Superseded by:\*\*\s*\[\[[^\]]+\]\]'
+    match: contains

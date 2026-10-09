@@ -1,0 +1,54 @@
+# Run: claude plugin eval plugins/issue-tracker --case issue-tracker-uses-declared-jira --runs 3 --trust-plugin --no-publish
+# Shared run/grant facts: docs/contributing.md, "Plugin evals". No grant needed (Skill only,
+# the user asks which tool, nothing is posted).
+# Should-fire behavior case with a declared tracker: the project's CLAUDE.md says Jira. A
+# no-plugin model defaults to `gh issue create` for a git repo; the skill says the declared
+# section is the single source of truth and Jira means the connector, never `gh issue`.
+# Sabotage map: uses_jira checks "Jira: use the Jira MCP connector"; no_gh_issue checks
+# "never `gh issue`".
+# Can fail: any `gh issue` in the reply fails no_gh_issue; skill_fired fails if the
+# description stops matching issue creation.
+schema_version: "1.1"
+name: issue-tracker-uses-declared-jira
+description: >
+  With a CLAUDE.md declaring "Jira project: SHOP", a request to file a bug makes the model
+  invoke issue-tracker and answer with the Jira connector, not gh issue. expected_outcome:
+  PASS when the skill fires, the reply mentions Jira (connector/MCP) and no gh issue command;
+  FAIL otherwise.
+tags: [issue-tracker, behavior, quick]
+
+execution:
+  prompt: |
+    This repo is on GitHub and its CLAUDE.md contains:
+
+    ## Issue tracker
+    Jira project: SHOP
+
+    File a bug for me: "checkout button does nothing on Safari". Don't post anything yet.
+    In at most 3 sentences, say which tool you would use to create it and where it will live.
+  max_turns: 6
+  allowed_tools:
+    - Skill
+
+graders:
+  # Steps. Indicator in a two-arm run, scored only with the plugin.
+  - name: skill_fired
+    type: tool_used
+    tool: Skill
+    input_match: '"skill"\s*:\s*"(?:[\w-]+:)?issue-tracker"'
+    min: 1
+    arm: with-only
+
+  # Result.
+  - name: uses_jira
+    type: regex
+    target: last_message
+    pattern: 'Jira[^\n]*(?:connector|MCP)|(?:connector|MCP)[^\n]*Jira'
+    flags: i
+    match: contains
+
+  - name: no_gh_issue
+    type: regex
+    target: last_message
+    pattern: 'gh\s+issue'
+    match: not_contains

@@ -1,0 +1,40 @@
+# Run: claude plugin eval plugins/memory-hygiene --case memory-hygiene-stays-quiet-on-ram-question --trust-plugin --no-publish
+# Shared run/grant facts: docs/contributing.md, "Plugin evals". No grant needed (Skill only).
+# Should-not-fire near-miss: "memory" meaning RAM, nothing to do with auto-memory files.
+# Regression guard: delta 0 by design.
+# Can fail: the skill firing fails no_memory_skill; a reply that does not mention a heap or
+# leak fails answers_leak.
+schema_version: "1.1"
+name: memory-hygiene-stays-quiet-on-ram-question
+description: >
+  A question about a Node process's growing memory (RAM) must not invoke memory-hygiene.
+  expected_outcome: PASS when the skill is not invoked and the reply addresses the heap or a
+  leak; FAIL otherwise. Regression guard: Delta 0 by design.
+tags: [memory-hygiene, trigger, quick]
+
+execution:
+  prompt: |
+    My Node service's memory climbs from 200MB to 2GB over a day and never drops. In two
+    sentences, what is the first thing you would check? Don't run anything.
+  max_turns: 6
+  allowed_tools:
+    - Skill
+
+graders:
+  - name: no_memory_skill
+    type: tool_used
+    tool: Skill
+    input_match: '"skill"\s*:\s*"(?:[\w-]+:)?memory-hygiene"'
+    min: 0
+    max: 0
+    arm: both
+
+  # Completion check, tautological for a baseline.
+  - name: answers_leak
+    type: regex
+    target: last_message
+    pattern: 'heap|leak'
+    flags: i
+    match: contains
+    arm: both
+    weight: 0.5

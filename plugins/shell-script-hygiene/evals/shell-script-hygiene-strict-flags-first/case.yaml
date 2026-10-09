@@ -1,0 +1,56 @@
+# Run: claude plugin eval plugins/shell-script-hygiene --case shell-script-hygiene-strict-flags-first --runs 3 --trust-plugin --no-publish
+# Shared run/grant facts: docs/contributing.md, "Plugin evals". No grant needed (Skill only,
+# the script is written in the reply).
+# Should-fire behavior case: a new bash script. A no-plugin model usually writes `set -e` or
+# nothing; the skill demands `set -uo pipefail` as the first real statement, a `--help` path
+# and named exit codes (delta expected).
+# Sabotage map: sets_strict_flags checks the first bullet ("first real statement should be
+# `set -uo pipefail`"); has_help the `-h`/`--help` bullet; no_bare_exit_1 the named-exit-codes
+# bullet.
+# Can fail: `set -e` alone or a late `set` fails sets_strict_flags; `exit 1` fails
+# no_bare_exit_1; skill_fired fails if the description stops matching.
+schema_version: "1.1"
+name: shell-script-hygiene-strict-flags-first
+description: >
+  Asked for a new bash script, the model invokes shell-script-hygiene and the script it writes
+  has set -uo pipefail (or -euo) right after the shebang, handles -h/--help and uses no bare
+  exit 1. expected_outcome: PASS when the skill fires and all three script checks hold; FAIL
+  otherwise.
+tags: [shell-script-hygiene, behavior, quick]
+
+execution:
+  prompt: |
+    Write backup.sh: a bash script that takes a directory path as its only argument and
+    copies it to /var/backups/ with cp -a. Print the complete script in one code block and
+    nothing else.
+  max_turns: 6
+  allowed_tools:
+    - Skill
+
+graders:
+  # Steps. Indicator in a two-arm run, scored only with the plugin.
+  - name: skill_fired
+    type: tool_used
+    tool: Skill
+    input_match: '"skill"\s*:\s*"(?:[\w-]+:)?shell-script-hygiene"'
+    min: 1
+    arm: with-only
+
+  # Result.
+  - name: sets_strict_flags
+    type: regex
+    target: last_message
+    pattern: '^#!.*\n(?:\s*(?:#[^\n]*)?\n)*set -e?uo pipefail'
+    match: contains
+
+  - name: has_help
+    type: regex
+    target: last_message
+    pattern: '(?:-h\b|--help)'
+    match: contains
+
+  - name: no_bare_exit_1
+    type: regex
+    target: last_message
+    pattern: '\bexit 1\b'
+    match: not_contains
