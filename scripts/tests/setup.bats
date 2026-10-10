@@ -546,7 +546,7 @@ _add_memory_hygiene_hook_fixture() {
   _add_worktree_core_fixture
   run_setup
   assert_success
-  HOOK_CMD="$HOME/.claude/skills/worktree-core/skills/git-worktree-usage/scripts/require-worktree-hook.sh"
+  HOOK_CMD="node \"$HOME/.claude/skills/worktree-core/scripts/ts/require-worktree-hook.ts\""
   run python3 -c "
 import json, sys
 d = json.load(open('$HOME/.claude/settings.json'))
@@ -562,7 +562,7 @@ sys.exit(0 if '$HOOK_CMD' in cmds else 1)
   assert_success
   run_setup
   assert_success
-  HOOK_CMD="$HOME/.claude/skills/worktree-core/skills/git-worktree-usage/scripts/require-worktree-hook.sh"
+  HOOK_CMD="node \"$HOME/.claude/skills/worktree-core/scripts/ts/require-worktree-hook.ts\""
   run python3 -c "
 import json
 d = json.load(open('$HOME/.claude/settings.json'))
@@ -579,7 +579,7 @@ assert count == 1, 'expected 1, got {}'.format(count)
   assert_success
   run_setup_with --skip=worktree-core
   assert_success
-  HOOK_CMD="$HOME/.claude/skills/worktree-core/skills/git-worktree-usage/scripts/require-worktree-hook.sh"
+  HOOK_CMD="node \"$HOME/.claude/skills/worktree-core/scripts/ts/require-worktree-hook.ts\""
   run python3 -c "
 import json
 d = json.load(open('$HOME/.claude/settings.json'))
@@ -593,8 +593,8 @@ assert '$HOOK_CMD' not in cmds, 'hook still present after skip'
   _add_worktree_core_fixture
   run_setup
   assert_success
-  SYMLINK_CMD="$HOME/.claude/skills/worktree-core/skills/git-worktree-usage/scripts/check-worktree-symlinks-hook.sh"
-  PRUNE_CMD="$HOME/.claude/skills/worktree-core/skills/git-worktree-usage/scripts/prune-merged-worktrees-hook.sh"
+  SYMLINK_CMD="node \"$HOME/.claude/skills/worktree-core/scripts/ts/check-worktree-symlinks-hook.ts\""
+  PRUNE_CMD="node \"$HOME/.claude/skills/worktree-core/scripts/ts/prune-merged-worktrees-hook.ts\""
   run python3 -c "
 import json, sys
 d = json.load(open('$HOME/.claude/settings.json'))
@@ -613,8 +613,8 @@ assert all('matcher' not in e for e in entries), 'SessionStart entry should have
   assert_success
   run_setup_with --skip=worktree-core
   assert_success
-  SYMLINK_CMD="$HOME/.claude/skills/worktree-core/skills/git-worktree-usage/scripts/check-worktree-symlinks-hook.sh"
-  PRUNE_CMD="$HOME/.claude/skills/worktree-core/skills/git-worktree-usage/scripts/prune-merged-worktrees-hook.sh"
+  SYMLINK_CMD="node \"$HOME/.claude/skills/worktree-core/scripts/ts/check-worktree-symlinks-hook.ts\""
+  PRUNE_CMD="node \"$HOME/.claude/skills/worktree-core/scripts/ts/prune-merged-worktrees-hook.ts\""
   run python3 -c "
 import json
 d = json.load(open('$HOME/.claude/settings.json'))
@@ -629,7 +629,7 @@ assert '$PRUNE_CMD' not in cmds, 'auto-prune hook still present after skip'
   _add_memory_hygiene_hook_fixture
   run_setup
   assert_success
-  HOOK_CMD="$HOME/.claude/skills/memory-hygiene/hooks/scripts/memory-hygiene-stop-hook.sh"
+  HOOK_CMD="node \"$HOME/.claude/skills/memory-hygiene/scripts/ts/memory-hygiene-stop-hook.ts\""
   run python3 -c "
 import json, sys
 d = json.load(open('$HOME/.claude/settings.json'))
@@ -647,12 +647,40 @@ assert all('matcher' not in e for e in entries), 'Stop entry should have no matc
   assert_success
   run_setup_with --skip=memory-hygiene
   assert_success
-  HOOK_CMD="$HOME/.claude/skills/memory-hygiene/hooks/scripts/memory-hygiene-stop-hook.sh"
+  HOOK_CMD="node \"$HOME/.claude/skills/memory-hygiene/scripts/ts/memory-hygiene-stop-hook.ts\""
   run python3 -c "
 import json
 d = json.load(open('$HOME/.claude/settings.json'))
 cmds = [h['command'] for e in d.get('hooks', {}).get('Stop', []) for h in e.get('hooks', [])]
 assert '$HOOK_CMD' not in cmds, 'hook still present after skip'
+"
+  [ "$status" -eq 0 ]
+}
+
+@test "hook migration: setup replaces retired .sh shim registrations with the node .ts command" {
+  _add_worktree_core_fixture
+  _add_memory_hygiene_hook_fixture
+  mkdir -p "$HOME/.claude"
+  LEGACY="$HOME/.claude/skills/worktree-core/skills/git-worktree-usage/scripts/require-worktree-hook.sh"
+  LEGACY_MH="$HOME/.claude/skills/memory-hygiene/hooks/scripts/memory-hygiene-stop-hook.sh"
+  python3 - "$HOME/.claude/settings.json" "$LEGACY" "$LEGACY_MH" <<'PY'
+import json, sys
+legacy, mh = sys.argv[2], sys.argv[3]
+json.dump({"hooks": {
+  "PreToolUse": [{"matcher": "Edit|Write", "hooks": [{"type": "command", "command": legacy}]}],
+  "Stop": [{"hooks": [{"type": "command", "command": mh}, {"type": "command", "command": "foreign-stop"}]}],
+}}, open(sys.argv[1], "w"))
+PY
+  run_setup
+  assert_success
+  run python3 -c "
+import json
+d = json.load(open('$HOME/.claude/settings.json'))
+cmds = [h['command'] for ev in d['hooks'].values() for e in ev for h in e['hooks']]
+assert '$LEGACY' not in cmds and '$LEGACY_MH' not in cmds, cmds
+assert 'node \"$HOME/.claude/skills/worktree-core/scripts/ts/require-worktree-hook.ts\"' in cmds, cmds
+assert 'node \"$HOME/.claude/skills/memory-hygiene/scripts/ts/memory-hygiene-stop-hook.ts\"' in cmds, cmds
+assert 'foreign-stop' in cmds, cmds
 "
   [ "$status" -eq 0 ]
 }

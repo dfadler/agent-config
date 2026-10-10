@@ -31,9 +31,11 @@
 #                            skipped, and deregisters it when the feature is
 #                            skipped. teardown.sh deregisters every row
 #                            unconditionally, regardless of this field.
-#   PLUGIN_HOOK_CMDS[i]      Absolute path to the installed hook script under
-#                            ~/.claude/skills, matching where setup.sh links
-#                            each plugin (see the plugin-linking block below).
+#   PLUGIN_HOOK_CMDS[i]      Command line (`node "<abs .ts path>"`) for the hook
+#                            script under ~/.claude/skills, matching where
+#                            setup.sh links each plugin. Quoted so a HOME with
+#                            spaces survives the shell. PLUGIN_HOOK_LEGACY_CMDS[i]
+#                            is the retired .sh path for the same row.
 #
 # shellcheck disable=SC2034  # read by setup.sh/teardown.sh after sourcing
 PLUGIN_HOOK_EVENTS=(
@@ -58,6 +60,17 @@ PLUGIN_HOOK_FEATURES=(
 )
 # shellcheck disable=SC2034
 PLUGIN_HOOK_CMDS=(
+  "node \"$HOME/.claude/skills/worktree-core/scripts/ts/require-worktree-hook.ts\""
+  "node \"$HOME/.claude/skills/worktree-core/scripts/ts/check-worktree-symlinks-hook.ts\""
+  "node \"$HOME/.claude/skills/worktree-core/scripts/ts/prune-merged-worktrees-hook.ts\""
+  "node \"$HOME/.claude/skills/memory-hygiene/scripts/ts/memory-hygiene-stop-hook.ts\""
+)
+# Retired .sh shim commands (removed in #441 phase 6). setup.sh deregisters
+# any still present in settings.json (migration) and teardown.sh sweeps them
+# too, so no hook is left pointing at a deleted file. Rows pair with the
+# arrays above by index (same event).
+# shellcheck disable=SC2034
+PLUGIN_HOOK_LEGACY_CMDS=(
   "$HOME/.claude/skills/worktree-core/skills/git-worktree-usage/scripts/require-worktree-hook.sh"
   "$HOME/.claude/skills/worktree-core/skills/git-worktree-usage/scripts/check-worktree-symlinks-hook.sh"
   "$HOME/.claude/skills/worktree-core/skills/git-worktree-usage/scripts/prune-merged-worktrees-hook.sh"

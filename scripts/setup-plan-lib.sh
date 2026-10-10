@@ -277,6 +277,14 @@ plan_plugin_links() {
 # in which case the action is still planned so the applier reports it.
 plan_hooks() {
   local settings="$HOME/.claude/settings.json" i rc
+  # Migration: drop retired .sh shim registrations before (re)registering.
+  for i in "${!PLUGIN_HOOK_EVENTS[@]}"; do
+    rc=0
+    hook_registration_state "${PLUGIN_HOOK_EVENTS[$i]}" "${PLUGIN_HOOK_LEGACY_CMDS[$i]}" "$settings" || rc=$?
+    if [[ "$rc" == 0 ]]; then
+      printf 'deregister-hook\t%s\t%s\n' "${PLUGIN_HOOK_EVENTS[$i]}" "${PLUGIN_HOOK_LEGACY_CMDS[$i]}"
+    fi
+  done
   for i in "${!PLUGIN_HOOK_EVENTS[@]}"; do
     rc=0
     hook_registration_state "${PLUGIN_HOOK_EVENTS[$i]}" "${PLUGIN_HOOK_CMDS[$i]}" "$settings" || rc=$?
