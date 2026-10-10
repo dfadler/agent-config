@@ -27,9 +27,9 @@ setup() {
   echo "## Convention three (opt-in only)" > "$FAKE_REPO/claude/conventions/three.md"
   printf '# comment, and a blank line below\n\none.md\ntwo.md\n' \
     > "$FAKE_REPO/claude/conventions/DEFAULT_ENABLED"
-  mkdir -p "$FAKE_REPO/plugins/dfadler-agent-config/.claude-plugin"
-  echo '{"name":"dfadler-agent-config"}' \
-    > "$FAKE_REPO/plugins/dfadler-agent-config/.claude-plugin/plugin.json"
+  mkdir -p "$FAKE_REPO/plugins/demo-plugin/.claude-plugin"
+  echo '{"name":"demo-plugin"}' \
+    > "$FAKE_REPO/plugins/demo-plugin/.claude-plugin/plugin.json"
   mkdir -p "$FAKE_REPO/scripts"
   cp "$REPO_ROOT/scripts/claude-md-lib.sh" "$FAKE_REPO/scripts/claude-md-lib.sh"
   cp "$REPO_ROOT/scripts/settings-lib.sh" "$FAKE_REPO/scripts/settings-lib.sh"
@@ -67,13 +67,13 @@ run_setup_with() {
   [ -f "$HOME/.claude/CLAUDE.md" ]
   grep -qF "@$FAKE_REPO/claude/CLAUDE.md" "$HOME/.claude/CLAUDE.md"
   [ "$(readlink "$HOME/.claude/commands/demo.md")" = "$FAKE_REPO/claude/commands/demo.md" ]
-  [ "$(readlink "$HOME/.claude/skills/dfadler-agent-config")" = "$FAKE_REPO/plugins/dfadler-agent-config" ]
+  [ "$(readlink "$HOME/.claude/skills/demo-plugin")" = "$FAKE_REPO/plugins/demo-plugin" ]
 }
 
 @test "links the plugin as a directory, not its contents" {
   run_setup
   assert_success
-  [ -L "$HOME/.claude/skills/dfadler-agent-config" ]
+  [ -L "$HOME/.claude/skills/demo-plugin" ]
   # If contents were linked individually there'd be per-skill entries here.
   local count
   count="$(find "$HOME/.claude/skills" -maxdepth 1 -mindepth 1 | wc -l | tr -d ' ')"
@@ -247,7 +247,7 @@ run_setup_with() {
 # plugin was linked as a unit, and links under the old generic-tools name.
 @test "prunes a superseded per-skill link into this repo's plugins/" {
   mkdir -p "$HOME/.claude/skills"
-  ln -s "$FAKE_REPO/plugins/dfadler-agent-config/skills/gh-attach-image" \
+  ln -s "$FAKE_REPO/plugins/demo-plugin/skills/gh-attach-image" \
     "$HOME/.claude/skills/gh-attach-image"
   run_setup
   assert_success
@@ -272,13 +272,13 @@ run_setup_with() {
   # $HOME is $SANDBOX/home and the repo is $SANDBOX/repo, so this is the real
   # relative path from the link's directory into the repo's plugins/.
   # resolve_symlink_target cds into the target's PARENT, so that directory has to exist.
-  mkdir -p "$FAKE_REPO/plugins/dfadler-agent-config/skills"
-  ln -s "../../../repo/plugins/dfadler-agent-config/skills/old-skill" \
+  mkdir -p "$FAKE_REPO/plugins/demo-plugin/skills"
+  ln -s "../../../repo/plugins/demo-plugin/skills/old-skill" \
     "$HOME/.claude/skills/old-skill"
   # Sanity-check the fixture itself: if this relative target didn't actually
   # point into the repo, the test would pass for the wrong reason.
   [ "$(cd "$HOME/.claude/skills" && cd "$(dirname "$(readlink old-skill)")" && pwd)" \
-    = "$FAKE_REPO/plugins/dfadler-agent-config/skills" ]
+    = "$FAKE_REPO/plugins/demo-plugin/skills" ]
 
   run_setup
   assert_success
@@ -290,7 +290,7 @@ run_setup_with() {
   assert_success
   run_setup
   assert_success
-  [ "$(readlink "$HOME/.claude/skills/dfadler-agent-config")" = "$FAKE_REPO/plugins/dfadler-agent-config" ]
+  [ "$(readlink "$HOME/.claude/skills/demo-plugin")" = "$FAKE_REPO/plugins/demo-plugin" ]
 }
 
 @test "does not prune a foreign link that merely lives in skills/" {
@@ -324,7 +324,7 @@ run_setup_with() {
   assert_output_contains "Commands:"
   assert_output_contains "demo"
   assert_output_contains "Plugins:"
-  assert_output_contains "dfadler-agent-config"
+  assert_output_contains "demo-plugin"
   [ ! -e "$HOME/.claude" ]
 }
 
@@ -339,21 +339,21 @@ run_setup_with() {
   run_setup_with --skip=demo
   assert_success
   [ ! -e "$HOME/.claude/commands/demo.md" ]
-  [ "$(readlink "$HOME/.claude/skills/dfadler-agent-config")" = "$FAKE_REPO/plugins/dfadler-agent-config" ]
+  [ "$(readlink "$HOME/.claude/skills/demo-plugin")" = "$FAKE_REPO/plugins/demo-plugin" ]
 }
 
 @test "--skip=<plugin> leaves that plugin unlinked but links commands" {
-  run_setup_with --skip=dfadler-agent-config
+  run_setup_with --skip=demo-plugin
   assert_success
-  [ ! -e "$HOME/.claude/skills/dfadler-agent-config" ]
+  [ ! -e "$HOME/.claude/skills/demo-plugin" ]
   [ "$(readlink "$HOME/.claude/commands/demo.md")" = "$FAKE_REPO/claude/commands/demo.md" ]
 }
 
 @test "--skip accepts a comma-separated list across both namespaces" {
-  run_setup_with --skip=demo,dfadler-agent-config
+  run_setup_with --skip=demo,demo-plugin
   assert_success
   [ ! -e "$HOME/.claude/commands/demo.md" ]
-  [ ! -e "$HOME/.claude/skills/dfadler-agent-config" ]
+  [ ! -e "$HOME/.claude/skills/demo-plugin" ]
 }
 
 @test "opting a command back out on a later run removes its previously-linked symlink" {
@@ -369,11 +369,11 @@ run_setup_with() {
 @test "opting a plugin back out on a later run removes its previously-linked symlink" {
   run_setup
   assert_success
-  [ -L "$HOME/.claude/skills/dfadler-agent-config" ]
-  run_setup_with --skip=dfadler-agent-config
+  [ -L "$HOME/.claude/skills/demo-plugin" ]
+  run_setup_with --skip=demo-plugin
   assert_success
   assert_output_contains "Removed superseded symlink"
-  [ ! -e "$HOME/.claude/skills/dfadler-agent-config" ]
+  [ ! -e "$HOME/.claude/skills/demo-plugin" ]
 }
 
 @test "re-running with the same --skip list is idempotent" {
@@ -397,7 +397,7 @@ run_setup_with() {
 # --- --include -----------------------------------------------------------
 
 @test "--skip and --include together exits 2 and links nothing" {
-  run_setup_with --skip=demo --include=dfadler-agent-config
+  run_setup_with --skip=demo --include=demo-plugin
   [ "$status" -eq 2 ]
   assert_output_contains "--skip and --include cannot be combined."
   [ ! -e "$HOME/.claude" ]
@@ -435,49 +435,49 @@ run_setup_with() {
   run_setup_with --skip=
   assert_success
   [ "$(readlink "$HOME/.claude/commands/demo.md")" = "$FAKE_REPO/claude/commands/demo.md" ]
-  [ "$(readlink "$HOME/.claude/skills/dfadler-agent-config")" = "$FAKE_REPO/plugins/dfadler-agent-config" ]
+  [ "$(readlink "$HOME/.claude/skills/demo-plugin")" = "$FAKE_REPO/plugins/demo-plugin" ]
 }
 
 @test "--include=<command> links only that command, not the plugin" {
   run_setup_with --include=demo
   assert_success
   [ "$(readlink "$HOME/.claude/commands/demo.md")" = "$FAKE_REPO/claude/commands/demo.md" ]
-  [ ! -e "$HOME/.claude/skills/dfadler-agent-config" ]
+  [ ! -e "$HOME/.claude/skills/demo-plugin" ]
 }
 
 @test "--include=<plugin> links only that plugin, not the command" {
-  run_setup_with --include=dfadler-agent-config
+  run_setup_with --include=demo-plugin
   assert_success
-  [ "$(readlink "$HOME/.claude/skills/dfadler-agent-config")" = "$FAKE_REPO/plugins/dfadler-agent-config" ]
+  [ "$(readlink "$HOME/.claude/skills/demo-plugin")" = "$FAKE_REPO/plugins/demo-plugin" ]
   [ ! -e "$HOME/.claude/commands/demo.md" ]
 }
 
 @test "--include accepts a comma-separated list across both namespaces" {
-  run_setup_with --include=demo,dfadler-agent-config
+  run_setup_with --include=demo,demo-plugin
   assert_success
   [ "$(readlink "$HOME/.claude/commands/demo.md")" = "$FAKE_REPO/claude/commands/demo.md" ]
-  [ "$(readlink "$HOME/.claude/skills/dfadler-agent-config")" = "$FAKE_REPO/plugins/dfadler-agent-config" ]
+  [ "$(readlink "$HOME/.claude/skills/demo-plugin")" = "$FAKE_REPO/plugins/demo-plugin" ]
 }
 
 @test "narrowing --include on a later run removes the previously-linked command" {
-  run_setup_with --include=demo,dfadler-agent-config
+  run_setup_with --include=demo,demo-plugin
   assert_success
   [ -L "$HOME/.claude/commands/demo.md" ]
-  run_setup_with --include=dfadler-agent-config
+  run_setup_with --include=demo-plugin
   assert_success
   assert_output_contains "Removed opted-out symlink"
   [ ! -e "$HOME/.claude/commands/demo.md" ]
-  [ "$(readlink "$HOME/.claude/skills/dfadler-agent-config")" = "$FAKE_REPO/plugins/dfadler-agent-config" ]
+  [ "$(readlink "$HOME/.claude/skills/demo-plugin")" = "$FAKE_REPO/plugins/demo-plugin" ]
 }
 
 @test "narrowing --include on a later run removes the previously-linked plugin" {
-  run_setup_with --include=demo,dfadler-agent-config
+  run_setup_with --include=demo,demo-plugin
   assert_success
-  [ -L "$HOME/.claude/skills/dfadler-agent-config" ]
+  [ -L "$HOME/.claude/skills/demo-plugin" ]
   run_setup_with --include=demo
   assert_success
   assert_output_contains "Removed superseded symlink"
-  [ ! -e "$HOME/.claude/skills/dfadler-agent-config" ]
+  [ ! -e "$HOME/.claude/skills/demo-plugin" ]
 }
 
 @test "re-running with the same --include list is idempotent" {
@@ -490,10 +490,10 @@ run_setup_with() {
 }
 
 @test "--include prints the exact re-run command as the last output" {
-  run_setup_with --no-companions --include=demo,dfadler-agent-config
+  run_setup_with --no-companions --include=demo,demo-plugin
   assert_success
   [ "${lines[$((${#lines[@]} - 2))]}" = "To re-run with this feature selection:" ]
-  [ "${lines[$((${#lines[@]} - 1))]}" = "  ./setup.sh --include=demo,dfadler-agent-config" ]
+  [ "${lines[$((${#lines[@]} - 1))]}" = "  ./setup.sh --include=demo,demo-plugin" ]
 }
 
 @test "--skip prints the exact re-run command as the last output" {
@@ -512,10 +512,10 @@ run_setup_with() {
 @test "dropping --include on a later run re-links everything" {
   run_setup_with --include=demo
   assert_success
-  [ ! -e "$HOME/.claude/skills/dfadler-agent-config" ]
+  [ ! -e "$HOME/.claude/skills/demo-plugin" ]
   run_setup
   assert_success
-  [ "$(readlink "$HOME/.claude/skills/dfadler-agent-config")" = "$FAKE_REPO/plugins/dfadler-agent-config" ]
+  [ "$(readlink "$HOME/.claude/skills/demo-plugin")" = "$FAKE_REPO/plugins/demo-plugin" ]
 }
 
 # ---------------------------------------------------------------------------
