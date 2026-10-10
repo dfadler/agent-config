@@ -17,6 +17,7 @@ setup() {
   mkdir -p "$FAKE_REPO/scripts"
   # Copy only what check-companions.sh reads, so the fixture stays small and
   # stable.
+  cp "$REPO_ROOT/scripts/settings-lib.sh" "$FAKE_REPO/scripts/settings-lib.sh"
   cp "$REPO_ROOT/scripts/check-companions.sh" \
     "$FAKE_REPO/scripts/check-companions.sh"
   chmod +x "$FAKE_REPO/scripts/check-companions.sh"

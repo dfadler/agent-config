@@ -141,11 +141,13 @@ how to install it.
 
 ```bash
 ./doctor.sh          # report only — same checks setup.sh runs at the end
-./doctor.sh --fix    # also apply known fixes (currently: rtk's exclude_commands)
+./doctor.sh --fix    # also apply known fixes (rtk's exclude_commands, dangling hooks/symlinks)
+./upgrade.sh         # git pull --ff-only, ./setup.sh, then ./doctor.sh --fix
 ```
 
 `doctor.sh` is a thin wrapper around `scripts/check-companions.sh`; both names run
-the same checks. Nothing is changed unless `--fix` (or `--install-deps` for the
+the same checks, and doctor is the one place repairs live (`setup.sh --fix` forwards
+to it). Nothing is changed unless `--fix` (or `--install-deps` for the
 `pyte` dependency) is passed explicitly — see
 [`docs/companion-plugins.md`](docs/companion-plugins.md#known-conflict-rtks-git-rewrite-breaks-git-inside-a-worktree-session)
 for the rtk conflict `--fix` currently resolves.

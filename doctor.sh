@@ -1,7 +1,8 @@
 #!/usr/bin/env bash
 # Thin discoverability wrapper, alongside setup.sh/teardown.sh at the repo
 # root. All detect/fix logic lives in scripts/check-companions.sh — this
-# just forwards to it unchanged.
+# just forwards to it unchanged. doctor owns detection and repair; setup.sh
+# only links and registers.
 #
 # Usage: ./doctor.sh [--install-deps] [--fix]
 

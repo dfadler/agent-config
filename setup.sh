@@ -37,11 +37,13 @@ run is rejected rather than guessing which one wins.
   --install-deps     Also install a missing dependency (python3 -m pip
                      install --user pyte), when the interpreter allows it, and
                      playwright-cli (npm install -g @playwright/cli, Node 22).
-  --fix              Also apply other known fixes the companion checks
-                     detect, instead of only reporting them (currently: rtk's
-                     exclude_commands config — see docs/companion-plugins.md).
-                     Forwarded to scripts/check-companions.sh; never runs as
-                     a side effect of a bare invocation.
+  --fix              Backward-compatible forward to './doctor.sh --fix', the
+                     primary way to repair drift (rtk's exclude_commands
+                     config, a displaced require-worktree hook, dangling
+                     hook entries and symlinks). setup only links and
+                     registers; when its closing checks find drift they say
+                     to run './doctor.sh --fix'. Never runs as a side effect
+                     of a bare invocation. See docs/companion-plugins.md.
   --skip=<list>      Comma-separated feature names to leave unlinked (and
                      to unlink if a previous run linked them). A feature is
                      either a slash command's basename (e.g. "adversarial-
