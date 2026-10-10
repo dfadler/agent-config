@@ -68,3 +68,13 @@ lockfile. That argues for keeping it a default include rather than converting it
 Reclassifying it to opt-in either way would mean editing `DEFAULT_ENABLED`'s
 enabled set, which is out of scope here (see issue #278's non-goals), so it's
 recorded as-is: Include (default).
+
+## Eval coverage
+
+Plugin evals cannot test an `@include` convention. A run loads only the plugin under
+test; `CLAUDE.md` and personal settings are absent, and project config a
+`scaffold_script` writes (`CLAUDE.md`, `.claude/`) is not loaded
+(`plugins/eval-authoring/skills/author-cases/references/agents.md` and
+`fixtures-and-mocks.md`). Pasting the rule into the case prompt would test the model
+reading a prompt, not the include, so the always-loaded includes have no evals
+(#647). A rule that needs one should become a skill with a trigger, per the sort above.
