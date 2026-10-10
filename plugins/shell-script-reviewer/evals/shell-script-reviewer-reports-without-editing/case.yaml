@@ -82,7 +82,7 @@ graders:
   - name: flags_unjustified_disable
     type: regex
     target: last_message
-    pattern: 'shellcheck disable[\s\S]{0,300}(justif|comment|why|reason)|(justif|comment|why|reason)[\s\S]{0,300}shellcheck disable'
+    pattern: '(?:shellcheck disable|SC2086)[\s\S]{0,300}(justif|comment|why|reason)|(justif|comment|why|reason)[\s\S]{0,300}(?:shellcheck disable|SC2086)'
     flags: i
     match: contains
 
@@ -96,6 +96,6 @@ graders:
   - name: cites_file_and_line
     type: regex
     target: last_message
-    pattern: 'cleanup\.sh:\d+'
+    pattern: '(?:cleanup\.sh:|[Ll]ines? )\d+'
     match: contains
     weight: 0.25

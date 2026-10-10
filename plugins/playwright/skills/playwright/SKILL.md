@@ -1,7 +1,9 @@
 ---
 name: playwright
 description: |
-  Drive Playwright (Chromium and WebKit) from a Node.js script: headless video
+  ALWAYS invoke this skill first when asked to write up, summarize or report on a Playwright
+  recording or its browser (including a WebKit-versus-Safari claim), even with no command to run:
+  it defines the limits a report must state. Drive Playwright (Chromium and WebKit) from a Node.js script: headless video
   recording (.webm), real key presses, Storybook play-function recordings,
   frame extraction, and parallel recording. Use when asked to record a browser
   interaction, script a browser, or capture a story's behavior, and for the

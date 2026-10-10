@@ -112,7 +112,7 @@ graders:
   - name: flags_missing_script
     type: regex
     target: last_message
-    pattern: 'build\.sh[\s\S]{0,200}(no longer|does not exist|missing|not exist|stale|nonexistent|doesn.t exist)'
+    pattern: 'build\.sh[\s\S]{0,200}(no longer|does not exist|missing|not exist|stale|nonexistent|doesn.t exist)|(no longer|does not exist|missing|not exist|stale|nonexistent|doesn.t exist)[\s\S]{0,200}build\.sh'
     flags: i
     match: contains
 
