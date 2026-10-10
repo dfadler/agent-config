@@ -36,3 +36,12 @@ graders:
     flags: i
     match: contains
     weight: 0.5
+
+
+  # Polarity: keeps_serial also matches "in order ... then spawn parallel subagents".
+  - name: no_parallel_plan
+    type: regex
+    target: last_message
+    pattern: "(?<!not )(?<!n't )(?<!never )(?:spawn|launch|dispatch|fan[- ]out)\\w*\\b[^.]{0,60}\\b(?:parallel|concurrent|(?:two|three|four|multiple|several|\\d+)\\s+(?:\\w+\\s+)?sub-?agents)"
+    flags: i
+    match: not_contains
