@@ -68,13 +68,13 @@ NODE_STAMP=node_modules/.installed
 # gh-attach-image upload script (well covered by bats) moved to TypeScript and
 # left the denominator, leaving 67.99%; to 66 after the worktree-core hooks and
 # prune/verify scripts moved to TypeScript (66.38%); and to 65 after the
-# memory-hygiene stop hook and collab-retro scan script moved too. All are rounded DOWN — kcov line coverage
+# memory-hygiene stop hook and collab-retro scan script moved too; and to 61 after the gha-ci-audit collect/fetch scripts moved (61.99%). All are rounded DOWN — kcov line coverage
 # jitters by fractions of a point as scripts and tests change shape, so the
 # floor sits just under the measurement rather than exactly on it. Measured
 # on ubuntu-24.04 with kcov 42 and bats at the commit shell.yml pins. Lowering
 # this takes a deliberate commit; raising it as coverage improves is welcome.
 COVERAGE_DIR="${COVERAGE_DIR:-coverage}" # overridable so tests never delete a live kcov output dir
-COVERAGE_MIN=65
+COVERAGE_MIN=61
 
 # What lands in the denominator, and what doesn't:
 #
