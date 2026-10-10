@@ -66,7 +66,8 @@ cannot decide.
    for the judgment pass, if available (invocation recipe in the agent file). Then give the user the run command from the
    [run-evals](../run-evals/SKILL.md) skill. Do not run paid
    evals yourself: agent sessions usually cannot authenticate, and `--scaffold` is manual
-   opt-in only.
+   opt-in only. A PR that adds or changes cases carries an "Eval results" section (the
+   run-evals summary), or says why it has none.
 
 ## Gotchas
 

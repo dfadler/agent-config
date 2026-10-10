@@ -13,6 +13,7 @@ import {
   writeFileSync,
 } from "node:fs";
 import { delimiter, dirname, join } from "node:path";
+import { createInterface } from "node:readline/promises";
 
 export interface SpawnOptions {
   /** Called with each stdout chunk as it arrives, so output can be shown live and still captured. */
@@ -55,6 +56,8 @@ export interface Io {
   readonly readFile: (path: string) => string | undefined;
   /** Writes a file, creating parent directories. */
   readonly writeFile: (path: string, text: string) => void;
+  /** Asks a yes/no question on the terminal. False (never a guess) when there is no one to ask. */
+  readonly confirm: (question: string) => Promise<boolean>;
 }
 
 export const spawnProcess: Spawner = (command, args, options = {}) =>
@@ -154,5 +157,12 @@ export const nodeIo = (env: Readonly<Record<string, string | undefined>>): Io =>
   writeFile: (path, text) => {
     mkdirSync(dirname(path), { recursive: true });
     writeFileSync(path, text);
+  },
+  confirm: async (question) => {
+    if (!process.stdin.isTTY) return false;
+    const rl = createInterface({ input: process.stdin, output: process.stderr });
+    const answer = await rl.question(question);
+    rl.close();
+    return /^y(es)?$/i.test(answer.trim());
   },
 });

@@ -13,9 +13,10 @@ allowed-tools: Bash(node ${CLAUDE_SKILL_DIR}/../../scripts/ts/lint/cli.ts *)
 - **Input:** `$ARGUMENTS`: a plugin path, optionally a cost tier (`quick`, `standard`,
   `thorough`) and any other wrapper option (run the wrapper with `--help`).
 - **Output:** the lint result, the planned commands (`--dry-run`), then the wrapper's
-  own output and exit code, reported as is.
+  own output and exit code, reported as is, plus its paste-ready "Eval results" Markdown.
 - **Does not:** start a run you did not ask for, pass `--scaffold`, edit cases or grants,
-  or re-implement the wrapper's preflight checks.
+  re-implement the wrapper's preflight checks, or edit a PR body (`--pr`) without the
+  user's confirmation.
 
 A run is paid: cases x runs x arms agent runs, plus three judge calls per `llm` or
 `baseline` grader per run. The cost figures `claude plugin eval` reports are
@@ -52,7 +53,13 @@ it, do not rebuild any of that.
    can authenticate; an agent session usually cannot (child runs fail with
    `Not logged in`). Give the exact non-dry-run command to run in their own shell.
    Run it from here only if the user asks and the session is logged in.
-5. **Relay the result.** Report the wrapper's output and exit code without
+   To re-run a subset, add `--case <name-or-glob>` (the wrapper filters its own plan, so
+   no temp `--eval-dir`). To put the results in a PR, add `--pr <n>`: it prints the exact
+   marked block, asks, then replaces the `run-evals` block in the PR body with `gh pr
+   edit`. It is off by default, refuses `--dry-run`, and `--yes` skips only the question.
+5. **Relay the result.** The run ends with a Markdown summary (per-case with, without and
+   delta, tier, models, cost, the command, and the redacted, truncated reply of each
+   failed grader); paste it under an "Eval results" heading. Report the wrapper's output and exit code without
    reinterpreting; relay its preflight errors verbatim. Exit codes:
    - `0`: passed, results trustworthy.
    - `1`: below threshold, load failure, or no cases.
