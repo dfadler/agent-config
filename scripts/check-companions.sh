@@ -1207,10 +1207,15 @@ check_dangling() {
     if [[ "$kind" == "hook" ]]; then
       if [[ "$backed_up" == 0 ]]; then
         ts="$(date +%Y%m%d%H%M%S)"
-        cp "$settings" "$settings.bak-$ts"
-        echo "Backed up $settings to $settings.bak-$ts"
-        backed_up=1
+        if cp "$settings" "$settings.bak-$ts"; then
+          echo "Backed up $settings to $settings.bak-$ts"
+          backed_up=1
+        else
+          echo "⚠ could not back up $settings; not removing dangling hooks" >&2
+          backed_up=-1
+        fi
       fi
+      [[ "$backed_up" == 1 ]] || continue
       echo "Removing dangling $a hook: $b"
       ensure_hook_deregistered "$a" "$b" "$settings"
     else

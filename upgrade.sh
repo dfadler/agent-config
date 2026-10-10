@@ -53,7 +53,11 @@ if [[ "$branch" != "main" ]]; then
   echo "upgrade: not on main (on '${branch:-detached HEAD}'). Switch to main first." >&2
   exit 1
 fi
-if [[ -n "$(git status --porcelain)" ]]; then
+if ! status_out="$(git status --porcelain)"; then
+  echo "upgrade: git status failed." >&2
+  exit 1
+fi
+if [[ -n "$status_out" ]]; then
   echo "upgrade: working tree has uncommitted changes. Commit or discard them first." >&2
   exit 1
 fi

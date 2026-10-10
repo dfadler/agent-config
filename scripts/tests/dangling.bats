@@ -115,3 +115,13 @@ run_doctor() {
   assert_success
   [ -L "$HOME/.claude/skills/foreign" ]
 }
+
+@test "--fix keeps the stale hook when the settings backup fails" {
+  mkdir -p "$SANDBOX/shims"
+  printf '#!/bin/sh\nexit 1\n' >"$SANDBOX/shims/cp"
+  chmod +x "$SANDBOX/shims/cp"
+  before="$(cat "$HOME/.claude/settings.json")"
+  PATH="$SANDBOX/shims:$PATH" run_doctor --fix
+  assert_output_contains "could not back up"
+  [ "$(cat "$HOME/.claude/settings.json")" = "$before" ]
+}
