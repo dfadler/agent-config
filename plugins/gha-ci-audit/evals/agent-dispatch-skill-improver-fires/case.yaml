@@ -35,6 +35,6 @@ graders:
   - name: reports_missing_input
     type: regex
     target: last_message
-    pattern: '(benchmark\.json|grading\.json|iteration-4)[\s\S]{0,200}(missing|not found|no such|does not exist|doesn.t exist|could not|couldn.t|unable)|(missing|not found|no such|does not exist|doesn.t exist|could not|couldn.t|unable)[\s\S]{0,200}(benchmark\.json|grading\.json|iteration-4)'
+    pattern: '(benchmark\.json|grading\.json|iteration-4)[\s\S]{0,200}(missing|not found|no such|does not exist|doesn.t exist|could not|couldn.t|unable|denied|never read)|(missing|not found|no such|does not exist|doesn.t exist|could not|couldn.t|unable|denied|never read)[\s\S]{0,200}(benchmark\.json|grading\.json|iteration-4)'
     flags: i
     match: contains
