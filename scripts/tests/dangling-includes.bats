@@ -56,7 +56,7 @@ run_doctor() {
   before="$(cat "$P")"
   run_doctor --fix
   assert_success
-  assert_output_contains "Removing dangling include from $P:2"
+  assert_output_contains "Removed dangling include from $P:2"
   [ "$(grep -c . "$P")" = 4 ]
   grep -q 'keep.md' "$P"
   grep -q '^@RTK.md$' "$P"
@@ -73,6 +73,7 @@ run_doctor() {
   before="$(cat "$P")"
   PATH="$SANDBOX/shims:$PATH" run_doctor --fix
   assert_output_contains "could not back up"
+  refute_output_contains "Removed dangling include"
   [ "$(cat "$P")" = "$before" ]
 }
 
@@ -82,7 +83,7 @@ run_doctor() {
   rm -f "$HOME"/.claude/*.bak-*
   run_doctor --fix
   assert_success
-  refute_output_contains "Removing dangling include"
+  refute_output_contains "Removed dangling include"
   [ "$(cat "$P")" = "$snap" ]
   [ -z "$(ls "$HOME"/.claude/*.bak-* 2>/dev/null)" ]
 }
@@ -92,4 +93,22 @@ run_doctor() {
   run_doctor --fix
   assert_success
   assert_output_contains "no dangling @-includes"
+}
+
+@test "--fix leaves a ..-escaping include alone" {
+  printf '@%s/claude/../outside.md\n' "$FAKE_REPO" >"$P"
+  before="$(cat "$P")"
+  run_doctor --fix
+  assert_success
+  assert_output_contains "left alone"
+  [ "$(cat "$P")" = "$before" ]
+}
+
+@test "--fix edits the target of a symlinked file and keeps the link" {
+  mv "$P" "$SANDBOX/real.md"
+  ln -s "$SANDBOX/real.md" "$P"
+  run_doctor --fix
+  assert_success
+  [ -L "$P" ]
+  ! grep -q 'gone.md' "$SANDBOX/real.md"
 }

@@ -1245,11 +1245,11 @@ check_dangling_includes() {
   if common="$(git -C "$REPO_ROOT" rev-parse --path-format=absolute --git-common-dir 2>/dev/null)"; then
     roots+=("$(dirname "$common")/claude/")
   fi
-  local found=0 name file lineno raw path base r owned note ts drop
+  local found=0 name file lineno raw path base r owned note ts drop dir target tmp
   for name in CLAUDE.md CLAUDE.personal.md; do
     file="$HOME/.claude/$name"
     [[ -f "$file" ]] || continue
-    local -a mine=()
+    local -a mine=() notes=()
     lineno=0
     while IFS= read -r raw || [[ -n "$raw" ]]; do
       lineno=$((lineno + 1))
@@ -1262,9 +1262,19 @@ check_dangling_includes() {
       [[ -e "$path" ]] && continue
       found=1
       owned=0
-      for r in "${roots[@]}"; do
-        [[ "$path" == "$r"* ]] && owned=1
-      done
+      # Resolve `..` and symlinked parents before the prefix check; if the
+      # parent dir is gone too, `..` components make ownership unprovable.
+      if dir="$(cd -P "$(dirname "$path")" 2>/dev/null && pwd -P)"; then
+        path="$dir/$(basename "$path")"
+        for r in "${roots[@]}"; do
+          r="$(cd -P "$r" 2>/dev/null && pwd -P)/" || continue
+          [[ "$path" == "$r"* ]] && owned=1
+        done
+      elif [[ "/$path/" != */../* ]]; then
+        for r in "${roots[@]}"; do
+          [[ "$path" == "$r"* ]] && owned=1
+        done
+      fi
       if [[ "$owned" == 0 ]]; then
         echo "⚠ $file:$lineno includes a missing file (left alone; not ours): ${raw#@}" >&2
         continue
@@ -1276,7 +1286,7 @@ check_dangling_includes() {
         echo "⚠ $file:$lineno includes a file that no longer exists: ${raw#@}$note" >&2
       else
         mine+=("$lineno")
-        echo "Removing dangling include from $file:$lineno: ${raw#@}$note"
+        notes+=("$lineno: ${raw#@}$note")
       fi
     done <"$file"
     if [[ "$FIX" == "1" && ${#mine[@]} -gt 0 ]]; then
@@ -1284,9 +1294,22 @@ check_dangling_includes() {
       if cp "$file" "$file.bak-$ts"; then
         echo "Backed up $file to $file.bak-$ts"
         drop=" ${mine[*]} "
-        awk -v drop="$drop" 'index(drop, " " NR " ") == 0' "$file" >"$file.tmp-$ts" &&
-          cat "$file.tmp-$ts" >"$file"
-        rm -f "$file.tmp-$ts"
+        # Edit the symlink's target, and swap the finished temp file in with
+        # mv so a failed write never truncates the original. cp -p keeps the
+        # mode; the awk redirect then overwrites only the content.
+        target="$file"
+        [[ -L "$file" ]] && target="$(readlink -f "$file")"
+        tmp="$target.tmp-$ts"
+        if cp -p "$target" "$tmp" &&
+          awk -v drop="$drop" 'index(drop, " " NR " ") == 0' "$target" >"$tmp" &&
+          mv -f "$tmp" "$target"; then
+          for raw in "${notes[@]}"; do
+            echo "Removed dangling include from $file:$raw"
+          done
+        else
+          rm -f "$tmp"
+          echo "⚠ could not rewrite $file; left unchanged" >&2
+        fi
       else
         echo "⚠ could not back up $file; not removing dangling includes" >&2
       fi
