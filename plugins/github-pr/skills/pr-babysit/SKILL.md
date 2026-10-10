@@ -17,11 +17,11 @@ description: |
   --auto-merge. Never approves or merges a PR touching a security-critical or
   regulated path — always escalates those to a human instead. For continuous
   monitoring run it under /loop; a single invocation is exactly one pass.
-  Requires the consuming repo to supply its own snapshot script/command
-  matching the JSON contract documented below — this skill has no `gh`-only
-  fallback and does no snapshotting itself.
+  Snapshots with the plugin's own `gh`-only script by default; a project
+  can override it with its own snapshot command matching the JSON contract
+  documented below.
 metadata:
-  version: "1.3.0"
+  version: "1.4.0"
 ---
 
 # Babysit PRs (one pass)
@@ -35,18 +35,17 @@ actions to standalone sibling skills — `fix-ci` to
 owned by a sub-skill, and the final report. See "Delegation boundary" below
 for the exact split. It has no knowledge of any particular repo's slug,
 worktree layout, or build tooling — those live in the project-local skill
-that invokes this one, which supplies:
+that invokes this one, which may supply:
 
 - **A snapshot command** — some `<snapshot-command>` that emits JSON matching
-  the "Snapshot contract" below on stdout. The project-local skill states
-  what this command actually is (e.g. a `package.json` script) and how to
-  pass through an optional PR number/URL argument.
-- **Repo-specific mechanics** — the exact `gh api repos/<owner>/<repo>/...`
-  calls, worktree conventions, and local verification commands (lint/
-  typecheck/test invocations) for that project.
-
-If you were invoked directly rather than via a project-local skill that
-supplies these, stop and say so — this skill cannot run standalone.
+  the "Snapshot contract" below on stdout. Optional: with none, use the
+  plugin's default (Step 1). A project-local skill that supplies one states
+  what it is (e.g. a `package.json` script) and how to pass through an
+  optional PR number/URL argument.
+- **Repo-specific mechanics** — worktree conventions and local verification
+  commands (lint/typecheck/test invocations) for that project. If invoked
+  with none, find them from the repo's own docs (`CLAUDE.md`, README,
+  package scripts) before running anything.
 
 Parse `$ARGUMENTS`: an optional PR number or URL (narrows to that PR), and an
 optional `--auto-merge` flag (arms GitHub auto-merge on ready PRs; default is
@@ -54,12 +53,17 @@ report-only).
 
 ## Step 1 — snapshot
 
-Run the project's snapshot command, passing the PR argument through as-is if
-one was given:
+Run the project's snapshot command if it supplies one; otherwise the
+plugin's default, which needs only an authenticated `gh` and Node 22.18+.
+Pass the PR argument through as-is if one was given:
 
 ```bash
-<snapshot-command> [--pr <number-or-url>]
+node "${CLAUDE_PLUGIN_ROOT}/scripts/ts/pr-snapshot.ts" [--pr <number-or-url>]
 ```
+
+The default has no knowledge of a project's bot-owned branches or required
+review rules, so it never emits `changelog-branch`; a project that needs
+that overrides it. An override must emit the same contract.
 
 The JSON on stdout is the world-state for this pass. Don't re-derive any of
 it with ad-hoc `gh` calls; the only extra reads you should need are failure

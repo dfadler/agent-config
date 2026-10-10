@@ -2,3 +2,5 @@ schema_version: "1"
 grants:
   docs-staleness-checker-reports-without-editing:
     - "Write"
+  docs-staleness-flags-stale-node-version:
+    - "Write"
