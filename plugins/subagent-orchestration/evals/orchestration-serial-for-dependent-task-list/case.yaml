@@ -32,7 +32,7 @@ graders:
   - name: names_dependency
     type: regex
     target: last_message
-    pattern: 'same file|shared file|depend|conflict|ordering|one file'
+    pattern: 'same file|shared file|single file|one file|depend|conflict|order|builds? on|each (?:step|change)|overlap|rely|relies'
     flags: i
     match: contains
     weight: 0.5
