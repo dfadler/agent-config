@@ -34,7 +34,7 @@ graders:
   - name: rewrites_description
     type: regex
     target: last_message
-    pattern: '\bCI\b[\s\S]{0,200}\b(when|use|if)\b|\b(when|use|if)\b[\s\S]{0,200}\bCI\b'
+    pattern: '\bCI\b[\s\S]{0,200}\b(when|whenever|use|if|trigger)\b|\b(when|whenever|use|if|trigger)\b[\s\S]{0,200}\bCI\b'
     flags: i
     match: contains
     arm: both

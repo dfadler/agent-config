@@ -34,6 +34,6 @@ graders:
   - name: reports_missing_input
     type: regex
     target: last_message
-    pattern: '(eval_metadata|report\.html|outputs)[\s\S]{0,200}(missing|not found|no such|does not exist|doesn.t exist|could not|couldn.t|unable)|(missing|not found|no such|does not exist|doesn.t exist|could not|couldn.t|unable)[\s\S]{0,200}(eval_metadata|report\.html|outputs)'
+    pattern: '(eval_metadata|report\.html|outputs)[\s\S]{0,500}(missing|not found|no such|does not exist|doesn.t exist|could not|couldn.t|unable|denied|blocked|not grade|no grading)|(missing|not found|no such|does not exist|doesn.t exist|could not|couldn.t|unable|denied|blocked|not grade|no grading)[\s\S]{0,500}(eval_metadata|report\.html|outputs)'
     flags: i
     match: contains
