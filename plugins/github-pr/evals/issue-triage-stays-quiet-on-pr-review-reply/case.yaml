@@ -31,12 +31,12 @@ graders:
     max: 0
     arm: both
 
-  # Result: the request was addressed with a review-reply approach (a completion check, so the
-  # quiet case cannot pass on an empty reply). Weighted down: a baseline passes it too.
+  # Result: both replies are drafted, rename (opts/options) and test (a completion check, so the
+  # quiet case cannot pass on an empty or one-sided reply). Weighted down: a baseline passes it too.
   - name: addresses_review_threads
     type: regex
     target: last_message
-    pattern: 'thread|unresolved|resolve|address|reply|fix'
+    pattern: '(?:\bopts\b|\boptions\b)[\s\S]*\btest\b|\btest\b[\s\S]*(?:\bopts\b|\boptions\b)'
     flags: i
     match: contains
     arm: both
