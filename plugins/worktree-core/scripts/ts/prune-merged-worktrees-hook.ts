@@ -1,8 +1,8 @@
 // SessionStart hook: remove Claude worktrees whose PR has merged.
 //
 // Mode: WORKTREE_AUTO_PRUNE env var (0/false/no/off = nudge only, 1/true/yes/on
-// = auto-remove), then worktree.autoPrune (true/false) in settings, else do
-// nothing. See prune-merged-worktrees.ts for the safety envelope.
+// = auto-remove), then worktree.autoPrune (true/false) in settings, else print
+// a one-line nudge if merged worktrees exist (--hint). See prune-merged-worktrees.ts for the safety envelope.
 // Informational: always exits 0, even on internal failure.
 import { existsSync } from "node:fs";
 import { join } from "node:path";
@@ -26,16 +26,17 @@ const boolSetting = (settings: unknown): string => {
 
 export const pruneMerged = (ctx: HookCtx, script: string = PRUNE): number => {
   if (isRemote(ctx.env)) return 0;
-  // Fallback "" means "not configured", distinct from an explicit "off",
-  // which still runs the script in nudge-only (--hook) mode.
+  // Fallback "" means "not configured": run the cheap --hint nudge. An
+  // explicit "off" runs the full nudge-only (--hook) mode.
   const mode = resolveEnableMode(ctx, {
     envVar: "WORKTREE_AUTO_PRUNE",
     fromSettings: boolSetting,
     fallback: "",
     valid: ["on", "off"],
   });
-  if (mode === "" || !existsSync(script)) return 0;
-  const r = ctx.script(script, [mode === "on" ? "--auto" : "--hook"]);
+  if (!existsSync(script)) return 0;
+  const flag = mode === "on" ? "--auto" : mode === "off" ? "--hook" : "--hint";
+  const r = ctx.script(script, [flag]);
   ctx.out(r.stdout);
   return 0;
 };

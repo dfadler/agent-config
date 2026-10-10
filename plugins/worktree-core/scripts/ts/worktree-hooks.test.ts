@@ -220,19 +220,23 @@ describe("pruneMerged", () => {
   const script = import.meta.filename;
   const prune = (v: unknown) => JSON.stringify({ worktree: { autoPrune: v } });
 
-  it("does nothing when unconfigured or remote", () => {
-    const a = makeCtx({});
-    pruneMerged(a.ctx, script);
+  it("does nothing when remote", () => {
     const b = makeCtx({ env: { CLAUDE_CODE_REMOTE: "true", WORKTREE_AUTO_PRUNE: "on" } });
     pruneMerged(b.ctx, script);
-    expect(a.bashCalls).toEqual([]);
     expect(b.bashCalls).toEqual([]);
   });
 
-  it("ignores a non-boolean autoPrune setting", () => {
+  it("unconfigured runs the cheap --hint nudge and forwards its output", () => {
+    const a = makeCtx({ bashOut: { stdout: "2 could be pruned\n", stderr: "" } });
+    expect(pruneMerged(a.ctx, script)).toBe(0);
+    expect(a.bashCalls).toEqual([[script, "--hint"]]);
+    expect(a.out.join("")).toBe("2 could be pruned\n");
+  });
+
+  it("a non-boolean autoPrune setting counts as unset (--hint)", () => {
     const c = makeCtx({ settings: prune("yes") });
     pruneMerged(c.ctx, script);
-    expect(c.bashCalls).toEqual([]);
+    expect(c.bashCalls).toEqual([[script, "--hint"]]);
   });
 
   it.each<[Fake, string]>([
