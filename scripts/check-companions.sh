@@ -52,6 +52,13 @@ can also run it directly (also reachable as ./doctor.sh from the repo root).
                    and CLAUDE.personal.md whose file under this repo's claude/
                    tree is gone, backing up to <file>.bak-<time> first). Never runs as a side effect of a bare invocation.
   -h, --help       Show this message and exit.
+
+Run from inside a project, it also reports (never edits) that project's
+.claude/settings.local.json allow rules that are overly broad (git push, stash,
+checkout, gh pr merge), name a package manager the lockfile says is unused,
+point at a vanished path or are one-off literal commands; and the worktree
+count and disk use under .claude/worktrees plus whether worktree.autoPrune
+(or WORKTREE_AUTO_PRUNE) is set. Only the current project is checked.
 USAGE
 }
 
@@ -1322,10 +1329,139 @@ check_dangling_includes() {
   fi
 }
 
+# --------------------------------------------------------------------------
+# Project allow rules and worktree hygiene (report-only, never edits)
+#
+# Scope: only the project doctor is run from (git toplevel of $PWD, else $PWD).
+# There is no registry of projects to walk, and the project list in
+# ~/.claude.json is Claude Code's private state. Run ./doctor.sh from a project
+# to check that project.
+#
+# Allow rules in <project>/.claude/settings.local.json are flagged only for:
+#   - broad grants: Bash(git push|stash|checkout|gh pr merge *), Bash, Bash(*)
+#   - a package manager (bun, pnpm, yarn) the project has a lockfile for a
+#     different one of, and none for itself. npm/npx are never flagged: they
+#     are routinely used beside pnpm for registry queries.
+#   - a hard-coded /Users/... or /home/... path that no longer exists
+#   - a one-off literal: no wildcard and a quote, heredoc or `git commit`
+# Plus an info line for read-only rules that belong in shared settings.
+# --------------------------------------------------------------------------
+check_local_allow_rules() {
+  local proj="$1" file="$1/.claude/settings.local.json"
+  [[ -f "$file" ]] || return 0
+  if ! command -v jq >/dev/null 2>&1; then
+    echo "⚠ jq not found -- skipping the allow-rule check for $file" >&2
+    return 0
+  fi
+  local rules
+  if ! rules="$(jq -r '.permissions.allow[]? | strings' "$file" 2>/dev/null)"; then
+    echo "⚠ could not parse $file -- skipping the allow-rule check" >&2
+    return 0
+  fi
+  local locks=" " f
+  for f in pnpm-lock.yaml:pnpm bun.lock:bun bun.lockb:bun yarn.lock:yarn package-lock.json:npm; do
+    [[ -e "$proj/${f%%:*}" ]] && locks+="${f##*:} "
+  done
+
+  local -a warns=() moves=()
+  local rule inner base tool p flagged short
+  while IFS= read -r rule; do
+    [[ -n "$rule" ]] || continue
+    short="${rule:0:100}"
+    flagged=""
+    if [[ "$rule" == "Bash" ]]; then
+      warns+=("overly broad (allows every command): $short")
+      continue
+    fi
+    [[ "$rule" =~ ^Bash\((.*)\)$ ]] || continue
+    inner="${BASH_REMATCH[1]}"
+    base="${inner%:\*}"
+    base="${base% \*}"
+    if [[ "$inner" == "*" ]] ||
+      { [[ "$base" != "$inner" ]] && [[ "$base" =~ ^(git\ (push|stash|checkout)|gh\ pr\ merge)$ ]]; }; then
+      warns+=("overly broad: $short")
+      continue
+    fi
+    tool="${inner%% *}"
+    [[ "$tool" == "bunx" ]] && tool="bun"
+    if [[ "$tool" =~ ^(bun|pnpm|yarn)$ && "$locks" != " " && "$locks" != *" $tool "* ]]; then
+      warns+=("tool the project no longer uses (lockfiles:${locks%" "}): $short")
+      continue
+    fi
+    while IFS= read -r p; do
+      [[ -n "$p" && ! -e "$p" ]] && flagged="$p"
+    done < <(grep -oE '/(Users|home)/[^[:space:]"'"'"')]+' <<<"$inner" || true)
+    if [[ -n "$flagged" ]]; then
+      warns+=("hard-coded path that no longer exists ($flagged): $short")
+      continue
+    fi
+    if [[ "$inner" != *\** && ("$inner" == "git commit"* || "$inner" == *\'* || "$inner" == *\"* || "$inner" == *'<<'*) ]]; then
+      warns+=("one-off literal command: $short")
+      continue
+    fi
+    if [[ "$base" =~ ^(git\ (status|diff|log|show|branch)|ls|cat|head|tail|wc|grep|rg|gh\ (pr|issue)\ (view|list|checks|status)|gh\ run\ (view|list))($|\ ) &&
+      ! "$base" =~ [\;\&\|\>\<\`\$] ]]; then
+      moves+=("$short")
+    fi
+  done <<<"$rules"
+
+  if [[ ${#warns[@]} -eq 0 && ${#moves[@]} -eq 0 ]]; then
+    echo "✓ no overly broad or stale allow rules in $file"
+    return 0
+  fi
+  local w
+  for w in ${warns[@]+"${warns[@]}"}; do
+    echo "⚠ $file: $w" >&2
+  done
+  if [[ ${#moves[@]} -gt 0 ]]; then
+    echo "ℹ $file: read-only rules that could live in shared .claude/settings.json:" >&2
+    for w in "${moves[@]}"; do echo "    $w" >&2; done
+  fi
+  echo "  Report only: doctor never edits settings. Prune $file by hand." >&2
+}
+
+# Counts registered worktrees under <main checkout>/.claude/worktrees, their
+# disk use, and whether the worktree-core prune hook is switched on
+# (WORKTREE_AUTO_PRUNE env, then worktree.autoPrune in the project's
+# .claude/settings.json -- the same two places the hook reads).
+check_worktree_hygiene() {
+  local proj="$1" common main dir count=0 kb=0 path mode="" size
+  common="$(git -C "$proj" rev-parse --path-format=absolute --git-common-dir 2>/dev/null)" || return 0
+  main="$(dirname "$common")"
+  dir="$main/.claude/worktrees"
+  while IFS= read -r path; do
+    [[ "$path" == "$dir/"* ]] && count=$((count + 1))
+  done < <(git -C "$proj" worktree list --porcelain 2>/dev/null | sed -n 's/^worktree //p')
+  [[ "$count" -gt 0 ]] || return 0
+  kb="$(du -sk "$dir" 2>/dev/null | cut -f1)"
+
+  if [[ -n "${WORKTREE_AUTO_PRUNE:-}" ]]; then
+    mode="WORKTREE_AUTO_PRUNE=$WORKTREE_AUTO_PRUNE"
+  elif [[ -f "$proj/.claude/settings.json" ]] && command -v jq >/dev/null 2>&1; then
+    mode="$(jq -r '.worktree.autoPrune | select(type == "boolean") | "worktree.autoPrune=\(.)"' \
+      "$proj/.claude/settings.json" 2>/dev/null || true)"
+  fi
+  size="$(awk -v k="${kb:-0}" 'BEGIN { printf "%.1f MB", k / 1024 }')"
+  if [[ -n "$mode" ]]; then
+    echo "✓ $count worktrees under $dir ($size); $mode"
+  else
+    echo "ℹ $count worktrees under $dir ($size); worktree.autoPrune is not set, so merged worktrees are never pruned." >&2
+    echo "  Set {\"worktree\": {\"autoPrune\": true}} in .claude/settings.json (or WORKTREE_AUTO_PRUNE=1) to enable." >&2
+  fi
+}
+
+check_project() {
+  local proj
+  proj="$(git rev-parse --show-toplevel 2>/dev/null)" || proj="$PWD"
+  check_local_allow_rules "$proj"
+  check_worktree_hygiene "$proj"
+}
+
 check_convention_deps
 check_available_conventions
 check_dangling
 check_dangling_includes
+check_project
 check_git_identity
 check_python_deps
 
