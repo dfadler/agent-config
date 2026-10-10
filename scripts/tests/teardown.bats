@@ -21,9 +21,9 @@ setup() {
   mkdir -p "$FAKE_REPO/claude/commands"
   echo "# global instructions" > "$FAKE_REPO/claude/CLAUDE.md"
   echo "# a command" > "$FAKE_REPO/claude/commands/demo.md"
-  mkdir -p "$FAKE_REPO/plugins/dfadler-agent-config/.claude-plugin"
-  echo '{"name":"dfadler-agent-config"}' \
-    > "$FAKE_REPO/plugins/dfadler-agent-config/.claude-plugin/plugin.json"
+  mkdir -p "$FAKE_REPO/plugins/demo-plugin/.claude-plugin"
+  echo '{"name":"demo-plugin"}' \
+    > "$FAKE_REPO/plugins/demo-plugin/.claude-plugin/plugin.json"
 }
 
 teardown() {
@@ -46,8 +46,8 @@ install_links() {
     "# >>> agent-config managed end <<<" \
     > "$HOME/.claude/CLAUDE.md"
   ln -s "$FAKE_REPO/claude/commands/demo.md" "$HOME/.claude/commands/demo.md"
-  ln -s "$FAKE_REPO/plugins/dfadler-agent-config" \
-    "$HOME/.claude/skills/dfadler-agent-config"
+  ln -s "$FAKE_REPO/plugins/demo-plugin" \
+    "$HOME/.claude/skills/demo-plugin"
 }
 
 # Legacy state: a symlink to the repo (pre-managed-section format).
@@ -55,8 +55,8 @@ install_legacy_links() {
   mkdir -p "$HOME/.claude/commands" "$HOME/.claude/skills"
   ln -s "$FAKE_REPO/claude/CLAUDE.md" "$HOME/.claude/CLAUDE.md"
   ln -s "$FAKE_REPO/claude/commands/demo.md" "$HOME/.claude/commands/demo.md"
-  ln -s "$FAKE_REPO/plugins/dfadler-agent-config" \
-    "$HOME/.claude/skills/dfadler-agent-config"
+  ln -s "$FAKE_REPO/plugins/demo-plugin" \
+    "$HOME/.claude/skills/demo-plugin"
 }
 
 @test "removes managed section from generated CLAUDE.md and restores non-empty CLAUDE.personal.md" {
@@ -188,8 +188,8 @@ install_legacy_links() {
   run_teardown
   assert_success
 
-  [ ! -L "$HOME/.claude/skills/dfadler-agent-config" ]
-  [ ! -e "$HOME/.claude/skills/dfadler-agent-config" ]
+  [ ! -L "$HOME/.claude/skills/demo-plugin" ]
+  [ ! -e "$HOME/.claude/skills/demo-plugin" ]
 }
 
 @test "leaves a foreign skills symlink untouched" {
@@ -245,7 +245,7 @@ install_legacy_links() {
   assert_success
 
   [ ! -e "$HOME/.claude/commands/demo.md" ]
-  [ -L "$HOME/.claude/skills/dfadler-agent-config" ]
+  [ -L "$HOME/.claude/skills/demo-plugin" ]
   grep -qF "agent-config managed" "$HOME/.claude/CLAUDE.md"
   [ -f "$HOME/.claude/CLAUDE.personal.md" ]
 }
@@ -262,7 +262,7 @@ open('$HOME/.claude/settings.json', 'w').write(json.dumps(d))
   run_teardown --plugins
   assert_success
 
-  [ ! -e "$HOME/.claude/skills/dfadler-agent-config" ]
+  [ ! -e "$HOME/.claude/skills/demo-plugin" ]
   [ -L "$HOME/.claude/commands/demo.md" ]
   grep -qF "agent-config managed" "$HOME/.claude/CLAUDE.md"
   run python3 -c "
@@ -284,7 +284,7 @@ assert '$HOOK_CMD' not in cmds, 'hook still present after teardown'
   [ ! -e "$HOME/.claude/CLAUDE.md" ] || ! grep -qF "agent-config managed" "$HOME/.claude/CLAUDE.md"
   [ "$(cat "$HOME/.claude/CLAUDE.md")" = "personal content" ]
   [ -L "$HOME/.claude/commands/demo.md" ]
-  [ -L "$HOME/.claude/skills/dfadler-agent-config" ]
+  [ -L "$HOME/.claude/skills/demo-plugin" ]
 }
 
 @test "--commands --plugins together unlink both but leave CLAUDE.md alone" {
@@ -295,7 +295,7 @@ assert '$HOOK_CMD' not in cmds, 'hook still present after teardown'
   assert_success
 
   [ ! -e "$HOME/.claude/commands/demo.md" ]
-  [ ! -e "$HOME/.claude/skills/dfadler-agent-config" ]
+  [ ! -e "$HOME/.claude/skills/demo-plugin" ]
   grep -qF "agent-config managed" "$HOME/.claude/CLAUDE.md"
   [ -f "$HOME/.claude/CLAUDE.personal.md" ]
 }

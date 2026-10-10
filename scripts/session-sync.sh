@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # Fast-forward this checkout to origin/main (only when the tree is clean and
 # the update is a fast-forward) and re-run setup.sh, so the symlinks under
-# ~/.claude (CLAUDE.md, commands/, and the dfadler-agent-config plugin) stay
+# ~/.claude (CLAUDE.md, commands/, and the plugin symlinks) stay
 # current without a manual `git pull`. Never merges, rebases, or touches a
 # dirty tree. setup.sh's own header explains why re-running it is safe.
 #

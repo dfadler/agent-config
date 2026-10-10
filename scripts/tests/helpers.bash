@@ -537,7 +537,7 @@ shim_claude() {
     other-plugin-only)
       body='[
   {
-    "id": "dfadler-agent-config@skills-dir",
+    "id": "demo-plugin@skills-dir",
     "enabled": true
   }
 ]'

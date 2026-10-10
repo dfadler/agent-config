@@ -33,7 +33,7 @@ setup() {
   echo "# another command" >"$FAKE_REPO/claude/commands/other.md"
   echo "## Convention one" >"$FAKE_REPO/claude/conventions/one.md"
   printf '# comment\n\none.md\n' >"$FAKE_REPO/claude/conventions/DEFAULT_ENABLED"
-  _add_plugin dfadler-agent-config
+  _add_plugin demo-plugin
   _add_plugin worktree-core
   _add_plugin memory-hygiene
   # Hook scripts for every row in scripts/plugin-hooks.sh, so setup registers
