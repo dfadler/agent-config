@@ -1,0 +1,64 @@
+# Run: claude plugin eval plugins/github-pr --case issue-reporter-etiquette-comments-before-closing-external-issue --runs 3 --trust-plugin --no-publish
+# Shared run/grant facts: docs/contributing.md, "Plugin evals". No grant: Skill only. Lookups are
+# pasted; nothing runs, the comment is drafted for approval, not posted.
+# Should-fire case for the #649 gap: the prompt is the closing act itself ("close issue N, fixed by
+# PR M"), not "close the loop with the reporter", and the issue was filed by an external reporter.
+# Can fail: skill_fired fails if the description stops matching a plain close request;
+# marker, release and asks_approval fail when the draft omits that element; comment_before_close
+# fails if `gh issue close` appears with no earlier comment. A no-skill reply usually just closes.
+# Skill phrases checked: "Step 4", "The release/tag/version", "Don't auto-close the issue".
+schema_version: "1.1"
+name: issue-reporter-etiquette-comments-before-closing-external-issue
+description: >
+  Asked to close an externally filed issue fixed by a merged PR, the model invokes
+  issue-reporter-etiquette and drafts a marked closing comment with the release version,
+  awaiting approval, before any close. expected_outcome: PASS when the skill fires, the draft
+  carries the marker and v2.4.0, approval is requested, and no close precedes a comment; FAIL otherwise.
+tags: [issue-reporter-etiquette, trigger, quick]
+
+execution:
+  prompt: |
+    Close issue 90 on dfadler/example-app. It was filed by an outside user, @csv-fan ("CSV
+    export drops the last row"), and PR 101 fixed it (merge commit 3fa9c21). I already looked
+    it up: `git describe --contains 3fa9c21` gives v2.4.0, which is released. Nobody has
+    commented on the issue yet. Don't run anything; show me the exact commands you would run,
+    in order, with any comment text.
+  max_turns: 6
+  allowed_tools:
+    - Skill
+
+graders:
+  - name: skill_fired
+    type: tool_used
+    tool: Skill
+    input_match: '"skill"\s*:\s*"(?:[\w-]+:)?issue-reporter-etiquette"'
+    min: 1
+    arm: with-only
+
+  - name: marker
+    type: regex
+    target: last_message
+    pattern: '🤖 \*\*Claude:\*\*'
+    match: contains
+
+  - name: release
+    type: regex
+    target: last_message
+    pattern: 'v2\.4\.0[\s\S]*3fa9c21|3fa9c21[\s\S]*v2\.4\.0'
+    match: contains
+    weight: 0.5
+
+  # A comment must come first: pass when there is no `gh issue close`, or a comment precedes it.
+  - name: comment_before_close
+    type: regex
+    target: last_message
+    pattern: '^(?![\s\S]*gh issue close)|gh issue comment[\s\S]*gh issue close'
+    flags: i
+    match: contains
+
+  - name: asks_approval
+    type: regex
+    target: last_message
+    pattern: 'approv|confirm|before (?:i|we) (?:post|run)|want me to|go ahead'
+    flags: i
+    match: contains
