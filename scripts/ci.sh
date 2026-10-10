@@ -14,7 +14,7 @@
 # runs on any platform pytest itself does — coverage.py has no macOS SIP
 # restriction the way kcov's bash instrumentation does.
 #
-# The Python side (the detached-terminal skill and the gha-ci-audit plugin)
+# The Python side (the detached-terminal skill)
 # needs a virtualenv. Every target that shells out to ruff/mypy/pytest builds
 # `venv` first and always runs through .venv's pinned interpreter (never
 # whatever `python3` happens to resolve to on PATH) — a stray, unpinned global
@@ -42,18 +42,8 @@ sh_find() { find scripts plugins setup.sh teardown.sh doctor.sh -type f -name '*
 PY_SOURCES=(
   plugins/detached-terminal/scripts/agent_term.py
   scripts/tests/test_agent_term.py
-  plugins/gha-ci-audit/scripts/aggregate.py
-  plugins/gha-ci-audit/scripts/check_failures.py
-  plugins/gha-ci-audit/scripts/check_status.py
-  plugins/gha-ci-audit/scripts/collect_pipeline.py
-  plugins/gha-ci-audit/scripts/compute_workflow_timing.py
-  plugins/gha-ci-audit/scripts/grade.py
-  plugins/gha-ci-audit/scripts/timing.py
-  plugins/gha-ci-audit/scripts/write_assertions.py
-  plugins/gha-ci-audit/scripts/utils.py
-  plugins/gha-ci-audit/tests/test_gha_ci_audit.py
 )
-PY_TESTS=(scripts/tests plugins/gha-ci-audit/tests)
+PY_TESTS=(scripts/tests)
 
 # The non-test entries of PY_SOURCES, reduced to their containing directories,
 # is what `coverage-py` points pytest-cov at. Deliberately directory-based
@@ -64,7 +54,7 @@ PY_TESTS=(scripts/tests plugins/gha-ci-audit/tests)
 # filesystem. A new file in a DIFFERENT directory has to be added to
 # PY_SOURCES first, the same manual step lint-py and typecheck already need.
 py_coverage_dirs() {
-  printf '%s\n' "${PY_SOURCES[@]}" | grep -v -e '^scripts/tests/' -e '^plugins/gha-ci-audit/tests/' |
+  printf '%s\n' "${PY_SOURCES[@]}" | grep -v -e '^scripts/tests/' |
     xargs -n1 dirname | sort -u | sed 's|$|/|'
 }
 
@@ -78,13 +68,13 @@ NODE_STAMP=node_modules/.installed
 # gh-attach-image upload script (well covered by bats) moved to TypeScript and
 # left the denominator, leaving 67.99%; to 66 after the worktree-core hooks and
 # prune/verify scripts moved to TypeScript (66.38%); and to 65 after the
-# memory-hygiene stop hook and collab-retro scan script moved too. All are rounded DOWN — kcov line coverage
+# memory-hygiene stop hook and collab-retro scan script moved too; and to 61 after the gha-ci-audit collect/fetch scripts moved (61.99%). All are rounded DOWN — kcov line coverage
 # jitters by fractions of a point as scripts and tests change shape, so the
 # floor sits just under the measurement rather than exactly on it. Measured
 # on ubuntu-24.04 with kcov 42 and bats at the commit shell.yml pins. Lowering
 # this takes a deliberate commit; raising it as coverage improves is welcome.
 COVERAGE_DIR="${COVERAGE_DIR:-coverage}" # overridable so tests never delete a live kcov output dir
-COVERAGE_MIN=65
+COVERAGE_MIN=61
 
 # What lands in the denominator, and what doesn't:
 #
@@ -111,16 +101,16 @@ KCOV_EXCLUDE=/scripts/tests,/scripts/ci.sh
 
 # Python's own coverage floor, the sibling of COVERAGE_MIN (dfadler/
 # agent-config#208). Same discipline: the first honest measurement rounded
-# DOWN. 52 is `coverage-py` measured on macOS (Python 3.14.7, pytest==9.0.3,
-# pytest-cov==7.1.0 pinned in requirements-dev.txt) after the gha-ci-audit
-# scripts and their tests were wired in; the measurement is
+# DOWN. 33 is `coverage-py` (33.95%) now that detached-terminal is the only
+# Python left under test (it was 52 while the gha-ci-audit scripts, since
+# ported to TypeScript, were measured too); the measurement is
 # platform-independent (coverage.py, unlike kcov, instruments Python
 # everywhere). It is low because agent_term.py's CLI/daemon dispatch
 # (cmd_start, serve, bind_control_socket, the socket loop) is exercised only
 # by real usage, not by the unit tests — a real gap, not a measurement error.
 # Lowering this takes a deliberate commit; raising it is welcome.
 COVERAGE_PY_DIR=coverage-py
-COVERAGE_PY_MIN=52
+COVERAGE_PY_MIN=33
 
 # What lands in the denominator — the Python mirror of the kcov comment:
 #

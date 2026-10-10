@@ -31,12 +31,12 @@ plugins/gha-ci-audit-workspace/
 └── iteration-N/
     ├── <eval_name>/
     │   └── with_skill/
-    │       ├── eval_metadata.json   (written by setup_eval.sh)
+    │       ├── eval_metadata.json   (written by setup-eval.ts)
     │       ├── outputs/report.html  (written by eval agent)
     │       ├── timing.json          (written by orchestrator from task notification)
     │       └── grading.json         (written by grader agent)
-    ├── benchmark.json               (written by aggregate.py)
-    ├── benchmark.md                 (written by aggregate.py)
+    ├── benchmark.json               (written by aggregate.ts)
+    ├── benchmark.md                 (written by aggregate.ts)
     └── feedback.json                (written by viewer when user submits)
 ```
 

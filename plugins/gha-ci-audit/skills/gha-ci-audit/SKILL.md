@@ -16,23 +16,23 @@ Collect workflow run data from the GitHub API, find patterns that cost time or m
 > - `agents/grader.md` — how to grade report.html outputs against assertions
 > - `agents/analyzer.md` — how to analyze benchmark patterns after grading
 > - `agents/skill-improver.md` — propose targeted SKILL.md edits based on grading evidence
-> - `scripts/setup_eval.sh` — create iteration directories
-> - `scripts/check_status.py` — see what's done and what's missing
-> - `scripts/aggregate.py` — produce benchmark.json from grading results
-> - `scripts/launch_viewer.sh` — start the eval viewer
+> - `scripts/ts/gha-ci-audit/setup-eval.ts` — create iteration directories
+> - `scripts/ts/gha-ci-audit/check-status.ts` — see what's done and what's missing
+> - `scripts/ts/gha-ci-audit/aggregate.ts` — produce benchmark.json from grading results
+> - `scripts/ts/gha-ci-audit/launch-viewer.ts` — start the eval viewer
 
 > **Bundled analysis scripts** — **never write inline Python or ad-hoc shell analysis. Always call these scripts.** Every data-analysis step in this skill has a corresponding script; if you find yourself writing `python3 -c "..."` or a custom bash loop, stop and use the matching script instead.
 > - `scripts/ts/gha-ci-audit/analyze-runs.ts` — duration stats + conclusion/event breakdown from runs JSON
 > - `scripts/ts/gha-ci-audit/analyze-jobs.ts` — critical path, billable minutes, top jobs, optional step breakdown
-> - `scripts/fetch_workflow_stats.sh` — counts + avg/p90 for multiple workflow IDs in one pass
+> - `scripts/ts/gha-ci-audit/fetch-workflow-stats.ts` — counts + avg/p90 for multiple workflow IDs in one pass
 > - `scripts/ts/gha-ci-audit/find-p50-run.ts` — print the run ID of the successful run closest to median duration (use before analyze-jobs.ts)
-> - `scripts/check_failures.py` — detect chronic failure patterns; writes `failure_check.json` (`chronic`/`failure_rate`/`details`) via `--output` (use in Step 6 pre-check)
-> - `scripts/write_assertions.py` — populate assertions from evals.json into eval_metadata.json (use in orchestrator Step 2; never use a heredoc or inline Python for this)
-> - `scripts/compute_workflow_timing.py` — read workflow runs JSON from stdin, output avg and p90 duration in minutes (used internally by fetch_workflow_stats.sh)
-> - `scripts/collect_pipeline.py` — the collect phase's implementation (workflow detection, p50 selection, chronic-failure check, collect_summary.json); `collect.sh` calls it once in-process rather than shelling out to it step by step. `check_failures.py` above is a thin CLI wrapper over this module's function, kept as a separate file because it's also called directly, outside `collect.sh`, by this skill's Step 6. Not run directly otherwise.
-> - `scripts/ts/gha-ci-audit/timing.ts` — render-phase `--start`/`--end <outputs_dir>` timing CLI (see `agents/renderer.md`); `scripts/ts/gha-ci-audit/merge-timing.ts <outputs_dir>` then folds collect and render timing into `timing.json`. `scripts/timing.py` is the Python counterpart `collect_pipeline.py` still imports for the collect phase (not run directly)
-> - `scripts/utils.py` — shared `parse_dt`/`duration_minutes`/`thirty_days_ago` helpers imported by the scripts above (not run directly)
-> - `scripts/common.sh` — shared `thirty_days_ago_iso` shell helper; sourced by `fetch_workflow_stats.sh` (not run directly)
+> - `scripts/ts/gha-ci-audit/check-failures.ts` — detect chronic failure patterns; writes `failure_check.json` (`chronic`/`failure_rate`/`details`) via `--output` (use in Step 6 pre-check)
+> - `scripts/ts/gha-ci-audit/write-assertions.ts` — populate assertions from evals.json into eval_metadata.json (use in orchestrator Step 2; never use a heredoc or inline Python for this)
+> - `scripts/ts/gha-ci-audit/compute-workflow-timing.ts` — read workflow runs JSON from stdin, output avg and p90 duration in minutes (used by `fetch-workflow-stats.ts`)
+> - `scripts/ts/gha-ci-audit/collect.ts` — the whole collect phase in one process (workflow detection, p50 selection, chronic-failure check, secondary stats, collect_summary.json); the collector agent runs it. Exit codes: 0 ok, 1 fatal, 2 ambiguous primary workflow
+> - `scripts/ts/gha-ci-audit/timing.ts` — render-phase `--start`/`--end <outputs_dir>` timing CLI (see `agents/renderer.md`); `scripts/ts/gha-ci-audit/merge-timing.ts <outputs_dir>` then folds collect and render timing into `timing.json`. the collect phase uses the same `start()`/`end()` helpers in-process
+> - `scripts/ts/gha-ci-audit/common.ts`, `gh.ts` — shared date/stat helpers and the `gh api` wrapper imported by the scripts above (not run directly)
+> - `scripts/ts/gha-ci-audit/thirty-days-ago.ts` — prints the UTC timestamp 30 days ago for the runs API `created>=` filter
 
 ## Step 1: Identify the repository
 
@@ -67,18 +67,17 @@ If there are multiple candidates, pick the one with the most runs (see Step 3). 
 For the primary CI workflow:
 
 ```bash
-source /path/to/scripts/common.sh
-gh api "repos/{owner}/{repo}/actions/workflows/{id}/runs?per_page=1&created=>$(thirty_days_ago_iso)" \
+gh api "repos/{owner}/{repo}/actions/workflows/{id}/runs?per_page=1&created=>=$(node /path/to/scripts/ts/gha-ci-audit/thirty-days-ago.ts)" \
   --jq '.total_count'
 ```
 
-> `thirty_days_ago_iso` (in `scripts/common.sh`) uses `date -v-30d` on macOS or `date -d '30 days ago'` on Linux, and prints an empty string if neither works — treat an empty result as "omit the filter" and note the caveat.
+> `thirty-days-ago.ts` prints the timestamp in UTC (`YYYY-MM-DDTHH:MM:SSZ`), the format the `created>=` filter expects.
 
 For each other workflow, get counts the same way. This gives you the true volume — don't rely on paginating through runs (you'd hit the 500-run API cap before seeing 30 days for busy workflows).
 
 ## Step 4: Sample recent runs for timing and outcome data
 
-Save runs to `outputs/runs.json` first, then analyze. **Always save to this path** — later steps (`find-p50-run.ts`, `check_failures.py`) read it from there:
+Save runs to `outputs/runs.json` first, then analyze. **Always save to this path** — later steps (`find-p50-run.ts`, `check-failures.ts`) read it from there:
 
 ```bash
 gh api "repos/{owner}/{repo}/actions/workflows/{id}/runs?per_page=100" > outputs/runs.json
@@ -88,10 +87,10 @@ node /path/to/scripts/ts/gha-ci-audit/analyze-runs.ts outputs/runs.json --group-
 
 The script outputs: by-conclusion counts, avg/median/stdev per conclusion, p50/p90/p99/max percentiles, and duration buckets. **Use this output directly — never write inline Python to compute these numbers.**
 
-For secondary workflows, use `fetch_workflow_stats.sh` to get counts + avg/p90 for all of them in one pass:
+For secondary workflows, use `fetch-workflow-stats.ts` to get counts + avg/p90 for all of them in one pass:
 
 ```bash
-bash /path/to/scripts/fetch_workflow_stats.sh {owner}/{repo} {wf_id1} {wf_id2} {wf_id3}
+node /path/to/scripts/ts/gha-ci-audit/fetch-workflow-stats.ts {owner}/{repo} {wf_id1} {wf_id2} {wf_id3}
 ```
 
 Key metrics to capture from the output:
@@ -140,7 +139,7 @@ Work through each pattern. Compute a rough magnitude estimate for each so you ca
 
 ### Pre-check: Persistent failure signal
 
-The collector already ran `check_failures.py` and wrote `outputs/failure_check.json` — **do not count failures manually, and do not re-run the script**. Read the JSON file:
+The collector already ran `check-failures.ts` and wrote `outputs/failure_check.json` — **do not count failures manually, and do not re-run the script**. Read the JSON file:
 
 ```python
 import json
