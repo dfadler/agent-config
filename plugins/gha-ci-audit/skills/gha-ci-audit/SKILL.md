@@ -16,10 +16,10 @@ Collect workflow run data from the GitHub API, find patterns that cost time or m
 > - `agents/grader.md` — how to grade report.html outputs against assertions
 > - `agents/analyzer.md` — how to analyze benchmark patterns after grading
 > - `agents/skill-improver.md` — propose targeted SKILL.md edits based on grading evidence
-> - `scripts/setup_eval.sh` — create iteration directories
+> - `scripts/ts/gha-ci-audit/setup-eval.ts` — create iteration directories
 > - `scripts/ts/gha-ci-audit/check-status.ts` — see what's done and what's missing
-> - `scripts/aggregate.py` — produce benchmark.json from grading results
-> - `scripts/launch_viewer.sh` — start the eval viewer
+> - `scripts/ts/gha-ci-audit/aggregate.ts` — produce benchmark.json from grading results
+> - `scripts/ts/gha-ci-audit/launch-viewer.ts` — start the eval viewer
 
 > **Bundled analysis scripts** — **never write inline Python or ad-hoc shell analysis. Always call these scripts.** Every data-analysis step in this skill has a corresponding script; if you find yourself writing `python3 -c "..."` or a custom bash loop, stop and use the matching script instead.
 > - `scripts/ts/gha-ci-audit/analyze-runs.ts` — duration stats + conclusion/event breakdown from runs JSON
@@ -27,7 +27,7 @@ Collect workflow run data from the GitHub API, find patterns that cost time or m
 > - `scripts/ts/gha-ci-audit/fetch-workflow-stats.ts` — counts + avg/p90 for multiple workflow IDs in one pass
 > - `scripts/ts/gha-ci-audit/find-p50-run.ts` — print the run ID of the successful run closest to median duration (use before analyze-jobs.ts)
 > - `scripts/ts/gha-ci-audit/check-failures.ts` — detect chronic failure patterns; writes `failure_check.json` (`chronic`/`failure_rate`/`details`) via `--output` (use in Step 6 pre-check)
-> - `scripts/write_assertions.py` — populate assertions from evals.json into eval_metadata.json (use in orchestrator Step 2; never use a heredoc or inline Python for this)
+> - `scripts/ts/gha-ci-audit/write-assertions.ts` — populate assertions from evals.json into eval_metadata.json (use in orchestrator Step 2; never use a heredoc or inline Python for this)
 > - `scripts/ts/gha-ci-audit/compute-workflow-timing.ts` — read workflow runs JSON from stdin, output avg and p90 duration in minutes (used by `fetch-workflow-stats.ts`)
 > - `scripts/ts/gha-ci-audit/collect.ts` — the whole collect phase in one process (workflow detection, p50 selection, chronic-failure check, secondary stats, collect_summary.json); the collector agent runs it. Exit codes: 0 ok, 1 fatal, 2 ambiguous primary workflow
 > - `scripts/ts/gha-ci-audit/timing.ts` — render-phase `--start`/`--end <outputs_dir>` timing CLI (see `agents/renderer.md`); `scripts/ts/gha-ci-audit/merge-timing.ts <outputs_dir>` then folds collect and render timing into `timing.json`. the collect phase uses the same `start()`/`end()` helpers in-process

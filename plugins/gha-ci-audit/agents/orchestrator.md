@@ -48,15 +48,15 @@ duplicate its id/dir_name/repo mapping elsewhere. To add an eval, add an entry t
 For each eval, run setup then copy in assertions:
 
 ```bash
-bash $SCRIPTS/setup_eval.sh "$ITER" vite-audit           1 "$(jq -r '.evals[0].prompt' $EVALS)"
-bash $SCRIPTS/setup_eval.sh "$ITER" agent-config-context 2 "$(jq -r '.evals[1].prompt' $EVALS)"
-bash $SCRIPTS/setup_eval.sh "$ITER" facebook-react       3 "$(jq -r '.evals[2].prompt' $EVALS)"
+node $SCRIPTS/ts/gha-ci-audit/setup-eval.ts "$ITER" vite-audit           1 "$(jq -r '.evals[0].prompt' $EVALS)"
+node $SCRIPTS/ts/gha-ci-audit/setup-eval.ts "$ITER" agent-config-context 2 "$(jq -r '.evals[1].prompt' $EVALS)"
+node $SCRIPTS/ts/gha-ci-audit/setup-eval.ts "$ITER" facebook-react       3 "$(jq -r '.evals[2].prompt' $EVALS)"
 ```
 
 Then write assertions into each `eval_metadata.json`:
 
 ```bash
-python3 $SCRIPTS/write_assertions.py $ITER $EVALS
+node $SCRIPTS/ts/gha-ci-audit/write-assertions.ts $ITER $EVALS
 ```
 
 ---
@@ -162,7 +162,7 @@ After all graders complete, run `check-status.ts` again and confirm all three sh
 ## Step 8: Aggregate
 
 ```bash
-python3 $SCRIPTS/aggregate.py $ITER --skill-name gha-ci-audit --model "<the model you are running as, e.g. claude-sonnet-4-6>"
+node $SCRIPTS/ts/gha-ci-audit/aggregate.ts $ITER --skill-name gha-ci-audit --model "<the model you are running as, e.g. claude-sonnet-4-6>"
 ```
 
 Pass `--model` explicitly so the benchmark metadata records the model actually used for this run, not a stale default.
@@ -174,7 +174,7 @@ This produces `$ITER/benchmark.json` and `$ITER/benchmark.md`. Print the pass ra
 ## Step 9: Launch viewer
 
 ```bash
-bash $SCRIPTS/launch_viewer.sh $ITER --previous $WORKSPACE/iteration-<PREVIOUS_N>
+node $SCRIPTS/ts/gha-ci-audit/launch-viewer.ts $ITER --previous $WORKSPACE/iteration-<PREVIOUS_N>
 ```
 
 Omit `--previous` if this is the first iteration. The viewer starts at `http://localhost:3117`.
@@ -221,7 +221,7 @@ Keep it concise — one paragraph per eval, then a one-line verdict.
 | Collector produces no `collect_summary.json` | Report to user; ask retry or skip — do not spawn renderer for that eval |
 | Renderer produces no `report.html` | Data files are intact — re-spawn renderer only (no re-fetch needed) |
 | A grader fails to write `grading.json` | Re-spawn the grader for that eval only |
-| `aggregate.py` finds no graded runs | At least one `grading.json` is missing — run `check-status.ts` and fix before re-running |
+| `aggregate.ts` finds no graded runs | At least one `grading.json` is missing — run `check-status.ts` and fix before re-running |
 | Viewer port 3117 already in use | The launch script handles this by killing the previous viewer; if it still fails, report the PID conflict |
 | Notification arrives with no `duration_ms` | Record `duration_ms: null` in the phase timing file rather than omitting it; note the gap in the summary |
 | Skill improver fails | Non-blocking — report the error but do not delay the summary; proposals can be generated separately |
