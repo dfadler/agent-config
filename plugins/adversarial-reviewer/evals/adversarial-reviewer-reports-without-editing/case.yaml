@@ -94,6 +94,6 @@ graders:
   - name: cites_file_and_line
     type: regex
     target: last_message
-    pattern: 'download\.ts:\d+'
+    pattern: '(?:download\.ts:|[Ll]ines? )\d+'
     match: contains
     weight: 0.5

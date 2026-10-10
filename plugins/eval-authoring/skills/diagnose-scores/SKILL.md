@@ -1,6 +1,6 @@
 ---
 name: diagnose-scores
-description: Explain why an eval case scored low - negative or zero Δ, 0.00 on output that looks correct, exit 1 or 2 with fine-looking results. Free, read-only.
+description: ALWAYS invoke this skill first when asked where to start on an eval case with a negative Delta or a low score on replies that look correct, even when nothing is to hand to run, because it sets the order of suspects (judge first). Explain why an eval case scored low - negative or zero Δ, 0.00 on output that looks correct, exit 1 or 2 with fine-looking results. Free, read-only.
 allowed-tools: Bash(node ${CLAUDE_SKILL_DIR}/../../scripts/ts/diagnose/diagnose.ts *)
 argument-hint: "[results-dir | aggregate-result.json | plugin-path]"
 ---
