@@ -1,0 +1,40 @@
+# Run: claude plugin eval plugins/eval-authoring --case diagnose-scores-fires-on-negative-delta
+# Not run yet: paid, hand-off only (#646). No grant: Skill only; the prompt forbids running
+# anything, and with no results directory the skill's own step 1 says to stop and ask for a run.
+# Should-fire case for the diagnose-scores skill: the description's first symptom, a negative
+# Delta with output that looks right. The skill's interpretation says to suspect the judge first.
+# Can fail: skill_fired scores 0 if the description stops matching this phrasing (an unscored
+# indicator in a two-arm run, per the graders reference); suspects_judge = 0 if the reply does not
+# name the judge, which a no-plugin model often skips for "tweak the prompt" advice.
+# Skill phrase checked: "suspect the judge first".
+schema_version: "1.1"
+name: diagnose-scores-fires-on-negative-delta
+description: >
+  Asked why an eval case scored a negative Delta although the replies look correct, the model
+  invokes diagnose-scores and points at the judge. expected_outcome: PASS when the skill fires and
+  the reply names the judge (an llm grader) as the first suspect; FAIL otherwise.
+tags: [eval-authoring, diagnose-scores, trigger, quick]
+
+execution:
+  prompt: |
+    My eval case for a formatting skill scored a Delta of -0.33 (with-plugin 0.33, without 0.67),
+    but when I read the with-plugin replies they look correct. Where do I start looking? Answer in
+    your reply; do not run anything.
+  max_turns: 6
+  allowed_tools:
+    - Skill
+
+graders:
+  - name: skill_fired
+    type: tool_used
+    tool: Skill
+    input_match: '"skill"\s*:\s*"(?:[\w-]+:)?diagnose-scores"'
+    min: 1
+    arm: with-only
+
+  - name: suspects_judge
+    type: regex
+    target: last_message
+    pattern: 'judge|llm grader|rubric'
+    flags: i
+    match: contains

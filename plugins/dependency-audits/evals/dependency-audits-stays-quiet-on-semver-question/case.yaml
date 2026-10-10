@@ -1,0 +1,39 @@
+# Run: claude plugin eval plugins/dependency-audits --case dependency-audits-stays-quiet-on-semver-question
+# Not run yet: paid, hand-off only (#646). No grant needed (Skill only).
+# Should-not-fire near-miss: shares "dependency" and "package.json" vocabulary but touches no
+# manifest. The skill says it "only fires when a dependency file is actually touched". Regression
+# guard: the no-plugin arm passes by default, so Delta is zero by design.
+# Can fail: no_audit_skill = 0 if the skill fires on dependency vocabulary alone;
+# explains_caret = 0 if the question is not answered.
+schema_version: "1.1"
+name: dependency-audits-stays-quiet-on-semver-question
+description: >
+  A question about what a caret range in package.json means, with no change made, must not invoke
+  dependency-audits. expected_outcome: PASS when the skill is not invoked and the reply says the
+  caret allows minor and patch updates; FAIL otherwise.
+tags: [dependency-audits, trigger, quick]
+
+execution:
+  prompt: |
+    In one sentence, what does "^4.17.15" mean for lodash in a package.json dependencies entry?
+    Don't change or run anything.
+  max_turns: 4
+  allowed_tools:
+    - Skill
+
+graders:
+  - name: no_audit_skill
+    type: tool_used
+    tool: Skill
+    input_match: '"skill"\s*:\s*"(?:[\w-]+:)?dependency-audits"'
+    min: 0
+    max: 0
+    arm: both
+
+  - name: explains_caret
+    type: regex
+    target: last_message
+    pattern: 'minor|patch|compatible|4\.x|below 5|<\s*5'
+    flags: i
+    match: contains
+    arm: both

@@ -1,0 +1,47 @@
+# Run: claude plugin eval plugins/shell-script-hygiene --case shell-script-hygiene-justifies-shellcheck-disable
+# Not run yet: paid, hand-off only (#646). No grant needed (Skill only, the script is in the reply).
+# Should-fire case for the justified-disable bullet: "a comment on the line above explaining why
+# it's sound ... Never a bare disable." A no-plugin model often adds a bare or same-line disable.
+# Can fail: comment_above_disable = 0 if no explaining comment line sits directly above the
+# directive; skill_fired = 0 if the description stops matching a *.sh edit.
+schema_version: "1.1"
+name: shell-script-hygiene-justifies-shellcheck-disable
+description: >
+  Asked to silence a shellcheck SC2086 warning in an existing script, the model invokes
+  shell-script-hygiene and puts an explaining comment on the line directly above the disable
+  directive. expected_outcome: PASS when the skill fires and a comment line precedes the
+  directive; FAIL on a bare or same-line disable.
+tags: [shell-script-hygiene, behavior, quick]
+
+execution:
+  prompt: |
+    shellcheck warns SC2086 on the `tar` line of this script, and the word splitting is
+    intentional because EXTRA_FLAGS holds several flags. Silence the warning. Print the complete
+    updated script in one code block and nothing else; don't run anything.
+
+    ```bash
+    #!/usr/bin/env bash
+    set -uo pipefail
+    EXTRA_FLAGS="--exclude=.git --exclude=node_modules"
+    tar czf out.tgz $EXTRA_FLAGS src
+    ```
+  max_turns: 6
+  allowed_tools:
+    - Skill
+
+graders:
+  - name: skill_fired
+    type: tool_used
+    tool: Skill
+    input_match: '"skill"\s*:\s*"(?:[\w-]+:)?shell-script-hygiene"'
+    min: 1
+    arm: with-only
+
+  # A real comment (not itself a shellcheck directive, at least 10 characters) on the line
+  # directly above the directive.
+  - name: comment_above_disable
+    type: regex
+    target: last_message
+    pattern: '^[ \t]*#(?! *shellcheck)[^\n]{10,}\n[ \t]*# shellcheck disable=SC2086'
+    flags: m
+    match: contains

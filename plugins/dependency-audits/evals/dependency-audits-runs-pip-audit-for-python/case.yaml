@@ -1,0 +1,38 @@
+# Run: claude plugin eval plugins/dependency-audits --case dependency-audits-runs-pip-audit-for-python
+# Not run yet: paid, hand-off only (#646). No grant needed (Skill only, nothing is run).
+# Should-fire case, second ecosystem: the skill names `pip-audit` for Python, not only npm audit.
+# A no-plugin model tends to say "run the tests" and stop (delta expected).
+# Skill phrase checked: "`pip-audit`" in the audit-tool list.
+# Can fail: names_pip_audit = 0 if the plan has no pip-audit step; skill_fired = 0 if the
+# description stops matching requirements.txt.
+schema_version: "1.1"
+name: dependency-audits-runs-pip-audit-for-python
+description: >
+  Asked to finish after adding a Python dependency to requirements.txt, the model invokes
+  dependency-audits and its plan includes pip-audit. expected_outcome: PASS when the skill fires
+  and the plan names pip-audit; FAIL otherwise.
+tags: [dependency-audits, behavior, quick]
+
+execution:
+  prompt: |
+    In this Python project I added requests==2.31.0 to requirements.txt and installed it into the
+    virtualenv. Don't run anything. List, as numbered commands, every step you would take before
+    telling me this change is done and committing it.
+  max_turns: 6
+  allowed_tools:
+    - Skill
+
+graders:
+  - name: skill_fired
+    type: tool_used
+    tool: Skill
+    input_match: '"skill"\s*:\s*"(?:[\w-]+:)?dependency-audits"'
+    min: 1
+    arm: with-only
+
+  - name: names_pip_audit
+    type: regex
+    target: last_message
+    pattern: 'pip-audit'
+    flags: i
+    match: contains

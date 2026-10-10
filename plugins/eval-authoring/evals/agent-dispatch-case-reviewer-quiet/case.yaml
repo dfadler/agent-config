@@ -1,0 +1,43 @@
+# Run: claude plugin eval plugins/eval-authoring --case agent-dispatch-case-reviewer-quiet
+# Not run yet: paid, hand-off only (#646). No grant needed (Agent and Read only).
+# Quiet case for eval-authoring:case-reviewer: shares "eval case" vocabulary but asks what one
+# field means, with no case file to review. The dispatch case already exists
+# (case-reviewer-flags-planted-weak-case). Regression guard: the no-plugin arm passes it by
+# default, so Delta is zero by design.
+# Can fail: reviewer_not_dispatched = 0 if the agent over-triggers on "eval case";
+# explains_max_turns = 0 if the question is not answered. The author-cases skill may fire here;
+# that is not graded.
+schema_version: "1.1"
+name: agent-dispatch-case-reviewer-quiet
+description: >
+  A question about what max_turns means in an eval case must not dispatch
+  eval-authoring:case-reviewer. expected_outcome: PASS when the agent is not dispatched and the
+  reply says max_turns limits the number of turns; FAIL otherwise.
+tags: [eval-authoring, case-reviewer, agent, trigger, quick]
+
+execution:
+  prompt: |
+    In one sentence, what does `max_turns` do in a `claude plugin eval` case? No files, no
+    commands.
+  max_turns: 4
+  allowed_tools:
+    - Agent
+    - Read
+    - Skill
+
+graders:
+  - name: reviewer_not_dispatched
+    type: tool_used
+    tool: Agent
+    input_match: '"subagent_type"\s*:\s*"(?:[\w-]+:)?case-reviewer"'
+    min: 0
+    max: 0
+    arm: both
+
+  - name: explains_max_turns
+    type: regex
+    target: last_message
+    pattern: '(limit|cap|bound|maximum|max)[\s\S]{0,80}turns?|turns?[\s\S]{0,80}(limit|cap|bound|maximum)'
+    flags: i
+    match: contains
+    arm: both

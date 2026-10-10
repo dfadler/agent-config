@@ -1,0 +1,49 @@
+# Run: claude plugin eval plugins/memory-hygiene --case memory-hygiene-names-bug-memory-by-topic
+# Not run yet: paid, hand-off only (#646). No grant needed (Skill only, the file is written in the
+# reply).
+# Should-fire case, second naming shape: a dated, event-style bug memory. The skill's
+# anti-pattern list says "nothing session- or date-specific (`bug/fix-from-tuesday`). Name the
+# topic, not the event." A no-plugin model tends to write a snake_case or dated file name.
+# Can fail: topic_key_name = 0 if the slug is not two-segment kebab-case; no_date_in_name = 0 if
+# the name carries a date or weekday; skill_fired = 0 if the description stops matching.
+schema_version: "1.1"
+name: memory-hygiene-names-bug-memory-by-topic
+description: >
+  Asked to write an auto-memory about a nil panic found in the user list on a given day, the model
+  invokes memory-hygiene and gives it a two-segment family/description name with no date.
+  expected_outcome: PASS when the skill fires, a name: line holds a two-segment kebab-case slug
+  and that slug has no date or weekday; FAIL otherwise.
+tags: [memory-hygiene, behavior, quick]
+
+execution:
+  prompt: |
+    On Tuesday 2026-10-06 we found that the user list endpoint panics on a nil pointer when a
+    user has no profile. Write an auto-memory file about this bug so future sessions know. Don't
+    run anything. Reply with the new file's contents (front matter included) and nothing else.
+  max_turns: 6
+  allowed_tools:
+    - Skill
+
+graders:
+  - name: skill_fired
+    type: tool_used
+    tool: Skill
+    input_match: '"skill"\s*:\s*"(?:[\w-]+:)?memory-hygiene"'
+    min: 1
+    arm: with-only
+
+  - name: topic_key_name
+    type: regex
+    target: last_message
+    pattern: '^name:\s*"?[a-z0-9]+(?:-[a-z0-9]+)*/[a-z0-9]+(?:-[a-z0-9]+)*"?\s*$'
+    flags: m
+    match: contains
+
+  # The name: line must not carry a date or weekday. Anchored to the name line so a date in the
+  # body (which the prompt gives) does not trip it.
+  - name: no_date_in_name
+    type: regex
+    target: last_message
+    pattern: '^name:.*(?:\d{4}|\d{2}-\d{2}|monday|tuesday|wednesday|thursday|friday|today|yesterday)'
+    flags: im
+    match: not_contains

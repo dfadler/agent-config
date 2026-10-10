@@ -1,0 +1,40 @@
+# Run: claude plugin eval plugins/shell-script-reviewer --case agent-dispatch-shell-script-reviewer-quiet
+# Not run yet: paid, hand-off only (#646). No grant needed (Agent and Read only).
+# Quiet case for shell-script-reviewer: shares shell-script vocabulary but asks what one flag
+# line does, with no diff or script to review. The dispatch case already exists
+# (shell-script-reviewer-reports-without-editing). Regression guard: the no-plugin arm passes it
+# by default, so Delta is zero by design.
+# Can fail: reviewer_not_dispatched = 0 if the agent over-triggers on shell vocabulary;
+# explains_pipefail = 0 if the question is not answered.
+schema_version: "1.1"
+name: agent-dispatch-shell-script-reviewer-quiet
+description: >
+  A question about what `set -o pipefail` does must not dispatch
+  shell-script-reviewer:shell-script-reviewer. expected_outcome: PASS when the agent is not
+  dispatched and the reply says a pipeline fails if any command in it fails; FAIL otherwise.
+tags: [shell-script-reviewer, agent, trigger, quick]
+
+execution:
+  prompt: |
+    In one sentence, what does `set -o pipefail` do in a bash script? No files, no commands.
+  max_turns: 4
+  allowed_tools:
+    - Agent
+    - Read
+
+graders:
+  - name: reviewer_not_dispatched
+    type: tool_used
+    tool: Agent
+    input_match: '"subagent_type"\s*:\s*"(?:[\w-]+:)?shell-script-reviewer"'
+    min: 0
+    max: 0
+    arm: both
+
+  - name: explains_pipefail
+    type: regex
+    target: last_message
+    pattern: '(any|every|each|whole|last)[\s\S]{0,80}(fail|non-?zero)|(fail|non-?zero)[\s\S]{0,80}(any|every|each|whole|pipeline)'
+    flags: i
+    match: contains
+    arm: both

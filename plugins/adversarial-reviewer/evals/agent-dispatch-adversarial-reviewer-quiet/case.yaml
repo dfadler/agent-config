@@ -1,0 +1,41 @@
+# Run: claude plugin eval plugins/adversarial-reviewer --case agent-dispatch-adversarial-reviewer-quiet
+# Not run yet: paid, hand-off only (#646). No grant needed (Agent and Read only).
+# Quiet case for adversarial-reviewer: shares "review" and "bug" vocabulary but asks for a concept
+# explained, with no change to tear apart. The dispatch case already exists
+# (adversarial-reviewer-reports-without-editing). Regression guard: the no-plugin arm passes it by
+# default, so Delta is zero by design.
+# Can fail: reviewer_not_dispatched = 0 if the agent over-triggers on "review"; defines_race = 0 if
+# the question is not answered.
+schema_version: "1.1"
+name: agent-dispatch-adversarial-reviewer-quiet
+description: >
+  A conceptual question about what a race condition is must not dispatch
+  adversarial-reviewer:adversarial-reviewer. expected_outcome: PASS when the agent is not
+  dispatched and the reply mentions timing or ordering of concurrent operations; FAIL otherwise.
+tags: [adversarial-reviewer, agent, trigger, quick]
+
+execution:
+  prompt: |
+    A teammate wrote "possible race condition" in my code review. In one sentence, what does that
+    mean? No files, no commands.
+  max_turns: 4
+  allowed_tools:
+    - Agent
+    - Read
+
+graders:
+  - name: reviewer_not_dispatched
+    type: tool_used
+    tool: Agent
+    input_match: '"subagent_type"\s*:\s*"(?:[\w-]+:)?adversarial-reviewer"'
+    min: 0
+    max: 0
+    arm: both
+
+  - name: defines_race
+    type: regex
+    target: last_message
+    pattern: 'concurren|simultaneous|same time|timing|order of|interleav|parallel'
+    flags: i
+    match: contains
+    arm: both

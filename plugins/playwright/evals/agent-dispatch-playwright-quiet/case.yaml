@@ -1,0 +1,39 @@
+# Run: claude plugin eval plugins/playwright --case agent-dispatch-playwright-quiet
+# Not run yet: paid, hand-off only (#646). No grant needed (Agent and Read only).
+# Quiet case for the playwright:playwright agent: shares Playwright vocabulary but asks a
+# one-sentence API question, with no browser task to run. Regression guard: the no-plugin arm
+# passes it by default, so Delta is zero by design.
+# Can fail: agent_not_dispatched = 0 if the agent over-triggers on the word Playwright;
+# explains_locator = 0 if the question is not answered.
+schema_version: "1.1"
+name: agent-dispatch-playwright-quiet
+description: >
+  A one-sentence question about Playwright locators must not dispatch playwright:playwright.
+  expected_outcome: PASS when the agent is not dispatched and the reply says a locator finds
+  elements on the page; FAIL otherwise.
+tags: [playwright, agent, trigger, quick]
+
+execution:
+  prompt: |
+    In one sentence, what is a Playwright locator? Reply with the sentence only.
+  max_turns: 4
+  allowed_tools:
+    - Agent
+    - Read
+
+graders:
+  - name: agent_not_dispatched
+    type: tool_used
+    tool: Agent
+    input_match: '"subagent_type"\s*:\s*"(?:playwright:)?playwright"'
+    min: 0
+    max: 0
+    arm: both
+
+  - name: explains_locator
+    type: regex
+    target: last_message
+    pattern: 'find|select|identif|locat|target|resolv'
+    flags: i
+    match: contains
+    arm: both

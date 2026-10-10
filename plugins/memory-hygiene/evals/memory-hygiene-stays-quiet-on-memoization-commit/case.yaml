@@ -1,0 +1,40 @@
+# Run: claude plugin eval plugins/memory-hygiene --case memory-hygiene-stays-quiet-on-memoization-commit
+# Not run yet: paid, hand-off only (#646). No grant needed (Skill only).
+# Should-not-fire near-miss: "memoization"/"cache" share the memory vocabulary but are ordinary
+# code. A different near-miss from the RAM-question case. Regression guard: the no-plugin arm
+# passes by default, so Delta is zero by design.
+# Can fail: no_memory_skill = 0 if the skill fires on "memo"; writes_message = 0 if no commit
+# message is given.
+schema_version: "1.1"
+name: memory-hygiene-stays-quiet-on-memoization-commit
+description: >
+  A request for a commit message about adding memoization to a function must not invoke
+  memory-hygiene. expected_outcome: PASS when the skill is not invoked and the reply contains a
+  commit message that mentions memoization or caching; FAIL otherwise.
+tags: [memory-hygiene, trigger, quick]
+
+execution:
+  prompt: |
+    I added memoization to fibonacci() so repeated calls are cached. Write a one-line commit
+    message for it. Reply with the message only; don't run anything.
+  max_turns: 4
+  allowed_tools:
+    - Skill
+
+graders:
+  - name: no_memory_skill
+    type: tool_used
+    tool: Skill
+    input_match: '"skill"\s*:\s*"(?:[\w-]+:)?memory-hygiene"'
+    min: 0
+    max: 0
+    arm: both
+
+  - name: writes_message
+    type: regex
+    target: last_message
+    pattern: 'memoiz|cach'
+    flags: i
+    match: contains
+    arm: both
+    weight: 0.5
