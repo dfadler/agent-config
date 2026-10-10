@@ -171,6 +171,39 @@ describe("modes", () => {
     expect(existsSync(a)).toBe(true);
   });
 
+  it("--hint prints the enable nudge for merged worktrees and removes nothing", () => {
+    const p = mergedWorktree("a");
+    const r = go(["--hint", "--yes"]);
+    expect(r).toEqual({
+      code: 0,
+      out: "🧹 1 merged worktree(s) could be pruned; set worktree.autoPrune to enable",
+      err: "",
+    });
+    expect(existsSync(p)).toBe(true);
+  });
+
+  it("--hint is silent with no other Claude worktree, without calling gh", () => {
+    const real = makeRun(sb.env);
+    const called: string[] = [];
+    const ctx: Ctx = {
+      cwd: sb.repo,
+      run: (cmd, args, at) => {
+        called.push(cmd);
+        return real(cmd, args, at);
+      },
+      out: (l) => called.push(`out:${l}`),
+      err: (l) => called.push(`err:${l}`),
+      now: () => 0,
+    };
+    expect(main(["--hint"], ctx)).toBe(0);
+    expect(called.filter((c) => c !== "git")).toEqual([]);
+  });
+
+  it("--hint is silent when the only worktree is unmerged", () => {
+    sb.addWorktree("a");
+    expect(go(["--hint"])).toEqual({ code: 0, out: "", err: "" });
+  });
+
   it("--hook is silent when nothing is removable", () => {
     sb.addWorktree("a");
     expect(go(["--hook"])).toEqual({ code: 0, out: "", err: "" });

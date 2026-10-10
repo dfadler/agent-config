@@ -50,6 +50,10 @@
 //   prune-merged-worktrees.ts --yes        # actually remove the merged worktrees
 //   prune-merged-worktrees.ts --hook       # quiet unless something is removable
 //                                          # (read-only nudge); never removes anything
+//   prune-merged-worktrees.ts --hint      # like --hook, but prints only a one-line
+//                                          # "N could be pruned; set worktree.autoPrune"
+//                                          # nudge, and skips GitHub when no other
+//                                          # Claude worktree exists
 //   prune-merged-worktrees.ts --auto       # quiet auto-remove for the SessionStart
 //                                          # hook: removes the merged set, prints a
 //                                          # one-line summary, never fails the session
@@ -176,10 +180,14 @@ export const main = (argv: readonly string[], ctx: Ctx): number => {
   let apply = false;
   let hook = false;
   let auto = false;
+  let hint = false;
   for (const arg of argv) {
     if (arg === "-y" || arg === "--yes") apply = true;
     else if (arg === "--hook") hook = true;
-    else if (arg === "--auto") {
+    else if (arg === "--hint") {
+      hint = true;
+      hook = true;
+    } else if (arg === "--auto") {
       auto = true;
       hook = true;
     } else if (arg === "-h" || arg === "--help") {
@@ -207,6 +215,16 @@ export const main = (argv: readonly string[], ctx: Ctx): number => {
   const common = git(["rev-parse", "--git-common-dir"]).stdout.trim();
   const repoRoot = realpathSync(resolve(cwd, common, ".."));
   const wtPrefix = `${repoRoot}/.claude/worktrees/`;
+
+  // Cheap pre-check for --hint: no other Claude worktree means nothing to
+  // prune, so skip the GitHub calls entirely.
+  if (
+    hint &&
+    !parseWorktrees(git(["worktree", "list", "--porcelain"]).stdout).some(
+      (r) => r.path !== self && r.path.startsWith(wtPrefix),
+    )
+  )
+    return 0;
 
   if (
     run("gh", ["--version"], cwd).status !== 0 ||
@@ -432,7 +450,11 @@ export const main = (argv: readonly string[], ctx: Ctx): number => {
   }
 
   if (hook) {
-    if (removable.length > 0) {
+    if (hint && removable.length > 0) {
+      ctx.out(
+        `🧹 ${String(removable.length)} merged worktree(s) could be pruned; set worktree.autoPrune to enable`,
+      );
+    } else if (removable.length > 0) {
       ctx.out(
         `🧹 ${String(removable.length)} merged worktree(s) can be cleaned up:`,
       );

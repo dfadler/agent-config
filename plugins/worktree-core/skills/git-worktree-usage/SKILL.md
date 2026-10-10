@@ -145,13 +145,15 @@ session — both catch their own errors and always exit 0.
   only when the directory is older than 10 minutes (a concurrent session's
   own in-progress worktree creation looks identical to abandoned wreckage
   from the outside, so anything younger is left for a later sweep to judge
-  instead) and holds no file or symlink anywhere in its tree. **Off by
-  default** — the hook does nothing until a project opts in. Auto-prune
+  instead) and holds no file or symlink anywhere in its tree. **Removal
+  is off by default** — unconfigured, the hook only prints a one-line "N merged
+  worktrees could be pruned; set worktree.autoPrune to enable" nudge (silent
+  when there is nothing to prune). Auto-prune
   mode (highest priority first): the `WORKTREE_AUTO_PRUNE` env var
   (`0`/`false`/`no`/`off` → nudge-only; `1`/`true`/`yes`/`on` →
   auto-remove; anything else → from settings); `worktree.autoPrune` in
   `.claude/settings.json` (`true` → auto-remove; `false` → nudge-only; no
-  key at all → skip entirely — no nudge, no removal); default: skip.
+  key at all → one-line enable nudge, no removal); default: that nudge.
 
   A project may additionally declare `worktree.autoPruneCruftMarkers` in its
   own `.claude/settings.json` — an array of `{"path": "...", "beginMarker":
