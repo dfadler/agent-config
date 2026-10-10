@@ -24,6 +24,15 @@ import { end, start } from "./timing.ts";
 
 export class CollectFatalError extends Error {}
 
+const parseJson = (name: string, raw: string, empty: unknown): unknown => {
+  if (raw.trim() === "") return empty;
+  try {
+    return JSON.parse(raw);
+  } catch (e) {
+    throw new CollectFatalError(`Invalid JSON in ${name}: ${e instanceof Error ? e.message : String(e)}`);
+  }
+};
+
 /** `workflow_candidates.json` has already been written when this is thrown. */
 export class AmbiguousPrimaryWorkflowError extends Error {}
 
@@ -138,7 +147,7 @@ export const collect = (a: {
     '[.workflows[] | select(.state == "active") | {id, name, path}] | sort_by(.name)',
   ]);
   write("workflows.json", workflowsRaw);
-  const parsedWorkflows: unknown = workflowsRaw.trim() === "" ? [] : JSON.parse(workflowsRaw);
+  const parsedWorkflows: unknown = parseJson("workflows", workflowsRaw, []);
   const workflows = Array.isArray(parsedWorkflows) ? parsedWorkflows.filter(isObject) : [];
 
   let workflowId = a.workflowId;
@@ -181,7 +190,7 @@ export const collect = (a: {
   log("[collect] Step 3: fetching workflow runs\n");
   const runsRaw = api(gh, [`repos/${repo}/actions/workflows/${String(workflowId)}/runs?per_page=100`]);
   write("runs.json", runsRaw);
-  const runsPayload: unknown = runsRaw.trim() === "" ? {} : JSON.parse(runsRaw);
+  const runsPayload: unknown = parseJson("runs", runsRaw, {});
 
   log("[collect] Step 4: computing p50 run\n");
   const p50 = findP50Run(runsPayload);

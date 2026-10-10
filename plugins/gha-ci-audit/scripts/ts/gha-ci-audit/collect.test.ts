@@ -202,6 +202,12 @@ describe("collect", () => {
     );
   });
 
+  it("reports malformed workflow JSON as a fatal error, not a SyntaxError", () => {
+    const base = fakeGh().gh;
+    const gh: Gh = (a) => (a.some((x) => x.endsWith("/actions/workflows")) ? "{not json" : base(a));
+    expect(() => collect({ repo: "o/r", outputDir: outDir(), workflowId: 12345, deps: mkDeps(gh).deps })).toThrow(/Invalid JSON in workflows/);
+  });
+
   it("is fatal on a non-numeric run count", () => {
     const base = fakeGh().gh;
     const gh: Gh = (a) => (a.includes(".total_count") ? "lots\n" : base(a));

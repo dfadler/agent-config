@@ -42,7 +42,7 @@ const sleepMs = (ms: number): Promise<void> =>
 export const realDeps: Deps = {
   env: process.env,
   pidsOnPort: (port) => {
-    const r = spawnSync("lsof", ["-ti", `:${port}`], { encoding: "utf8" });
+    const r = spawnSync("lsof", ["-t", `-iTCP:${port}`, "-sTCP:LISTEN"], { encoding: "utf8" });
     return r.stdout
       .split(/\s+/)
       .map(Number)
