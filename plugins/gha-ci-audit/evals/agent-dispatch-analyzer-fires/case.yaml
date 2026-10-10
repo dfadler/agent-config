@@ -1,0 +1,43 @@
+# Run: node plugins/eval-authoring/scripts/ts/run-evals/run-evals.ts --tier quick plugins/gha-ci-audit
+# (quick tier: one run, plugin arm only, `--ablation none`: the no-plugin arm cannot dispatch a
+# plugin agent, "Agent type ... not found".) Not run yet: paid, hand-off only (#646).
+# Dispatch case for gha-ci-audit:analyzer. No grant: the prompt names a benchmark file that does
+# not exist, so the agent's contract (agents/analyzer.md, Step 1: read benchmark.json) can only
+# end in a missing-file report. No Bash or Write is granted.
+# Can fail: the main model answers itself instead of dispatching (analyzer_dispatched = 0), or
+# the agent invents benchmark results instead of reporting the missing file (reports_missing = 0).
+schema_version: "1.1"
+name: agent-dispatch-analyzer-fires
+description: >
+  Asked to run the gha-ci-audit analyzer agent on a benchmark file that does not exist, the model
+  dispatches gha-ci-audit:analyzer and relays that benchmark.json is missing.
+  expected_outcome: PASS when the agent is dispatched and the reply names benchmark.json as
+  missing; FAIL when it is not dispatched or the reply claims findings.
+tags: [gha-ci-audit, analyzer, agent, quick]
+
+execution:
+  prompt: |
+    Use the gha-ci-audit:analyzer agent on the benchmark at /work/iteration-1/benchmark.json
+    (skill at /work/skills/gha-ci-audit/SKILL.md, notes to /work/iteration-1/analyzer_notes.json)
+    and tell me what it found.
+  max_turns: 8
+  allowed_tools:
+    - Agent
+    - Read
+    - Glob
+
+graders:
+  # Steps: the plugin's agent was dispatched, not imitated.
+  - name: analyzer_dispatched
+    type: tool_used
+    tool: Agent
+    input_match: '"subagent_type"\s*:\s*"(?:[\w-]+:)?analyzer"'
+    min: 1
+
+  # Result: the agent reports the missing input instead of fabricating patterns.
+  - name: reports_missing
+    type: regex
+    target: last_message
+    pattern: 'benchmark\.json[\s\S]{0,200}(missing|not found|no such|does not exist|doesn.t exist|could not|couldn.t|unable)|(missing|not found|no such|does not exist|doesn.t exist|could not|couldn.t|unable)[\s\S]{0,200}benchmark\.json'
+    flags: i
+    match: contains

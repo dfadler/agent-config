@@ -1,0 +1,40 @@
+# Run: claude plugin eval plugins/gha-ci-audit --case agent-dispatch-grader-quiet
+# Not run yet: paid, hand-off only (#646). No grant needed (Agent and Read only).
+# Quiet case for gha-ci-audit:grader: shares "assertion" and "pass/fail" vocabulary but asks for a
+# one-line opinion on an assertion's wording, with no run to grade. Regression guard: the
+# no-plugin arm passes it by default, so Delta is zero by design.
+# Can fail: grader_not_dispatched = 0 if the agent over-triggers; judges_assertion = 0 if the
+# question is not answered.
+schema_version: "1.1"
+name: agent-dispatch-grader-quiet
+description: >
+  A question about whether one assertion is well worded must not dispatch gha-ci-audit:grader.
+  expected_outcome: PASS when the agent is not dispatched and the reply calls the assertion
+  vague, weak or unverifiable; FAIL otherwise.
+tags: [gha-ci-audit, grader, agent, trigger, quick]
+
+execution:
+  prompt: |
+    Is this a good assertion for an eval of a CI audit report: "the report looks helpful"? One
+    sentence, no files, no commands.
+  max_turns: 4
+  allowed_tools:
+    - Agent
+    - Read
+
+graders:
+  - name: grader_not_dispatched
+    type: tool_used
+    tool: Agent
+    input_match: '"subagent_type"\s*:\s*"(?:[\w-]+:)?grader"'
+    min: 0
+    max: 0
+    arm: both
+
+  - name: judges_assertion
+    type: regex
+    target: last_message
+    pattern: 'vague|subjective|weak|unverifiable|not (specific|measurable|verifiable|checkable)|too (broad|general)'
+    flags: i
+    match: contains
+    arm: both

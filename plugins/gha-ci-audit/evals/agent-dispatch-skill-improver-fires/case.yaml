@@ -1,0 +1,40 @@
+# Run: node plugins/eval-authoring/scripts/ts/run-evals/run-evals.ts --tier quick plugins/gha-ci-audit
+# (quick tier: one run, plugin arm only, `--ablation none`: the no-plugin arm cannot dispatch a
+# plugin agent, "Agent type ... not found".) Not run yet: paid, hand-off only (#646).
+# Dispatch case for gha-ci-audit:skill-improver. No grant: the iteration directory does not exist,
+# so the agent's Step 1 (read benchmark.json and grading.json) can only end in a missing-input
+# report. The agent is also propose-only ("does not apply changes").
+# Can fail: the main model answers itself (improver_dispatched = 0), or the agent invents
+# proposed edits (reports_missing_input = 0).
+schema_version: "1.1"
+name: agent-dispatch-skill-improver-fires
+description: >
+  Asked to run the gha-ci-audit skill-improver agent on an iteration directory that does not
+  exist, the model dispatches gha-ci-audit:skill-improver and relays that benchmark or grading
+  data is missing. expected_outcome: PASS when the agent is dispatched and the reply names the
+  missing data; FAIL when it is not dispatched or the reply proposes edits anyway.
+tags: [gha-ci-audit, skill-improver, agent, quick]
+
+execution:
+  prompt: |
+    Use the gha-ci-audit:skill-improver agent on /work/iteration-4
+    (skill at /work/skills/gha-ci-audit/SKILL.md) and tell me what edits it proposes.
+  max_turns: 8
+  allowed_tools:
+    - Agent
+    - Read
+    - Glob
+
+graders:
+  - name: improver_dispatched
+    type: tool_used
+    tool: Agent
+    input_match: '"subagent_type"\s*:\s*"(?:[\w-]+:)?skill-improver"'
+    min: 1
+
+  - name: reports_missing_input
+    type: regex
+    target: last_message
+    pattern: '(benchmark\.json|grading\.json|iteration-4)[\s\S]{0,200}(missing|not found|no such|does not exist|doesn.t exist|could not|couldn.t|unable)|(missing|not found|no such|does not exist|doesn.t exist|could not|couldn.t|unable)[\s\S]{0,200}(benchmark\.json|grading\.json|iteration-4)'
+    flags: i
+    match: contains
