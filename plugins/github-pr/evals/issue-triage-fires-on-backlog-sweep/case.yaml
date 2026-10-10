@@ -1,7 +1,8 @@
 # Run: claude plugin eval plugins/github-pr --case issue-triage-fires-on-backlog-sweep --runs 3 --trust-plugin --no-publish
 # Shared run/grant facts: docs/contributing.md, "Plugin evals". No grant: Skill only.
 # Should-fire case: a sweep over open issues rather than one number.
-# Can fail: skill_fired fails if the description stops matching the sweep wording.
+# Can fail: skill_fired fails if the description stops matching the sweep wording. The bucket
+# graders pass without the skill body (sabotage-checked), so this case tests the trigger only.
 schema_version: "1.1"
 name: issue-triage-fires-on-backlog-sweep
 description: >
@@ -11,8 +12,12 @@ tags: [issue-triage, trigger, quick]
 
 execution:
   prompt: |
-    Which open issues on dfadler/example-app are ready, need info, or look like duplicates?
-    Do not run commands or post anything.
+    Sweep these open issues of dfadler/example-app; do not run commands or post anything.
+    Your final message must sort them into ready, needs info and likely duplicate.
+
+    1. "Crash when config file is missing": has a stack trace and repro steps.
+    2. "App crashes without config.yaml": same stack trace as 1, filed later.
+    3. "Make it faster": no details.
   max_turns: 4
   allowed_tools:
     - Skill
@@ -25,11 +30,18 @@ graders:
     min: 1
     arm: with-only
 
-  - name: addresses_ask
+  - name: sorted_into_buckets
     type: regex
     target: last_message
-    pattern: 'duplicate'
+    pattern: 'likely duplicate'
     flags: i
     match: contains
     arm: both
-    weight: 0.5
+
+  - name: needs_info_bucket
+    type: regex
+    target: last_message
+    pattern: 'needs info'
+    flags: i
+    match: contains
+    arm: both

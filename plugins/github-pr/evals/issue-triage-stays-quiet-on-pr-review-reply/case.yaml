@@ -2,7 +2,8 @@
 # Shared run/grant facts: docs/contributing.md, "Plugin evals". No grant: Skill only.
 # Should-not-fire: PR review comments belong to pr-comments, not issue triage.
 # Regression guard: a no-plugin arm passes by default, so the Delta is about 0 by design.
-# Can fail: triage_not_fired fails if issue-triage over-triggers.
+# Can fail: triage_not_fired fails if issue-triage over-triggers (sabotage-checked with a
+# fires-on-everything description). The prompt asks for a concrete result so a skill can fire.
 schema_version: "1.1"
 name: issue-triage-stays-quiet-on-pr-review-reply
 description: >
@@ -12,8 +13,11 @@ tags: [issue-triage, trigger, quick]
 
 execution:
   prompt: |
-    Reply to the review comments on PR 87 of dfadler/example-app. Do not run commands or
-    post anything; just say how you would approach it.
+    Reply to the review comments on PR 87 of dfadler/example-app. Do it now, no commands.
+    Your final message must be only the two draft replies.
+
+    1. @bob on src/cli.ts:10: "Please rename `opts` to `options`."
+    2. @bob on src/cli.ts:44: "This needs a test."
   max_turns: 4
   allowed_tools:
     - Skill
@@ -27,12 +31,12 @@ graders:
     max: 0
     arm: both
 
-  # Result: the request was addressed with a review-reply approach (a completion check, so the
-  # quiet case cannot pass on an empty reply). Weighted down: a baseline passes it too.
+  # Result: both replies are drafted, rename (opts/options) and test (a completion check, so the
+  # quiet case cannot pass on an empty or one-sided reply). Weighted down: a baseline passes it too.
   - name: addresses_review_threads
     type: regex
     target: last_message
-    pattern: 'thread|unresolved|resolve|address|reply|fix'
+    pattern: '(?:\bopts\b|\boptions\b)[\s\S]*\btest\b|\btest\b[\s\S]*(?:\bopts\b|\boptions\b)'
     flags: i
     match: contains
     arm: both
