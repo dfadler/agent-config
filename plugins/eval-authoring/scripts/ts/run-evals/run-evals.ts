@@ -36,7 +36,10 @@ import {
   type Invocation,
 } from "./plan.ts";
 import { runPreflight } from "./preflight.ts";
+import { caseRow, renderBlock, renderSummary, withBlock } from "./summary.ts";
 import {
+  DEFAULT_JUDGE_MODEL,
+  DEFAULT_MODEL,
   DEFAULT_TIER,
   TIERS,
   ceilingFor,
@@ -71,13 +74,28 @@ ${Object.values(TIERS).map((t) => `                         ${t.name}: ${t.descr
   --model <id>         pin the model (default: pinned in the wrapper)
   --judge-model <id>   pin the judge model (default: pinned in the wrapper)
   --eval-dir <dir>     eval directory relative to the plugin
+  --case <name-or-glob> run only the cases whose name matches (* and ?
+                       are wildcards); the other cases are not planned, so the
+                       ceiling, preflight and exit codes cover the subset.
+                       One pattern, and no match is an error (exit 3)
   --output-dir <dir>   base results directory (default: <eval-dir>/results).
                        Each wrapper run writes <dir>/run-<time>/<NN>-<case>
   --publish-report     publish the report (default: --no-publish)
   --keep-temp          keep run traces
   --skip-unavailable   exit 0 when plugin eval is in early access or down
   --dry-run            print the commands and exit; runs nothing
+  --pr <n>             after the run, write the results summary into a marked
+                       block (<!-- run-evals:start --> ... <!-- run-evals:end -->)
+                       of PR <n>'s body with "gh pr edit", replacing the block
+                       on a re-run. Off by default. Prints the exact block and
+                       asks for confirmation; never edits in --dry-run
+  --yes                with --pr: skip the confirmation (the block is still
+                       printed first)
   -h, --help           show this help
+
+At the end of a real run the wrapper prints a paste-ready Markdown summary
+(per-case with, without and delta, tier, models, cost, the run command, and the
+redacted, truncated failing reply of each failed grader).
 
 After each invocation the wrapper checks that the result holds exactly the
 planned case; a missing, extra or zero-case result exits 7 and names the case.
@@ -107,6 +125,9 @@ interface Options {
   readonly reporting: Reporting;
   readonly skipUnavailable: boolean;
   readonly dryRun: boolean;
+  readonly only: string | undefined;
+  readonly pr: string | undefined;
+  readonly yes: boolean;
 }
 
 type Parsed =
@@ -121,12 +142,15 @@ const VALUE_FLAGS: readonly string[] = [
   "--judge-model",
   "--eval-dir",
   "--output-dir",
+  "--case",
+  "--pr",
 ];
 const BOOL_FLAGS: readonly string[] = [
   "--publish-report",
   "--keep-temp",
   "--skip-unavailable",
   "--dry-run",
+  "--yes",
 ];
 
 /** A plain decimal greater than zero ("0.5", "2", ".5"); anything else (empty, "abc", "-1", "NaN", "1e3", "0x10", "0") is undefined. */
@@ -176,6 +200,16 @@ export const parseArgs = (argv: readonly string[]): Parsed => {
       message: `--max-cost-usd must be a positive finite number of US dollars, got '${costText}'`,
     };
   }
+  const pr = values.get("--pr");
+  if (pr !== undefined && !/^[1-9]\d*$/.test(pr)) {
+    return { kind: "error", message: `--pr must be a PR number, got '${pr}'` };
+  }
+  if (pr !== undefined && bools.has("--dry-run")) {
+    return { kind: "error", message: "--pr never runs with --dry-run (a dry run publishes nothing)" };
+  }
+  if (pr === undefined && bools.has("--yes")) {
+    return { kind: "error", message: "--yes only applies with --pr" };
+  }
   const [plugin, ...extra] = positionals;
   if (plugin === undefined) {
     return { kind: "error", message: "missing <plugin-path>" };
@@ -202,6 +236,9 @@ export const parseArgs = (argv: readonly string[]): Parsed => {
       },
       skipUnavailable: bools.has("--skip-unavailable"),
       dryRun: bools.has("--dry-run"),
+      only: values.get("--case"),
+      pr,
+      yes: bools.has("--yes"),
     },
   };
 };
@@ -330,7 +367,12 @@ const runInvocation = async (
   outputDir: string,
   budgetUsd: number,
   shareUsd: number,
-): Promise<{ readonly summary: InvocationSummary; readonly stop: boolean }> => {
+): Promise<{
+  readonly summary: InvocationSummary;
+  readonly stop: boolean;
+  /** The located aggregate-result.json text, for the printed summary only. */
+  readonly resultText: string | undefined;
+}> => {
   const args = buildCliArgs(
     invocationSpec(options, target, trust, inv, outputDir, budgetUsd),
   );
@@ -359,6 +401,7 @@ const runInvocation = async (
         resultDir: undefined,
       },
       stop: true,
+      resultText: undefined,
     };
   }
   const located = locateResult(io, outputDir);
@@ -397,11 +440,13 @@ const runInvocation = async (
       resultDir: located?.dir,
     },
     stop: verdict.stop,
+    resultText: located?.text,
   };
 };
 
 interface Progress {
   readonly done: readonly InvocationSummary[];
+  readonly texts: readonly (string | undefined)[];
   readonly spentUsd: number;
   readonly stopped: boolean;
   readonly outOfBudget: boolean;
@@ -432,6 +477,7 @@ export const main = async (
     suite,
     grants,
     options.tier.tag,
+    options.only,
   );
   if (!plan.ok) return fail(io, EXIT_CONFIG, plan.reason);
 
@@ -504,12 +550,13 @@ export const main = async (
       );
       return {
         done: [...acc.done, r.summary],
+        texts: [...acc.texts, r.resultText],
         spentUsd: round4(acc.spentUsd + r.summary.chargedUsd),
         stopped: r.stop,
         outOfBudget: false,
       };
     },
-    Promise.resolve({ done: [], spentUsd: 0, stopped: false, outOfBudget: false }),
+    Promise.resolve({ done: [], texts: [], spentUsd: 0, stopped: false, outOfBudget: false }),
   );
   const unstarted = invocations
     .slice(progress.done.length)
@@ -542,7 +589,67 @@ export const main = async (
   io.err(
     `run-evals: tier ${options.tier.name}, ablation ${options.tier.ablation}: exit ${String(exit)}\n`,
   );
-  return exit;
+  const markdown = renderSummary({
+    plugin: basename(target),
+    tier: options.tier.name,
+    model: options.model ?? DEFAULT_MODEL,
+    judgeModel: options.judgeModel ?? DEFAULT_JUDGE_MODEL,
+    spentUsd: progress.spentUsd,
+    ceilingUsd,
+    exit,
+    command: `node plugins/eval-authoring/scripts/ts/run-evals/run-evals.ts ${argv.map(shellWord).join(" ")}`,
+    unstarted,
+    cases: progress.done.map((d, i) => ({
+      caseName: d.caseName,
+      exit: d.exit,
+      row: caseRow(d.caseName, progress.texts[i]),
+    })),
+  });
+  if (options.pr === undefined) {
+    io.out(`\n${markdown}\n`);
+    return exit;
+  }
+  const block = renderBlock(markdown);
+  io.out(`\n${block}\n`);
+  const published = await publishToPr(io, options.pr, block, options.yes);
+  return published === undefined ? exit : worstExit(exit, published);
+};
+
+const shellWord = (a: string): string =>
+  /^[\w@%+=:,./-]+$/.test(a) ? a : `'${a.replace(/'/g, "'\\''")}'`;
+
+/**
+ * The publish step of --pr: show the block, get a yes (or --yes), then edit
+ * the PR body. Returns an exit code only when something went wrong.
+ */
+const publishToPr = async (
+  io: Io,
+  pr: string,
+  block: string,
+  yes: boolean,
+): Promise<ExitCode | undefined> => {
+  const view = await io.spawn("gh", ["pr", "view", pr, "--json", "body", "-q", ".body"]);
+  if (view.error !== undefined || view.status !== 0) {
+    io.err(`run-evals: could not read PR #${pr} (gh pr view failed); body not edited\n`);
+    return EXIT_DEPENDENCY;
+  }
+  if (!yes && !(await io.confirm(`Write the block above into the body of PR #${pr}? [y/N] `))) {
+    io.err(`run-evals: PR #${pr} not edited\n`);
+    return undefined;
+  }
+  const edit = await io.spawn("gh", [
+    "pr",
+    "edit",
+    pr,
+    "--body",
+    withBlock(view.stdout.replace(/\n$/, ""), block),
+  ]);
+  if (edit.error !== undefined || edit.status !== 0) {
+    io.err(`run-evals: gh pr edit failed for PR #${pr}; body not edited\n`);
+    return EXIT_DEPENDENCY;
+  }
+  io.err(`run-evals: PR #${pr} body updated\n`);
+  return undefined;
 };
 
 /** Entry point: the only code that touches `process`. */

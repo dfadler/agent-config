@@ -38,8 +38,18 @@ export const issueLines = (
       `${i.loc.file}:${String(i.loc.line)}: ${i.message}`,
   );
 
+/** A case name or a glob (`*` and `?` only) as an anchored regex. */
+export const caseMatcher = (pattern: string): RegExp =>
+  new RegExp(
+    `^${pattern
+      .replace(/[.+^${}()|[\]\\]/g, "\\$&")
+      .replace(/\*/g, ".*")
+      .replace(/\?/g, ".")}$`,
+  );
+
 /**
- * Group the suite's cases by grant set. `tag` keeps only cases carrying it.
+ * Group the suite's cases by grant set. `tag` keeps only cases carrying it;
+ * `only` (the wrapper's --case) keeps only cases whose name matches the glob.
  * Fails (rather than guessing) on parser issues, a stale grants entry, a case
  * name that would be read as a glob, or no case left to run.
  */
@@ -47,6 +57,7 @@ export const planGroups = (
   suite: EvalSuite,
   grants: GrantsFile,
   tag: string | undefined,
+  only?: string,
 ): Plan => {
   const names = suite.cases.map((c) => c.name.value);
   const checked = checkGrantCaseNames(grants, names);
@@ -54,16 +65,19 @@ export const planGroups = (
   if (problems.length > 0) {
     return { ok: false, reason: problems.join("\n") };
   }
+  const matcher = only === undefined ? undefined : caseMatcher(only);
   const selected = suite.cases.filter(
-    (c) => tag === undefined || c.tags.value.includes(tag),
+    (c) =>
+      (tag === undefined || c.tags.value.includes(tag)) &&
+      (matcher === undefined || matcher.test(c.name.value)),
   );
   if (selected.length === 0) {
     return {
       ok: false,
       reason:
-        tag === undefined
+        tag === undefined && only === undefined
           ? `no cases found under ${suite.evalDir}`
-          : `no cases tagged '${tag}' under ${suite.evalDir}`,
+          : `no cases${tag === undefined ? "" : ` tagged '${tag}'`}${only === undefined ? "" : ` matching --case '${only}'`} under ${suite.evalDir}`,
     };
   }
   const globby = selected.map((c) => c.name.value).filter(hasGlobMeta);

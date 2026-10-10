@@ -79,6 +79,10 @@ export interface FakeIoOptions {
   readonly files?: Readonly<Record<string, string>>;
   /** Directory listings to return, by path. */
   readonly dirs?: Readonly<Record<string, readonly string[]>>;
+  /** The answer to a confirm() question; default is no. */
+  readonly confirm?: boolean;
+  /** Reply for a spawned `gh` call, given its argv. */
+  readonly onGh?: (args: readonly string[]) => SpawnResult;
 }
 
 export interface FakeIo {
@@ -87,6 +91,7 @@ export interface FakeIo {
   readonly out: string[];
   readonly err: string[];
   readonly written: Map<string, string>;
+  readonly questions: string[];
 }
 
 export const fakeIo = (o: FakeIoOptions = {}): FakeIo => {
@@ -94,6 +99,7 @@ export const fakeIo = (o: FakeIoOptions = {}): FakeIo => {
   const out: string[] = [];
   const err: string[] = [];
   const written = new Map<string, string>();
+  const questions: string[] = [];
   const files = new Map<string, string>(Object.entries(o.files ?? {}));
   let cliCount = 0;
   const onPath = o.onPath ?? { claude: ["/bin/claude"], git: ["/bin/git"] };
@@ -109,6 +115,9 @@ export const fakeIo = (o: FakeIoOptions = {}): FakeIo => {
         return Promise.resolve(
           spawned({ stdout: `${o.claudeVersion ?? "2.1.287"} (Claude Code)\n` }),
         );
+      }
+      if (command === "gh") {
+        return Promise.resolve(o.onGh?.(args) ?? spawned());
       }
       if (command === "git") {
         return Promise.resolve(spawned({ stdout: "git version 2.39.3\n" }));
@@ -140,8 +149,12 @@ export const fakeIo = (o: FakeIoOptions = {}): FakeIo => {
     writeFile: (p, t) => {
       written.set(p, t);
     },
+    confirm: (q) => {
+      questions.push(q);
+      return Promise.resolve(o.confirm ?? false);
+    },
   };
-  return { io, calls, out, err, written };
+  return { io, calls, out, err, written, questions };
 };
 
 /** Minimal valid `aggregate-result.json` text. */
