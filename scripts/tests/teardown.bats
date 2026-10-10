@@ -252,7 +252,7 @@ install_legacy_links() {
 
 @test "--plugins only unlinks plugins and deregisters the hook, leaving commands and CLAUDE.md alone" {
   install_links
-  HOOK_CMD="$HOME/.claude/skills/worktree-core/skills/git-worktree-usage/scripts/require-worktree-hook.sh"
+  HOOK_CMD="node \"$HOME/.claude/skills/worktree-core/scripts/ts/require-worktree-hook.ts\""
   python3 -c "
 import json
 d = {'hooks': {'PreToolUse': [{'matcher': 'Edit|Write', 'hooks': [{'type': 'command', 'command': '$HOOK_CMD'}]}]}}
@@ -305,7 +305,7 @@ assert '$HOOK_CMD' not in cmds, 'hook still present after teardown'
 # ---------------------------------------------------------------------------
 
 @test "hook deregistration: removes worktree-core PreToolUse hook from settings.json" {
-  HOOK_CMD="$HOME/.claude/skills/worktree-core/skills/git-worktree-usage/scripts/require-worktree-hook.sh"
+  HOOK_CMD="node \"$HOME/.claude/skills/worktree-core/scripts/ts/require-worktree-hook.ts\""
   mkdir -p "$HOME/.claude"
   python3 -c "
 import json
@@ -332,8 +332,8 @@ assert '$HOOK_CMD' not in cmds, 'hook still present after teardown'
 }
 
 @test "hook deregistration: removes worktree-core SessionStart hooks from settings.json" {
-  SYMLINK_CMD="$HOME/.claude/skills/worktree-core/skills/git-worktree-usage/scripts/check-worktree-symlinks-hook.sh"
-  PRUNE_CMD="$HOME/.claude/skills/worktree-core/skills/git-worktree-usage/scripts/prune-merged-worktrees-hook.sh"
+  SYMLINK_CMD="node \"$HOME/.claude/skills/worktree-core/scripts/ts/check-worktree-symlinks-hook.ts\""
+  PRUNE_CMD="node \"$HOME/.claude/skills/worktree-core/scripts/ts/prune-merged-worktrees-hook.ts\""
   mkdir -p "$HOME/.claude"
   python3 -c "
 import json
@@ -356,7 +356,7 @@ assert '$PRUNE_CMD' not in cmds, 'auto-prune hook still present after teardown'
 }
 
 @test "hook deregistration: removes the memory-hygiene Stop hook from settings.json" {
-  HOOK_CMD="$HOME/.claude/skills/memory-hygiene/hooks/scripts/memory-hygiene-stop-hook.sh"
+  HOOK_CMD="node \"$HOME/.claude/skills/memory-hygiene/scripts/ts/memory-hygiene-stop-hook.ts\""
   mkdir -p "$HOME/.claude"
   python3 -c "
 import json
@@ -370,6 +370,25 @@ import json
 d = json.load(open('$HOME/.claude/settings.json'))
 cmds = [h['command'] for e in d.get('hooks', {}).get('Stop', []) for h in e.get('hooks', [])]
 assert '$HOOK_CMD' not in cmds, 'hook still present after teardown'
+"
+  [ "$status" -eq 0 ]
+}
+
+@test "hook deregistration: also sweeps a leftover retired .sh shim registration" {
+  LEGACY="$HOME/.claude/skills/memory-hygiene/hooks/scripts/memory-hygiene-stop-hook.sh"
+  mkdir -p "$HOME/.claude"
+  python3 -c "
+import json
+d = {'hooks': {'Stop': [{'hooks': [{'type': 'command', 'command': '$LEGACY'}]}]}}
+open('$HOME/.claude/settings.json', 'w').write(json.dumps(d))
+"
+  run_teardown
+  assert_success
+  run python3 -c "
+import json
+d = json.load(open('$HOME/.claude/settings.json'))
+cmds = [h['command'] for e in d.get('hooks', {}).get('Stop', []) for h in e.get('hooks', [])]
+assert '$LEGACY' not in cmds, 'legacy hook still present after teardown'
 "
   [ "$status" -eq 0 ]
 }

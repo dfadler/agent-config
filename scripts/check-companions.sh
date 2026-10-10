@@ -679,7 +679,7 @@ WORKTREE_HOOK_STATE_SCRIPT=$(
 import json, os, sys
 
 hook_path = os.path.expanduser(
-    "~/.claude/skills/worktree-core/skills/git-worktree-usage/scripts/require-worktree-hook.sh"
+    "~/.claude/skills/worktree-core/scripts/ts/require-worktree-hook.ts"
 )
 settings_path = os.path.expanduser("~/.claude/settings.json")
 
@@ -726,7 +726,7 @@ WORKTREE_HOOK_FIX_SCRIPT=$(
 import json, os, sys
 
 hook_path = os.path.expanduser(
-    "~/.claude/skills/worktree-core/skills/git-worktree-usage/scripts/require-worktree-hook.sh"
+    "~/.claude/skills/worktree-core/scripts/ts/require-worktree-hook.ts"
 )
 settings_path = os.path.expanduser("~/.claude/settings.json")
 
@@ -749,6 +749,11 @@ if group is None:
 
 hook_list = group.setdefault("hooks", [])
 
+# Drop the retired .sh shim entry (removed in #441 phase 6) so it cannot dangle
+legacy = "/git-worktree-usage/scripts/require-worktree-hook.sh"
+hook_list[:] = [h for h in hook_list
+                if legacy not in (h.get("command", "") if isinstance(h, dict) else str(h))]
+
 # No-op if already present
 for h in hook_list:
     cmd = h.get("command", "") if isinstance(h, dict) else str(h)
@@ -757,7 +762,7 @@ for h in hook_list:
         sys.exit(0)
 
 # Add the hook, preserving all existing entries in this group
-hook_list.append({"type": "command", "command": hook_path})
+hook_list.append({"type": "command", "command": 'node "{}"'.format(hook_path)})
 
 with open(settings_path, "w") as f:
     json.dump(data, f, indent=2)
@@ -792,7 +797,7 @@ fix_require_worktree_hook() {
   check_worktree_enforce
 }
 
-# Checks whether require-worktree-hook.sh is registered in ~/.claude/settings.json
+# Checks whether require-worktree-hook.ts is registered in ~/.claude/settings.json
 # under a PreToolUse entry with matcher "Edit|Write". This hook can be displaced
 # when another tool (e.g. rtk init --global) rewrites the PreToolUse array.
 # Detects: present / group-missing / hook-missing / file-missing states.
@@ -800,7 +805,7 @@ fix_require_worktree_hook() {
 # Skips entirely when the worktree-core plugin is not linked (check_convention_deps
 # will flag that separately).
 check_require_worktree_hook() {
-  local hook_script="$HOME/.claude/skills/worktree-core/skills/git-worktree-usage/scripts/require-worktree-hook.sh"
+  local hook_script="$HOME/.claude/skills/worktree-core/scripts/ts/require-worktree-hook.ts"
   # Plugin not linked — check_convention_deps will surface that
   [[ -f "$hook_script" ]] || return 0
 

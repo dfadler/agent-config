@@ -203,6 +203,7 @@ if [[ "$DO_PLUGINS" -eq 1 ]]; then
   GLOBAL_SETTINGS="$HOME/.claude/settings.json"
   for i in "${!PLUGIN_HOOK_EVENTS[@]}"; do
     ensure_hook_deregistered "${PLUGIN_HOOK_EVENTS[$i]}" "${PLUGIN_HOOK_CMDS[$i]}" "$GLOBAL_SETTINGS"
+    ensure_hook_deregistered "${PLUGIN_HOOK_EVENTS[$i]}" "${PLUGIN_HOOK_LEGACY_CMDS[$i]}" "$GLOBAL_SETTINGS"
   done
 fi
 

@@ -35,8 +35,8 @@ setup() {
     printf '{"name":"%s"}\n' "$p" >"$FAKE_REPO/plugins/$p/.claude-plugin/plugin.json"
   done
   CLAUDE="$HOME/.claude"
-  WT_HOOKS="$CLAUDE/skills/worktree-core/skills/git-worktree-usage/scripts"
-  MH_HOOK="$CLAUDE/skills/memory-hygiene/hooks/scripts/memory-hygiene-stop-hook.sh"
+  WT_HOOKS="$CLAUDE/skills/worktree-core/scripts/ts"
+  MH_HOOK="node \"$CLAUDE/skills/memory-hygiene/scripts/ts/memory-hygiene-stop-hook.ts\""
 }
 
 teardown() {
@@ -77,9 +77,9 @@ install() {
 
 # The plan lines for the hook rows, in plugin-hooks.sh order.
 hook_lines() {
-  printf 'register-hook\tPreToolUse\t%s\tEdit|Write\n' "$WT_HOOKS/require-worktree-hook.sh"
-  printf 'register-hook\tSessionStart\t%s\n' "$WT_HOOKS/check-worktree-symlinks-hook.sh"
-  printf 'register-hook\tSessionStart\t%s\n' "$WT_HOOKS/prune-merged-worktrees-hook.sh"
+  printf 'register-hook\tPreToolUse\t%s\tEdit|Write\n' "node \"$WT_HOOKS/require-worktree-hook.ts\""
+  printf 'register-hook\tSessionStart\t%s\n' "node \"$WT_HOOKS/check-worktree-symlinks-hook.ts\""
+  printf 'register-hook\tSessionStart\t%s\n' "node \"$WT_HOOKS/prune-merged-worktrees-hook.ts\""
   printf 'register-hook\tStop\t%s\n' "$MH_HOOK"
 }
 
@@ -180,9 +180,9 @@ hook_lines() {
   [ "$status" -eq 0 ]
   has "unlink${T}opted-out${T}$CLAUDE/commands/demo.md${T}$FAKE_REPO/claude/commands/demo.md"
   has "unlink${T}superseded${T}$CLAUDE/skills/worktree-core${T}$FAKE_REPO/plugins/worktree-core"
-  has "deregister-hook${T}PreToolUse${T}$WT_HOOKS/require-worktree-hook.sh"
-  has "deregister-hook${T}SessionStart${T}$WT_HOOKS/check-worktree-symlinks-hook.sh"
-  has "deregister-hook${T}SessionStart${T}$WT_HOOKS/prune-merged-worktrees-hook.sh"
+  has "deregister-hook${T}PreToolUse${T}node \"$WT_HOOKS/require-worktree-hook.ts\""
+  has "deregister-hook${T}SessionStart${T}node \"$WT_HOOKS/check-worktree-symlinks-hook.ts\""
+  has "deregister-hook${T}SessionStart${T}node \"$WT_HOOKS/prune-merged-worktrees-hook.ts\""
   # The kept plugin's hook is already registered: no action for it.
   lacks "Stop"
 }
