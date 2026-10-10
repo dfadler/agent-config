@@ -50,6 +50,24 @@ jobs:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
+      # Visibility only (#648): a plugin with skills/agents but no evals/ is absent
+      # from the matrix, so list it here rather than let the gap go unseen.
+      - name: Report plugins without evals
+        run: |
+          set -euo pipefail
+          missing=""
+          for d in plugins/*/; do
+            [ -d "${d}evals" ] && continue
+            if [ -d "${d}skills" ] || [ -d "${d}agents" ] || [ -f "${d}SKILL.md" ]; then
+              missing="$missing $(basename "$d")"
+            fi
+          done
+          if [ -n "$missing" ]; then
+            echo "::warning::Plugins with skills/agents but no evals/:$missing"
+            echo "Plugins with skills/agents but no evals/:$missing" >> "$GITHUB_STEP_SUMMARY"
+          else
+            echo "Every plugin with skills/agents has evals/." >> "$GITHUB_STEP_SUMMARY"
+          fi
       - id: list
         env:
           PLUGIN: ${{ inputs.plugin }}
