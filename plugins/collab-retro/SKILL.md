@@ -38,7 +38,7 @@ a change to this repo rather than something that just sits in memory forever.
 Run the scanner:
 
 ```bash
-plugins/collab-retro/scripts/scan-feedback-memories.sh
+node plugins/collab-retro/scripts/ts/scan-feedback-memories.ts
 ```
 
 This lists every `feedback`-type memory file across all projects on this
