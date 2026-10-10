@@ -48,7 +48,9 @@ can also run it directly (also reachable as ./doctor.sh from the repo root).
                    and dangling symlinks in ~/.claude/skills and
                    ~/.claude/commands that point into this install; the
                    settings file is backed up to settings.json.bak-<time>
-                   first). Never runs as a side effect of a bare invocation.
+                   first; and removing @-include lines in ~/.claude/CLAUDE.md
+                   and CLAUDE.personal.md whose file under this repo's claude/
+                   tree is gone, backing up to <file>.bak-<time> first). Never runs as a side effect of a bare invocation.
   -h, --help       Show this message and exit.
 USAGE
 }
@@ -1228,9 +1230,102 @@ check_dangling() {
   fi
 }
 
+# --------------------------------------------------------------------------
+# Dangling @-includes
+#
+# Scans ~/.claude/CLAUDE.md and ~/.claude/CLAUDE.personal.md (only these two;
+# nested includes are not followed) for `@path` lines whose file is gone.
+# Ownership is narrow: a missing absolute path under this repo's claude/ tree
+# (or its main checkout's) is ours -- reported, and removed by --fix after a
+# timestamped backup. Any other missing include (relative like `@RTK.md`, or
+# outside the repo) is only warned about, never removed.
+# --------------------------------------------------------------------------
+check_dangling_includes() {
+  local roots=("$REPO_ROOT/claude/") common
+  if common="$(git -C "$REPO_ROOT" rev-parse --path-format=absolute --git-common-dir 2>/dev/null)"; then
+    roots+=("$(dirname "$common")/claude/")
+  fi
+  local found=0 name file lineno raw path base r owned note ts drop dir target tmp
+  for name in CLAUDE.md CLAUDE.personal.md; do
+    file="$HOME/.claude/$name"
+    [[ -f "$file" ]] || continue
+    local -a mine=() notes=()
+    lineno=0
+    while IFS= read -r raw || [[ -n "$raw" ]]; do
+      lineno=$((lineno + 1))
+      [[ "$raw" =~ ^@([^[:space:]]+)$ ]] || continue
+      path="${BASH_REMATCH[1]}"
+      case "$path" in
+        \~/*) path="$HOME/${path:2}" ;;
+      esac
+      [[ "$path" == /* ]] || path="$HOME/.claude/$path"
+      [[ -e "$path" ]] && continue
+      found=1
+      owned=0
+      # Resolve `..` and symlinked parents before the prefix check; if the
+      # parent dir is gone too, `..` components make ownership unprovable.
+      if dir="$(cd -P "$(dirname "$path")" 2>/dev/null && pwd -P)"; then
+        path="$dir/$(basename "$path")"
+        for r in "${roots[@]}"; do
+          r="$(cd -P "$r" 2>/dev/null && pwd -P)/" || continue
+          [[ "$path" == "$r"* ]] && owned=1
+        done
+      elif [[ "/$path/" != */../* ]]; then
+        for r in "${roots[@]}"; do
+          [[ "$path" == "$r"* ]] && owned=1
+        done
+      fi
+      if [[ "$owned" == 0 ]]; then
+        echo "⚠ $file:$lineno includes a missing file (left alone; not ours): ${raw#@}" >&2
+        continue
+      fi
+      base="$(basename "$path" .md)"
+      note=""
+      [[ -d "$REPO_ROOT/plugins/$base" ]] && note=" -- now loads as the $base skill, nothing lost"
+      if [[ "$FIX" != "1" ]]; then
+        echo "⚠ $file:$lineno includes a file that no longer exists: ${raw#@}$note" >&2
+      else
+        mine+=("$lineno")
+        notes+=("$lineno: ${raw#@}$note")
+      fi
+    done <"$file"
+    if [[ "$FIX" == "1" && ${#mine[@]} -gt 0 ]]; then
+      ts="$(date +%Y%m%d%H%M%S)"
+      if cp "$file" "$file.bak-$ts"; then
+        echo "Backed up $file to $file.bak-$ts"
+        drop=" ${mine[*]} "
+        # Edit the symlink's target, and swap the finished temp file in with
+        # mv so a failed write never truncates the original. cp -p keeps the
+        # mode; the awk redirect then overwrites only the content.
+        target="$file"
+        [[ -L "$file" ]] && target="$(readlink -f "$file")"
+        tmp="$target.tmp-$ts"
+        if cp -p "$target" "$tmp" &&
+          awk -v drop="$drop" 'index(drop, " " NR " ") == 0' "$target" >"$tmp" &&
+          mv -f "$tmp" "$target"; then
+          for raw in "${notes[@]}"; do
+            echo "Removed dangling include from $file:$raw"
+          done
+        else
+          rm -f "$tmp"
+          echo "⚠ could not rewrite $file; left unchanged" >&2
+        fi
+      else
+        echo "⚠ could not back up $file; not removing dangling includes" >&2
+      fi
+    fi
+  done
+  if [[ "$found" == 0 ]]; then
+    echo "✓ no dangling @-includes in ~/.claude/CLAUDE.md or CLAUDE.personal.md"
+  elif [[ "$FIX" != "1" ]]; then
+    echo "  Run './doctor.sh --fix' to remove the ones from this repo." >&2
+  fi
+}
+
 check_convention_deps
 check_available_conventions
 check_dangling
+check_dangling_includes
 check_git_identity
 check_python_deps
 

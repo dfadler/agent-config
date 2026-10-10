@@ -44,6 +44,10 @@ doctor finds dangling leftovers of this install: hook commands in
 touched) and dangling symlinks in `~/.claude/skills` and `~/.claude/commands` pointing
 into this repo. Without `--fix` it only reports; with `--fix` it backs up
 `settings.json` to `settings.json.bak-<timestamp>`, then removes each one and prints it.
+It also flags dangling `@<path>` includes in `~/.claude/CLAUDE.md` and `CLAUDE.personal.md`
+(e.g. conventions since converted to skills): `--fix` backs the file up to
+`<file>.bak-<timestamp>` and removes only lines pointing into this repo's `claude/` tree;
+other missing includes are only warned about.
 
 See [`docs/plugin-loading.md`](./plugin-loading.md) for how the linked plugin
 directory actually gets picked up by Claude Code and why its contents load
