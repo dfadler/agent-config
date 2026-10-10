@@ -7,6 +7,10 @@ contains a `plugin.json` file into `~/.claude/skills/<name>`, and the plugin loa
 straight out of this working copy. Edits here are live in the next session; there's
 nothing to commit, push, or update first.
 
+Plugin scripts and hooks are TypeScript (`node script.ts`, Node 22.18+). The exceptions are
+the bootstrap bash that runs before Node exists (`setup.sh`, `doctor.sh`, `check-companions.sh`)
+and `detached-terminal`'s Python PTY holder; see [`contributing.md`](contributing.md#checks).
+
 This repo currently ships many plugins under `plugins/`:
 `accessibility-skills`, `detached-terminal`, `eval-authoring`,
 `fetch-execute-guide`, `gh-attach-image`, `gh-untrusted`, `gha-ci-audit`, `playwright`, `screen-capture`, `second-brain`,

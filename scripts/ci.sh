@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Entry points for this repo's shell, Python and kcov checks. CI calls
+# Entry points for this repo's remaining bash (bootstrap), Python (detached-terminal) and kcov checks. CI calls
 # `bash scripts/ci.sh <target>` and humans run the same command, so a green `scripts/ci.sh check` locally
 # means the same thing a green PR does. The Node-based checks are package.json
 # scripts (`pnpm run <name>`); this script reaches them for the `check`
@@ -100,12 +100,11 @@ KCOV_INCLUDE="$ROOT/scripts,$ROOT/plugins,$ROOT/setup.sh"
 KCOV_EXCLUDE=/scripts/tests,/scripts/ci.sh
 
 # Python's own coverage floor, the sibling of COVERAGE_MIN (dfadler/
-# agent-config#208). Same discipline: the first honest measurement rounded
-# DOWN. 33 is `coverage-py` (33.95%) now that detached-terminal is the only
-# Python left under test (it was 52 while the gha-ci-audit scripts, since
-# ported to TypeScript, were measured too); the measurement is
-# platform-independent (coverage.py, unlike kcov, instruments Python
-# everywhere). It is low because agent_term.py's CLI/daemon dispatch
+# agent-config#208). Same discipline: a measurement rounded DOWN. Python in
+# this repo is only detached-terminal's agent_term.py (a documented exception
+# to TypeScript-by-default: Node has no stdlib PTY, #441), so 33 is that one
+# file's `coverage-py` result (33.95%); the measurement is platform-independent
+# (coverage.py, unlike kcov, instruments Python everywhere). It is low because agent_term.py's CLI/daemon dispatch
 # (cmd_start, serve, bind_control_socket, the socket loop) is exercised only
 # by real usage, not by the unit tests — a real gap, not a measurement error.
 # Lowering this takes a deliberate commit; raising it is welcome.
@@ -264,10 +263,10 @@ coverage_py() {
 # `check` must be the UNION of what every workflow runs. The split, so a new
 # target lands in both places:
 #
-#   shell.yml      lint-shellcheck, lint-shfmt, lint-set-flags, lint-claude-md,
-#                  structure, test-sh, coverage
+#   shell.yml      lint-shellcheck, lint-shfmt, test-sh, coverage
 #   python.yml     lint-py, typecheck, test-py, coverage-py
-#   typescript.yml lint-ts, typecheck-ts, check-skills, lint-plugin-evals,
+#   typescript.yml lint-ts, typecheck-ts, lint-set-flags, lint-claude-md, structure,
+#                  check-links, check-skills, lint-plugin-evals,
 #                  check-vitest-flags, check-vitest-v3-names, test-ts, coverage-ts
 #   actionlint.yml lint-actions
 #

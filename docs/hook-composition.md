@@ -4,7 +4,8 @@ This document describes how `worktree-core`'s hooks are designed to
 compose with hooks from other plugins without
 producing collisions or conflicting behavior, and how `setup.sh`/`teardown.sh`
 edit the shared config files those hooks are registered in without clobbering
-configuration other tools own.
+configuration other tools own. Hooks are TypeScript run by `node`; `setup.sh`/`teardown.sh` are
+bootstrap bash by design (they run before Node is guaranteed).
 
 ## The contract: hooks are additive
 

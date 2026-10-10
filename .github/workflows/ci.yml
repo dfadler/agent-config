@@ -10,9 +10,9 @@ name: CI
 # (`on: workflow_call:`), call it from a job here, and add that job to the
 # sentinel's needs: — no branch-protection settings change.
 #
-#   shell       shell.yml        shellcheck, shfmt, set-flags, claude-md-size,
-#                                structure, test-sh, coverage (sh-*.yml)
-#   typescript  typescript.yml   pnpm run lint / typecheck / test / coverage
+#   shell       shell.yml        shellcheck, shfmt, test-sh, coverage (sh-*.yml)
+#   typescript  typescript.yml   pnpm run lint / typecheck / set-flags / CLAUDE.md size /
+#                                plugin structure / links / test / coverage
 #   python      python.yml       scripts/ci.sh lint-py / typecheck / test-py / coverage-py
 #
 # actionlint.yml (paths-filtered) and issue-bot.yml stay standalone: a

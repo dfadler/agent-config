@@ -42,9 +42,7 @@ a CI failure here.
 - **Node setup is the `.github/actions/setup-node-pnpm` composite.** Node from
   `.nvmrc`, pnpm from `packageManager`, then `pnpm install --frozen-lockfile`. Any workflow
   that runs a `pnpm run` script (or a `scripts/ci.sh` target that needs `node_modules`) runs it right after checkout
-  instead of repeating the three steps (`typescript.yml` and
-  `sh-claude-md-size.yml` do; the other `sh-*.yml` files add it as their checks
-  move to TypeScript). Its external actions are
+  instead of repeating the three steps (`typescript.yml` does). Its external actions are
   SHA-pinned inside the composite, so a bump happens in one place.
 - **`env:` blocks do not propagate across `workflow_call` boundaries.** An
   `env:` key defined at the orchestrator level (or in the caller's job) is
