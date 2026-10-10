@@ -19,6 +19,11 @@
 //   * hooks/hooks.json, if present, parses as JSON, its top level is an
 //     object, and every command rooted at ${CLAUDE_PLUGIN_ROOT}/ names an
 //     existing executable file.
+//   * every command row in scripts/plugin-hooks.sh (what setup.sh registers in
+//     ~/.claude/settings.json) resolves, via the ~/.claude/skills/<plugin>
+//     link setup creates, to a file that exists under plugins/, and no
+//     PLUGIN_HOOK_LEGACY_CMDS row does (a retired path must not be live).
+//     Skipped when ROOT has no scripts/plugin-hooks.sh.
 //
 // Frontmatter is read with the flat `key: value` and block-scalar rules this
 // repo uses (no YAML parser: zero runtime dependencies). Anything more
@@ -31,6 +36,7 @@ import {
   readFileSync,
   statSync,
 } from "node:fs";
+import { spawnSync } from "node:child_process";
 import { cliError, EXIT_FAILURE, EXIT_USAGE } from "./lib/exit-codes.ts";
 import { err, ok } from "./lib/result.ts";
 import { run, type Main } from "./lib/run.ts";
@@ -346,6 +352,73 @@ const checkPlugin = (pluginDir: string): readonly string[] => {
   ];
 };
 
+// ------------------------------------------------------------ hook table
+
+const HOME_MARK = "/__HOME__";
+
+/**
+ * Rows of [cmd, legacyCmd] from scripts/plugin-hooks.sh, or a problem string.
+ * That file is bash arrays whose values interpolate $HOME, so rather than
+ * re-parsing bash from TS (brittle: quoting, "|" in matchers) we let bash
+ * evaluate it with a sentinel HOME and print one tab-separated row per hook.
+ * Paths contain no tabs or newlines.
+ */
+const readHookTable = (
+  file: string,
+):
+  | { readonly rows: readonly (readonly [string, string])[] }
+  | { readonly problem: string } => {
+  const r = spawnSync(
+    "bash",
+    [
+      "-c",
+      'source "$1"; for i in "${!PLUGIN_HOOK_CMDS[@]}"; do printf "%s\\t%s\\n" "${PLUGIN_HOOK_CMDS[$i]}" "${PLUGIN_HOOK_LEGACY_CMDS[$i]:-}"; done',
+      "_",
+      file,
+    ],
+    { encoding: "utf8", env: { PATH: process.env["PATH"] ?? "", HOME: HOME_MARK } },
+  );
+  if (r.status !== 0) return { problem: `could not evaluate (${r.stderr.trim()})` };
+  return {
+    rows: r.stdout
+      .split("\n")
+      .filter((l) => l !== "")
+      .map((l) => {
+        const [cmd = "", legacy = ""] = l.split("\t");
+        return [cmd, legacy] as const;
+      }),
+  };
+};
+
+/** Map a registered command's script path to its location in the repo. */
+const repoPathOf = (root: string, cmd: string): string | undefined => {
+  const path = /"([^"]+)"/.exec(cmd)?.[1] ?? cmd;
+  const prefix = `${HOME_MARK}/.claude/skills/`;
+  return path.startsWith(prefix) ? `${root}/plugins/${path.slice(prefix.length)}` : undefined;
+};
+
+const checkHookTable = (root: string): readonly string[] => {
+  const file = `${root}/scripts/plugin-hooks.sh`;
+  if (!present(file)) return [];
+  const t = readHookTable(file);
+  if ("problem" in t) return [`${file}: ${t.problem}`];
+  const live = new Set(t.rows.map(([cmd]) => repoPathOf(root, cmd)));
+  return t.rows.flatMap(([cmd, legacy]) => {
+    const target = repoPathOf(root, cmd);
+    const old = legacy === "" ? undefined : repoPathOf(root, legacy);
+    return [
+      ...(target === undefined
+        ? [`${file}: hook command not under ~/.claude/skills: ${cmd}`]
+        : kindOf(target) === "file"
+          ? []
+          : [`${file}: registered hook has no file: ${cmd} (expected ${target})`]),
+      ...(old !== undefined && (live.has(old) || kindOf(old) === "file")
+        ? [`${file}: legacy command is still live (retire the file): ${legacy}`]
+        : []),
+    ];
+  });
+};
+
 // ------------------------------------------------------------------------ CLI
 
 export const main: Main = (argv) => {
@@ -361,7 +434,10 @@ export const main: Main = (argv) => {
       cliError(EXIT_FAILURE, `::error::no plugins found under ${root}/plugins/`),
     );
   }
-  const errors = plugins.flatMap((p) => checkPlugin(`${root}/plugins/${p}`));
+  const errors = [
+    ...plugins.flatMap((p) => checkPlugin(`${root}/plugins/${p}`)),
+    ...checkHookTable(root),
+  ];
   return errors.length > 0
     ? err(
         cliError(

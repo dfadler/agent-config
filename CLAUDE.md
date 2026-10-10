@@ -14,3 +14,5 @@ GitHub Issues
   `docs/github-actions.md` — SHA-pinning, composite-action-vs-reusable-workflow
   judgment calls, the debugging escalation order, and known failure patterns already
   hit and resolved here.
+
+- Changing a hook, plugin or skill path that `setup.sh` registers or links? Check it against `setup.sh`, `upgrade.sh`, `doctor.sh` and `teardown.sh`; `scripts/tests/lifecycle-drift.bats` and `check-plugin-structure` (hook table vs disk) catch drift.
