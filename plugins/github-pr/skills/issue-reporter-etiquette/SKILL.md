@@ -3,7 +3,11 @@ name: issue-reporter-etiquette
 description: |
   Load this before drafting any comment on a GitHub issue you are working —
   an acknowledgment before starting, a note that part of the request is
-  deferred, a status update, or a closing comment. It defines the AI marker,
+  deferred, a status update, or a closing comment — and BEFORE running
+  `gh issue close` or merging a PR whose body says `Closes #N` / `Fixes #N`
+  for an issue someone else filed (an external reporter, not the repo owner
+  or a bot): the reporter gets a comment naming the PR, SHA and release
+  first, so the issue is never closed silently. It defines the AI marker,
   naming deferred parts and why, and naming every PR, SHA and release.
   How to behave, in public, toward the person who filed a GitHub issue this
   session is working — distinct from `pr-babysit`/`pr-review-rubric`, which

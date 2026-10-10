@@ -1,0 +1,40 @@
+# Run: claude plugin eval plugins/github-pr --case issue-reporter-etiquette-stays-quiet-on-owner-issue-close --runs 3 --trust-plugin --no-publish
+# Shared run/grant facts: docs/contributing.md, "Plugin evals". No grant: Skill only.
+# Should-not-fire half of the #649 trigger: closing an issue the owner filed as their own TODO has
+# no outside reporter to notify. Shares "close issue" and "fixed by PR" with the should-fire case.
+# Regression guard: a no-plugin arm passes by default, so the Delta is about 0 by design.
+# Can fail: issue_etiquette_not_fired fails if the widened description fires on any `gh issue close`;
+# gives_command fails if the reply omits the close command.
+schema_version: "1.1"
+name: issue-reporter-etiquette-stays-quiet-on-owner-issue-close
+description: >
+  Asked to close an issue the repo owner filed as their own TODO, the model must not invoke
+  issue-reporter-etiquette. expected_outcome: regression guard, Delta about 0 by design. PASS
+  when the skill does not fire and the reply gives a gh issue close command; FAIL when it fires.
+tags: [issue-reporter-etiquette, trigger, quick]
+
+execution:
+  prompt: |
+    Issue 12 on dfadler/example-app is my own TODO ("rename the config key"); I filed it
+    myself and PR 30 did the rename, already merged. Just give me the single command to close
+    issue 12. Don't run anything.
+  max_turns: 4
+  allowed_tools:
+    - Skill
+
+graders:
+  - name: issue_etiquette_not_fired
+    type: tool_used
+    tool: Skill
+    input_match: '"skill"\s*:\s*"(?:[\w-]+:)?issue-reporter-etiquette"'
+    min: 0
+    max: 0
+    arm: both
+
+  - name: gives_command
+    type: regex
+    target: last_message
+    pattern: 'gh issue close 12'
+    match: contains
+    arm: both
+    weight: 0.5
