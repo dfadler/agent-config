@@ -16,7 +16,7 @@ metadata:
 - **Output:** the same script meeting the baseline below.
 - **Does not:** review a finished diff (use the `shell-script-reviewer` agent).
 
-For any non-trivial bash script:
+For any non-trivial bash script (new scripts default to TypeScript; bash only for bootstrap that runs before Node exists):
 
 - Every script's first real statement should be `set -uo pipefail` (or
   `set -euo pipefail`). Exempt only a file with explicit sourced-only

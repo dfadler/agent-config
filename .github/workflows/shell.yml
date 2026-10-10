@@ -14,9 +14,6 @@ name: Shell
 # Checks and the scripts/ci.sh targets they invoke:
 #   shellcheck     bash scripts/ci.sh lint-shellcheck
 #   shfmt          bash scripts/ci.sh lint-shfmt
-#   set-flags      pnpm run lint-set-flags
-#   claude-md-size pnpm run lint-claude-md
-#   structure      pnpm run check-plugin-structure
 #   test-sh        bash scripts/ci.sh test-sh
 #   coverage       bash scripts/ci.sh coverage   (needs test-sh: guards the kcov build)
 
@@ -34,21 +31,6 @@ jobs:
 
   shfmt:
     uses: ./.github/workflows/sh-shfmt.yml
-    permissions:
-      contents: read
-
-  set-flags:
-    uses: ./.github/workflows/sh-set-flags.yml
-    permissions:
-      contents: read
-
-  claude-md-size:
-    uses: ./.github/workflows/sh-claude-md-size.yml
-    permissions:
-      contents: read
-
-  structure:
-    uses: ./.github/workflows/sh-structure.yml
     permissions:
       contents: read
 

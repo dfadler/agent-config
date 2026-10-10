@@ -114,6 +114,13 @@ worth avoiding on those grounds even before the mechanism question above.
 
 ## Checks
 
+New scripts are TypeScript (`node script.ts`; see [`testing.md`](testing.md)). Two documented
+exceptions stay: the bootstrap bash that runs before Node exists or manages the user's `~/.claude`
+(`setup.sh`, `teardown.sh`, `doctor.sh`, `scripts/check-companions.sh` and the libs they source,
+`scripts/session-sync.sh`), and `detached-terminal`'s `agent_term.py` (Node has no stdlib PTY).
+Those keep the shellcheck/shfmt/bats/kcov and ruff/mypy/pytest gates below
+([#441](https://github.com/dfadler/agent-config/issues/441)).
+
 `scripts/ci.sh check` runs everything CI runs, and CI calls these same targets
 (`bash scripts/ci.sh <target>`, or `pnpm run <name>` for the Node-based ones) so a
 green run locally means the same thing a green PR does. `pnpm run check` is a thin delegate to the same script; `bash scripts/ci.sh --help`
@@ -173,7 +180,7 @@ step). A plugin-owned check uses `plugins/<plugin>/scripts/ts/check-foo.ts`. See
 Two checks exist because a linter can't express them. `scripts/ts/check-shell-set-flags.ts`
 enforces the `set -uo pipefail` opener from the global `CLAUDE.md`, which shellcheck
 has no rule for. `scripts/ts/check-plugin-structure.ts` is the closest thing to a typechecker a
-shell-and-Markdown repo can have: this repo's *product* is declarative metadata, and a
+repo of Markdown and plugin metadata can have: this repo's *product* is declarative metadata, and a
 skill whose `name:` drifts from its directory fails silently at load time rather than
 loudly in review — which is exactly what the plugin rename could have caused.
 

@@ -2,9 +2,8 @@ name: TypeScript
 
 # Lints, typechecks and tests the TypeScript scripts under scripts/ts/ and
 # plugins/*/scripts/ts/, and runs the repo gates that are TypeScript checks
-# (set-flags, CLAUDE.md size, plugin structure, markdown links). The first
-# three duplicate sh-set-flags/sh-claude-md-size/sh-structure until phase 8 of
-# #441 deletes those; vitest enforces the 90% line floor (vitest.config.ts).
+# (set-flags, CLAUDE.md size, plugin structure, markdown links). Vitest
+# enforces the 90% line floor (vitest.config.ts).
 #
 # Calls the package.json scripts (`pnpm run <name>`) that
 # `scripts/ci.sh check` delegates to, so a green local check and a green PR mean the same thing. The Node
