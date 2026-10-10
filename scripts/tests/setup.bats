@@ -41,6 +41,7 @@ setup() {
   chmod +x "$FAKE_REPO/scripts/offer-safe-chain-permission.sh"
   cp "$REPO_ROOT/scripts/git-identity.sh" "$FAKE_REPO/scripts/git-identity.sh"
   chmod +x "$FAKE_REPO/scripts/git-identity.sh"
+  cp "$REPO_ROOT/scripts/settings-lib.sh" "$FAKE_REPO/scripts/settings-lib.sh"
   cp "$REPO_ROOT/scripts/check-companions.sh" \
     "$FAKE_REPO/scripts/check-companions.sh"
   chmod +x "$FAKE_REPO/scripts/check-companions.sh"

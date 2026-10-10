@@ -28,6 +28,23 @@ the rename would otherwise leave dangling. Anything under `~/.claude/{skills,age
 pointing into this repo's `plugins/` that isn't the current plugin link is stale by
 definition; links pointing anywhere else are left alone.
 
+### Upgrading and repairing
+
+```bash
+~/Development/agent-config/upgrade.sh          # git pull --ff-only, ./setup.sh, ./doctor.sh --fix
+~/Development/agent-config/upgrade.sh --plan   # setup --plan + report-only doctor; no pull
+```
+
+`upgrade.sh` refuses unless the checkout is on `main`, clean, and can fast-forward, and
+stops at the first failing step. Setup only links and registers; `./doctor.sh --fix` is
+where repairs live (`setup.sh --fix` still forwards to it). Besides the companion checks,
+doctor finds dangling leftovers of this install: hook commands in
+`~/.claude/settings.json` whose script no longer exists (only paths under
+`~/.claude/skills`, `~/.claude/commands` or this repo; other tools' hooks are never
+touched) and dangling symlinks in `~/.claude/skills` and `~/.claude/commands` pointing
+into this repo. Without `--fix` it only reports; with `--fix` it backs up
+`settings.json` to `settings.json.bak-<timestamp>`, then removes each one and prints it.
+
 See [`docs/plugin-loading.md`](./plugin-loading.md) for how the linked plugin
 directory actually gets picked up by Claude Code and why its contents load
 under the `<plugin>:<name>` namespace.

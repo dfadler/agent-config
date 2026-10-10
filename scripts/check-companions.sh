@@ -43,8 +43,12 @@ can also run it directly (also reachable as ./doctor.sh from the repo root).
                    PreToolUse hook would otherwise break git commands inside
                    a worktree-isolated session; merging the require-worktree
                    PreToolUse hook back into ~/.claude/settings.json when
-                   another tool has displaced it — see docs/companion-plugins.md).
-                   Never runs as a side effect of a bare invocation.
+                   another tool has displaced it — see docs/companion-plugins.md;
+                   removing dangling hook entries in ~/.claude/settings.json
+                   and dangling symlinks in ~/.claude/skills and
+                   ~/.claude/commands that point into this install; the
+                   settings file is backed up to settings.json.bak-<time>
+                   first). Never runs as a side effect of a bare invocation.
   -h, --help       Show this message and exit.
 USAGE
 }
@@ -67,6 +71,10 @@ while [[ $# -gt 0 ]]; do
 done
 
 REPO_ROOT="$(cd -P "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+
+# Helpers for removing hook entries from ~/.claude/settings.json.
+# shellcheck source=scripts/settings-lib.sh
+source "$REPO_ROOT/scripts/settings-lib.sh"
 
 # --------------------------------------------------------------------------
 # Runtime dependencies
@@ -1104,8 +1112,120 @@ check_playwright_cli() {
   fi
 }
 
+# --------------------------------------------------------------------------
+# Dangling entries
+#
+# Finds leftovers from things this install used to own: hook commands in
+# ~/.claude/settings.json whose script file is gone, and symlinks in
+# ~/.claude/skills and ~/.claude/commands whose target is gone. Ownership is
+# deliberately narrow, so foreign entries are never touched: a hook counts
+# only if a path in its command sits under ~/.claude/skills, ~/.claude/commands,
+# or this repo (or its main checkout), and a symlink only if its target sits
+# under this repo, its main checkout, or ~/.claude/plugins. A hook command with
+# no such path (e.g. `rtk hook claude`) is skipped.
+# Prints one tab-separated line per finding: "hook EVENT COMMAND" or
+# "link PATH TARGET".
+# --------------------------------------------------------------------------
+DANGLING_SCRIPT=$(
+  cat <<'PYEOF'
+import json, os, shlex
+
+home, repo = os.environ["HOME"], os.environ["REPO"]
+roots = [repo]
+if os.environ.get("MAIN_ROOT"):
+    roots.append(os.environ["MAIN_ROOT"])
+hook_roots = roots + [home + "/.claude/skills", home + "/.claude/commands"]
+link_roots = roots + [home + "/.claude/plugins"]
+
+def under(path, rs):
+    path = os.path.normpath(path)
+    return any(path == r or path.startswith(r.rstrip("/") + "/") for r in rs)
+
+try:
+    with open(home + "/.claude/settings.json") as f:
+        hooks = json.load(f).get("hooks", {})
+except Exception:
+    hooks = {}
+for event, entries in hooks.items():
+    for entry in entries if isinstance(entries, list) else []:
+        for h in entry.get("hooks", []) if isinstance(entry, dict) else []:
+            cmd = h.get("command", "") if isinstance(h, dict) else ""
+            try:
+                tokens = shlex.split(cmd)
+            except ValueError:
+                continue
+            for t in tokens:
+                t = os.path.expandvars(os.path.expanduser(t))
+                if t.startswith("/") and under(t, hook_roots) and not os.path.exists(t):
+                    print("hook\t%s\t%s" % (event, cmd))
+                    break
+
+for d in ("skills", "commands"):
+    base = os.path.join(home, ".claude", d)
+    if not os.path.isdir(base):
+        continue
+    for name in sorted(os.listdir(base)):
+        p = os.path.join(base, name)
+        if os.path.islink(p) and not os.path.exists(p):
+            raw = os.readlink(p)
+            t = raw if os.path.isabs(raw) else os.path.join(base, raw)
+            if under(t, link_roots):
+                print("link\t%s\t%s" % (p, raw))
+PYEOF
+)
+
+check_dangling() {
+  if ! command -v python3 >/dev/null 2>&1; then
+    echo "⚠ python3 not found — skipping the dangling-entry check" >&2
+    return 0
+  fi
+  local main_root="" common settings="$HOME/.claude/settings.json"
+  if common="$(git -C "$REPO_ROOT" rev-parse --path-format=absolute --git-common-dir 2>/dev/null)"; then
+    main_root="$(dirname "$common")"
+  fi
+
+  local findings
+  findings="$(REPO="$REPO_ROOT" MAIN_ROOT="$main_root" python3 -c "$DANGLING_SCRIPT")" || {
+    echo "⚠ the dangling-entry check failed to run" >&2
+    return 0
+  }
+  if [[ -z "$findings" ]]; then
+    echo "✓ no dangling hook entries or symlinks in ~/.claude"
+    return 0
+  fi
+
+  local kind a b backed_up=0 ts
+  while IFS=$'\t' read -r kind a b; do
+    if [[ "$FIX" != "1" ]]; then
+      if [[ "$kind" == "hook" ]]; then
+        echo "⚠ dangling $a hook in $settings (script no longer exists): $b" >&2
+      else
+        echo "⚠ dangling symlink (target no longer exists): $a -> $b" >&2
+      fi
+      continue
+    fi
+    if [[ "$kind" == "hook" ]]; then
+      if [[ "$backed_up" == 0 ]]; then
+        ts="$(date +%Y%m%d%H%M%S)"
+        cp "$settings" "$settings.bak-$ts"
+        echo "Backed up $settings to $settings.bak-$ts"
+        backed_up=1
+      fi
+      echo "Removing dangling $a hook: $b"
+      ensure_hook_deregistered "$a" "$b" "$settings"
+    else
+      rm "$a"
+      echo "Removed dangling symlink: $a -> $b"
+    fi
+  done <<<"$findings"
+  if [[ "$FIX" != "1" ]]; then
+    echo "  Run './doctor.sh --fix' to remove them." >&2
+  fi
+}
+
 check_convention_deps
 check_available_conventions
+check_dangling
 check_git_identity
 check_python_deps
 

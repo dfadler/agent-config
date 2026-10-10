@@ -34,7 +34,7 @@ cd "$ROOT"
 
 # Every shell script in the repo, NUL-safe. Kept as a `find` rather than a
 # hand-maintained list so a new script is covered the moment it lands.
-sh_find() { find scripts plugins setup.sh teardown.sh doctor.sh -type f -name '*.sh' -print0; }
+sh_find() { find scripts plugins setup.sh teardown.sh doctor.sh upgrade.sh -type f -name '*.sh' -print0; }
 
 # Python sources: the skills' implementations plus their tests. A new file in
 # a directory not already listed here also needs its directory to reach
