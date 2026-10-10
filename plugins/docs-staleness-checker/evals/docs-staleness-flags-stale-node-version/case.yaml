@@ -1,0 +1,107 @@
+# Run: node plugins/eval-authoring/scripts/ts/run-evals/run-evals.ts --tier quick plugins/docs-staleness-checker
+# (quick tier, `--ablation none`: the no-plugin arm cannot dispatch a plugin agent.)
+# Grant: Write, recorded in grants.yaml, so the run can create the small repo the agent reads.
+# Agent coverage: docs-staleness-checker's "stale count or specific named list" and "named file"
+# checks (agents/docs-staleness-checker.md, "What to look for"), the version-drift case a
+# weekly scheduled pass exists to catch (README.md in this plugin).
+# Can fail: checker_dispatched if the main model audits the docs itself; the *_created checks if
+# setup did not happen; flags_stale_version if the agent misses "Node 18" against .nvmrc and
+# engines saying 22; readme_left_unchanged if the README was rewritten; no_extra_writes if more
+# than the three setup Writes happened. Scoring runs are pending.
+schema_version: "1.1"
+name: docs-staleness-flags-stale-node-version
+description: >
+  Asked to create a README that says Node 18 while .nvmrc and package.json require Node 22,
+  then have the docs staleness checker agent audit it, the model dispatches
+  docs-staleness-checker, which flags the stale Node version and leaves the README unchanged.
+  expected_outcome: PASS when the agent is dispatched, the Node 18 claim is reported as stale
+  and the README is unchanged; FAIL otherwise.
+tags: [docs-staleness-checker, agent, report-only, quick]
+
+execution:
+  prompt: |
+    Please create these three files exactly as written, then have the docs staleness checker
+    agent audit the README against the code and tell me what it found.
+
+    File README.md:
+
+    ```markdown
+    # tidy
+
+    Requires Node 18. Run `npm test` to check your changes.
+    ```
+
+    File .nvmrc:
+
+    ```text
+    22
+    ```
+
+    File package.json:
+
+    ```json
+    {
+      "name": "tidy",
+      "scripts": { "test": "node --test" },
+      "engines": { "node": ">=22" }
+    }
+    ```
+  max_turns: 14
+  allowed_tools:
+    - Agent
+    - Write
+    - Read
+    - Glob
+    - Grep
+
+graders:
+  - name: checker_dispatched
+    type: tool_used
+    tool: Agent
+    input_match: '"subagent_type"\s*:\s*"(?:[\w-]+:)?docs-staleness-checker"'
+    min: 1
+
+  - name: readme_created
+    type: file_exists
+    path: "README.md"
+    exists: true
+
+  - name: nvmrc_created
+    type: file_exists
+    path: ".nvmrc"
+    exists: true
+
+  - name: package_created
+    type: file_exists
+    path: "package.json"
+    exists: true
+
+  # Report-only contract: only the three setup Writes, and the README is untouched.
+  - name: no_extra_writes
+    type: tool_used
+    tool: Write
+    min: 3
+    max: 3
+
+  - name: readme_left_unchanged
+    type: regex
+    target:
+      source: file
+      path: "README.md"
+    pattern: 'Requires Node 18'
+    match: contains
+
+  # Result: the planted stale version reached the reply, next to the real one.
+  - name: flags_stale_version
+    type: regex
+    target: last_message
+    pattern: 'Node 18[\s\S]{0,200}(stale|outdated|out of date|mismatch|no longer|conflict|incorrect)'
+    flags: i
+    match: contains
+
+  - name: cites_readme
+    type: regex
+    target: last_message
+    pattern: 'README\.md'
+    match: contains
+    weight: 0.25

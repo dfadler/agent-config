@@ -311,9 +311,8 @@ didn't trace.
 
 The exported skills are a different story: `pr-review-rubric` and
 `pr-babysit` are both explicitly designed to be wired into *other* repos'
-automation (`pr-babysit/SKILL.md:35-37`: "If you were invoked directly rather
-than via a project-local skill that supplies [a snapshot command], stop and
-say so — this skill cannot run standalone"; `pr-review-rubric` needs an
+automation (`pr-babysit` snapshots with the plugin's own `gh` script unless
+the project overrides it; `pr-review-rubric` needs an
 external `pr-review.md` orchestrator, per §3). Wherever a consuming repo
 wires either of these into a GitHub Actions bot (as the rubric's own
 "mention job"/"engage job"/"auto-review" terminology implies,
