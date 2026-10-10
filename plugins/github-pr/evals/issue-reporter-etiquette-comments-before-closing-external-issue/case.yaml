@@ -48,17 +48,17 @@ graders:
     match: contains
     weight: 0.5
 
-  # A comment must come first: pass when there is no `gh issue close`, or a comment precedes it.
+  # A comment must come first: the drafted `gh issue comment` precedes any `gh issue close`.
   - name: comment_before_close
     type: regex
     target: last_message
-    pattern: '^(?![\s\S]*gh issue close)|gh issue comment[\s\S]*gh issue close'
+    pattern: 'gh issue comment[\s\S]*gh issue close|gh issue comment(?![\s\S]*gh issue close)'
     flags: i
     match: contains
 
   - name: asks_approval
     type: regex
     target: last_message
-    pattern: 'approv|confirm|before (?:i|we) (?:post|run)|want me to|go ahead'
+    pattern: 'approv|want me to|shall i|before (?:i|we) (?:post|run)|let me know'
     flags: i
     match: contains
