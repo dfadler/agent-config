@@ -1,0 +1,87 @@
+# Run: node plugins/eval-authoring/scripts/ts/run-evals/run-evals.ts --tier quick plugins/vitest
+# (quick tier: one run, plugin arm only, `--ablation none`: the no-plugin arm cannot dispatch a
+# plugin agent, "Agent type ... not found".) Not run yet: paid, hand-off only (#646).
+# Grant: Write, recorded in grants.yaml, so the run can create the test file the agent reads (the
+# eval workspace starts empty). Bash is not granted, so Vitest cannot run: the agent reports from
+# reading the code, and the second test depends on the first through a module-level counter.
+# Agent coverage: report-only contract (agents/flaky-test-investigator.md: "You never edit,
+# write, or commit"): the test file must be left unchanged.
+# Can fail: investigator_dispatched if the main model investigates itself; names_shared_state if
+# the cause is missed; test_left_unchanged / no_extra_writes if the agent edits the file.
+schema_version: "1.1"
+name: agent-dispatch-flaky-investigator-fires
+description: >
+  Asked to create a test whose second case depends on a module-level counter and have the flaky
+  test investigator look at it, the model dispatches vitest:flaky-test-investigator, which names
+  the shared module-level state as the cause and leaves the file unchanged. expected_outcome:
+  PASS when the agent is dispatched, the reply names the shared counter and the file is
+  unchanged; FAIL otherwise.
+tags: [vitest, flaky-test-investigator, agent, report-only]
+
+execution:
+  prompt: |
+    Please create this file exactly as written, then have the flaky test investigator agent look
+    at it: the second test fails now and then in CI and I do not know why. Tell me what it found.
+
+    File src/counter.test.ts:
+
+    ```ts
+    import { describe, it, expect } from "vitest";
+
+    let count = 0;
+
+    describe("counter", () => {
+      it("increments from zero", () => {
+        count += 1;
+        expect(count).toBe(1);
+      });
+
+      it("increments twice in total", () => {
+        count += 1;
+        expect(count).toBe(2);
+      });
+    });
+    ```
+  max_turns: 12
+  allowed_tools:
+    - Agent
+    - Write
+    - Read
+    - Glob
+    - Grep
+
+graders:
+  - name: investigator_dispatched
+    type: tool_used
+    tool: Agent
+    input_match: '"subagent_type"\s*:\s*"(?:[\w-]+:)?flaky-test-investigator"'
+    min: 1
+
+  # Precondition: the setup step wrote the file the agent reads.
+  - name: file_created
+    type: file_exists
+    path: "src/counter.test.ts"
+    exists: true
+
+  # Report-only contract: only the one setup Write, and the file is untouched.
+  - name: no_extra_writes
+    type: tool_used
+    tool: Write
+    min: 1
+    max: 1
+
+  - name: test_left_unchanged
+    type: regex
+    target:
+      source: file
+      path: "src/counter.test.ts"
+    pattern: 'let count = 0;'
+    match: contains
+
+  # Result: the cause, in either word order within 150 characters.
+  - name: names_shared_state
+    type: regex
+    target: last_message
+    pattern: '(shared|module[- ]level|top[- ]level|mutable|global|leak|persist)[\s\S]{0,150}(count|state|variable)|(count|state|variable)[\s\S]{0,150}(shared|module[- ]level|top[- ]level|leak|persist|between tests|order)'
+    flags: i
+    match: contains

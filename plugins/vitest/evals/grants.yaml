@@ -1,0 +1,6 @@
+# Per-case --allow-tools grants (format: plugins/eval-authoring/docs/grants-format.md).
+# Write lets the run create the test file that the flaky-test-investigator reads.
+schema_version: "1"
+grants:
+  agent-dispatch-flaky-investigator-fires:
+    - "Write"

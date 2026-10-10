@@ -1,0 +1,39 @@
+# Run: claude plugin eval plugins/eval-authoring --case run-evals-not-model-invoked
+# Not run yet: paid, hand-off only (#646). No grant: Skill only.
+# Should-not-fire case for run-evals. The skill sets `disable-model-invocation: true` (paid,
+# slash command only), so a plain request to run evals must not make the model invoke it; the
+# model should hand the command to the user. Regression guard: no skill fires in the no-plugin
+# arm either, so Delta is zero by design.
+# Can fail: run_evals_not_invoked = 0 if the flag is dropped from the skill's frontmatter and the
+# model starts paid runs on its own; hands_off = 0 if the reply gives no way to run them.
+schema_version: "1.1"
+name: run-evals-not-model-invoked
+description: >
+  Asked to run a plugin's evals, the model must not invoke run-evals itself, since it is a paid
+  slash command. expected_outcome: PASS when the skill is not invoked and the reply points the
+  user to the run-evals command or wrapper; FAIL when the skill is invoked.
+tags: [eval-authoring, run-evals, trigger, quick]
+
+execution:
+  prompt: |
+    Please run all the evals for plugins/memory-hygiene now and tell me the scores. Answer in your
+    reply; do not run anything yourself.
+  max_turns: 4
+  allowed_tools:
+    - Skill
+
+graders:
+  - name: run_evals_not_invoked
+    type: tool_used
+    tool: Skill
+    input_match: '"skill"\s*:\s*"(?:[\w-]+:)?run-evals"'
+    min: 0
+    max: 0
+    arm: both
+
+  - name: hands_off
+    type: regex
+    target: last_message
+    pattern: 'run-evals|claude plugin eval|slash command|your (own )?shell|logged[- ]in'
+    flags: i
+    match: contains

@@ -1,0 +1,48 @@
+# Run: claude plugin eval plugins/vitest --case agent-dispatch-flaky-investigator-quiet
+# Not run yet: paid, hand-off only (#646). No grant needed (Agent and Read only).
+# Quiet case for vitest:flaky-test-investigator: a test that fails every time on a wrong expected
+# value shares the vocabulary ("test fails", "Vitest") but is deterministic, not flaky.
+# Regression guard: the no-plugin arm passes it by default, so Delta is zero by design.
+# Can fail: investigator_not_dispatched = 0 if the agent over-triggers on any failing test;
+# spots_wrong_expectation = 0 if the reply misses that the expected value is wrong.
+schema_version: "1.1"
+name: agent-dispatch-flaky-investigator-quiet
+description: >
+  A Vitest test that fails on every run because of a wrong expected value must not dispatch
+  vitest:flaky-test-investigator. expected_outcome: PASS when the agent is not dispatched and the
+  reply says the expected value is wrong; FAIL otherwise.
+tags: [vitest, flaky-test-investigator, agent, trigger, quick]
+
+execution:
+  prompt: |
+    This Vitest test fails on every single run with "expected 4 to be 3". Why? One sentence, no
+    files, no commands.
+
+    ```ts
+    import { expect, it } from "vitest";
+    const add = (a: number, b: number) => a + b;
+    it("adds", () => {
+      expect(add(2, 2)).toBe(3);
+    });
+    ```
+  max_turns: 4
+  allowed_tools:
+    - Agent
+    - Read
+
+graders:
+  - name: investigator_not_dispatched
+    type: tool_used
+    tool: Agent
+    input_match: '"subagent_type"\s*:\s*"(?:[\w-]+:)?flaky-test-investigator"'
+    min: 0
+    max: 0
+    arm: both
+
+  - name: spots_wrong_expectation
+    type: regex
+    target: last_message
+    pattern: 'should (be|equal|expect)[\s\S]{0,20}4|toBe\(4\)|(wrong|incorrect|typo|mistake)[\s\S]{0,60}(expect|assert|3)|(expect|assert)[\s\S]{0,60}(wrong|incorrect|typo|mistake)'
+    flags: i
+    match: contains
+    arm: both

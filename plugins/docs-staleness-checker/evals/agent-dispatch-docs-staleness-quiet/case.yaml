@@ -1,0 +1,40 @@
+# Run: claude plugin eval plugins/docs-staleness-checker --case agent-dispatch-docs-staleness-quiet
+# Not run yet: paid, hand-off only (#646). No grant needed (Agent and Read only).
+# Quiet case for docs-staleness-checker: shares "README" and "docs" vocabulary but asks for a new
+# sentence to be written, which is authoring, not auditing existing docs against code. The
+# dispatch case already exists (docs-staleness-checker-reports-without-editing). Regression
+# guard: the no-plugin arm passes it by default, so Delta is zero by design.
+# Can fail: checker_not_dispatched = 0 if the agent over-triggers on "README"; writes_sentence =
+# 0 if the sentence is not given.
+schema_version: "1.1"
+name: agent-dispatch-docs-staleness-quiet
+description: >
+  A request to write one new README sentence must not dispatch
+  docs-staleness-checker:docs-staleness-checker. expected_outcome: PASS when the agent is not
+  dispatched and the reply gives a sentence that mentions installing; FAIL otherwise.
+tags: [docs-staleness-checker, agent, trigger, quick]
+
+execution:
+  prompt: |
+    Write one README sentence telling users to install the tool with `npm install -g mytool`.
+    Reply with the sentence only. No files, no commands.
+  max_turns: 4
+  allowed_tools:
+    - Agent
+    - Read
+
+graders:
+  - name: checker_not_dispatched
+    type: tool_used
+    tool: Agent
+    input_match: '"subagent_type"\s*:\s*"(?:[\w-]+:)?docs-staleness-checker"'
+    min: 0
+    max: 0
+    arm: both
+
+  - name: writes_sentence
+    type: regex
+    target: last_message
+    pattern: 'npm install -g mytool'
+    match: contains
+    arm: both

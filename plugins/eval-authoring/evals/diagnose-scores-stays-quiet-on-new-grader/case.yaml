@@ -1,0 +1,40 @@
+# Run: claude plugin eval plugins/eval-authoring --case diagnose-scores-stays-quiet-on-new-grader
+# Not run yet: paid, hand-off only (#646). No grant: Skill only.
+# Should-not-fire case for diagnose-scores: a near-miss that shares "eval" and "grader" vocabulary
+# but wants a grader written for a case that has not run, not a low score explained. The
+# author-cases skill may fire instead; that is not graded. Regression guard: the no-plugin arm
+# passes it by default, so Delta is zero by design.
+# Can fail: diagnose_not_fired = 0 if the skill over-triggers on eval vocabulary;
+# gives_regex_type = 0 if the question is not answered.
+schema_version: "1.1"
+name: diagnose-scores-stays-quiet-on-new-grader
+description: >
+  A request for which grader type checks exact reply text must not invoke diagnose-scores.
+  expected_outcome: PASS when the skill is not invoked and the reply names the regex grader; FAIL
+  otherwise.
+tags: [eval-authoring, diagnose-scores, trigger, quick]
+
+execution:
+  prompt: |
+    I am writing a new eval case and need to check that the reply contains the exact word
+    "approved". Which grader type should I use? One sentence, no files, no commands.
+  max_turns: 4
+  allowed_tools:
+    - Skill
+
+graders:
+  - name: diagnose_not_fired
+    type: tool_used
+    tool: Skill
+    input_match: '"skill"\s*:\s*"(?:[\w-]+:)?diagnose-scores"'
+    min: 0
+    max: 0
+    arm: both
+
+  - name: gives_regex_type
+    type: regex
+    target: last_message
+    pattern: '\bregex\b'
+    flags: i
+    match: contains
+    arm: both

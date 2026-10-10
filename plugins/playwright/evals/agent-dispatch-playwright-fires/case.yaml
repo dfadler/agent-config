@@ -1,0 +1,41 @@
+# Run: node plugins/eval-authoring/scripts/ts/run-evals/run-evals.ts --tier quick plugins/playwright
+# (quick tier: one run, plugin arm only, `--ablation none`: the no-plugin arm cannot dispatch a
+# plugin agent, "Agent type ... not found".) Not run yet: paid, hand-off only (#646).
+# Dispatch case for the playwright:playwright agent. No grant: the prompt forbids running anything,
+# so the agent answers from its contract (agents/playwright.md: "Say plainly when the result is
+# Playwright's WebKit and not Safari"). Bash and Write are not granted.
+# Can fail: the main model answers itself (agent_dispatched = 0), or the reply calls the capture a
+# Safari check (says_not_safari = 0).
+schema_version: "1.1"
+name: agent-dispatch-playwright-fires
+description: >
+  Asked to have the playwright agent report on a WebKit recording of focus rings without running
+  anything, the model dispatches playwright:playwright and the reply states that Playwright's
+  WebKit is not Safari. expected_outcome: PASS when the agent is dispatched and the reply says
+  WebKit here is not Safari; FAIL otherwise.
+tags: [playwright, agent, quick]
+
+execution:
+  prompt: |
+    Use the playwright:playwright agent. I recorded a page tabbing through a menu with
+    Playwright's WebKit browser and every item showed a focus ring. Without running anything, ask
+    it how I should word what this shows for Safari users, and tell me its answer in two
+    sentences.
+  max_turns: 8
+  allowed_tools:
+    - Agent
+    - Read
+
+graders:
+  - name: agent_dispatched
+    type: tool_used
+    tool: Agent
+    input_match: '"subagent_type"\s*:\s*"(?:playwright:)?playwright"'
+    min: 1
+
+  - name: says_not_safari
+    type: regex
+    target: last_message
+    pattern: '(?:not|isn.t|n.t)\s+(?:the same as\s+|equivalent to\s+|real\s+)?Safari|differs? from Safari|Safari.{0,40}(?:may|might|can) differ'
+    flags: i
+    match: contains
