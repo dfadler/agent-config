@@ -1,7 +1,8 @@
 # Run: claude plugin eval plugins/github-pr --case issue-triage-fires-on-single-issue --runs 3 --trust-plugin --no-publish
 # Shared run/grant facts: docs/contributing.md, "Plugin evals". No grant: Skill only.
 # Should-fire case: a single-issue triage request.
-# Can fail: skill_fired fails if the description stops matching "triage issue N".
+# Can fail: skill_fired fails if the description stops matching "triage issue N";
+# draft_comment_marked and suggested_priority fail if the skill body is not followed.
 schema_version: "1.1"
 name: issue-triage-fires-on-single-issue
 description: >
@@ -11,8 +12,14 @@ tags: [issue-triage, trigger, quick]
 
 execution:
   prompt: |
-    Triage issue 12 on dfadler/example-app: is it a duplicate, what is it, what should we
-    ask the reporter? Do not run commands or post anything.
+    Triage issue 12 of dfadler/example-app. Use the JSON below; do not run commands or post
+    anything. Your final message must be the recommendation block and a draft comment.
+
+    ```json
+    {"number": 12, "title": "Crash when config file is missing",
+     "author": "alice", "state": "OPEN",
+     "body": "Running `app start` without config.yaml crashes with a stack trace. Expected a friendly error."}
+    ```
   max_turns: 4
   allowed_tools:
     - Skill
@@ -25,11 +32,17 @@ graders:
     min: 1
     arm: with-only
 
-  - name: addresses_ask
+  - name: draft_comment_marked
     type: regex
     target: last_message
-    pattern: 'duplicate'
+    pattern: '🤖 \*\*Claude:\*\*'
+    match: contains
+    arm: both
+
+  - name: suggested_priority
+    type: regex
+    target: last_message
+    pattern: 'suggested priority'
     flags: i
     match: contains
     arm: both
-    weight: 0.5

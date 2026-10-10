@@ -2,7 +2,8 @@
 # Shared run/grant facts: docs/contributing.md, "Plugin evals". No grant: Skill only.
 # Should-not-fire: telling a reporter a fix landed is issue-reporter-etiquette's job.
 # Regression guard: a no-plugin arm passes by default, so the Delta is about 0 by design.
-# Can fail: triage_not_fired fails if issue-triage over-triggers.
+# Can fail: triage_not_fired fails if issue-triage over-triggers (sabotage-checked with a
+# fires-on-everything description). The prompt asks for a concrete result so a skill can fire.
 schema_version: "1.1"
 name: issue-triage-stays-quiet-on-reporter-update
 description: >
@@ -13,8 +14,8 @@ tags: [issue-triage, trigger, quick]
 
 execution:
   prompt: |
-    Tell the reporter of issue 40 on dfadler/example-app it's fixed in PR 91. Draft the
-    comment only; do not run commands or post anything.
+    Tell the reporter of issue 40 on dfadler/example-app it's fixed in PR 91. Do it now, no
+    commands. Your final message must be only the draft comment text.
   max_turns: 4
   allowed_tools:
     - Skill
