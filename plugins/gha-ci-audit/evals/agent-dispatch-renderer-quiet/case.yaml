@@ -1,0 +1,40 @@
+# Run: claude plugin eval plugins/gha-ci-audit --case agent-dispatch-renderer-quiet
+# Not run yet: paid, hand-off only (#646). No grant needed (Agent and Read only).
+# Quiet case for gha-ci-audit:renderer: shares "render a report.html" vocabulary but asks for a
+# generic snippet that needs no collected data. Regression guard: the no-plugin arm passes it by
+# default, so Delta is zero by design.
+# Can fail: renderer_not_dispatched = 0 if the agent over-triggers on "report.html";
+# gives_table_markup = 0 if the snippet is not given.
+schema_version: "1.1"
+name: agent-dispatch-renderer-quiet
+description: >
+  A request for a generic HTML table snippet must not dispatch gha-ci-audit:renderer.
+  expected_outcome: PASS when the agent is not dispatched and the reply contains a table element;
+  FAIL otherwise.
+tags: [gha-ci-audit, renderer, agent, trigger, quick]
+
+execution:
+  prompt: |
+    Give me a minimal HTML snippet for a two-column table with a header row, as the body of a
+    report.html page. Reply with the snippet only; do not create files.
+  max_turns: 4
+  allowed_tools:
+    - Agent
+    - Read
+
+graders:
+  - name: renderer_not_dispatched
+    type: tool_used
+    tool: Agent
+    input_match: '"subagent_type"\s*:\s*"(?:[\w-]+:)?renderer"'
+    min: 0
+    max: 0
+    arm: both
+
+  - name: gives_table_markup
+    type: regex
+    target: last_message
+    pattern: '<table[\s>][\s\S]*<th'
+    flags: i
+    match: contains
+    arm: both

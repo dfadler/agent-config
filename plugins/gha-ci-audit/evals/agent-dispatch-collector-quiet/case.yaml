@@ -1,0 +1,40 @@
+# Run: claude plugin eval plugins/gha-ci-audit --case agent-dispatch-collector-quiet
+# Not run yet: paid, hand-off only (#646). No grant needed (Agent and Read only).
+# Quiet case for gha-ci-audit:collector: shares "GitHub Actions data" and "repo" vocabulary but
+# asks for a one-line command the user will run themselves. Regression guard: the no-plugin arm
+# passes it by default, so Delta is zero by design.
+# Can fail: collector_not_dispatched = 0 if the agent over-triggers; names_gh_command = 0 if the
+# question is not answered.
+schema_version: "1.1"
+name: agent-dispatch-collector-quiet
+description: >
+  A request for the gh command that lists recent workflow runs must not dispatch
+  gha-ci-audit:collector. expected_outcome: PASS when the agent is not dispatched and the reply
+  gives a gh run list or gh api command; FAIL otherwise.
+tags: [gha-ci-audit, collector, agent, trigger, quick]
+
+execution:
+  prompt: |
+    What single gh CLI command lists the last 20 workflow runs of a repository? Give just the
+    command, I will run it myself. Do not run anything.
+  max_turns: 4
+  allowed_tools:
+    - Agent
+    - Read
+
+graders:
+  - name: collector_not_dispatched
+    type: tool_used
+    tool: Agent
+    input_match: '"subagent_type"\s*:\s*"(?:[\w-]+:)?collector"'
+    min: 0
+    max: 0
+    arm: both
+
+  - name: names_gh_command
+    type: regex
+    target: last_message
+    pattern: 'gh run list|gh api[^\n]*actions/runs'
+    flags: i
+    match: contains
+    arm: both

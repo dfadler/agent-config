@@ -1,0 +1,40 @@
+# Run: node plugins/eval-authoring/scripts/ts/run-evals/run-evals.ts --tier quick plugins/gha-ci-audit
+# (quick tier: one run, plugin arm only, `--ablation none`: the no-plugin arm cannot dispatch a
+# plugin agent, "Agent type ... not found".) Not run yet: paid, hand-off only (#646).
+# Dispatch case for gha-ci-audit:orchestrator. No grant: Bash is not granted, so the agent cannot
+# run its setup and sub-agents; a faithful run reports it could not proceed. The orchestrator is
+# the most expensive agent here, so max_turns is capped.
+# Can fail: the main model answers itself (orchestrator_dispatched = 0), or the agent claims the
+# iteration completed (admits_not_completed = 0).
+schema_version: "1.1"
+name: agent-dispatch-orchestrator-fires
+description: >
+  Asked to run the gha-ci-audit orchestrator agent for an eval iteration in an empty workspace
+  with no command access, the model dispatches gha-ci-audit:orchestrator and relays that the
+  iteration could not run. expected_outcome: PASS when the agent is dispatched and the reply
+  admits it did not complete; FAIL when it is not dispatched or it claims a finished iteration.
+tags: [gha-ci-audit, orchestrator, agent, quick]
+
+execution:
+  prompt: |
+    Use the gha-ci-audit:orchestrator agent to run eval iteration 5 (previous iteration 4) and
+    tell me whether it finished.
+  max_turns: 8
+  allowed_tools:
+    - Agent
+    - Read
+    - Glob
+
+graders:
+  - name: orchestrator_dispatched
+    type: tool_used
+    tool: Agent
+    input_match: '"subagent_type"\s*:\s*"(?:[\w-]+:)?orchestrator"'
+    min: 1
+
+  - name: admits_not_completed
+    type: regex
+    target: last_message
+    pattern: '(could not|couldn.t|cannot|can.t|unable|not able|did not|didn.t|not (finish|complete))[\s\S]{0,150}(run|finish|complete|proceed|execute|start)|evals\.json|no (bash|shell)|not (available|granted|permitted|allowed)'
+    flags: i
+    match: contains

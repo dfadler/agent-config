@@ -1,0 +1,40 @@
+# Run: claude plugin eval plugins/gha-ci-audit --case agent-dispatch-skill-improver-quiet
+# Not run yet: paid, hand-off only (#646). No grant needed (Agent and Read only).
+# Quiet case for gha-ci-audit:skill-improver: shares "improve a skill description" vocabulary but
+# asks for one inline rewrite with no grading data. Regression guard: the no-plugin arm passes it
+# by default, so Delta is zero by design.
+# Can fail: improver_not_dispatched = 0 if the agent over-triggers; rewrites_description = 0 if no
+# rewrite is given.
+schema_version: "1.1"
+name: agent-dispatch-skill-improver-quiet
+description: >
+  A request to reword one skill description inline must not dispatch gha-ci-audit:skill-improver.
+  expected_outcome: PASS when the agent is not dispatched and the reply offers a reworded
+  description mentioning CI; FAIL otherwise.
+tags: [gha-ci-audit, skill-improver, agent, trigger, quick]
+
+execution:
+  prompt: |
+    Reword this skill description to be one sentence and mention when it should trigger: "Audits
+    CI." Reply with the new sentence only, no files.
+  max_turns: 4
+  allowed_tools:
+    - Agent
+    - Read
+
+graders:
+  - name: improver_not_dispatched
+    type: tool_used
+    tool: Agent
+    input_match: '"subagent_type"\s*:\s*"(?:[\w-]+:)?skill-improver"'
+    min: 0
+    max: 0
+    arm: both
+
+  - name: rewrites_description
+    type: regex
+    target: last_message
+    pattern: '\bCI\b[\s\S]{0,200}\b(when|use|if)\b|\b(when|use|if)\b[\s\S]{0,200}\bCI\b'
+    flags: i
+    match: contains
+    arm: both

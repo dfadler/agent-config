@@ -1,0 +1,40 @@
+# Run: claude plugin eval plugins/gha-ci-audit --case agent-dispatch-orchestrator-quiet
+# Not run yet: paid, hand-off only (#646). No grant needed (Agent and Read only).
+# Quiet case for gha-ci-audit:orchestrator: shares "orchestrator" and "iteration" vocabulary but
+# asks a general multi-agent question. Regression guard: the no-plugin arm passes it by default,
+# so Delta is zero by design.
+# Can fail: orchestrator_not_dispatched = 0 if the agent over-triggers on the word; explains_role
+# = 0 if the question is not answered.
+schema_version: "1.1"
+name: agent-dispatch-orchestrator-quiet
+description: >
+  A general question about what an orchestrator agent does must not dispatch
+  gha-ci-audit:orchestrator. expected_outcome: PASS when the agent is not dispatched and the
+  reply describes coordinating or delegating to other agents; FAIL otherwise.
+tags: [gha-ci-audit, orchestrator, agent, trigger, quick]
+
+execution:
+  prompt: |
+    In a multi-agent setup, what does an orchestrator agent do differently from the worker
+    agents it starts? Two sentences, no files, no commands.
+  max_turns: 4
+  allowed_tools:
+    - Agent
+    - Read
+
+graders:
+  - name: orchestrator_not_dispatched
+    type: tool_used
+    tool: Agent
+    input_match: '"subagent_type"\s*:\s*"(?:[\w-]+:)?orchestrator"'
+    min: 0
+    max: 0
+    arm: both
+
+  - name: explains_role
+    type: regex
+    target: last_message
+    pattern: 'coordinat|delegat|dispatch|assign|manag|sequenc|schedul'
+    flags: i
+    match: contains
+    arm: both

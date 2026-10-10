@@ -1,0 +1,41 @@
+# Run: node plugins/eval-authoring/scripts/ts/run-evals/run-evals.ts --tier quick plugins/gha-ci-audit
+# (quick tier: one run, plugin arm only, `--ablation none`: the no-plugin arm cannot dispatch a
+# plugin agent, "Agent type ... not found".) Not run yet: paid, hand-off only (#646).
+# Dispatch case for gha-ci-audit:renderer. No grant. agents/renderer.md "What this agent does NOT
+# do": if a required file is missing from outputs/ it reports which file and stops, with no
+# fetching. The empty workspace has no outputs/, so a faithful run ends in that report.
+# Can fail: the main model answers itself (renderer_dispatched = 0), or the agent invents a
+# report instead of reporting the missing data (reports_missing_data = 0).
+schema_version: "1.1"
+name: agent-dispatch-renderer-fires
+description: >
+  Asked to run the gha-ci-audit renderer agent on an outputs directory that does not exist, the
+  model dispatches gha-ci-audit:renderer and relays that the collected data files are missing.
+  expected_outcome: PASS when the agent is dispatched and the reply reports missing data; FAIL
+  when it is not dispatched or the reply claims a report was produced.
+tags: [gha-ci-audit, renderer, agent, quick]
+
+execution:
+  prompt: |
+    Use the gha-ci-audit:renderer agent to produce report.html from /work/out
+    (scripts_dir /work/scripts, skill at /work/skills/gha-ci-audit/SKILL.md) and tell me the
+    result.
+  max_turns: 8
+  allowed_tools:
+    - Agent
+    - Read
+    - Glob
+
+graders:
+  - name: renderer_dispatched
+    type: tool_used
+    tool: Agent
+    input_match: '"subagent_type"\s*:\s*"(?:[\w-]+:)?renderer"'
+    min: 1
+
+  - name: reports_missing_data
+    type: regex
+    target: last_message
+    pattern: '(missing|not found|no such|does not exist|doesn.t exist|empty|no data|could not|couldn.t|unable)'
+    flags: i
+    match: contains

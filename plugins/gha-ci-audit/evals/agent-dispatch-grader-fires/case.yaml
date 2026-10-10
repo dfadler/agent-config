@@ -1,0 +1,39 @@
+# Run: node plugins/eval-authoring/scripts/ts/run-evals/run-evals.ts --tier quick plugins/gha-ci-audit
+# (quick tier: one run, plugin arm only, `--ablation none`: the no-plugin arm cannot dispatch a
+# plugin agent, "Agent type ... not found".) Not run yet: paid, hand-off only (#646).
+# Dispatch case for gha-ci-audit:grader. No grant: the run to grade does not exist, so a faithful
+# agent reports that eval_metadata.json or report.html is missing instead of grading.
+# Can fail: the main model answers itself (grader_dispatched = 0), or the agent fabricates a
+# grading (reports_missing_input = 0).
+schema_version: "1.1"
+name: agent-dispatch-grader-fires
+description: >
+  Asked to run the gha-ci-audit grader agent on a run directory that does not exist, the model
+  dispatches gha-ci-audit:grader and relays that its inputs are missing. expected_outcome: PASS
+  when the agent is dispatched and the reply names a missing input; FAIL when it is not
+  dispatched or the reply claims pass/fail results.
+tags: [gha-ci-audit, grader, agent, quick]
+
+execution:
+  prompt: |
+    Use the gha-ci-audit:grader agent to grade the run whose outputs are in /work/run-1/outputs
+    against /work/run-1/eval_metadata.json and tell me which assertions passed.
+  max_turns: 8
+  allowed_tools:
+    - Agent
+    - Read
+    - Glob
+
+graders:
+  - name: grader_dispatched
+    type: tool_used
+    tool: Agent
+    input_match: '"subagent_type"\s*:\s*"(?:[\w-]+:)?grader"'
+    min: 1
+
+  - name: reports_missing_input
+    type: regex
+    target: last_message
+    pattern: '(eval_metadata|report\.html|outputs)[\s\S]{0,200}(missing|not found|no such|does not exist|doesn.t exist|could not|couldn.t|unable)|(missing|not found|no such|does not exist|doesn.t exist|could not|couldn.t|unable)[\s\S]{0,200}(eval_metadata|report\.html|outputs)'
+    flags: i
+    match: contains

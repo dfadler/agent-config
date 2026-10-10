@@ -1,0 +1,41 @@
+# Run: node plugins/eval-authoring/scripts/ts/run-evals/run-evals.ts --tier quick plugins/gha-ci-audit
+# (quick tier: one run, plugin arm only, `--ablation none`: the no-plugin arm cannot dispatch a
+# plugin agent, "Agent type ... not found".) Not run yet: paid, hand-off only (#646).
+# Dispatch case for gha-ci-audit:collector. No grant: Bash is not granted, so the agent cannot run
+# its collect.ts script or call the GitHub API; a faithful run says so.
+# Can fail: the main model answers itself (collector_dispatched = 0), or the agent claims to have
+# collected data it could not fetch (admits_no_collection = 0).
+schema_version: "1.1"
+name: agent-dispatch-collector-fires
+description: >
+  Asked to run the gha-ci-audit collector agent for a repository without any way to execute
+  commands, the model dispatches gha-ci-audit:collector and relays that nothing was collected.
+  expected_outcome: PASS when the agent is dispatched and the reply admits it could not run the
+  collection; FAIL when it is not dispatched or the reply claims data was written.
+tags: [gha-ci-audit, collector, agent, quick]
+
+execution:
+  prompt: |
+    Use the gha-ci-audit:collector agent for the repo example-org/example-repo
+    (outputs_dir /work/out, scripts_dir /work/scripts) and tell me what it collected.
+  max_turns: 8
+  allowed_tools:
+    - Agent
+    - Read
+    - Glob
+
+graders:
+  # Steps: the plugin's agent was dispatched, not imitated.
+  - name: collector_dispatched
+    type: tool_used
+    tool: Agent
+    input_match: '"subagent_type"\s*:\s*"(?:[\w-]+:)?collector"'
+    min: 1
+
+  # Result: no fabricated collection. Matches an inability statement or the script name.
+  - name: admits_no_collection
+    type: regex
+    target: last_message
+    pattern: 'collect\.ts|(could not|couldn.t|cannot|can.t|unable|not able|did not|didn.t)[\s\S]{0,120}(run|collect|fetch|execute)|no (bash|shell)|not (available|granted|permitted|allowed)'
+    flags: i
+    match: contains
