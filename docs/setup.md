@@ -57,7 +57,8 @@ Run from inside a project, doctor also reports (never edits) that project's
 `.claude/settings.local.json` allow rules that are too broad (`git push|stash|checkout *`,
 `gh pr merge *`), name a package manager the lockfile says is unused, point at a vanished
 path or are one-off literals, and the worktree count, disk use and `worktree.autoPrune`
-state under `.claude/worktrees`. Only the current project is checked.
+state under `.claude/worktrees`, listing any worktree that is locked, named `keep` or holds
+gitignored content (the prune hook's rules). Only the current project is checked.
 
 See [`docs/plugin-loading.md`](./plugin-loading.md) for how the linked plugin
 directory actually gets picked up by Claude Code and why its contents load

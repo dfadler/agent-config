@@ -56,7 +56,10 @@
 //                                          # "N could be pruned; set worktree.autoPrune"
 //                                          # nudge, and skips GitHub when no other
 //                                          # Claude worktree exists
-//   prune-merged-worktrees.ts --auto       # quiet auto-remove for the SessionStart
+//   prune-merged-worktrees.ts --unsafe     # list worktrees that are locked, named keep,
+//                                          # or hold gitignored content (local rules
+//                                          # only, no GitHub); used by doctor
+//   prune-merged-worktrees.ts --auto      # quiet auto-remove for the SessionStart
 //                                          # hook: removes the merged set, prints a
 //                                          # one-line summary, never fails the session
 import {
@@ -177,15 +180,40 @@ const hasNonDir = (dir: string): boolean =>
     e.isDirectory() ? hasNonDir(`${dir}/${e.name}`) : true,
   );
 
+/** Keep reason for a worktree whose name asks to be kept; `name` is relative to .claude/worktrees/. */
+export const keepNameReason = (name: string): string | undefined =>
+  /keep/i.test(name) ? "name contains 'keep'" : undefined;
+
+export const lockedReason = (locked: boolean): string | undefined =>
+  locked ? "locked (another session is using it)" : undefined;
+
+/** Gitignored content (paid eval results, kept traces) is lost on removal; node_modules is fine. */
+export const ignoredContentReason = (
+  git: (args: readonly string[], at?: string) => { readonly stdout: string },
+  path: string,
+): string | undefined => {
+  const held = git(["status", "--porcelain", "--ignored"], path)
+    .stdout.split("\n")
+    .filter(
+      (l) => l.startsWith("!! ") && !/(^|\/)node_modules\//.test(l.slice(3)),
+    )
+    .map((l) => l.slice(3));
+  return held.length === 0
+    ? undefined
+    : `holds gitignored content (${held.slice(0, 3).join(", ")}); remove by hand if disposable`;
+};
+
 /** Run the tool; returns the process exit code. */
 export const main = (argv: readonly string[], ctx: Ctx): number => {
   let apply = false;
   let hook = false;
   let auto = false;
   let hint = false;
+  let unsafe = false;
   for (const arg of argv) {
     if (arg === "-y" || arg === "--yes") apply = true;
     else if (arg === "--hook") hook = true;
+    else if (arg === "--unsafe") unsafe = true;
     else if (arg === "--hint") {
       hint = true;
       hook = true;
@@ -217,6 +245,22 @@ export const main = (argv: readonly string[], ctx: Ctx): number => {
   const common = git(["rev-parse", "--git-common-dir"]).stdout.trim();
   const repoRoot = realpathSync(resolve(cwd, common, ".."));
   const wtPrefix = `${repoRoot}/.claude/worktrees/`;
+
+  // --unsafe: local rules only (locked, keep name, gitignored content), no
+  // GitHub. Used by doctor to list worktrees that are not safe to remove.
+  if (unsafe) {
+    const listed = git(["worktree", "list", "--porcelain"]).stdout;
+    for (const rec of parseWorktrees(listed)) {
+      if (!rec.path.startsWith(wtPrefix)) continue;
+      const name = rec.path.slice(wtPrefix.length);
+      const why =
+        lockedReason(rec.locked) ??
+        keepNameReason(name) ??
+        ignoredContentReason(git, rec.path);
+      if (why !== undefined) ctx.out(`${name} — ${why}`);
+    }
+    return 0;
+  }
 
   // Cheap pre-check for --hint: no other Claude worktree means nothing to
   // prune, so skip the GitHub calls entirely.
@@ -343,12 +387,8 @@ export const main = (argv: readonly string[], ctx: Ctx): number => {
   type Rule = (path: string, branch: string, locked: boolean) => string | undefined;
   const rules: readonly Rule[] = [
     (p) => (p === self ? "current session" : undefined),
-    (_p, _b, locked) =>
-      locked ? "locked (another session is using it)" : undefined,
-    (p) =>
-      /keep/i.test(p.slice(wtPrefix.length))
-        ? "name contains 'keep'"
-        : undefined,
+    (_p, _b, locked) => lockedReason(locked),
+    (p) => keepNameReason(p.slice(wtPrefix.length)),
     (p, b) =>
       isMerged(b, git(["rev-parse", "HEAD"], p).stdout.trim())
         ? undefined
@@ -362,18 +402,7 @@ export const main = (argv: readonly string[], ctx: Ctx): number => {
         ? undefined
         : "uncommitted changes";
     },
-    (p) => {
-      // Gitignored content (paid eval results, kept traces) is lost on removal.
-      const held = git(["status", "--porcelain", "--ignored"], p)
-        .stdout.split("\n")
-        .filter(
-          (l) => l.startsWith("!! ") && !/(^|\/)node_modules\//.test(l.slice(3)),
-        )
-        .map((l) => l.slice(3));
-      return held.length === 0
-        ? undefined
-        : `holds gitignored content (${held.slice(0, 3).join(", ")}); remove by hand if disposable`;
-    },
+    (p) => ignoredContentReason(git, p),
     (p) => (pushedOrOnMain(p) ? undefined : "unpushed commits (or no upstream)"),
   ];
 
