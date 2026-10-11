@@ -91,7 +91,7 @@ describe("caseRow", () => {
 describe("skill_fired", () => {
   const run = (passed: boolean) => ({
     score: 1,
-    graders: [{ name: "skill_fired", passed, explanation: `Skill called ${passed ? 1 : 0}x` }],
+    graders: [{ name: "skill_fired", passed, explanation: passed ? "Skill called 1x" : "Skill called 0x" }],
   });
   const text = JSON.stringify({
     cases: [
