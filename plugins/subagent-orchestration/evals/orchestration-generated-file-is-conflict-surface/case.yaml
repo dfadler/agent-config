@@ -1,0 +1,42 @@
+# Run: claude plugin eval plugins/subagent-orchestration --case orchestration-generated-file-is-conflict-surface --runs 3 --trust-plugin --no-publish
+# Shared run/grant facts: docs/contributing.md, "Plugin evals". No grant; reply-only.
+# Covers the #621 follow-up: shared generated/binary files (lockfiles, snapshots, image
+# baselines) are a file surface; items that regenerate the same one are not disjoint.
+# Run with --ablation with-without; no skill_fired grader (reply-only).
+# Can fail: names_generated_surface fails if the reply never mentions the shared lockfile,
+# snapshots or baselines as a conflict; no_blind_parallel fails if it fans all three out
+# with no caveat about them.
+schema_version: "1.1"
+name: orchestration-generated-file-is-conflict-surface
+description: >
+  Given three tasks in different source dirs that all regenerate the same lockfile and
+  snapshot files, the reply treats those generated files as a shared conflict surface.
+  expected_outcome: PASS when it names the lockfile/snapshots as a conflict and serializes
+  or merges the affected items; FAIL when it fans all three out as disjoint.
+tags: [subagent-orchestration, trigger, quick]
+
+execution:
+  prompt: |
+    Please do these, in no particular order: (1) upgrade the `react-query` dependency and fix
+    the breakage in src/api/ (about 30 files), (2) upgrade `date-fns` and fix the breakage in
+    src/reports/ (about 25 files), (3) upgrade `zod` and fix the breakage in src/forms/ (about
+    20 files). How will you tackle these? Three sentences, no commands.
+  max_turns: 4
+  allowed_tools:
+    - Skill
+
+graders:
+  - name: names_generated_surface
+    type: regex
+    target: last_message
+    pattern: 'lock ?file|package-lock|snapshots?|baselines?|generated|binary|merge conflicts?|cannot (?:be )?merge|can.t (?:be )?merge'
+    flags: i
+    match: contains
+
+  # Polarity: names_generated_surface also matches "snapshots are fine, run all in parallel".
+  - name: no_blind_parallel
+    type: regex
+    target: last_message
+    pattern: "(?:all (?:three|3)|each|every one)\\b[^.]{0,60}\\b(?:in parallel|concurrently|simultaneously)(?![^.]{0,80}(?:lock ?file|package-lock|snapshot|conflict|serial|sequential|one at a time|then))"
+    flags: is
+    match: not_contains
