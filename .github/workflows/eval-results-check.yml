@@ -1,0 +1,45 @@
+name: Eval results check
+
+# Backstop for the PR convention (#662): a PR that touches plugins/*/evals/**
+# carries an "Eval results" heading in its body (keep the heading and write the
+# reason under it when no run was made). Only catches omission, not a
+# placeholder. Standalone and non-gating:
+# a paths: filter can't see the body, so it lists changed files itself.
+
+on:
+  pull_request:
+    types: [opened, edited, synchronize, reopened]
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event.pull_request.number }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+  pull-requests: read
+
+jobs:
+  check:
+    name: run
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Require an Eval results section when evals change
+        env:
+          GH_TOKEN: ${{ github.token }}
+          PR_NUMBER: ${{ github.event.pull_request.number }}
+          # Passed via env, never interpolated into the script.
+          PR_BODY: ${{ github.event.pull_request.body }}
+        run: |
+          set -euo pipefail
+          if ! gh api --paginate "repos/${GITHUB_REPOSITORY}/pulls/${PR_NUMBER}/files" --jq '.[].filename' \
+            | grep -Eq '^plugins/[^/]+/evals/'; then
+            echo "No plugins/*/evals/** changes; nothing to check."
+            exit 0
+          fi
+          if printf '%s\n' "$PR_BODY" | grep -Eiq '^#{1,6}[[:space:]]+eval results[[:space:]]*$'; then
+            echo "Found an 'Eval results' heading."
+            exit 0
+          fi
+          echo "::error::This PR changes plugins/*/evals/** but its body has no 'Eval results' heading. Add one with the run-evals summary, or write why no run was made."
+          exit 1
