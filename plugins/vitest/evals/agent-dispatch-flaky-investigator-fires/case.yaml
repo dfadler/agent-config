@@ -85,3 +85,18 @@ graders:
     pattern: '(shared|module[- ]level|top[- ]level|mutable|global|leak|persist)[\s\S]{0,150}(count|state|variable)|(count|state|variable)[\s\S]{0,150}(shared|module[- ]level|top[- ]level|leak|persist|between tests|order)'
     flags: i
     match: contains
+
+  # The fix, not just the cause: the report must say how to isolate the state.
+  - name: proposes_isolation_fix
+    type: regex
+    target: last_message
+    pattern: 'beforeEach|afterEach|(reset|re-?initiali[sz]e)\w*[\s\S]{0,30}(in|inside|before|between)[\s\S]{0,30}(test|each|describe)|inside the (test|describe|it)|move[\s\S]{0,40}into|(fresh|new|separate|own)[\s\S]{0,20}(instance|copy|counter|state)|isolate (the|each|this)'
+    flags: i
+    match: contains
+
+  # The report names the planted variable, not generic flakiness advice.
+  - name: names_the_variable
+    type: regex
+    target: last_message
+    pattern: '\bcount\b'
+    match: contains

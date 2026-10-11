@@ -39,3 +39,10 @@ graders:
     pattern: '(?:not|isn.t|n.t)\s+(?:the same as\s+|equivalent to\s+|real\s+)?Safari|differs? from Safari|Safari.{0,40}(?:may|might|can) differ'
     flags: i
     match: contains
+
+  # The reply is about the engine the user named, not generic accessibility advice.
+  - name: names_webkit
+    type: regex
+    target: last_message
+    pattern: 'WebKit'
+    match: contains

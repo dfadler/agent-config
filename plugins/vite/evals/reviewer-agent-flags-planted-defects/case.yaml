@@ -111,3 +111,26 @@ graders:
     pattern: 'package\.json:\d+'
     match: contains
     weight: 0.25
+
+  # Report-only contract: only the two setup Writes, and both planted defects survive.
+  - name: no_extra_writes
+    type: tool_used
+    tool: Write
+    min: 2
+    max: 2
+
+  - name: peer_range_left_unchanged
+    type: regex
+    target:
+      source: file
+      path: "package.json"
+    pattern: '"vite":\s*"\*"'
+    match: contains
+
+  - name: bundle_hook_left_unchanged
+    type: regex
+    target:
+      source: file
+      path: "src/vite/plugins/banner.ts"
+    pattern: 'return Object\.fromEntries'
+    match: contains
