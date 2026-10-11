@@ -21,8 +21,9 @@ setup() {
   mkdir -p "$FAKE_REPO/scripts" "$FAKE_REPO/claude/commands" "$FAKE_REPO/claude/conventions"
   cp "$REPO_ROOT/setup.sh" "$REPO_ROOT/teardown.sh" "$FAKE_REPO/"
   chmod +x "$FAKE_REPO/setup.sh" "$FAKE_REPO/teardown.sh"
+  cp -R "$REPO_ROOT/scripts/ts" "$FAKE_REPO/scripts/ts"
   local lib
-  for lib in claude-md-lib.sh settings-lib.sh plugin-hooks.sh symlink-lib.sh setup-plan-lib.sh \
+  for lib in claude-md-lib.sh settings-lib.sh plugin-hooks.sh plugin-hooks.tsv symlink-lib.sh setup-plan-lib.sh \
     offer-safe-chain-permission.sh git-identity.sh check-companions.sh; do
     cp "$REPO_ROOT/scripts/$lib" "$FAKE_REPO/scripts/$lib"
   done
@@ -36,7 +37,7 @@ setup() {
   _add_plugin demo-plugin
   _add_plugin worktree-core
   _add_plugin memory-hygiene
-  # Hook scripts for every row in scripts/plugin-hooks.sh, so setup registers
+  # Hook scripts for every row in scripts/plugin-hooks.tsv, so setup registers
   # (and teardown deregisters) the full hook set in settings.json.
   local wt="$FAKE_REPO/plugins/worktree-core/skills/git-worktree-usage/scripts"
   mkdir -p "$wt" "$FAKE_REPO/plugins/memory-hygiene/hooks/scripts"

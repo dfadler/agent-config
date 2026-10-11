@@ -20,7 +20,7 @@ setup() {
   cp "$REPO_ROOT/setup.sh" "$FAKE_REPO/"
   chmod +x "$FAKE_REPO/setup.sh"
   local lib
-  for lib in claude-md-lib.sh settings-lib.sh plugin-hooks.sh symlink-lib.sh \
+  for lib in claude-md-lib.sh settings-lib.sh plugin-hooks.sh plugin-hooks.tsv symlink-lib.sh \
     setup-plan-lib.sh offer-safe-chain-permission.sh git-identity.sh check-companions.sh; do
     cp "$REPO_ROOT/scripts/$lib" "$FAKE_REPO/scripts/$lib"
   done
