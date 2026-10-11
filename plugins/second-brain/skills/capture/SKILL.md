@@ -66,6 +66,10 @@ tags: [relevant, tags]
 ---
 ```
 
+`date` is the date the user states in the request (e.g. "Today is 2026-10-05",
+or a past/future day the note is about); use the system date only when none
+is given.
+
 Meeting notes also include:
 ```yaml
 attendees: [Name1, Name2]
