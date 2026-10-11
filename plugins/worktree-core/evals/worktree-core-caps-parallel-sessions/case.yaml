@@ -25,13 +25,13 @@ graders:
   - name: gives_range
     type: regex
     target: last_message
-    pattern: '\b(?:[2-3]|two|three)\s*(?:-|–|—|to)\s*(?:[4-6]|four|five|six)\b'
+    pattern: '\b(?:[2-3]|two|three)\s*(?:-|–|—|to)\s*(?:[4-6]|four|five|six)\b|\b(?:two|three|four|[2-4])\s+or\s+(?:three|four|five|six|[3-6])\b'
     flags: i
     match: contains
 
   - name: staggers
     type: regex
     target: last_message
-    pattern: 'stagger|ramp(?:ing)?[- ]up|one (?:or two )?at a time|a few at a time|in (?:batches|waves)|gradually|incrementally'
+    pattern: 'stagger|ramp(?:ing)?[- ]up|one (?:or two )?at a time|a few at a time|in (?:batches|waves)|gradually|incrementally|add more as|then add|start with (?:two|three|four|five|[2-5])\b'
     flags: i
     match: contains

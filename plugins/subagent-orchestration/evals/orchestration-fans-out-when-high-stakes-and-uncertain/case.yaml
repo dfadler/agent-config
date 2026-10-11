@@ -34,7 +34,7 @@ graders:
   - name: names_both
     type: regex
     target: last_message
-    pattern: '^(?=[\s\S]*(?:stakes|expensive|costly|gates|revers|irrevers))(?=[\s\S]*(?:uncertain|unknown|unclear|don.t know|unresolved|not knowable))'
+    pattern: '^(?=[\s\S]*(?:stakes|expensive|costly|gates|revers|irrevers))(?=[\s\S]*(?:uncertain|unknown|unclear|don.t know|unresolved|not knowable|nobody|no[- ]one|lacks?\b|expertise|knows?\b))'
     flags: i
     match: contains
     weight: 0.5

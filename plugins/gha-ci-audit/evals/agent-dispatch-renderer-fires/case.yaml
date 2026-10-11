@@ -38,6 +38,6 @@ graders:
     target: last_message
     # Plugin-specific: the renderer names the required data files or says to re-run the collector
     # (agents/renderer.md "MISSING: {filename}"). A bare "agent not found" does not match.
-    pattern: 'MISSING:|re-?run (?:the )?collector|\bcollector\b|collect_summary|failure_check|\b(?:runs|jobs|workflows)\.json'
+    pattern: 'MISSING:|re-?run (?:the )?collector|\bcollector\b|collect_summary|failure_check|\b(?:runs|jobs|workflows)\.json|\b(?:data|input|required) files\b'
     flags: i
     match: contains
