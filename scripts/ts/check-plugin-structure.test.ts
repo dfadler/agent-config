@@ -294,15 +294,12 @@ describe("main against a fixture tree", () => {
     });
   });
 
-  describe("scripts/plugin-hooks.sh table", () => {
-    const table = (cmd: string, legacy: string): void => {
-      put(
-        "scripts/plugin-hooks.sh",
-        `PLUGIN_HOOK_CMDS=(\n  "${cmd.replaceAll('"', '\\"')}"\n)\nPLUGIN_HOOK_LEGACY_CMDS=(\n  "${legacy}"\n)\n`,
-      );
+  describe("scripts/plugin-hooks.tsv table", () => {
+    const table = (script: string, legacy: string): void => {
+      put("scripts/plugin-hooks.tsv", `Stop\t-\tdemo\t${script}\t${legacy}\n`);
     };
-    const LIVE = 'node "$HOME/.claude/skills/demo/scripts/ts/h.ts"';
-    const OLD = "$HOME/.claude/skills/demo/scripts/old.sh";
+    const LIVE = "demo/scripts/ts/h.ts";
+    const OLD = "demo/scripts/old.sh";
 
     it("passes when the registered file exists and the legacy one does not", () => {
       put("plugins/demo/scripts/ts/h.ts", "");
@@ -315,9 +312,9 @@ describe("main against a fixture tree", () => {
       expect(failure()).toContain("registered hook has no file");
     });
 
-    it("fails when a registered hook is outside ~/.claude/skills", () => {
-      table('node "/opt/x.ts"', OLD);
-      expect(failure()).toContain("not under ~/.claude/skills");
+    it("fails on a malformed row", () => {
+      put("scripts/plugin-hooks.tsv", "Stop\t-\tdemo\n");
+      expect(failure()).toContain("expected 5 non-empty tab-separated columns");
     });
 
     it("fails when a legacy path still exists on disk", () => {

@@ -1,0 +1,19 @@
+# Single source of truth for the plugin hooks setup.sh registers and teardown
+# deregisters in ~/.claude/settings.json. Read by scripts/plugin-hooks.sh
+# (bash, before Node exists) and scripts/ts/hook-table.ts (TypeScript).
+#
+# Tab-separated, one row per hook; lines starting with # and blank lines are
+# skipped. Columns:
+#   event    Hook event name.
+#   matcher  Tool matcher regex, or - for an event with no matcher.
+#   feature  The --skip/--include feature (plugin directory) that owns the hook.
+#   script   Hook script, relative to ~/.claude/skills/ (where setup.sh links plugins).
+#   legacy   Retired .sh path for the same row, relative to ~/.claude/skills/.
+#
+# Why TSV, not JSON: bash needs no parser or python3 to read it, and an empty
+# field is spelled - because a tab is IFS whitespace and `read` would collapse
+# adjacent empty fields.
+PreToolUse	Edit|Write	worktree-core	worktree-core/scripts/ts/require-worktree-hook.ts	worktree-core/skills/git-worktree-usage/scripts/require-worktree-hook.sh
+SessionStart	-	worktree-core	worktree-core/scripts/ts/check-worktree-symlinks-hook.ts	worktree-core/skills/git-worktree-usage/scripts/check-worktree-symlinks-hook.sh
+SessionStart	-	worktree-core	worktree-core/scripts/ts/prune-merged-worktrees-hook.ts	worktree-core/skills/git-worktree-usage/scripts/prune-merged-worktrees-hook.sh
+Stop	-	memory-hygiene	memory-hygiene/scripts/ts/memory-hygiene-stop-hook.ts	memory-hygiene/hooks/scripts/memory-hygiene-stop-hook.sh

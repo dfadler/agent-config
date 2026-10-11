@@ -116,8 +116,8 @@ worth avoiding on those grounds even before the mechanism question above.
 
 New scripts are TypeScript (`node script.ts`; see [`testing.md`](testing.md)). Two documented
 exceptions stay: the bootstrap bash that runs before Node exists or manages the user's `~/.claude`
-(`setup.sh`, `teardown.sh`, `doctor.sh`, `scripts/check-companions.sh` and the libs they source,
-`scripts/session-sync.sh`), and `detached-terminal`'s `agent_term.py` (Node has no stdlib PTY).
+(`setup.sh`, `doctor.sh`, `scripts/check-companions.sh` and the libs they source,
+`scripts/session-sync.sh`, which must still work when Node is missing or too old after a pull), and `detached-terminal`'s `agent_term.py` (Node has no stdlib PTY).
 Those keep the shellcheck/shfmt/bats/kcov and ruff/mypy/pytest gates below
 ([#441](https://github.com/dfadler/agent-config/issues/441)).
 

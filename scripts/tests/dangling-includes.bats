@@ -10,7 +10,7 @@ setup() {
   FAKE_REPO="$SANDBOX/repo"
   mkdir -p "$FAKE_REPO/scripts" "$FAKE_REPO/claude/conventions" \
     "$FAKE_REPO/plugins/shell-script-hygiene" "$HOME/.claude"
-  cp "$REPO_ROOT/scripts/check-companions.sh" "$REPO_ROOT/scripts/settings-lib.sh" \
+  cp "$REPO_ROOT/scripts/check-companions.sh" "$REPO_ROOT/scripts/settings-lib.sh" "$REPO_ROOT/scripts/plugin-hooks.sh" "$REPO_ROOT/scripts/plugin-hooks.tsv" \
     "$REPO_ROOT/scripts/offer-safe-chain-permission.sh" "$REPO_ROOT/scripts/git-identity.sh" \
     "$FAKE_REPO/scripts/"
   chmod +x "$FAKE_REPO/scripts/"*.sh

@@ -32,11 +32,17 @@ teardown() {
   # Registered: every hook row, as a non-dangling command.
   run grep -c "$HOME/.claude/skills/" "$HOME/.claude/settings.json"
   [ "$output" -ge 4 ]
+  # Exec form: command "node" plus args, never a shell-quoted command string.
+  run grep -c '"command": "node"' "$HOME/.claude/settings.json"
+  [ "$output" -ge 4 ]
+  run grep -c 'node \\"' "$HOME/.claude/settings.json"
+  [ "$output" = "0" ]
   [ -L "$HOME/.claude/skills/worktree-core" ]
 
   run bash "$FAKE_REPO/doctor.sh"
   assert_success
   assert_output_contains "no dangling hook entries or symlinks"
+  assert_output_contains "no shell-form hook entries"
 
   run bash "$FAKE_REPO/teardown.sh"
   assert_success
@@ -46,4 +52,13 @@ teardown() {
   [ "$output" = "0" ]
   run find "$HOME/.claude/skills" "$HOME/.claude/commands" -type l
   [ -z "$output" ]
+}
+
+@test "plugin-hooks.sh loads the same rows when the table has no trailing newline" {
+  local n_with n_without
+  n_with=$(bash -c 'source "$1"; echo "${#PLUGIN_HOOK_EVENTS[@]}"' _ "$FAKE_REPO/scripts/plugin-hooks.sh")
+  printf '%s' "$(cat "$FAKE_REPO/scripts/plugin-hooks.tsv")" >"$FAKE_REPO/scripts/plugin-hooks.tsv"
+  n_without=$(bash -c 'source "$1"; echo "${#PLUGIN_HOOK_EVENTS[@]}"' _ "$FAKE_REPO/scripts/plugin-hooks.sh")
+  [ "$n_with" -gt 0 ]
+  [ "$n_with" = "$n_without" ]
 }

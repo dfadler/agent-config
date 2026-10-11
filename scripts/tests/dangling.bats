@@ -13,7 +13,7 @@ setup() {
   make_sandbox
   FAKE_REPO="$SANDBOX/repo"
   mkdir -p "$FAKE_REPO/scripts" "$HOME/.claude/skills" "$HOME/.claude/commands"
-  cp "$REPO_ROOT/scripts/check-companions.sh" "$REPO_ROOT/scripts/settings-lib.sh" \
+  cp "$REPO_ROOT/scripts/check-companions.sh" "$REPO_ROOT/scripts/settings-lib.sh" "$REPO_ROOT/scripts/plugin-hooks.sh" "$REPO_ROOT/scripts/plugin-hooks.tsv" \
     "$REPO_ROOT/scripts/offer-safe-chain-permission.sh" "$REPO_ROOT/scripts/git-identity.sh" \
     "$FAKE_REPO/scripts/"
   chmod +x "$FAKE_REPO/scripts/"*.sh
@@ -124,4 +124,84 @@ run_doctor() {
   PATH="$SANDBOX/shims:$PATH" run_doctor --fix
   assert_output_contains "could not back up"
   [ "$(cat "$HOME/.claude/settings.json")" = "$before" ]
+}
+
+# ---------------------------------------------------------------------------
+# Exec-form hooks (command + args)
+# ---------------------------------------------------------------------------
+
+@test "an exec-form hook whose script arg is gone is reported, then removed by --fix" {
+  printf '{"hooks":{"Stop":[{"hooks":[{"type":"command","command":"node","args":["%s"]}]}]}}\n' \
+    "$HOME/.claude/skills/p/gone.ts" >"$HOME/.claude/settings.json"
+  run_doctor
+  assert_success
+  assert_output_contains "dangling Stop hook"
+  assert_output_contains "gone.ts"
+  run_doctor --fix
+  assert_output_contains "Removing dangling Stop hook"
+  run grep -c "gone.ts" "$HOME/.claude/settings.json"
+  [ "$output" = "0" ]
+}
+
+@test "an exec-form hook with a live script arg is not flagged" {
+  mkdir -p "$HOME/.claude/skills/p"
+  : >"$HOME/.claude/skills/p/hook.ts"
+  printf '{"hooks":{"Stop":[{"hooks":[{"type":"command","command":"node","args":["%s"]}]}]}}\n' \
+    "$HOME/.claude/skills/p/hook.ts" >"$HOME/.claude/settings.json"
+  run_doctor --fix
+  assert_success
+  assert_output_contains "no dangling hook entries or symlinks"
+}
+
+@test "removing a dangling exec-form hook leaves a shell-form one that shares its command" {
+  mkdir -p "$HOME/.claude/skills/p"
+  : >"$HOME/.claude/skills/p/live.ts"
+  printf '{"hooks":{"Stop":[{"hooks":[{"type":"command","command":"node","args":["%s"]},{"type":"command","command":"node \\"%s\\""}]}]}}\n' \
+    "$HOME/.claude/skills/p/gone.ts" "$HOME/.claude/skills/p/live.ts" >"$HOME/.claude/settings.json"
+  run_doctor --fix
+  run python3 -c "
+import json
+hooks = json.load(open('$HOME/.claude/settings.json'))['hooks']['Stop'][0]['hooks']
+assert [h['command'] for h in hooks] == ['node \"$HOME/.claude/skills/p/live.ts\"'], hooks
+"
+  [ "$status" -eq 0 ]
+}
+
+# ---------------------------------------------------------------------------
+# Shell-form entries from this repo's hook table are flagged, and --fix
+# migrates them to exec form.
+# ---------------------------------------------------------------------------
+
+shell_form_settings() {
+  SHELL_SCRIPT="$HOME/.claude/skills/memory-hygiene/scripts/ts/memory-hygiene-stop-hook.ts"
+  mkdir -p "${SHELL_SCRIPT%/*}"
+  : >"$SHELL_SCRIPT"
+  printf '{"hooks":{"Stop":[{"hooks":[{"type":"command","command":"node \\"%s\\""},{"type":"command","command":"foreign"}]}]}}\n' \
+    "$SHELL_SCRIPT" >"$HOME/.claude/settings.json"
+}
+
+@test "shell-form: a table hook in shell form is reported and left alone without --fix" {
+  shell_form_settings
+  before="$(cat "$HOME/.claude/settings.json")"
+  run_doctor
+  assert_success
+  assert_output_contains "shell-form Stop hook"
+  [ "$(cat "$HOME/.claude/settings.json")" = "$before" ]
+}
+
+@test "shell-form: --fix migrates it to exec form with a backup, keeps foreign hooks, and is idempotent" {
+  shell_form_settings
+  run_doctor --fix
+  assert_success
+  assert_output_contains "Migrated Stop hook to exec form"
+  [ -n "$(ls "$HOME"/.claude/settings.json.bak-* 2>/dev/null)" ]
+  run python3 -c "
+import json
+hooks = json.load(open('$HOME/.claude/settings.json'))['hooks']['Stop'][0]['hooks']
+assert hooks[0] == {'type': 'command', 'command': 'node', 'args': ['$SHELL_SCRIPT']}, hooks
+assert hooks[1]['command'] == 'foreign', hooks
+"
+  [ "$status" -eq 0 ]
+  run_doctor --fix
+  assert_output_contains "no shell-form hook entries"
 }
