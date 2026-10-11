@@ -84,6 +84,9 @@ REPO_ROOT="$(cd -P "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 # Helpers for removing hook entries from ~/.claude/settings.json.
 # shellcheck source=scripts/settings-lib.sh
 source "$REPO_ROOT/scripts/settings-lib.sh"
+# The hook table, for the shell-form to exec-form migration check.
+# shellcheck source=scripts/plugin-hooks.sh
+source "$REPO_ROOT/scripts/plugin-hooks.sh"
 
 # --------------------------------------------------------------------------
 # Runtime dependencies
@@ -723,9 +726,14 @@ if group is None:
     print("group-missing")
     sys.exit(0)
 
+def hook_text(h):
+    # Shell form keeps the path in "command"; exec form keeps it in "args".
+    if not isinstance(h, dict):
+        return str(h)
+    return " ".join([h.get("command", "")] + [str(a) for a in h.get("args", [])])
+
 for h in group.get("hooks", []):
-    cmd = h.get("command", "") if isinstance(h, dict) else str(h)
-    if hook_path in cmd:
+    if hook_path in hook_text(h):
         print("present")
         sys.exit(0)
 
@@ -771,15 +779,17 @@ legacy = "/git-worktree-usage/scripts/require-worktree-hook.sh"
 hook_list[:] = [h for h in hook_list
                 if legacy not in (h.get("command", "") if isinstance(h, dict) else str(h))]
 
-# No-op if already present
+# No-op if already present, in either form (a shell-form entry is migrated by
+# check_shell_form_hooks, not here)
 for h in hook_list:
-    cmd = h.get("command", "") if isinstance(h, dict) else str(h)
-    if hook_path in cmd:
+    text = " ".join([h.get("command", "")] + [str(a) for a in h.get("args", [])]) \
+        if isinstance(h, dict) else str(h)
+    if hook_path in text:
         print("noop")
         sys.exit(0)
 
-# Add the hook, preserving all existing entries in this group
-hook_list.append({"type": "command", "command": 'node "{}"'.format(hook_path)})
+# Add the hook in exec form, preserving all existing entries in this group
+hook_list.append({"type": "command", "command": "node", "args": [hook_path]})
 
 with open(settings_path, "w") as f:
     json.dump(data, f, indent=2)
@@ -1132,8 +1142,8 @@ check_playwright_cli() {
 # or this repo (or its main checkout), and a symlink only if its target sits
 # under this repo, its main checkout, or ~/.claude/plugins. A hook command with
 # no such path (e.g. `rtk hook claude`) is skipped.
-# Prints one tab-separated line per finding: "hook EVENT COMMAND" or
-# "link PATH TARGET".
+# Prints one tab-separated line per finding: "hook EVENT COMMAND ARGS_JSON"
+# (ARGS_JSON empty for a shell-form hook) or "link PATH TARGET".
 # --------------------------------------------------------------------------
 DANGLING_SCRIPT=$(
   cat <<'PYEOF'
@@ -1159,14 +1169,20 @@ for event, entries in hooks.items():
     for entry in entries if isinstance(entries, list) else []:
         for h in entry.get("hooks", []) if isinstance(entry, dict) else []:
             cmd = h.get("command", "") if isinstance(h, dict) else ""
-            try:
-                tokens = shlex.split(cmd)
-            except ValueError:
-                continue
+            args = h.get("args") if isinstance(h, dict) else None
+            if isinstance(args, list):
+                # Exec form: the command and each arg are literal, no shell.
+                tokens = [cmd] + [str(a) for a in args]
+            else:
+                try:
+                    tokens = shlex.split(cmd)
+                except ValueError:
+                    continue
             for t in tokens:
                 t = os.path.expandvars(os.path.expanduser(t))
                 if t.startswith("/") and under(t, hook_roots) and not os.path.exists(t):
-                    print("hook\t%s\t%s" % (event, cmd))
+                    print("hook\t%s\t%s\t%s" % (event, cmd,
+                          json.dumps(args) if isinstance(args, list) else ""))
                     break
 
 for d in ("skills", "commands"):
@@ -1203,11 +1219,11 @@ check_dangling() {
     return 0
   fi
 
-  local kind a b backed_up=0 ts
-  while IFS=$'\t' read -r kind a b; do
+  local kind a b c backed_up=0 ts
+  while IFS=$'\t' read -r kind a b c; do
     if [[ "$FIX" != "1" ]]; then
       if [[ "$kind" == "hook" ]]; then
-        echo "⚠ dangling $a hook in $settings (script no longer exists): $b" >&2
+        echo "⚠ dangling $a hook in $settings (script no longer exists): $b${c:+ $c}" >&2
       else
         echo "⚠ dangling symlink (target no longer exists): $a -> $b" >&2
       fi
@@ -1225,8 +1241,8 @@ check_dangling() {
         fi
       fi
       [[ "$backed_up" == 1 ]] || continue
-      echo "Removing dangling $a hook: $b"
-      ensure_hook_deregistered "$a" "$b" "$settings"
+      echo "Removing dangling $a hook: $b${c:+ $c}"
+      ensure_hook_deregistered "$a" "$b" "$settings" "$c"
     else
       rm "$a"
       echo "Removed dangling symlink: $a -> $b"
@@ -1234,6 +1250,50 @@ check_dangling() {
   done <<<"$findings"
   if [[ "$FIX" != "1" ]]; then
     echo "  Run './doctor.sh --fix' to remove them." >&2
+  fi
+}
+
+# --------------------------------------------------------------------------
+# Shell-form hook entries
+#
+# Setup registers each hook in exec form (command "node" plus args), which
+# needs no shell quoting (https://code.claude.com/docs/en/hooks#exec-form-and-shell-form).
+# Earlier versions wrote the shell form `node "<path>"`; setup migrates those
+# on its next run, and this check reports (and with --fix rewrites in place,
+# after a timestamped backup) any that remain. Only entries matching this
+# repo's hook table exactly are touched.
+# --------------------------------------------------------------------------
+check_shell_form_hooks() {
+  local settings="$HOME/.claude/settings.json" i rc found=0 backed_up=0 ts
+  [[ -f "$settings" ]] || return 0
+  command -v python3 >/dev/null 2>&1 || return 0
+  for i in "${!PLUGIN_HOOK_EVENTS[@]}"; do
+    rc=0
+    hook_registration_state "${PLUGIN_HOOK_EVENTS[$i]}" "${PLUGIN_HOOK_SHELL_CMDS[$i]}" "$settings" || rc=$?
+    [[ "$rc" == 0 ]] || continue
+    found=1
+    if [[ "$FIX" != "1" ]]; then
+      echo "⚠ shell-form ${PLUGIN_HOOK_EVENTS[$i]} hook in $settings (exec form preferred): ${PLUGIN_HOOK_SHELL_CMDS[$i]}" >&2
+      continue
+    fi
+    if [[ "$backed_up" == 0 ]]; then
+      ts="$(date +%Y%m%d%H%M%S)"
+      if cp "$settings" "$settings.bak-$ts"; then
+        echo "Backed up $settings to $settings.bak-$ts"
+        backed_up=1
+      else
+        echo "⚠ could not back up $settings; not migrating shell-form hooks" >&2
+        backed_up=-1
+      fi
+    fi
+    [[ "$backed_up" == 1 ]] || continue
+    migrate_hook_to_exec_form "${PLUGIN_HOOK_EVENTS[$i]}" "${PLUGIN_HOOK_SHELL_CMDS[$i]}" \
+      "${PLUGIN_HOOK_CMDS[$i]}" "${PLUGIN_HOOK_ARGS_JSON[$i]}" "$settings"
+  done
+  if [[ "$found" == 0 ]]; then
+    echo "✓ no shell-form hook entries in $settings"
+  elif [[ "$FIX" != "1" ]]; then
+    echo "  Run './doctor.sh --fix' (or re-run setup.sh) to rewrite them." >&2
   fi
 }
 
@@ -1460,6 +1520,7 @@ check_project() {
 check_convention_deps
 check_available_conventions
 check_dangling
+check_shell_form_hooks
 check_dangling_includes
 check_project
 check_git_identity

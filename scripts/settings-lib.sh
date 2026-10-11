@@ -5,7 +5,13 @@
 #
 # Requires python3 (standard on macOS and all supported platforms).
 
-# ensure_hook_registered EVENT MATCHER COMMAND SETTINGS_FILE
+# A hook is identified by COMMAND plus an optional ARGS_JSON (a JSON array of
+# strings, e.g. '["/path/x.ts"]'). With ARGS_JSON the hook is exec form (the
+# settings entry carries "args" and Claude Code runs COMMAND without a shell);
+# without it, the shell form, matched on COMMAND alone with no "args".
+# https://code.claude.com/docs/en/hooks#exec-form-and-shell-form
+#
+# ensure_hook_registered EVENT MATCHER COMMAND SETTINGS_FILE [ARGS_JSON]
 #   Idempotently adds a command hook entry under hooks.<EVENT> in SETTINGS_FILE.
 #   MATCHER may be "" for an event that has no matcher concept (SessionStart,
 #   Stop, etc.) — the entry is then written without a "matcher" key at all,
@@ -16,7 +22,7 @@
 #   Prints a single status line on add; nothing if already present.
 #   Prints a warning to stderr and returns 0 if python3 is unavailable.
 ensure_hook_registered() {
-  local event="$1" matcher="$2" cmd="$3" settings="$4"
+  local event="$1" matcher="$2" cmd="$3" settings="$4" args="${5:-}"
 
   if ! command -v python3 >/dev/null 2>&1; then
     printf 'Warning: python3 not found — cannot register %s hook in %s\n' \
@@ -29,7 +35,7 @@ ensure_hook_registered() {
   fi
 
   SETTINGS_FILE="$settings" HOOK_EVENT="$event" \
-    HOOK_MATCHER="$matcher" HOOK_CMD="$cmd" \
+    HOOK_MATCHER="$matcher" HOOK_CMD="$cmd" HOOK_ARGS="$args" \
     python3 <<'PYEOF'
 import json, os, sys
 
@@ -37,6 +43,7 @@ settings_path = os.environ["SETTINGS_FILE"]
 event         = os.environ["HOOK_EVENT"]
 matcher       = os.environ["HOOK_MATCHER"]
 cmd           = os.environ["HOOK_CMD"]
+args          = json.loads(os.environ["HOOK_ARGS"] or "[]")
 
 with open(settings_path) as f:
     data = json.load(f)
@@ -45,10 +52,14 @@ hooks       = data.setdefault("hooks", {})
 event_hooks = hooks.setdefault(event, [])
 
 for entry in event_hooks:
-    if any(h.get("command") == cmd for h in entry.get("hooks", [])):
+    if any(h.get("command") == cmd and (h.get("args") or []) == args
+           for h in entry.get("hooks", [])):
         sys.exit(0)  # already registered
 
-new_entry = {"hooks": [{"type": "command", "command": cmd}]}
+new_hook = {"type": "command", "command": cmd}
+if args:
+    new_hook["args"] = args
+new_entry = {"hooks": [new_hook]}
 if matcher:
     new_entry["matcher"] = matcher
 event_hooks.append(new_entry)
@@ -62,8 +73,8 @@ print("Registered {} hook in {}".format(label, settings_path))
 PYEOF
 }
 
-# ensure_hook_deregistered EVENT COMMAND SETTINGS_FILE
-#   Idempotently removes every hook whose "command" equals COMMAND from all
+# ensure_hook_deregistered EVENT COMMAND SETTINGS_FILE [ARGS_JSON]
+#   Idempotently removes every hook identified by COMMAND (and ARGS_JSON) from all
 #   entries under hooks.<EVENT> in SETTINGS_FILE. Entries that become empty
 #   after the removal are dropped entirely. The parent hooks.<EVENT> key is
 #   removed when it becomes an empty array.
@@ -71,7 +82,7 @@ PYEOF
 #   Prints a single status line on removal; nothing if already absent.
 #   Prints a warning to stderr and returns 0 if python3 is unavailable.
 ensure_hook_deregistered() {
-  local event="$1" cmd="$2" settings="$3"
+  local event="$1" cmd="$2" settings="$3" args="${4:-}"
 
   [[ -f "$settings" ]] || return 0
 
@@ -81,13 +92,14 @@ ensure_hook_deregistered() {
     return 0
   fi
 
-  SETTINGS_FILE="$settings" HOOK_EVENT="$event" HOOK_CMD="$cmd" \
+  SETTINGS_FILE="$settings" HOOK_EVENT="$event" HOOK_CMD="$cmd" HOOK_ARGS="$args" \
     python3 <<'PYEOF'
 import json, os, sys
 
 settings_path = os.environ["SETTINGS_FILE"]
 event         = os.environ["HOOK_EVENT"]
 cmd           = os.environ["HOOK_CMD"]
+args          = json.loads(os.environ["HOOK_ARGS"] or "[]")
 
 with open(settings_path) as f:
     data = json.load(f)
@@ -99,7 +111,8 @@ new_entries = []
 removed     = False
 for entry in event_hooks:
     original = entry.get("hooks", [])
-    remaining = [h for h in original if h.get("command") != cmd]
+    remaining = [h for h in original
+                 if not (h.get("command") == cmd and (h.get("args") or []) == args)]
     entry_changed = len(remaining) < len(original)
     if entry_changed:
         removed = True
@@ -128,19 +141,19 @@ print("Deregistered {} hook from {}".format(event, settings_path))
 PYEOF
 }
 
-# hook_registration_state EVENT COMMAND SETTINGS_FILE
+# hook_registration_state EVENT COMMAND SETTINGS_FILE [ARGS_JSON]
 #   Read-only probe: never writes. Returns 0 if a hook with COMMAND is
 #   registered under hooks.<EVENT>, 1 if it is not (including when
 #   SETTINGS_FILE is missing), and 2 if that cannot be determined (python3
 #   unavailable, or SETTINGS_FILE is not valid JSON). Prints nothing.
 hook_registration_state() {
-  local event="$1" cmd="$2" settings="$3"
+  local event="$1" cmd="$2" settings="$3" args="${4:-}"
 
   [[ -f "$settings" ]] || return 1
   command -v python3 >/dev/null 2>&1 || return 2
 
   local rc=0
-  SETTINGS_FILE="$settings" HOOK_EVENT="$event" HOOK_CMD="$cmd" \
+  SETTINGS_FILE="$settings" HOOK_EVENT="$event" HOOK_CMD="$cmd" HOOK_ARGS="$args" \
     python3 <<'PYEOF' || rc=$?
 import json, os, sys
 
@@ -148,8 +161,9 @@ try:
     with open(os.environ["SETTINGS_FILE"]) as f:
         data = json.load(f)
     entries = data.get("hooks", {}).get(os.environ["HOOK_EVENT"], [])
+    want = json.loads(os.environ["HOOK_ARGS"] or "[]")
     found = any(
-        h.get("command") == os.environ["HOOK_CMD"]
+        h.get("command") == os.environ["HOOK_CMD"] and (h.get("args") or []) == want
         for entry in entries
         for h in entry.get("hooks", [])
     )
@@ -158,4 +172,67 @@ except Exception:
 sys.exit(0 if found else 1)
 PYEOF
   return "$rc"
+}
+
+# migrate_hook_to_exec_form EVENT SHELL_COMMAND COMMAND ARGS_JSON SETTINGS_FILE
+#   Rewrites, in place, every shell-form hook whose "command" is SHELL_COMMAND
+#   (no "args") under hooks.<EVENT> to the exec form COMMAND + ARGS_JSON,
+#   keeping its position and any other keys (timeout, ...). If the exec form is
+#   already registered in the same entry, the shell-form duplicate is dropped
+#   instead. Silent no-op when nothing matches or SETTINGS_FILE is missing.
+#   Prints a single status line when it rewrites; warns on stderr and returns 0
+#   if python3 is unavailable.
+migrate_hook_to_exec_form() {
+  local event="$1" shell_cmd="$2" cmd="$3" args="$4" settings="$5"
+
+  [[ -f "$settings" ]] || return 0
+
+  if ! command -v python3 >/dev/null 2>&1; then
+    printf 'Warning: python3 not found — cannot migrate %s hook in %s\n' \
+      "$event" "$settings" >&2
+    return 0
+  fi
+
+  SETTINGS_FILE="$settings" HOOK_EVENT="$event" HOOK_SHELL_CMD="$shell_cmd" \
+    HOOK_CMD="$cmd" HOOK_ARGS="$args" \
+    python3 <<'PYEOF'
+import json, os, sys
+
+settings_path = os.environ["SETTINGS_FILE"]
+event         = os.environ["HOOK_EVENT"]
+shell_cmd     = os.environ["HOOK_SHELL_CMD"]
+cmd           = os.environ["HOOK_CMD"]
+args          = json.loads(os.environ["HOOK_ARGS"])
+
+with open(settings_path) as f:
+    data = json.load(f)
+
+def is_shell(h):
+    return h.get("command") == shell_cmd and not h.get("args")
+
+def is_exec(h):
+    return h.get("command") == cmd and (h.get("args") or []) == args
+
+changed = False
+for entry in data.get("hooks", {}).get(event, []):
+    hooks = entry.get("hooks", [])
+    out = []
+    for h in hooks:
+        if is_shell(h):
+            changed = True
+            if any(is_exec(o) for o in hooks):
+                continue  # exec form already there: drop the duplicate
+            h = dict(h, command=cmd, args=args)
+        out.append(h)
+    entry["hooks"] = out
+
+if not changed:
+    sys.exit(0)
+
+with open(settings_path, "w") as f:
+    json.dump(data, f, indent=4)
+    f.write("\n")
+
+print("Migrated {} hook to exec form in {}".format(event, settings_path))
+PYEOF
 }

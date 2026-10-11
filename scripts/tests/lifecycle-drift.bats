@@ -32,11 +32,17 @@ teardown() {
   # Registered: every hook row, as a non-dangling command.
   run grep -c "$HOME/.claude/skills/" "$HOME/.claude/settings.json"
   [ "$output" -ge 4 ]
+  # Exec form: command "node" plus args, never a shell-quoted command string.
+  run grep -c '"command": "node"' "$HOME/.claude/settings.json"
+  [ "$output" -ge 4 ]
+  run grep -c 'node \\"' "$HOME/.claude/settings.json"
+  [ "$output" = "0" ]
   [ -L "$HOME/.claude/skills/worktree-core" ]
 
   run bash "$FAKE_REPO/doctor.sh"
   assert_success
   assert_output_contains "no dangling hook entries or symlinks"
+  assert_output_contains "no shell-form hook entries"
 
   run bash "$FAKE_REPO/teardown.sh"
   assert_success

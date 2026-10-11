@@ -30,8 +30,9 @@
 #   relink            <src> <dest> <old>     replace a stale symlink (old = target)
 #   unlink            <reason> <path> <old>  remove a symlink; reason is
 #                                            opted-out | superseded
-#   register-hook     <event> <cmd> [matcher]    matcher omitted when empty
-#   deregister-hook   <event> <cmd>
+#   register-hook     <event> <cmd> <args-json> [matcher]   exec form; matcher omitted when empty
+#   deregister-hook   <event> <cmd> [args-json]   args-json omitted for a shell-form <cmd>
+#   migrate-hook      <event> <shell-cmd> <cmd> <args-json>   rewrite shell form to exec form
 #   skip-plugin       <name> <reason>        informational: plugin left out
 #   skip-command      <dest> <reason> <name> informational: command left out
 #   warn-foreign-symlink <dest> <target>     informational: not ours, left alone
@@ -274,10 +275,11 @@ plan_plugin_links() {
 
 # Hook registration. Each hook's current state comes from hook_registration_state
 # (scripts/settings-lib.sh): 0 registered, 1 not, 2 cannot tell (no python3),
-# in which case the action is still planned so the applier reports it.
+# in which case the action is still planned so the applier reports it. A hook
+# is registered in exec form (command + args); earlier shell-form entries are
+# migrated in place, and retired .sh registrations are dropped.
 plan_hooks() {
-  local settings="$HOME/.claude/settings.json" i rc
-  # Migration: drop retired .sh shim registrations before (re)registering.
+  local settings="$HOME/.claude/settings.json" i rc_exec rc_shell rc
   for i in "${!PLUGIN_HOOK_EVENTS[@]}"; do
     rc=0
     hook_registration_state "${PLUGIN_HOOK_EVENTS[$i]}" "${PLUGIN_HOOK_LEGACY_CMDS[$i]}" "$settings" || rc=$?
@@ -286,19 +288,31 @@ plan_hooks() {
     fi
   done
   for i in "${!PLUGIN_HOOK_EVENTS[@]}"; do
-    rc=0
-    hook_registration_state "${PLUGIN_HOOK_EVENTS[$i]}" "${PLUGIN_HOOK_CMDS[$i]}" "$settings" || rc=$?
+    rc_exec=0
+    rc_shell=0
+    hook_registration_state "${PLUGIN_HOOK_EVENTS[$i]}" "${PLUGIN_HOOK_CMDS[$i]}" "$settings" \
+      "${PLUGIN_HOOK_ARGS_JSON[$i]}" || rc_exec=$?
+    hook_registration_state "${PLUGIN_HOOK_EVENTS[$i]}" "${PLUGIN_HOOK_SHELL_CMDS[$i]}" "$settings" || rc_shell=$?
     if ! is_skipped "${PLUGIN_HOOK_FEATURES[$i]}"; then
-      if [[ "$rc" != 0 ]]; then
+      if [[ "$rc_shell" == 0 ]]; then
+        printf 'migrate-hook\t%s\t%s\t%s\t%s\n' "${PLUGIN_HOOK_EVENTS[$i]}" \
+          "${PLUGIN_HOOK_SHELL_CMDS[$i]}" "${PLUGIN_HOOK_CMDS[$i]}" "${PLUGIN_HOOK_ARGS_JSON[$i]}"
+      elif [[ "$rc_exec" != 0 ]]; then
+        printf 'register-hook\t%s\t%s\t%s' "${PLUGIN_HOOK_EVENTS[$i]}" \
+          "${PLUGIN_HOOK_CMDS[$i]}" "${PLUGIN_HOOK_ARGS_JSON[$i]}"
         if [[ -n "${PLUGIN_HOOK_MATCHERS[$i]}" ]]; then
-          printf 'register-hook\t%s\t%s\t%s\n' "${PLUGIN_HOOK_EVENTS[$i]}" \
-            "${PLUGIN_HOOK_CMDS[$i]}" "${PLUGIN_HOOK_MATCHERS[$i]}"
-        else
-          printf 'register-hook\t%s\t%s\n' "${PLUGIN_HOOK_EVENTS[$i]}" "${PLUGIN_HOOK_CMDS[$i]}"
+          printf '\t%s' "${PLUGIN_HOOK_MATCHERS[$i]}"
         fi
+        printf '\n'
       fi
-    elif [[ "$rc" != 1 ]]; then
-      printf 'deregister-hook\t%s\t%s\n' "${PLUGIN_HOOK_EVENTS[$i]}" "${PLUGIN_HOOK_CMDS[$i]}"
+    else
+      if [[ "$rc_exec" != 1 ]]; then
+        printf 'deregister-hook\t%s\t%s\t%s\n' "${PLUGIN_HOOK_EVENTS[$i]}" \
+          "${PLUGIN_HOOK_CMDS[$i]}" "${PLUGIN_HOOK_ARGS_JSON[$i]}"
+      fi
+      if [[ "$rc_shell" != 1 ]]; then
+        printf 'deregister-hook\t%s\t%s\n' "${PLUGIN_HOOK_EVENTS[$i]}" "${PLUGIN_HOOK_SHELL_CMDS[$i]}"
+      fi
     fi
   done
 }

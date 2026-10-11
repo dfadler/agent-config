@@ -549,11 +549,11 @@ _add_memory_hygiene_hook_fixture() {
   _add_worktree_core_fixture
   run_setup
   assert_success
-  HOOK_CMD="node \"$HOME/.claude/skills/worktree-core/scripts/ts/require-worktree-hook.ts\""
+  HOOK_CMD="node $HOME/.claude/skills/worktree-core/scripts/ts/require-worktree-hook.ts"
   run python3 -c "
 import json, sys
 d = json.load(open('$HOME/.claude/settings.json'))
-cmds = [h['command'] for e in d.get('hooks', {}).get('PreToolUse', []) for h in e.get('hooks', [])]
+cmds = [' '.join([h['command']] + h.get('args', [])) for e in d.get('hooks', {}).get('PreToolUse', []) for h in e.get('hooks', [])]
 sys.exit(0 if '$HOOK_CMD' in cmds else 1)
 "
   [ "$status" -eq 0 ]
@@ -565,11 +565,11 @@ sys.exit(0 if '$HOOK_CMD' in cmds else 1)
   assert_success
   run_setup
   assert_success
-  HOOK_CMD="node \"$HOME/.claude/skills/worktree-core/scripts/ts/require-worktree-hook.ts\""
+  HOOK_CMD="node $HOME/.claude/skills/worktree-core/scripts/ts/require-worktree-hook.ts"
   run python3 -c "
 import json
 d = json.load(open('$HOME/.claude/settings.json'))
-cmds = [h['command'] for e in d.get('hooks', {}).get('PreToolUse', []) for h in e.get('hooks', [])]
+cmds = [' '.join([h['command']] + h.get('args', [])) for e in d.get('hooks', {}).get('PreToolUse', []) for h in e.get('hooks', [])]
 count = cmds.count('$HOOK_CMD')
 assert count == 1, 'expected 1, got {}'.format(count)
 "
@@ -582,11 +582,11 @@ assert count == 1, 'expected 1, got {}'.format(count)
   assert_success
   run_setup_with --skip=worktree-core
   assert_success
-  HOOK_CMD="node \"$HOME/.claude/skills/worktree-core/scripts/ts/require-worktree-hook.ts\""
+  HOOK_CMD="node $HOME/.claude/skills/worktree-core/scripts/ts/require-worktree-hook.ts"
   run python3 -c "
 import json
 d = json.load(open('$HOME/.claude/settings.json'))
-cmds = [h['command'] for e in d.get('hooks', {}).get('PreToolUse', []) for h in e.get('hooks', [])]
+cmds = [' '.join([h['command']] + h.get('args', [])) for e in d.get('hooks', {}).get('PreToolUse', []) for h in e.get('hooks', [])]
 assert '$HOOK_CMD' not in cmds, 'hook still present after skip'
 "
   [ "$status" -eq 0 ]
@@ -596,13 +596,13 @@ assert '$HOOK_CMD' not in cmds, 'hook still present after skip'
   _add_worktree_core_fixture
   run_setup
   assert_success
-  SYMLINK_CMD="node \"$HOME/.claude/skills/worktree-core/scripts/ts/check-worktree-symlinks-hook.ts\""
-  PRUNE_CMD="node \"$HOME/.claude/skills/worktree-core/scripts/ts/prune-merged-worktrees-hook.ts\""
+  SYMLINK_CMD="node $HOME/.claude/skills/worktree-core/scripts/ts/check-worktree-symlinks-hook.ts"
+  PRUNE_CMD="node $HOME/.claude/skills/worktree-core/scripts/ts/prune-merged-worktrees-hook.ts"
   run python3 -c "
 import json, sys
 d = json.load(open('$HOME/.claude/settings.json'))
 entries = d.get('hooks', {}).get('SessionStart', [])
-cmds = [h['command'] for e in entries for h in e.get('hooks', [])]
+cmds = [' '.join([h['command']] + h.get('args', [])) for e in entries for h in e.get('hooks', [])]
 assert '$SYMLINK_CMD' in cmds, 'symlink-check hook missing'
 assert '$PRUNE_CMD' in cmds, 'auto-prune hook missing'
 assert all('matcher' not in e for e in entries), 'SessionStart entry should have no matcher key'
@@ -616,12 +616,12 @@ assert all('matcher' not in e for e in entries), 'SessionStart entry should have
   assert_success
   run_setup_with --skip=worktree-core
   assert_success
-  SYMLINK_CMD="node \"$HOME/.claude/skills/worktree-core/scripts/ts/check-worktree-symlinks-hook.ts\""
-  PRUNE_CMD="node \"$HOME/.claude/skills/worktree-core/scripts/ts/prune-merged-worktrees-hook.ts\""
+  SYMLINK_CMD="node $HOME/.claude/skills/worktree-core/scripts/ts/check-worktree-symlinks-hook.ts"
+  PRUNE_CMD="node $HOME/.claude/skills/worktree-core/scripts/ts/prune-merged-worktrees-hook.ts"
   run python3 -c "
 import json
 d = json.load(open('$HOME/.claude/settings.json'))
-cmds = [h['command'] for e in d.get('hooks', {}).get('SessionStart', []) for h in e.get('hooks', [])]
+cmds = [' '.join([h['command']] + h.get('args', [])) for e in d.get('hooks', {}).get('SessionStart', []) for h in e.get('hooks', [])]
 assert '$SYMLINK_CMD' not in cmds, 'symlink-check hook still present after skip'
 assert '$PRUNE_CMD' not in cmds, 'auto-prune hook still present after skip'
 "
@@ -632,12 +632,12 @@ assert '$PRUNE_CMD' not in cmds, 'auto-prune hook still present after skip'
   _add_memory_hygiene_hook_fixture
   run_setup
   assert_success
-  HOOK_CMD="node \"$HOME/.claude/skills/memory-hygiene/scripts/ts/memory-hygiene-stop-hook.ts\""
+  HOOK_CMD="node $HOME/.claude/skills/memory-hygiene/scripts/ts/memory-hygiene-stop-hook.ts"
   run python3 -c "
 import json, sys
 d = json.load(open('$HOME/.claude/settings.json'))
 entries = d.get('hooks', {}).get('Stop', [])
-cmds = [h['command'] for e in entries for h in e.get('hooks', [])]
+cmds = [' '.join([h['command']] + h.get('args', [])) for e in entries for h in e.get('hooks', [])]
 assert '$HOOK_CMD' in cmds, 'memory-hygiene hook missing'
 assert all('matcher' not in e for e in entries), 'Stop entry should have no matcher key'
 "
@@ -650,11 +650,11 @@ assert all('matcher' not in e for e in entries), 'Stop entry should have no matc
   assert_success
   run_setup_with --skip=memory-hygiene
   assert_success
-  HOOK_CMD="node \"$HOME/.claude/skills/memory-hygiene/scripts/ts/memory-hygiene-stop-hook.ts\""
+  HOOK_CMD="node $HOME/.claude/skills/memory-hygiene/scripts/ts/memory-hygiene-stop-hook.ts"
   run python3 -c "
 import json
 d = json.load(open('$HOME/.claude/settings.json'))
-cmds = [h['command'] for e in d.get('hooks', {}).get('Stop', []) for h in e.get('hooks', [])]
+cmds = [' '.join([h['command']] + h.get('args', [])) for e in d.get('hooks', {}).get('Stop', []) for h in e.get('hooks', [])]
 assert '$HOOK_CMD' not in cmds, 'hook still present after skip'
 "
   [ "$status" -eq 0 ]
@@ -679,11 +679,76 @@ PY
   run python3 -c "
 import json
 d = json.load(open('$HOME/.claude/settings.json'))
-cmds = [h['command'] for ev in d['hooks'].values() for e in ev for h in e['hooks']]
+cmds = [' '.join([h['command']] + h.get('args', [])) for ev in d['hooks'].values() for e in ev for h in e['hooks']]
 assert '$LEGACY' not in cmds and '$LEGACY_MH' not in cmds, cmds
-assert 'node \"$HOME/.claude/skills/worktree-core/scripts/ts/require-worktree-hook.ts\"' in cmds, cmds
-assert 'node \"$HOME/.claude/skills/memory-hygiene/scripts/ts/memory-hygiene-stop-hook.ts\"' in cmds, cmds
+assert 'node $HOME/.claude/skills/worktree-core/scripts/ts/require-worktree-hook.ts' in cmds, cmds
+assert 'node $HOME/.claude/skills/memory-hygiene/scripts/ts/memory-hygiene-stop-hook.ts' in cmds, cmds
 assert 'foreign-stop' in cmds, cmds
+"
+  [ "$status" -eq 0 ]
+}
+
+@test "hook registration: hooks are registered in exec form (command node + args), not shell form" {
+  _add_worktree_core_fixture
+  run_setup
+  assert_success
+  run python3 -c "
+import json
+d = json.load(open('$HOME/.claude/settings.json'))
+hooks = [h for e in d['hooks']['PreToolUse'] for h in e['hooks']]
+assert hooks == [{'type': 'command', 'command': 'node',
+                  'args': ['$HOME/.claude/skills/worktree-core/scripts/ts/require-worktree-hook.ts']}], hooks
+"
+  [ "$status" -eq 0 ]
+}
+
+@test "hook migration: setup rewrites a shell-form registration to exec form in place, then is idempotent" {
+  _add_worktree_core_fixture
+  mkdir -p "$HOME/.claude"
+  SHELL_CMD="node \"$HOME/.claude/skills/worktree-core/scripts/ts/require-worktree-hook.ts\""
+  python3 - "$HOME/.claude/settings.json" "$SHELL_CMD" <<'PY'
+import json, sys
+json.dump({"hooks": {"PreToolUse": [{"matcher": "Edit|Write", "hooks": [
+  {"type": "command", "command": "foreign-before"},
+  {"type": "command", "command": sys.argv[2], "timeout": 7}]}]}}, open(sys.argv[1], "w"))
+PY
+  run_setup
+  assert_success
+  assert_output_contains "Migrated PreToolUse hook to exec form"
+  run python3 -c "
+import json
+d = json.load(open('$HOME/.claude/settings.json'))
+entry = d['hooks']['PreToolUse'][0]
+assert entry['matcher'] == 'Edit|Write' and len(d['hooks']['PreToolUse']) == 1, d
+hooks = entry['hooks']
+assert hooks[0]['command'] == 'foreign-before', hooks
+assert hooks[1] == {'type': 'command', 'command': 'node', 'timeout': 7,
+    'args': ['$HOME/.claude/skills/worktree-core/scripts/ts/require-worktree-hook.ts']}, hooks
+assert len(hooks) == 2, hooks
+"
+  [ "$status" -eq 0 ]
+  before="$(cat "$HOME/.claude/settings.json")"
+  run_setup
+  assert_success
+  [ "$(cat "$HOME/.claude/settings.json")" = "$before" ]
+}
+
+@test "hook migration: --skip deregisters both the shell-form and exec-form entries" {
+  _add_worktree_core_fixture
+  mkdir -p "$HOME/.claude"
+  python3 - "$HOME/.claude/settings.json" "$HOME/.claude/skills/worktree-core/scripts/ts/require-worktree-hook.ts" <<'PY'
+import json, sys
+p = sys.argv[2]
+json.dump({"hooks": {"PreToolUse": [{"matcher": "Edit|Write", "hooks": [
+  {"type": "command", "command": 'node "%s"' % p},
+  {"type": "command", "command": "node", "args": [p]}]}]}}, open(sys.argv[1], "w"))
+PY
+  run_setup_with --skip=worktree-core
+  assert_success
+  run python3 -c "
+import json
+d = json.load(open('$HOME/.claude/settings.json'))
+assert 'PreToolUse' not in d.get('hooks', {}), d
 "
   [ "$status" -eq 0 ]
 }

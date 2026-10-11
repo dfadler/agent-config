@@ -19,13 +19,8 @@ import {
 } from "node:fs";
 import { dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
-import { deregisterHook, isRecord, type JsonObject } from "./hook-settings.ts";
-import {
-  HOOK_TABLE_FILE,
-  legacyCommand,
-  parseHookTable,
-  shellCommand,
-} from "./hook-table.ts";
+import { deregisterHook, hookIs, isRecord, type JsonObject } from "./hook-settings.ts";
+import { allHookForms, HOOK_TABLE_FILE, parseHookTable } from "./hook-table.ts";
 import { EXIT_FAILURE, EXIT_OK, EXIT_USAGE } from "./lib/exit-codes.ts";
 
 // Must match scripts/claude-md-lib.sh (teardown.test.ts asserts they do).
@@ -150,7 +145,10 @@ export const restoreClaudeMd = (home: string, repoRoot: string, log: Log): void 
   }
 };
 
-/** Deregister every hook-table command (current and retired) from settings.json. */
+/**
+ * Deregister every hook-table hook from settings.json, in every form it has
+ * been registered in: exec (current), shell, and the retired .sh path.
+ */
 export const deregisterPluginHooks = (home: string, repoRoot: string, log: Log): number => {
   const settings = join(home, ".claude", "settings.json");
   if (!existsSync(settings)) return EXIT_OK;
@@ -169,8 +167,8 @@ export const deregisterPluginHooks = (home: string, repoRoot: string, log: Log):
   if (!isRecord(data)) return EXIT_OK;
   let current: JsonObject = data;
   for (const row of table.value) {
-    for (const cmd of [shellCommand(row, home), legacyCommand(row, home)]) {
-      const next = deregisterHook(current, row.event, (h) => h["command"] === cmd);
+    for (const form of allHookForms(row, home)) {
+      const next = deregisterHook(current, row.event, (h) => hookIs(h, form));
       if (next !== undefined) {
         current = next;
         writeFileSync(settings, `${JSON.stringify(current, null, 4)}\n`);
