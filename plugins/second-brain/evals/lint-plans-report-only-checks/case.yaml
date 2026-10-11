@@ -1,0 +1,57 @@
+# Run (one case at a time, #536/#538): claude plugin eval plugins/second-brain --case lint-plans-report-only-checks --trust-plugin --no-publish
+# Shared run/grant facts: docs/contributing.md, "Plugin evals". No grant needed (Skill only).
+# Reply-only, free graders: asks the model to name the checks it would run and whether it would
+# edit anything. A baseline lists generic checks; only the skill body knows the ambiguous-wikilink
+# check and the 00 Inbox orphan exemption (skill_specific_checks), and the first run showed the
+# generic graders alone give delta 0.
+# Sabotage map: grader patterns quote "Step 2: Run the checks" (wikilinks, orphans,
+# frontmatter, empty sections) and the Contract's "Does not: modify" line.
+# Can fail: skill_fired fails if the description stops matching a "lint my vault" request;
+# lists_checks fails if a check is dropped; states_report_only fails if the reply offers to fix.
+schema_version: "1.1"
+name: lint-plans-report-only-checks
+description: >
+  Asked to lint the second-brain vault, the model invokes lint and lists the checks it would
+  run, stating it will not edit notes. expected_outcome: PASS when the skill fires, the reply
+  names wikilinks, orphans, frontmatter and empty sections, and says it will not modify notes;
+  FAIL otherwise.
+tags: [second-brain, lint, trigger, quick]
+
+execution:
+  prompt: |
+    SECOND_BRAIN_VAULT_PATH is set to /vault. Lint my second brain vault.
+
+    Don't call any tools other than skills (the vault is not connected here). Instead list
+    the checks you would run, and say whether you would change any notes. Max 8 lines.
+  max_turns: 6
+  allowed_tools:
+    - Skill
+
+graders:
+  - name: skill_fired
+    type: tool_used
+    tool: Skill
+    input_match: '"skill"\s*:\s*"(?:[\w-]+:)?lint"'
+    min: 1
+    arm: with-only
+
+  - name: lists_checks
+    type: regex
+    target: last_message
+    pattern: '(?=[\s\S]*wikilink)(?=[\s\S]*orphan)(?=[\s\S]*frontmatter)(?=[\s\S]*empty)'
+    flags: i
+    match: contains
+
+  - name: skill_specific_checks
+    type: regex
+    target: last_message
+    pattern: '(?=[\s\S]*ambiguous)(?=[\s\S]*inbox)'
+    flags: i
+    match: contains
+
+  - name: states_report_only
+    type: regex
+    target: last_message
+    pattern: '(?:not|never|won.t|no)\b[^\n]{0,40}\b(?:modify|edit|change|fix|write)|report[- ]only|read[- ]only'
+    flags: i
+    match: contains

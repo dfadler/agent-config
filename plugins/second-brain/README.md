@@ -19,6 +19,9 @@ no-oping.
 
 - **`capture`** — save notes, decisions, links, and other information to the vault.
 - **`query`** — answer questions by searching and reading the vault.
+- **`lint`** — report-only vault health check against the PARA layout: dead or
+  ambiguous wikilinks, orphans, missing `date`/`tags` frontmatter, empty sections.
+  Never edits notes.
 - **`sync`** — sync vault notes with their Slack canvas sources and fill in
   missing documentation summaries.
 - **`config`** — internal primitive that reads and merges YAML frontmatter
