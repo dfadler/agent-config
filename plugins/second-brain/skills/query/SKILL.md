@@ -1,6 +1,9 @@
 ---
 name: query
 description: |
+  ALWAYS invoke this skill first when asked to check, search or look up the second
+  brain or vault ("check my second brain", "what did we decide about"), even if told
+  to only list the tools you would call; it defines the search plan.
   Answer questions by searching and reading the second-brain Obsidian vault.
   Use when the user asks about something that might already be captured —
   recalling a decision, finding context about a system or person, reviewing

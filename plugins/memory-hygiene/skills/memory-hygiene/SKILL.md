@@ -1,6 +1,9 @@
 ---
 name: memory-hygiene
 description: |
+  ALWAYS invoke this skill first, before writing any auto-memory file, when asked to
+  write, record, correct, supersede or prune a memory, even if the reply is only the
+  file's contents; it defines the `family/description` name and supersession markers.
   Naming, staleness, and conflict conventions for Claude Code's auto-memory files
   (`MEMORY.md` and the topic files it indexes). Use when writing, updating, or
   pruning a memory, or doing a memory review pass.

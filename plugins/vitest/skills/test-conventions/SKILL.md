@@ -1,6 +1,9 @@
 ---
 name: test-conventions
 description: |
+  ALWAYS invoke this skill first before advising on or changing `vitest.config.ts` or any
+  Vitest test, including "speed up Vitest", isolation, shuffle or coverage-threshold
+  changes, even when only giving advice.
   Conventions for writing or editing Vitest tests (`*.test.ts`, `*.spec.ts`) and
   `vitest.config.ts`: isolation under shuffled order, determinism, mock hygiene, and
   coverage thresholds. Use when adding or changing a Vitest test or its config. For
