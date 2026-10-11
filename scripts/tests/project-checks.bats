@@ -131,6 +131,25 @@ write_rules() {
   refute_output_contains "is not set"
 }
 
+@test "worktrees: ignored results or a keep name are listed as not safe to remove" {
+  mkdir -p "$HOME/.claude/skills"
+  ln -s "$REPO_ROOT/plugins/worktree-core" "$HOME/.claude/skills/worktree-core"
+  echo "results/" >"$PROJ/.gitignore"
+  git -C "$PROJ" add .gitignore
+  git -C "$PROJ" -c user.name=t -c user.email=t@example.com commit -q -m ignore
+  git -C "$PROJ" worktree add -q "$PROJ/.claude/worktrees/evals" -b evals
+  git -C "$PROJ" worktree add -q "$PROJ/.claude/worktrees/plain" -b plain
+  git -C "$PROJ" worktree add -q "$PROJ/.claude/worktrees/keep-me" -b keepme
+  mkdir -p "$PROJ/.claude/worktrees/evals/results"
+  echo x >"$PROJ/.claude/worktrees/evals/results/run1.json"
+  run_doctor
+  assert_success
+  assert_output_contains "not safe to remove"
+  assert_output_contains "evals — holds gitignored content (results/)"
+  assert_output_contains "keep-me — name contains 'keep'"
+  refute_output_contains "plain —"
+}
+
 @test "worktrees: outside a git repo the worktree check is skipped" {
   PROJ="$SANDBOX/plain"
   mkdir -p "$PROJ/.claude"
