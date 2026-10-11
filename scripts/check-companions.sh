@@ -1505,7 +1505,10 @@ check_worktree_hygiene() {
   # Same rules as the prune hook (shared code): locked, 'keep' in the name, or
   # gitignored content other than node_modules.
   local prune="$HOME/.claude/skills/worktree-core/scripts/ts/prune-merged-worktrees.ts" risky=""
-  [[ -f "$prune" ]] && risky="$(cd "$proj" && node "$prune" --unsafe 2>/dev/null || true)"
+  if [[ -f "$prune" ]]; then
+    risky="$(cd "$proj" && node "$prune" --unsafe 2>/dev/null)" ||
+      echo "⚠ could not check which worktrees are safe to remove ('node $prune --unsafe' failed)" >&2
+  fi
   if [[ -n "$risky" ]]; then
     echo "ℹ worktrees not safe to remove (prune will not touch them):" >&2
     while IFS= read -r path; do echo "    $path" >&2; done <<<"$risky"

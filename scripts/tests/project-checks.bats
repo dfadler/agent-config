@@ -150,6 +150,15 @@ write_rules() {
   refute_output_contains "plain —"
 }
 
+@test "worktrees: a failing safety check warns instead of staying silent" {
+  mkdir -p "$HOME/.claude/skills/worktree-core/scripts/ts"
+  echo 'process.exit(1)' >"$HOME/.claude/skills/worktree-core/scripts/ts/prune-merged-worktrees.ts"
+  git -C "$PROJ" worktree add -q "$PROJ/.claude/worktrees/plain" -b plain
+  run_doctor
+  assert_success
+  assert_output_contains "could not check which worktrees are safe to remove"
+}
+
 @test "worktrees: a locked worktree is listed as not safe to remove" {
   mkdir -p "$HOME/.claude/skills"
   ln -s "$REPO_ROOT/plugins/worktree-core" "$HOME/.claude/skills/worktree-core"
