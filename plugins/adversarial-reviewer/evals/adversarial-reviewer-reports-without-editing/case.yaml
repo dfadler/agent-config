@@ -97,3 +97,11 @@ graders:
     pattern: '(?:download\.ts:|[Ll]ines? )\d+'
     match: contains
     weight: 0.5
+
+  # Each finding names the tainted input, so a generic security lecture does not pass.
+  - name: names_tainted_query_input
+    type: regex
+    target: last_message
+    pattern: 'req\.query|query (param|string)|owner'
+    flags: i
+    match: contains
