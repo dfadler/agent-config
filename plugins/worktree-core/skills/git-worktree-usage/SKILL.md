@@ -1,8 +1,8 @@
 ---
 name: git-worktree-usage
 description: |
-  Git worktree and branch mechanics for isolating non-trivial work: creating
-  worktrees with `EnterWorktree` (never raw `git worktree add`), locking and
+  Create worktrees with the `EnterWorktree` tool, never raw `git worktree add`.
+  Git worktree and branch mechanics for isolating non-trivial work: locking and
   the stale-worktree sweep, picking what to parallelize by file surface, the
   repo-wide `git stash` collision hazard and its `git restore` alternative,
   branch naming, catching a branch up to a moved `main` via merge (not
@@ -22,6 +22,8 @@ metadata:
 ---
 
 # Git & worktree usage
+
+**Create worktrees with the `EnterWorktree` tool, never raw `git worktree add`.**
 
 This is the *mechanics* skill for git worktrees, branches, and conflict/PR-
 splitting workflows — not the policy of *when* isolation is required (that
