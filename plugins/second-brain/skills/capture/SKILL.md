@@ -61,7 +61,7 @@ Every note starts with:
 
 ```yaml
 ---
-date: YYYY-MM-DD
+date: 2026-10-05   # the date the user stated ("Today is 2026-10-05"), else the system date
 tags: [relevant, tags]
 ---
 ```
