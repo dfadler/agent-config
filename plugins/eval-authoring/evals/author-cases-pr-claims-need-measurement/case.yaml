@@ -1,6 +1,6 @@
 # Run: node plugins/eval-authoring/scripts/ts/run-evals/run-evals.ts --tier standard --case author-cases-pr-claims-need-measurement plugins/eval-authoring
 # Shared run/grant facts: docs/contributing.md, "Plugin evals". No grant; reply-only.
-# Covers the author-cases step 8 rule that a PR changing skill text reports with/without/delta
+# Covers the author-cases step 7 and 9 rules that a PR changing skill text reports with/without/delta
 # and does not claim an improvement the evals do not show. Run with the default two arms.
 # Can fail: reports_baseline_gap fails if the reply never says the without-plugin run is
 # missing; no_improvement_claim fails if the reply states the change improves or proves the
@@ -43,7 +43,7 @@ graders:
     flags: i
     match: contains
 
-  # The two figures only author-cases step 8 teaches (5 runs per arm to claim a delta; a
+  # The two figures only author-cases steps 7 and 9 teach (5 runs per arm to claim a delta; a
   # no-plugin baseline at or above 0.9 means the case does not discriminate).
   - name: states_five_run_minimum
     type: regex

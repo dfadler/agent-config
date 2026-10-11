@@ -60,15 +60,17 @@ cannot decide.
    recorded per case. Faking a CLI or MCP server: [fixtures and
    mocks](references/fixtures-and-mocks.md). Testing a plugin's agents:
    [agents](references/agents.md).
-7. **Lint.** `node ${CLAUDE_SKILL_DIR}/../../scripts/ts/lint/cli.ts <plugin-path>` (Node 22
+7. **Check the baseline.** Before trusting a new case, run it once without the plugin. A
+   baseline score of 0.9 or more means the prompt hands over the answer: rewrite it or
+   drop the case. A case that cannot separate the arms is a regression guard, not
+   evidence the skill helps.
+8. **Lint.** `node ${CLAUDE_SKILL_DIR}/../../scripts/ts/lint/cli.ts <plugin-path>` (Node 22
    or later). Fix every error. Fix each warning or write down why it is intended.
-8. **Review and hand off.** Ask the [case-reviewer agent](../../agents/case-reviewer.md)
+9. **Review and hand off.** Ask the [case-reviewer agent](../../agents/case-reviewer.md)
    for the judgment pass, if available (invocation recipe in the agent file). Then give the user the run command from the
    [run-evals](../run-evals/SKILL.md) skill. Do not run paid
    evals yourself: agent sessions usually cannot authenticate, and `--scaffold` is manual
-   opt-in only. Before trusting a new case, run it once without the plugin: a baseline at
-   or above 0.9 means the prompt hands over the answer, so rewrite it or drop the case.
-   A PR that adds or changes cases, or changes a skill or agent that has cases, carries an
+   opt-in only. A PR that adds or changes cases, or changes a skill or agent that has cases, carries an
    "Eval results" section (the run-evals summary, with the before score from the newest
    `evals/results/` run next to the after score, and 5 runs per arm or more to claim a
    delta), or says why it has none. The PR body states what was measured (with, without,
