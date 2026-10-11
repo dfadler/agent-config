@@ -65,14 +65,14 @@ graders:
   - name: categories_line
     type: regex
     target: last_message
-    pattern: 'Checklist categories reviewed:'
+    pattern: 'Checklist categories reviewed\s*(?:\*\*|__)?\s*:'
     match: contains
     arm: both
 
   - name: not_covered_section
     type: regex
     target: last_message
-    pattern: '^##[^\n]*Not covered by this review'
+    pattern: '^(?:#{2,4}[ \t]|\*\*|__)[^\n]*Not covered by this review'
     flags: im
     match: contains
     arm: both

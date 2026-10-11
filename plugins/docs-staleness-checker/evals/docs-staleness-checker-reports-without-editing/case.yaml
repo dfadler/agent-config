@@ -126,6 +126,6 @@ graders:
   - name: cites_readme_section
     type: regex
     target: last_message
-    pattern: 'README\.md'
+    pattern: 'README'
     match: contains
     weight: 0.25

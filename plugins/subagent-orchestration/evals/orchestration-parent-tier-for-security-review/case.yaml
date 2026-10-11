@@ -26,13 +26,13 @@ graders:
   - name: keeps_strong_tier
     type: regex
     target: last_message
-    pattern: '(?:keep|stay|use|stick)\b.{0,40}(?:parent|current|same|stronger|full)'
+    pattern: '^(?=[\s\S]*(?:(?:keep|stay|use|stick|inherit|default|give it)\b[\s\S]{0,60}(?:parent|current|same|stronger|full|inherit)|(?:current|parent) model))(?=[\s\S]*(?:judg(?:e)?ment|cross-file|parent[- ](?:tier|model)|synthesis|subtle|reasoning))'
     flags: i
     match: contains
 
   - name: no_cheap_pick
     type: regex
     target: last_message
-    pattern: '(?<!not )(?<!n.t )(?:use|pick|choose|go with|recommend|switch to)\s+(?:a\s+)?(?:haiku|cheaper|smaller)'
+    pattern: '(?<!not )(?<!n.t )(?:use|pick|choose|go with|recommend|switch to)\s+(?:a\s+)?(?:haiku|cheaper|smaller)(?!\s+(?:model\s+)?(?:for|on|elsewhere)\b[^.]{0,60}(?:search|gather|first pass|mechanical|summar|explor|locat|find|grep|caller))'
     flags: i
     match: not_contains

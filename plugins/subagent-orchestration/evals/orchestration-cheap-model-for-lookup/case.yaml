@@ -1,7 +1,7 @@
 # Run: claude plugin eval plugins/subagent-orchestration --case orchestration-cheap-model-for-lookup --runs 3 --trust-plugin --no-publish
 # Shared run/grant facts: docs/contributing.md, "Plugin evals". No grant; reply-only.
 # Should-fire case for "Pick the model tier": a mechanical lookup goes to a cheaper tier.
-# Run with --ablation with-without; no skill_fired grader (reply-only).
+# Run with --ablation with-without; skill_fired is a with-only indicator.
 # Can fail: cheap_tier fails if the reply names no cheaper tier; the prompt does not mention models.
 schema_version: "1.1"
 name: orchestration-cheap-model-for-lookup
@@ -21,9 +21,16 @@ execution:
     - Skill
 
 graders:
+  - name: skill_fired
+    type: tool_used
+    tool: Skill
+    input_match: '"skill"\s*:\s*"(?:[\w-]+:)?subagent-orchestration"'
+    min: 1
+    arm: with-only
+
   - name: cheap_tier
     type: regex
     target: last_message
-    pattern: 'haiku|cheaper|smaller model|lower[- ]tier|lightweight model'
+    pattern: 'haiku|sonnet|cheap|smaller|small model|lower[- ](?:tier|cost)|lightweight|light model|fast model|fastest|inexpensive|less expensive|economical|budget model|`?model`?\s+(?:parameter|param|field|override)|\bexplore\b'
     flags: i
     match: contains

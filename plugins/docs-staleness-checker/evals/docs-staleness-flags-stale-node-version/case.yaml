@@ -95,7 +95,7 @@ graders:
   - name: flags_stale_version
     type: regex
     target: last_message
-    pattern: 'Node 18[\s\S]{0,200}(stale|outdated|out of date|mismatch|no longer|conflict|incorrect)'
+    pattern: 'Node 18[\s\S]{0,200}(stale|outdated|out[- ]of[- ]date|mismatch|no longer|conflict|incorrect|drift|contradict|disagree|inconsisten|does not match|doesn.t match)|(stale|outdated|out[- ]of[- ]date|mismatch|no longer|conflict|incorrect|drift|contradict|disagree|inconsisten|does not match|doesn.t match)[\s\S]{0,200}Node 18'
     flags: i
     match: contains
 

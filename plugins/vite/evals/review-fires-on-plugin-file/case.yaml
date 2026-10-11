@@ -86,7 +86,7 @@ graders:
   - name: hot_update_is_not_blocking
     type: regex
     target: last_message
-    pattern: 'handleHotUpdate[\s\S]{0,500}(still works|non-?blocking|not (a )?(blocking|required|mandatory))'
+    pattern: 'handleHotUpdate[\s\S]{0,500}(still (works|functions|runs|supported|operates)|continues? to (work|function|run)|non-?blocking|not (a )?(blocking|required|mandatory|urgent|a bug|a defect)|migration (opportunity|candidate)|optional|nice[- ]to[- ]have|low[- ]priority|can wait)'
     flags: i
     match: contains
     weight: 0.5

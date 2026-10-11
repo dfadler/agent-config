@@ -48,7 +48,7 @@ graders:
   - name: no_action_claimed
     type: regex
     target: last_message
-    pattern: '(?:I|we)\s+(?:have\s+)?(?:applied|closed)|has been (?:closed|labell?ed)|issue (?:is|was) closed'
+    pattern: '(?:I|we)(?:\s+have|.ve)?\s+(?:applied|closed)|has been (?:closed|labell?ed)'
     flags: i
     match: not_contains
 

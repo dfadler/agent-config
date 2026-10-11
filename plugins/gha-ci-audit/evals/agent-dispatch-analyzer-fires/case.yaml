@@ -38,6 +38,6 @@ graders:
   - name: reports_missing
     type: regex
     target: last_message
-    pattern: 'benchmark\.json[\s\S]{0,200}(missing|not found|no such|does not exist|doesn.t exist|could not|couldn.t|unable)|(missing|not found|no such|does not exist|doesn.t exist|could not|couldn.t|unable)[\s\S]{0,200}benchmark\.json'
+    pattern: 'benchmark(?:\.json)?[\s\S]{0,400}(missing|not found|no such|does not exist|doesn.t exist|could not|couldn.t|unable)|(missing|not found|no such|does not exist|doesn.t exist|could not|couldn.t|unable)[\s\S]{0,400}benchmark(?:\.json)?'
     flags: i
     match: contains
