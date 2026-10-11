@@ -1,0 +1,49 @@
+# Run: claude plugin eval plugins/eval-authoring --case author-cases-before-after-on-skill-change --runs 3 --trust-plugin --no-publish
+# Covers the "evals follow skill changes" guidance: after editing a skill, the reply should name
+# updating the cases and comparing before and after scores, in the PR's Eval results section.
+# Can fail: a no-plugin reply says "add tests" generically and never names run-evals or Eval results.
+# Likely delta: positive; the skill fires only if its description matches an edit-then-PR request.
+# Near-miss boundary: author-cases-stays-quiet-on-unit-tests. EVAL009 info is intentional (reply-only skill case).
+schema_version: "1.1"
+name: author-cases-before-after-on-skill-change
+description: >
+  After changing a skill's behavior in a plugin that already has evals, the reply says to update the
+  cases and compare the before and after scores, and to put them in the PR's Eval results section.
+  expected_outcome: PASS when author-cases fires and the reply covers cases, a before/after score comparison and Eval results; FAIL otherwise.
+tags: [eval-authoring, author-cases, regression-guard]
+
+execution:
+  prompt: |
+    I just rewrote the instructions in my plugin's `release-notes` skill so it groups entries
+    by type. The plugin already has eval cases for it. I'm about to open the PR. What do I do
+    about the evals?
+    Don't create files or run any commands.
+  max_turns: 4
+  allowed_tools:
+    - Skill
+    - Read
+    - Glob
+
+graders:
+  - name: skill_fired
+    type: tool_used
+    tool: Skill
+    input_match: '"skill"\s*:\s*"(?:[\w-]+:)?author-cases"'
+    min: 1
+    arm: both
+
+  # PASS if the reply names a before/baseline score and an after score to compare.
+  # FAIL if it only says to "add tests" or "re-run" with no comparison.
+  - name: compares_before_after
+    type: regex
+    target: last_message
+    pattern: '(before|baseline|previous)[\s\S]*(after|new score|re-?run)|(after|re-?run)[\s\S]*(before|baseline|previous)'
+    flags: i
+    match: contains
+
+  - name: names_eval_results_or_run_evals
+    type: regex
+    target: last_message
+    pattern: 'run-evals|Eval results'
+    flags: i
+    match: contains
