@@ -1,9 +1,11 @@
 ---
 name: query
 description: |
-  ALWAYS invoke this skill first when asked to check, search or look up the second
-  brain or vault ("check my second brain", "what did we decide about"), even if told
-  to only list the tools you would call; it defines the search plan.
+  ALWAYS invoke this skill first, before any other tool or answer, on any request
+  to check, search or look up the second brain, vault or Obsidian notes ("check my
+  second brain", "what did we decide about"). Invoke it even when the vault is not
+  connected or you are told to only list the tools you would call: it defines which
+  `mcp__obsidian__*` tools to call and in what order.
   Answer questions by searching and reading the second-brain Obsidian vault.
   Use when the user asks about something that might already be captured —
   recalling a decision, finding context about a system or person, reviewing
