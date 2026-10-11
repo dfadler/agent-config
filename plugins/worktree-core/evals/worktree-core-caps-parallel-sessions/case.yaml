@@ -34,6 +34,6 @@ graders:
   - name: staggers
     type: regex
     target: last_message
-    pattern: 'stagger|ramp(?:ing)?[- ]up|one (?:or two )?at a time|a few at a time|in (?:batches|waves)|gradually|incrementally|add(?:ing)? more as|then add|start the rest|start with (?:two|three|four|five|[2-5])\b'
+    pattern: 'stagger|ramp(?:ing)?[- ]up|one (?:or two )?at a time|a few at a time|in (?:batches|waves)|gradually|incrementally|add(?:ing)? more as|then add|start the (?:rest|next)|start with (?:two|three|four|five|[2-5])\b'
     flags: i
     match: contains
