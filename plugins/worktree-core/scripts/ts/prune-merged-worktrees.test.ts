@@ -170,6 +170,29 @@ describe("upstream handling", () => {
   });
 });
 
+describe("merge-commit merges", () => {
+  // A merge-commit PR keeps the branch tip as headRefOid, so it is detected
+  // like any other merged PR even though main now holds a merge commit.
+  it("removes a worktree whose PR landed as a merge commit on main", () => {
+    const p = sb.addWorktree("a");
+    sb.git(p, "commit", "-q", "--allow-empty", "-m", "work");
+    sb.git(p, "push", "-q", "origin", "HEAD");
+    sb.git(sb.repo, "merge", "-q", "--no-ff", "-m", "Merge PR", "worktree-a");
+    sb.markMerged("worktree-a", sb.head(p));
+    expect(go([]).out).toMatch(/REMOVE {2}\.claude\/worktrees\/a/);
+  });
+
+  // Deliberate: with no PR object, "HEAD is an ancestor of main" also holds
+  // for a brand-new worktree, so it cannot be treated as merged.
+  it("keeps a branch merged into main by hand when no PR object exists", () => {
+    const p = sb.addWorktree("a");
+    sb.git(p, "commit", "-q", "--allow-empty", "-m", "work");
+    sb.git(p, "push", "-q", "origin", "HEAD");
+    sb.git(sb.repo, "merge", "-q", "--no-ff", "-m", "Merge local", "worktree-a");
+    expect(go([]).out).toMatch(/no merged PR for worktree-a/);
+  });
+});
+
 describe("modes", () => {
   it("--yes removes the merged worktree and its branch, leaves the rest", () => {
     const a = mergedWorktree("a");
