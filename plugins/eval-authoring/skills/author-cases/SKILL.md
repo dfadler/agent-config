@@ -1,6 +1,6 @@
 ---
 name: author-cases
-description: Write or fix `claude plugin eval` cases - graders, mocks, fixtures, thresholds, should-trigger and should-not-trigger prompts. Use when adding eval cases or graders to a plugin.
+description: Write or fix `claude plugin eval` cases - graders, mocks, fixtures, thresholds, should-trigger and should-not-trigger prompts. Use when adding eval cases or graders to a plugin, or when writing the PR description for a change to a plugin's skill or agent text that has eval cases.
 argument-hint: "<plugin-path> [skill-or-agent]"
 ---
 
