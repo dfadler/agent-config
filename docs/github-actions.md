@@ -61,6 +61,8 @@ a CI failure here.
   on PRs that don't match) and `issue-bot.yml` stay standalone. So does
   `vitest-soak.yml`, a scheduled/manual Vitest `--repeats` soak that is
   deliberately non-gating: it opens an issue on failure and never blocks a PR.
+  `eval-results-check.yml` is standalone and outside the sentinel too: it fails a PR
+  that touches `plugins/*/evals/**` with no "Eval results" heading in the body (#662).
 - **Sentinel job for branch protection.** When a thin orchestrator dispatches
   several reusable workflows in parallel, adding a dedicated `all-checks` job
   (with `if: always()` and `needs:` listing every other job) gives branch
