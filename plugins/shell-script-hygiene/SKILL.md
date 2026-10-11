@@ -1,6 +1,9 @@
 ---
 name: shell-script-hygiene
 description: |
+  ALWAYS invoke this skill first before writing or editing any bash script, including
+  silencing a shellcheck warning or adding a `# shellcheck disable`, even when the reply
+  is only the updated script.
   Hygiene baseline for bash scripts: strict flags first, shellcheck and shfmt, justified
   disables, `-h`/`--help`, named exit codes, hermetic tests. Use when writing or editing
   a `*.sh` file or any non-trivial bash script, or a bats test for one.

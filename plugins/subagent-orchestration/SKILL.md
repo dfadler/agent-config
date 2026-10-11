@@ -47,11 +47,14 @@ Z"), triage before starting item one:
 2. **Parallel set:** items with disjoint file surfaces and no ordering dependency. Send
    one `Agent` call per item in a single message, each in its own worktree if it edits
    files. Items that share a file, or one that feeds another, stay serial or go to one
-   agent together.
+   agent together. Grep each item's likely files and keep same-module items out of one
+   wave. Shared generated or binary files (lockfiles, image baselines, snapshots) count
+   as a file surface: git cannot merge them.
 3. **Say the split in a line or two** (which run in parallel, which wait, why), then
    dispatch. Don't ask permission for the obvious split.
 4. **Tier each agent** per "Pick the model tier"; a long list is not a reason to
-   upgrade them. Cap the fan-out at a handful of agents; batch the rest.
+   upgrade them. Cap the fan-out at a handful of agents (fewer when items overlap by module);
+   batch the rest. Tell each agent to use its own dev-server port.
 
 Tiny items (a one-line edit) stay in the main context: spawning costs more than doing.
 A single task with substeps is not a task list; use the routing table above.
