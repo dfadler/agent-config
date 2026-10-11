@@ -38,6 +38,13 @@ describe("findGaps", () => {
     ).toEqual([]);
   });
 
+  it("is quiet for a plugin with no eval directory", () => {
+    const top = mkdtempSync(join(tmpdir(), "stop-hook-"));
+    dirs.push(top);
+    touch(top, "plugins/q/.claude-plugin/plugin.json");
+    expect(findGaps(top, ["plugins/q/skills/s/SKILL.md"])).toEqual([]);
+  });
+
   it("ignores files that are not skills or agents", () => {
     const top = repoWithPlugin();
     expect(findGaps(top, ["plugins/p/README.md", "plugins/p/scripts/x.ts"])).toEqual([]);

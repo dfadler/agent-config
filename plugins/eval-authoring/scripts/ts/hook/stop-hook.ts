@@ -53,7 +53,7 @@ export interface Gap {
   readonly baseline: string | undefined;
 }
 
-/** Plugins whose skills or agents changed while nothing under their eval directory did. */
+/** Plugins that already have an eval directory whose skills or agents changed while nothing under it did. */
 export const findGaps = (
   top: string,
   files: readonly string[],
@@ -68,6 +68,7 @@ export const findGaps = (
   return [...byPlugin].flatMap(([root, rel]) => {
     const resolved = resolveEvalDir(root);
     const evalRel = resolved.ok ? resolved.dir : "evals";
+    if (!existsSync(join(root, evalRel))) return [];
     const inEvals = (p: string): boolean =>
       p === evalRel || p.startsWith(evalRel + sep);
     const changed = rel.filter(
