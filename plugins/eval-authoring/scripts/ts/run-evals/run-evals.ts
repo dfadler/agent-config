@@ -602,7 +602,7 @@ export const main = async (
     cases: progress.done.map((d, i) => ({
       caseName: d.caseName,
       exit: d.exit,
-      row: caseRow(d.caseName, progress.texts[i]),
+      row: caseRow(d.caseName, progress.texts[i], io.readFile),
     })),
   });
   if (options.pr === undefined) {
