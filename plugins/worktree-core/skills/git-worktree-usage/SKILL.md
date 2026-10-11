@@ -127,7 +127,9 @@ session — both catch their own errors and always exit 0.
 - **`prune-merged-worktrees-hook.ts`** runs `prune-merged-worktrees.ts
   --auto`: removes any worktree under `.claude/worktrees/` (on a
   `worktree-*` or `claude/*` branch) whose pull request has already merged,
-  as long as it's unlocked, isn't the current session's own worktree, has no
+  as long as it's unlocked, has no `keep` in its name, holds no gitignored
+  content besides `node_modules` (e.g. paid `evals/results/`; it is reported
+  as kept), isn't the current session's own worktree, has no
   uncommitted changes, and has no commits unpushed to its upstream — or,
   lacking an upstream at all (a branch that was never individually pushed
   under its own name), has a HEAD that's already an ancestor of the

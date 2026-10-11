@@ -12,6 +12,8 @@
 //     or `claude/*` (hand-made worktrees and the main checkout are never touched)
 //   * it is NOT locked (Claude Code locks a worktree while a session uses it)
 //   * it is NOT the worktree this script is being run from
+//   * its name does not contain "keep" and it holds no gitignored content other
+//     than node_modules (e.g. paid eval results), which removal would delete
 //   * its working tree is clean AND has no commits that aren't pushed to its
 //     upstream
 //   * a MERGED pull request exists for its branch at the SAME commit the
@@ -343,6 +345,10 @@ export const main = (argv: readonly string[], ctx: Ctx): number => {
     (p) => (p === self ? "current session" : undefined),
     (_p, _b, locked) =>
       locked ? "locked (another session is using it)" : undefined,
+    (p) =>
+      /keep/i.test(p.slice(wtPrefix.length))
+        ? "name contains 'keep'"
+        : undefined,
     (p, b) =>
       isMerged(b, git(["rev-parse", "HEAD"], p).stdout.trim())
         ? undefined
@@ -355,6 +361,18 @@ export const main = (argv: readonly string[], ctx: Ctx): number => {
       return !dirty && markers.every((m) => onlyMarkerBlock(p, m))
         ? undefined
         : "uncommitted changes";
+    },
+    (p) => {
+      // Gitignored content (paid eval results, kept traces) is lost on removal.
+      const held = git(["status", "--porcelain", "--ignored"], p)
+        .stdout.split("\n")
+        .filter(
+          (l) => l.startsWith("!! ") && !/(^|\/)node_modules\//.test(l.slice(3)),
+        )
+        .map((l) => l.slice(3));
+      return held.length === 0
+        ? undefined
+        : `holds gitignored content (${held.slice(0, 3).join(", ")}); remove by hand if disposable`;
     },
     (p) => (pushedOrOnMain(p) ? undefined : "unpushed commits (or no upstream)"),
   ];
