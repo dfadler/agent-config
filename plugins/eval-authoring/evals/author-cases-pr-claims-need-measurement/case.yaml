@@ -52,10 +52,13 @@ graders:
     flags: i
     match: contains
 
+  # Matches the 0.9 figure or the meaning: a high baseline makes the case a regression guard
+  # (the prompt gives the answer away). The literal-figure-only version scored four correct
+  # paraphrases as misses; this alternation was written after reading those replies.
   - name: states_baseline_gate
     type: regex
     target: last_message
-    pattern: '0\.9\b|90 ?%'
+    pattern: '0\.9\b|90 ?%|regression guard|(?:baseline|without[ -](?:the )?plugin|no-plugin)[^.\n]{0,80}(?:near|high|also (?:scores?|passes?|1\.00)|already)|(?:near|high)[^.\n]{0,40}baseline|prompt[^.\n]{0,40}(?:gives? away|hands? over|leaks?)'
     flags: i
     match: contains
 
