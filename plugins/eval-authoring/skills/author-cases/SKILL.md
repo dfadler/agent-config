@@ -1,6 +1,6 @@
 ---
 name: author-cases
-description: ALWAYS invoke this skill first when a plugin's skill or agent was just changed and the question is what to do about its evals, because it sets the order - update the cases, then compare before and after scores. Write or fix `claude plugin eval` cases - graders, mocks, fixtures, thresholds, should-trigger and should-not-trigger prompts. Use when adding eval cases or graders to a plugin.
+description: ALWAYS invoke this skill first when a plugin's skill or agent was just changed and the question is what to do about its evals, because it sets the order - update the cases, then compare before and after scores. Write or fix `claude plugin eval` cases - graders, mocks, fixtures, thresholds, should-trigger and should-not-trigger prompts. Use when adding eval cases or graders to a plugin, or when writing the PR description for a change to a plugin's skill or agent text that has eval cases.
 argument-hint: "<plugin-path> [skill-or-agent]"
 ---
 
@@ -60,16 +60,23 @@ cannot decide.
    recorded per case. Faking a CLI or MCP server: [fixtures and
    mocks](references/fixtures-and-mocks.md). Testing a plugin's agents:
    [agents](references/agents.md).
-7. **Lint.** `node ${CLAUDE_SKILL_DIR}/../../scripts/ts/lint/cli.ts <plugin-path>` (Node 22
+7. **Check the baseline.** Before trusting a new case, run it once without the plugin. A
+   baseline score of 0.9 or more means the prompt hands over the answer: rewrite it or
+   drop the case. A case that cannot separate the arms is a regression guard, not
+   evidence the skill helps.
+8. **Lint.** `node ${CLAUDE_SKILL_DIR}/../../scripts/ts/lint/cli.ts <plugin-path>` (Node 22
    or later). Fix every error. Fix each warning or write down why it is intended.
-8. **Review and hand off.** Ask the [case-reviewer agent](../../agents/case-reviewer.md)
+9. **Review and hand off.** Ask the [case-reviewer agent](../../agents/case-reviewer.md)
    for the judgment pass, if available (invocation recipe in the agent file). Then give the user the run command from the
    [run-evals](../run-evals/SKILL.md) skill. Do not run paid
    evals yourself: agent sessions usually cannot authenticate, and `--scaffold` is manual
-   opt-in only. A PR that adds or changes cases, or changes a skill or agent that has
-   cases, carries an "Eval results" section (the run-evals summary, with the before
-   score from the newest `evals/results/` run next to the after score), or says why it
-   has none.
+   opt-in only. A PR that adds or changes cases, or changes a skill or agent that has cases, carries an
+   "Eval results" section (the run-evals summary, with the before score from the newest
+   `evals/results/` run next to the after score, and 5 runs per arm or more to claim a
+   delta), or says why it has none. The PR body states what was measured (with, without,
+   delta) and names each changed behavior no case covers. It never says a change
+   "improves" or "fixes" a behavior without a case whose delta shows it; with a delta of
+   zero, call the cases regression guards and say the benefit is unverified.
 
 ## Gotchas
 
@@ -81,6 +88,11 @@ cannot decide.
   the word `eval`. It may also refuse compound commands (`$VAR`, globs, `for` loops,
   multi-file heredocs, some pipes). Use single plain commands and the Write tool; never
   write a workaround script, and ask the user to run what the hook blocks.
+- Each new sentence in a `SKILL.md` needs a case that fails when that sentence is deleted
+  (a sabotage map in the case header names it). A reply-only regex case on common-sense
+  routing sits at a 1.00 baseline and cannot register a skill change (#690: two such
+  cases, delta 0.00 at 10 runs per arm). Prefer a case whose prompt does not name the
+  answer, or one that grades the `Agent` calls the skill is meant to change.
 - Whether a case is useful is only known after a two-arm run (Δ above zero, graders
   discriminating). The lint cannot show that; say so rather than claiming it.
 - Action-based grading (grade the commands Claude runs, not its prose) needs a `Bash` grant
