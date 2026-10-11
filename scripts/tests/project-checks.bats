@@ -150,6 +150,19 @@ write_rules() {
   refute_output_contains "plain —"
 }
 
+@test "worktrees: a locked worktree is listed as not safe to remove" {
+  mkdir -p "$HOME/.claude/skills"
+  ln -s "$REPO_ROOT/plugins/worktree-core" "$HOME/.claude/skills/worktree-core"
+  git -C "$PROJ" worktree add -q "$PROJ/.claude/worktrees/busy" -b busy
+  git -C "$PROJ" worktree add -q "$PROJ/.claude/worktrees/idle" -b idle
+  git -C "$PROJ" worktree lock "$PROJ/.claude/worktrees/busy"
+  run_doctor
+  assert_success
+  assert_output_contains "not safe to remove"
+  assert_output_contains "busy — locked"
+  refute_output_contains "idle —"
+}
+
 @test "worktrees: outside a git repo the worktree check is skipped" {
   PROJ="$SANDBOX/plain"
   mkdir -p "$PROJ/.claude"
