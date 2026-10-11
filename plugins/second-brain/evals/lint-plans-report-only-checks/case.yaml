@@ -1,7 +1,9 @@
 # Run (one case at a time, #536/#538): claude plugin eval plugins/second-brain --case lint-plans-report-only-checks --trust-plugin --no-publish
 # Shared run/grant facts: docs/contributing.md, "Plugin evals". No grant needed (Skill only).
 # Reply-only, free graders: asks the model to name the checks it would run and whether it would
-# edit anything. A baseline does not know the five checks or the report-only rule.
+# edit anything. A baseline lists generic checks; only the skill body knows the ambiguous-wikilink
+# check and the 00 Inbox orphan exemption (skill_specific_checks), and the first run showed the
+# generic graders alone give delta 0.
 # Sabotage map: grader patterns quote "Step 2: Run the checks" (wikilinks, orphans,
 # frontmatter, empty sections) and the Contract's "Does not: modify" line.
 # Can fail: skill_fired fails if the description stops matching a "lint my vault" request;
@@ -37,6 +39,13 @@ graders:
     type: regex
     target: last_message
     pattern: '(?=[\s\S]*wikilink)(?=[\s\S]*orphan)(?=[\s\S]*frontmatter)(?=[\s\S]*empty)'
+    flags: i
+    match: contains
+
+  - name: skill_specific_checks
+    type: regex
+    target: last_message
+    pattern: '(?=[\s\S]*ambiguous)(?=[\s\S]*inbox)'
     flags: i
     match: contains
 
