@@ -52,7 +52,13 @@ it, do not rebuild any of that.
 4. **Hand the command to the user.** The run needs a shell where `claude plugin eval`
    can authenticate; an agent session usually cannot (child runs fail with
    `Not logged in`). Give the exact non-dry-run command to run in their own shell.
-   Run it from here only if the user asks and the session is logged in.
+   Run it from here only if the user asks and the session is logged in. When you do, make
+   progress visible: start it in the background (`run_in_background`) with its output going
+   to a file, never piped through `tail`, `head` or `grep`, which hide everything until the
+   command exits. Tell the user the output path (or the terminal tab) as soon as it starts,
+   then read that file to report progress. The wrapper prints each run as it finishes. Do
+   not edit the plugin under test while a run is in flight: the plugin arm loads its files
+   live. Run silently (foreground, summary only) only if the user asks for a silent run.
    To re-run a subset, add `--case <name-or-glob>` (the wrapper filters its own plan, so
    no temp `--eval-dir`). To put the results in a PR, add `--pr <n>`: it prints the exact
    marked block, asks, then replaces the `run-evals` block in the PR body with `gh pr
