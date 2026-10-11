@@ -76,6 +76,9 @@ worked examples are in `references/grading.md`.
    rather than reading every line by eye.
 4. **Grade each finding** per `references/grading.md`. Cite file:line and the
    exact snippet for every finding; never fabricate a location.
+   Computed contrast (even a literal color pair like `#999` on white) and
+   `autofocus` always go under Flagged, never Verified; only a missing
+   attribute, wrong element or positive `tabindex` is Verified.
 5. **Report.**
 
 ```
