@@ -83,6 +83,9 @@ export interface CaseRow {
   readonly delta: number | undefined;
   /** Graders that failed in the plugin arm. */
   readonly failed: readonly FailedGrader[];
+  /** Plugin-arm runs where skill_fired failed, and how many runs had that grader. */
+  readonly skillMissed: number;
+  readonly skillRuns: number;
 }
 
 /** Read the one case row from an invocation's `aggregate-result.json` text; undefined when unreadable. */
@@ -97,7 +100,12 @@ export const caseRow = (
   const agg = isRec(c["aggregates"]) ? c["aggregates"] : {};
   const arms = isRec(c["arms"]) ? c["arms"] : {};
   const runs = list(arms["with"]);
+  const skillGraders = runs.flatMap((r) =>
+    isRec(r) ? list(r["graders"]).filter((g) => isRec(g) && g["name"] === "skill_fired") : [],
+  );
   return {
+    skillRuns: skillGraders.length,
+    skillMissed: skillGraders.filter((g) => isRec(g) && g["passed"] === false).length,
     caseName,
     with: num(agg["score"]),
     without: num(agg["scoreWithout"]),
@@ -148,6 +156,9 @@ const cell = (s: string): string => s.replace(/\|/g, "\\|");
 /** The paste-ready Markdown. Heading "Eval results" is what the PR convention looks for. */
 export const renderSummary = (s: SummaryInput): string => {
   const failures = s.cases.flatMap((c) => c.row?.failed.map((f) => ({ c: c.caseName, f })) ?? []);
+  const unfired = s.cases.flatMap((c) =>
+    c.row !== undefined && c.row.skillMissed > 0 ? [{ caseName: c.caseName, row: c.row }] : [],
+  );
   return [
     "## Eval results",
     "",
@@ -160,6 +171,16 @@ export const renderSummary = (s: SummaryInput): string => {
         `| ${cell(c.caseName)} | ${fmt(c.row?.with)} | ${fmt(c.row?.without)} | ${fmt(c.row?.delta)} | ${String(c.exit)}${c.row === undefined ? " (no readable result)" : ""} |`,
     ),
     ...s.unstarted.map((n) => `| ${cell(n)} | not run | | | |`),
+    ...(unfired.length === 0
+      ? []
+      : [
+          "",
+          "Skill never fired (skill_fired is not scored, so the score can still look fine):",
+          "",
+          ...unfired.map(
+            (c) => `- \`${c.caseName}\`: skill_fired failed in ${String(c.row.skillMissed)} of ${String(c.row.skillRuns)} runs`,
+          ),
+        ]),
     ...(failures.length === 0
       ? []
       : [
