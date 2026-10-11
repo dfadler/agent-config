@@ -19,6 +19,7 @@ checks what a script can; the rest needs a paid run.
 |---|---|
 | [`scripts/ts/lint/`](scripts/ts/lint/cli.ts) | The single source of the rules (EVAL001 to EVAL021, `--list-rules`). Free, no model calls. Everything else calls it. |
 | [`hooks/`](hooks/hooks.json) | PostToolUse hook on `Write\|Edit`: lints after Claude edits a file under a plugin's eval directory and reports findings back as context. Report only, always exits 0, no-ops elsewhere and under `tests/`. |
+| [`hooks/` Stop](hooks/scripts/eval-gap-on-stop.sh) | Blocks a stop once when a plugin's `skills/` or `agents/` changed (vs `main`) with no change under its eval directory. The reason asks for updated cases and a before/after score comparison (baseline = newest `evals/results/` directory), or a one-line why-not. The retry passes, so it never loops. |
 | [`skills/author-cases`](skills/author-cases/SKILL.md) | Writing cases: graders (free first), mocks, fixtures, should-fire and should-not-fire prompts. |
 | [`skills/run-evals`](skills/run-evals/SKILL.md) | Slash command only (paid). Lints, shows the planned commands, then runs the wrapper. |
 | [`scripts/ts/run-evals/`](scripts/ts/run-evals/run-evals.ts) | The wrapper: cost tiers `quick` / `standard` / `thorough`, one CLI invocation per case (each under its own grants), a cumulative cost ceiling, preflight checks, never `--scaffold`. |

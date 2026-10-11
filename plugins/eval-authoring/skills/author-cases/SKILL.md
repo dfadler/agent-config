@@ -1,6 +1,6 @@
 ---
 name: author-cases
-description: Write or fix `claude plugin eval` cases - graders, mocks, fixtures, thresholds, should-trigger and should-not-trigger prompts. Use when adding eval cases or graders to a plugin.
+description: ALWAYS invoke this skill first when a plugin's skill or agent was just changed and the question is what to do about its evals, because it sets the order - update the cases, then compare before and after scores. Write or fix `claude plugin eval` cases - graders, mocks, fixtures, thresholds, should-trigger and should-not-trigger prompts. Use when adding eval cases or graders to a plugin.
 argument-hint: "<plugin-path> [skill-or-agent]"
 ---
 
@@ -66,10 +66,14 @@ cannot decide.
    for the judgment pass, if available (invocation recipe in the agent file). Then give the user the run command from the
    [run-evals](../run-evals/SKILL.md) skill. Do not run paid
    evals yourself: agent sessions usually cannot authenticate, and `--scaffold` is manual
-   opt-in only. A PR that adds or changes cases carries an "Eval results" section (the
-   run-evals summary), or says why it has none.
+   opt-in only. A PR that adds or changes cases, or changes a skill or agent that has
+   cases, carries an "Eval results" section (the run-evals summary, with the before
+   score from the newest `evals/results/` run next to the after score), or says why it
+   has none.
 
 ## Gotchas
+
+- The plugin's Stop hook blocks once when a plugin's skills or agents changed with no eval change. Treat it as a task: add or update the cases, then get the before (latest `evals/results/`) and after scores, or say why evals do not apply.
 
 - Declared plugin `dependencies` are not resolved in an eval run (observed in #450, not in
   the docs: the plugin is silently dropped). EVAL018 checks this.
