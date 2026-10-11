@@ -1,0 +1,57 @@
+# Run (one case at a time, #536/#538): claude plugin eval plugins/second-brain --case capture-uses-user-stated-date --trust-plugin --no-publish
+# Shared run/grant facts: docs/contributing.md, "Plugin evals". No grant needed (Skill only).
+# Reply-only, no mocks (see capture-routes-person-note for the reason); the prompt states the vault path.
+# Regression guard for #681: capture once wrote the real run date instead of the date in the
+# prompt (1 of 3 runs). The prompt states a date a year before the real one, so a fallback to
+# the system date shows as a 2026 date.
+# Known limit: this does NOT discriminate the SKILL.md date paragraph. With that paragraph
+# reverted, the with-plugin arm still scored 1.00 on 3 of 3 runs (two prompt wordings), so the
+# original failure is too rare to reproduce at 3 runs. It guards against a larger regression.
+# Sabotage map: grader names quote "Frontmatter" (`date:` follows the user-stated date).
+# Can fail: any `date:` other than 2025-03-14 scores 0 on stated_date_in_frontmatter and
+# system_date_absent; skill_fired fails if the description stops matching.
+schema_version: "1.1"
+name: capture-uses-user-stated-date
+description: >
+  Asked to save a note while the user states a date that is not the real current date, the
+  model invokes capture and writes that stated date in the frontmatter. expected_outcome: PASS
+  when the skill fires and `date:` is 2025-03-14 with no 2026 date anywhere; FAIL otherwise,
+  notably the system date.
+tags: [second-brain, capture, regression]
+
+execution:
+  prompt: |
+    SECOND_BRAIN_VAULT_PATH is set to /vault. Add to my second brain what I
+    know about Priya Raman: staff engineer on Search, joined in 2024, prefers
+    async updates, owns the search rollout plan. (I'm writing this on
+    2025-03-14, from an old laptop whose clock is wrong.)
+
+    Don't call any tools other than skills (the vault is not connected here). Reply with the
+    vault-relative path of the note on the first line, then the full note in
+    one markdown code block, and nothing else.
+  max_turns: 6
+  allowed_tools:
+    - Skill
+
+graders:
+  # Steps. Indicator in a two-arm run, scored only with the plugin.
+  - name: skill_fired
+    type: tool_used
+    tool: Skill
+    input_match: '"skill"\s*:\s*"(?:[\w-]+:)?capture"'
+    min: 1
+    arm: with-only
+
+  # Result.
+  - name: stated_date_in_frontmatter
+    type: regex
+    target: last_message
+    pattern: '^date:\s*[\x22\x27]?2025-03-14'
+    flags: m
+    match: contains
+
+  - name: system_date_absent
+    type: regex
+    target: last_message
+    pattern: '2026-'
+    match: not_contains

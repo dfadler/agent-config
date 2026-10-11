@@ -1,8 +1,8 @@
 ---
 name: git-worktree-usage
 description: |
-  Git worktree and branch mechanics for isolating non-trivial work: creating
-  worktrees with `EnterWorktree` (never raw `git worktree add`), locking and
+  Create worktrees with the `EnterWorktree` tool, never raw `git worktree add`.
+  Git worktree and branch mechanics for isolating non-trivial work: locking and
   the stale-worktree sweep, picking what to parallelize by file surface, the
   repo-wide `git stash` collision hazard and its `git restore` alternative,
   branch naming, catching a branch up to a moved `main` via merge (not
@@ -22,6 +22,8 @@ metadata:
 ---
 
 # Git & worktree usage
+
+**Create worktrees with the `EnterWorktree` tool, never raw `git worktree add`.**
 
 This is the *mechanics* skill for git worktrees, branches, and conflict/PR-
 splitting workflows — not the policy of *when* isolation is required (that
@@ -125,7 +127,9 @@ session — both catch their own errors and always exit 0.
 - **`prune-merged-worktrees-hook.ts`** runs `prune-merged-worktrees.ts
   --auto`: removes any worktree under `.claude/worktrees/` (on a
   `worktree-*` or `claude/*` branch) whose pull request has already merged,
-  as long as it's unlocked, isn't the current session's own worktree, has no
+  as long as it's unlocked, has no `keep` in its name, holds no gitignored
+  content besides `node_modules` (e.g. paid `evals/results/`; it is reported
+  as kept), isn't the current session's own worktree, has no
   uncommitted changes, and has no commits unpushed to its upstream — or,
   lacking an upstream at all (a branch that was never individually pushed
   under its own name), has a HEAD that's already an ancestor of the

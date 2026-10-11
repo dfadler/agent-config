@@ -106,6 +106,9 @@ Checklist categories reviewed: <list>   ·   N/A (not present in target): <list>
   rendered page — recommend axe-core/Lighthouse and human/AT testing for these.
 ```
 
+Copy the `Checklist categories reviewed:` line verbatim, label included; do not
+shorten it to `Categories reviewed:`.
+
 Spend the report's words on findings and handoffs; a clean category is its name
 in "reviewed," not a paragraph. Don't let "not present in target" (N/A) or "not
 covered by this review" read as "passed" — they're honestly different things.

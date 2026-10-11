@@ -47,3 +47,11 @@ graders:
     target: last_message
     pattern: 'git\s+worktree\s+add'
     match: not_contains
+    weight: 2.0
+
+  # The reply is exactly one code block: no prose around it, no second block.
+  - name: single_code_block
+    type: regex
+    target: last_message
+    pattern: '^\s*```[^`]*```\s*$'
+    match: contains

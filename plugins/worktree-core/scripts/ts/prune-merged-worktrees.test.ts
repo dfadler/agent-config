@@ -101,6 +101,27 @@ describe("classification (dry run)", () => {
     expect(go([]).out).toMatch(/locked \(another session is using it\)/);
   });
 
+  it("keeps a worktree holding gitignored results, but not one with only node_modules", () => {
+    const p = sb.addWorktree("a");
+    put(join(p, ".gitignore"), "results/\nnode_modules/\n");
+    sb.git(p, "add", ".gitignore");
+    sb.git(p, "commit", "-q", "-m", "ignore");
+    sb.git(p, "push", "-q", "origin", "HEAD");
+    sb.markMerged("worktree-a", sb.head(p));
+    put(join(p, "node_modules", "x", "y.js"), "x");
+    expect(go([]).out).toMatch(/REMOVE/);
+    put(join(p, "results", "r.json"), "{}");
+    const r = go(["--yes"]);
+    expect(r.out).toMatch(/keep {4}.*holds gitignored content \(results\//);
+    expect(existsSync(join(p, "results", "r.json"))).toBe(true);
+  });
+
+  it("keeps a merged worktree with keep in its name", () => {
+    const p = mergedWorktree("a-keep");
+    expect(go(["--yes"]).out).toMatch(/name contains 'keep'/);
+    expect(existsSync(p)).toBe(true);
+  });
+
   it("keeps the worktree the script runs from", () => {
     const p = mergedWorktree("a");
     expect(go([], { cwd: p }).out).toMatch(/current session/);

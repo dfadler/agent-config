@@ -10,6 +10,7 @@ import {
   quoteSafe,
   redact,
   renderBlock,
+  renderSummary,
   withBlock,
 } from "./summary.ts";
 
@@ -84,6 +85,31 @@ describe("caseRow", () => {
     expect(caseRow("alpha", "not json")).toBeUndefined();
     expect(caseRow("other", failing("alpha"))).toBeUndefined();
     expect(caseRow("alpha", undefined)).toBeUndefined();
+  });
+});
+
+describe("skill_fired", () => {
+  const run = (passed: boolean) => ({
+    score: 1,
+    graders: [{ name: "skill_fired", passed, explanation: passed ? "Skill called 1x" : "Skill called 0x" }],
+  });
+  const text = JSON.stringify({
+    cases: [
+      {
+        name: "quiet",
+        aggregates: { score: 1, scoreWithout: 1, delta: 0 },
+        arms: { with: [run(false), run(false), run(true)], without: [] },
+      },
+    ],
+  });
+  it("counts missed runs and the summary flags a case that still scored well", () => {
+    const row = caseRow("quiet", text);
+    expect(row).toMatchObject({ skillMissed: 2, skillRuns: 3, with: 1 });
+    const md = renderSummary({
+      plugin: "p", tier: "t", model: "m", judgeModel: "j", spentUsd: 0, ceilingUsd: 1,
+      exit: 0, command: "c", unstarted: [], cases: [{ caseName: "quiet", exit: 0, row }],
+    });
+    expect(md).toContain("`quiet`: skill_fired failed in 2 of 3 runs");
   });
 });
 
