@@ -312,7 +312,7 @@ apply_claude_md() {
 apply_plan() {
   local verb a b c
   INCLUDE_REFS=()
-  while IFS=$'\t' read -r verb a b c; do
+  while IFS=$'\t' read -r verb a b c d; do
     case "$verb" in
       "") ;;
       skip-plugin) echo "Skipping plugin ($b): $a" ;;
@@ -361,10 +361,13 @@ apply_plan() {
         esac
         ;;
       register-hook)
-        ensure_hook_registered "$a" "${c:-}" "$b" "$HOME/.claude/settings.json"
+        ensure_hook_registered "$a" "${d:-}" "$b" "$HOME/.claude/settings.json" "$c"
         ;;
       deregister-hook)
-        ensure_hook_deregistered "$a" "$b" "$HOME/.claude/settings.json"
+        ensure_hook_deregistered "$a" "$b" "$HOME/.claude/settings.json" "${c:-}"
+        ;;
+      migrate-hook)
+        migrate_hook_to_exec_form "$a" "$b" "$c" "$d" "$HOME/.claude/settings.json"
         ;;
       *)
         echo "Unknown plan verb: $verb" >&2

@@ -48,6 +48,10 @@ It also flags dangling `@<path>` includes in `~/.claude/CLAUDE.md` and `CLAUDE.p
 (e.g. conventions since converted to skills): `--fix` backs the file up to
 `<file>.bak-<timestamp>` and removes only lines pointing into this repo's `claude/` tree;
 other missing includes are only warned about.
+Hooks are registered in exec form (`"command": "node", "args": [path]`, no shell quoting;
+[hooks docs](https://code.claude.com/docs/en/hooks#exec-form-and-shell-form)). Setup
+rewrites an earlier shell-form `node "path"` entry in place on its next run; doctor reports
+any that remain and `--fix` migrates them. `teardown.sh` removes every form.
 
 Run from inside a project, doctor also reports (never edits) that project's
 `.claude/settings.local.json` allow rules that are too broad (`git push|stash|checkout *`,

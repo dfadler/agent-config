@@ -1,7 +1,7 @@
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
 import { describe, expect, it } from "vitest";
-import { HOOK_TABLE_FILE, legacyCommand, parseHookTable, shellCommand } from "./hook-table.ts";
+import { allHookForms, HOOK_TABLE_FILE, parseHookTable } from "./hook-table.ts";
 
 const row = "PreToolUse\tEdit|Write\tworktree-core\tworktree-core/a.ts\tworktree-core/old.sh";
 
@@ -26,11 +26,14 @@ describe("parseHookTable", () => {
     expect(r.tag === "err" && r.error).toContain("line 2");
   });
 
-  it("builds shell-form and legacy commands under HOME", () => {
+  it("builds the exec, shell and legacy forms under HOME", () => {
     const r = parseHookTable(`${row}\n`);
     const first = r.tag === "ok" ? r.value[0] : undefined;
-    expect(first && shellCommand(first, "/h")).toBe('node "/h/.claude/skills/worktree-core/a.ts"');
-    expect(first && legacyCommand(first, "/h")).toBe("/h/.claude/skills/worktree-core/old.sh");
+    expect(first && allHookForms(first, "/h")).toEqual([
+      { command: "node", args: ["/h/.claude/skills/worktree-core/a.ts"] },
+      { command: 'node "/h/.claude/skills/worktree-core/a.ts"' },
+      { command: "/h/.claude/skills/worktree-core/old.sh" },
+    ]);
   });
 
   it("parses the real table", () => {
