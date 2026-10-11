@@ -71,6 +71,8 @@ cannot decide.
 
 ## Gotchas
 
+- The plugin's Stop hook blocks once when a plugin's skills or agents changed with no eval change. Treat it as a task: add or update the cases, then get the before (latest `evals/results/`) and after scores, or say why evals do not apply.
+
 - Declared plugin `dependencies` are not resolved in an eval run (observed in #450, not in
   the docs: the plugin is silently dropped). EVAL018 checks this.
 - In a worktree-isolated session in this repo, a hook may block shell commands containing
