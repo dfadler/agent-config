@@ -37,7 +37,7 @@ _json_string() {
 _load_plugin_hooks() {
   local table event matcher feature script legacy path
   table="$(dirname "${BASH_SOURCE[0]}")/plugin-hooks.tsv"
-  while IFS=$'\t' read -r event matcher feature script legacy; do
+  while IFS=$'\t' read -r event matcher feature script legacy || [[ -n "$event" ]]; do
     case "$event" in '' | '#'*) continue ;; esac
     [[ "$matcher" == "-" ]] && matcher=""
     PLUGIN_HOOK_EVENTS+=("$event")
