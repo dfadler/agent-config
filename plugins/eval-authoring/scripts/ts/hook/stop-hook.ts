@@ -107,12 +107,16 @@ const readStdin = async (): Promise<string> => {
 
 export const runStopHook = (raw: string): string => {
   try {
-    const event = JSON.parse(raw) as {
-      cwd?: string;
-      stop_hook_active?: boolean;
-    };
-    if (event.stop_hook_active === true) return "";
-    const top = git(event.cwd ?? process.cwd(), [
+    const event: unknown = JSON.parse(raw);
+    if (typeof event !== "object" || event === null) return "";
+    if ("stop_hook_active" in event && event.stop_hook_active === true) {
+      return "";
+    }
+    const cwd =
+      "cwd" in event && typeof event.cwd === "string"
+        ? event.cwd
+        : process.cwd();
+    const top = git(cwd, [
       "rev-parse",
       "--show-toplevel",
     ]).trim();
