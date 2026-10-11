@@ -112,9 +112,11 @@ refactors the script 2 tests); 5 needs 1 and 4; 6 comes last.
    run before Node exists (see
    [#605](https://github.com/dfadler/agent-config/issues/605)). So do the helpers
    only they call: `claude-md-lib.sh`, `git-identity.sh` and
-   `offer-safe-chain-permission.sh`. Still undecided:
-   whether `teardown.sh`, the hooks, and `agent_term.py` move at all, and whether
-   plugins require Node.
+   `offer-safe-chain-permission.sh`. `teardown.sh` is now a shim to `scripts/ts/teardown.ts` (it runs after Node
+   exists), sharing the hook table with bash via `scripts/plugin-hooks.tsv`
+   ([#667](https://github.com/dfadler/agent-config/issues/667)). `session-sync.sh` stays
+   bash: it must work when Node is missing or too old after a pull. Still undecided:
+   whether `agent_term.py` moves at all, and whether plugins require Node.
 
 ## Verification
 
