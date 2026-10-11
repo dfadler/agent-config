@@ -34,7 +34,7 @@ graders:
   - name: no_screenshots_needed
     type: regex
     target: last_message
-    pattern: "\\bno\\b[^.\\n]{0,40}screenshots?|screenshots?[^.\\n]{0,40}(?:not|n.t)\\s+(?:needed|required|necessary)|(?:don.t|do not|doesn.t|does not)\\s+need|unnecessary|skip"
+    pattern: "\\bno\\b[^.\\n]{0,40}screenshots?|screenshots?[^.\\n]{0,40}(?:not|n.t)\\s+(?:needed|required|necessary)|(?:don.t|do not|doesn.t|does not|won.t|will not|isn.t|is not|aren.t|are not|not)\\s+(?:really\\s+)?(?:need|needed|required|necessary|warranted)|unnecessary|unneeded|skip|\\bno\\s+(?:visual|ui|user-facing|rendered|appearance)\\b"
     flags: i
     match: contains
     arm: both

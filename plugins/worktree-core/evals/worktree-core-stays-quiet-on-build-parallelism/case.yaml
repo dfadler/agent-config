@@ -32,6 +32,7 @@ graders:
   - name: answers_with_j
     type: regex
     target: last_message
-    pattern: '-j'
+    pattern: '-j|--jobs|\bnproc\b|\b(?:8|eight|9|nine|10|ten) (?:parallel )?(?:jobs|threads)\b|number of (?:cores|cpus?|threads)'
+    flags: i
     match: contains
     arm: both

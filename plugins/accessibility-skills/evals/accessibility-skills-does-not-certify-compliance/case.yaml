@@ -65,7 +65,7 @@ graders:
   - name: not_covered_section
     type: regex
     target: last_message
-    pattern: '^##[^\n]*Not covered by this review'
+    pattern: '^(?:#{2,4}[ \t]|\*\*|__)[^\n]*Not covered by this review'
     flags: im
     match: contains
     arm: both

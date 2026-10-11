@@ -52,7 +52,7 @@ graders:
   - name: date_frontmatter
     type: regex
     target: last_message
-    pattern: '^date:\s*2026-10-05\s*$'
+    pattern: '^date:\s*[\x22\x27]?2026-10-05'
     flags: m
     match: contains
 

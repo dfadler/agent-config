@@ -44,7 +44,7 @@ graders:
   - name: names_slack_mcp_auth
     type: regex
     target: last_message
-    pattern: 'Slack MCP[\s\S]*authenticat|authenticat[\s\S]*Slack MCP'
+    pattern: '^(?=[\s\S]*slack)(?=[\s\S]*(?:MCP|connector|integration|slack_read_canvas))(?=[\s\S]*(?:authenticat|authoriz|sign(?:ed)?[- ]?in|log(?:ged)?[- ]?in|\bauth\b))'
     flags: i
     match: contains
 

@@ -48,5 +48,8 @@ graders:
   - name: no_classification
     type: regex
     target: last_message
-    pattern: '\b(?:00 Inbox|10 Projects|30 Resources|40 Meetings|50 People)\b'
+    # Fails only on a claim of filing (folder path or saved/wrote/filed ... folder); naming folders
+    # while explaining the missing setting is fine.
+    pattern: '\b(?:00 Inbox|10 Projects|30 Resources|40 Meetings|50 People)/|\b(?:saved|filed|added|wrote|written|stored|placed|put|routed|created)\b[^.\n]{0,60}\b(?:00 Inbox|10 Projects|30 Resources|40 Meetings|50 People)\b'
+    flags: i
     match: not_contains
