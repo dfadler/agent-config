@@ -1,0 +1,49 @@
+# Run: claude plugin eval plugins/subagent-orchestration --case orchestration-own-dev-server-port --runs 3 --trust-plugin --no-publish
+# Shared run/grant facts: docs/contributing.md, "Plugin evals". No grant; reply-only.
+# Covers the #621 follow-up: parallel agents that start a dev server each get their own port.
+# Run with --ablation with-without; no skill_fired grader (reply-only).
+# Can fail: assigns_own_port fails if the reply plans parallel agents but never mentions a
+# separate/distinct port per agent.
+schema_version: "1.1"
+name: orchestration-own-dev-server-port
+description: >
+  Given three independent UI checks that each need the dev server, the reply runs them in
+  parallel and gives each agent its own port. expected_outcome: PASS when it names a
+  distinct port per agent; FAIL when it launches them in parallel on one shared port.
+tags: [subagent-orchestration, trigger, quick]
+
+execution:
+  prompt: |
+    Here's what I'd like done, in no particular order: (1) start the dev server and screenshot
+    every route under app/admin/ (about 15 pages) to check for layout regressions, (2) start the
+    dev server and run the Playwright suite in e2e/checkout/, triaging failures, (3) start the
+    dev server and audit app/marketing/ pages for broken links. They touch different directories
+    and don't depend on each other, but each needs its own dev server running at the same time
+    (the server keeps per-session state, so they can't share one). How will you tackle these?
+    Three sentences, no commands.
+  max_turns: 4
+  allowed_tools:
+    - Skill
+
+graders:
+  - name: skill_fired
+    type: tool_used
+    tool: Skill
+    input_match: '"skill"\s*:\s*"(?:[\w-]+:)?subagent-orchestration"'
+    min: 1
+    arm: with-only
+
+
+  - name: plans_parallel
+    type: regex
+    target: last_message
+    pattern: '(?=.*(?:parallel|concurrent|simultaneous|at the same time|at once))(?=.*agent)'
+    flags: is
+    match: contains
+
+  - name: assigns_own_port
+    type: regex
+    target: last_message
+    pattern: '(?:own|separate|distinct|different|unique|its)\s+(?:dev[- ]server\s+)?port|ports?\s+(?:per|for each)|port (?:collision|conflict|clash)|each\b[^.]{0,40}\bport|\bport\s+\d{4}\b[^.]{0,80}\bport\s+\d{4}'
+    flags: is
+    match: contains
