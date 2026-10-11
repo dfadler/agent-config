@@ -41,10 +41,35 @@ export const parseHookTable = (
   return ok(rows);
 };
 
-/** The shell-form command line setup registers for a row. */
-export const shellCommand = (row: HookRow, home: string): string =>
-  `node "${home}/.claude/skills/${row.script}"`;
+/** How a hook is identified in settings.json: `command`, plus `args` in exec form. */
+export interface HookCommand {
+  readonly command: string;
+  /** Absent in shell form. */
+  readonly args?: readonly string[];
+}
 
-/** The retired command setup/teardown sweep for a row. */
-export const legacyCommand = (row: HookRow, home: string): string =>
-  `${home}/.claude/skills/${row.legacy}`;
+/**
+ * The exec form setup registers (no shell, so no quoting; see
+ * https://code.claude.com/docs/en/hooks#exec-form-and-shell-form).
+ */
+export const execHook = (row: HookRow, home: string): HookCommand => ({
+  command: "node",
+  args: [`${home}/.claude/skills/${row.script}`],
+});
+
+/** The earlier shell-form registration, `node "<path>"`, that setup migrates. */
+export const shellHook = (row: HookRow, home: string): HookCommand => ({
+  command: `node "${home}/.claude/skills/${row.script}"`,
+});
+
+/** The retired .sh registration setup/teardown sweep. */
+export const legacyHook = (row: HookRow, home: string): HookCommand => ({
+  command: `${home}/.claude/skills/${row.legacy}`,
+});
+
+/** Every form teardown removes for a row. */
+export const allHookForms = (row: HookRow, home: string): readonly HookCommand[] => [
+  execHook(row, home),
+  shellHook(row, home),
+  legacyHook(row, home),
+];

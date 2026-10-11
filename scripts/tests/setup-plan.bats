@@ -36,7 +36,8 @@ setup() {
   done
   CLAUDE="$HOME/.claude"
   WT_HOOKS="$CLAUDE/skills/worktree-core/scripts/ts"
-  MH_HOOK="node \"$CLAUDE/skills/memory-hygiene/scripts/ts/memory-hygiene-stop-hook.ts\""
+  MH_HOOK="node${T}[\"$CLAUDE/skills/memory-hygiene/scripts/ts/memory-hygiene-stop-hook.ts\"]"
+  MH_SHELL="node \"$CLAUDE/skills/memory-hygiene/scripts/ts/memory-hygiene-stop-hook.ts\""
 }
 
 teardown() {
@@ -77,9 +78,9 @@ install() {
 
 # The plan lines for the hook rows, in plugin-hooks.sh order.
 hook_lines() {
-  printf 'register-hook\tPreToolUse\t%s\tEdit|Write\n' "node \"$WT_HOOKS/require-worktree-hook.ts\""
-  printf 'register-hook\tSessionStart\t%s\n' "node \"$WT_HOOKS/check-worktree-symlinks-hook.ts\""
-  printf 'register-hook\tSessionStart\t%s\n' "node \"$WT_HOOKS/prune-merged-worktrees-hook.ts\""
+  printf 'register-hook\tPreToolUse\tnode\t["%s"]\tEdit|Write\n' "$WT_HOOKS/require-worktree-hook.ts"
+  printf 'register-hook\tSessionStart\tnode\t["%s"]\n' "$WT_HOOKS/check-worktree-symlinks-hook.ts"
+  printf 'register-hook\tSessionStart\tnode\t["%s"]\n' "$WT_HOOKS/prune-merged-worktrees-hook.ts"
   printf 'register-hook\tStop\t%s\n' "$MH_HOOK"
 }
 
@@ -180,9 +181,9 @@ hook_lines() {
   [ "$status" -eq 0 ]
   has "unlink${T}opted-out${T}$CLAUDE/commands/demo.md${T}$FAKE_REPO/claude/commands/demo.md"
   has "unlink${T}superseded${T}$CLAUDE/skills/worktree-core${T}$FAKE_REPO/plugins/worktree-core"
-  has "deregister-hook${T}PreToolUse${T}node \"$WT_HOOKS/require-worktree-hook.ts\""
-  has "deregister-hook${T}SessionStart${T}node \"$WT_HOOKS/check-worktree-symlinks-hook.ts\""
-  has "deregister-hook${T}SessionStart${T}node \"$WT_HOOKS/prune-merged-worktrees-hook.ts\""
+  has "deregister-hook${T}PreToolUse${T}node${T}[\"$WT_HOOKS/require-worktree-hook.ts\"]"
+  has "deregister-hook${T}SessionStart${T}node${T}[\"$WT_HOOKS/check-worktree-symlinks-hook.ts\"]"
+  has "deregister-hook${T}SessionStart${T}node${T}[\"$WT_HOOKS/prune-merged-worktrees-hook.ts\"]"
   # The kept plugin's hook is already registered: no action for it.
   lacks "Stop"
 }
@@ -202,6 +203,36 @@ PY
   has "register-hook${T}Stop${T}$MH_HOOK"
   lacks "register-hook${T}PreToolUse"
   has "link${T}$FAKE_REPO/plugins/memory-hygiene${T}$CLAUDE/skills/memory-hygiene"
+}
+
+@test "plan: a shell-form hook entry is migrated to exec form, not registered again" {
+  install
+  python3 - "$CLAUDE/settings.json" "$MH_SHELL" <<'PY'
+import json, sys
+path, cmd = sys.argv[1], sys.argv[2]
+data = json.load(open(path))
+data["hooks"]["Stop"] = [{"hooks": [{"type": "command", "command": cmd}]}]
+json.dump(data, open(path, "w"))
+PY
+  plan
+  [ "$status" -eq 0 ]
+  has "migrate-hook${T}Stop${T}$MH_SHELL${T}$MH_HOOK"
+  lacks "register-hook${T}Stop"
+}
+
+@test "plan: opting a plugin out deregisters its shell-form entry as well as its exec form" {
+  install
+  python3 - "$CLAUDE/settings.json" "$MH_SHELL" <<'PY'
+import json, sys
+path, cmd = sys.argv[1], sys.argv[2]
+data = json.load(open(path))
+data["hooks"]["Stop"].append({"hooks": [{"type": "command", "command": cmd}]})
+json.dump(data, open(path, "w"))
+PY
+  plan --skip=memory-hygiene
+  [ "$status" -eq 0 ]
+  has "deregister-hook${T}Stop${T}$MH_HOOK"
+  has "deregister-hook${T}Stop${T}$MH_SHELL"
 }
 
 @test "plan: a stale symlink this repo owns is replaced; a foreign or real one is only warned about" {
@@ -301,7 +332,7 @@ PY
     verb="${line%%$'\t'*}"
     case "$verb" in
       mkdir | personal-migrate | personal-create | include | claude-md | link | relink | unlink | \
-        register-hook | deregister-hook | skip-plugin | skip-command | warn-foreign-symlink | warn-exists) ;;
+        register-hook | deregister-hook | migrate-hook | skip-plugin | skip-command | warn-foreign-symlink | warn-exists) ;;
       *)
         echo "undocumented verb: $verb" >&2
         return 1

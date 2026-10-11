@@ -2,10 +2,24 @@
 // teardown.ts is the TypeScript caller; scripts/settings-lib.sh (python3) is
 // the bootstrap-bash counterpart with the same removal semantics.
 
+import type { HookCommand } from "./hook-table.ts";
+
 export type JsonObject = Readonly<Record<string, unknown>>;
 
 export const isRecord = (v: unknown): v is JsonObject =>
   typeof v === "object" && v !== null && !Array.isArray(v);
+
+/** True when `hook` is `want`: same command and the same args (none = shell form). */
+export const hookIs = (hook: JsonObject, want: HookCommand): boolean => {
+  const args: unknown = hook["args"];
+  const have: readonly unknown[] = Array.isArray(args) ? args : [];
+  const wantArgs = want.args ?? [];
+  return (
+    hook["command"] === want.command &&
+    have.length === wantArgs.length &&
+    have.every((a, i) => a === wantArgs[i])
+  );
+};
 
 /**
  * Remove every hook under `hooks.<event>` for which `isTarget` is true.

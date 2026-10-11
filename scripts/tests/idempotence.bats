@@ -134,7 +134,7 @@ seed_user_state() {
 import json
 d = json.load(open('$HOME/.claude/settings.json'))
 assert d['theme'] == 'dark', 'unrelated key lost'
-cmds = [h['command'] for ev in d['hooks'].values() for e in ev for h in e['hooks']]
+cmds = [' '.join([h['command']] + h.get('args', [])) for ev in d['hooks'].values() for e in ev for h in e['hooks']]
 assert cmds.count('/usr/bin/true') == 1, 'user hook duplicated or lost'
 managed = [c for c in cmds if c != '/usr/bin/true']
 assert len(managed) == 4, 'expected 4 managed hooks, got {}'.format(len(managed))

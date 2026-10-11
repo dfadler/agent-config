@@ -135,7 +135,7 @@ it owns, identified by an explicit marker:
 
 | Shared location | Ownership marker | Where |
 |---|---|---|
-| `~/.claude/settings.json` (`hooks.<EVENT>`) | Exact `command` string match against this repo's own hook table (`scripts/plugin-hooks.tsv`, shared by bash and TypeScript) | `ensure_hook_registered`/`ensure_hook_deregistered` in `scripts/settings-lib.sh`; `deregisterHook` in `scripts/ts/hook-settings.ts` (`teardown`) |
+| `~/.claude/settings.json` (`hooks.<EVENT>`) | Exact `command` + `args` match (exec form `node` + path; the earlier shell-form `node "path"` and the retired `.sh` are matched too, for migration) against this repo's own hook table (`scripts/plugin-hooks.tsv`, shared by bash and TypeScript) | `ensure_hook_registered`/`ensure_hook_deregistered`/`migrate_hook_to_exec_form` in `scripts/settings-lib.sh`; `deregisterHook` in `scripts/ts/hook-settings.ts` (`teardown`) |
 | `~/.claude/CLAUDE.md` | `MANAGED_BEGIN`/`MANAGED_END` marker pair | `ensure_claude_md_includes()` (`setup.sh`), `restoreClaudeMd()` (`scripts/ts/teardown.ts`) |
 | `~/.claude/CLAUDE.personal.md` (empty placeholder) | `.setup-managed` sidecar file | `migrate_personal_claude_md()` (`setup.sh`), checked in `restoreClaudeMd()` (`scripts/ts/teardown.ts`) |
 | `~/.claude/{commands,skills,agents}/*` | Resolved symlink target falls under this repo's root | `link()`/`prune_stale_plugin_links()` (`setup.sh`), `unlinkIfOwned`/`unlinkDirContents` (`scripts/ts/teardown.ts`) |

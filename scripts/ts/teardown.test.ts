@@ -61,7 +61,12 @@ const settings = (data: unknown): void => {
   write(claude("settings.json"), JSON.stringify(data));
 };
 const readSettings = (): unknown => JSON.parse(readFileSync(claude("settings.json"), "utf8"));
+// Shell form (what older setups registered) and exec form (what setup registers now).
 const cmd = (script: string): string => `node "${home}/.claude/skills/${script}"`;
+const execHookEntry = (script: string, matcher?: string): unknown => ({
+  ...(matcher === undefined ? {} : { matcher }),
+  hooks: [{ type: "command", command: "node", args: [`${home}/.claude/skills/${script}`] }],
+});
 
 beforeEach(() => {
   sandbox = realpathSync(mkdtempSync(join(tmpdir(), "teardown-")));
@@ -247,6 +252,34 @@ describe("hook deregistration", () => {
           ] },
         ],
         Stop: [entry(`${home}/.claude/skills/memory-hygiene/hooks/scripts/memory-hygiene-stop-hook.sh`)],
+      },
+    });
+    run();
+    expect(readSettings()).toEqual({ hooks: {} });
+  });
+
+  it("removes exec-form hooks, and keeps a node hook with other args", () => {
+    const other = entry("x");
+    const foreignNode = {
+      hooks: [{ type: "command", command: "node", args: ["/elsewhere/own-hook.ts"] }],
+    };
+    settings({
+      hooks: {
+        PreToolUse: [execHookEntry("worktree-core/scripts/ts/require-worktree-hook.ts", "Edit|Write")],
+        Stop: [execHookEntry("memory-hygiene/scripts/ts/memory-hygiene-stop-hook.ts"), foreignNode, other],
+      },
+    });
+    run();
+    expect(readSettings()).toEqual({ hooks: { Stop: [foreignNode, other] } });
+  });
+
+  it("removes a migrated-from shell form and the exec form side by side", () => {
+    settings({
+      hooks: {
+        Stop: [
+          entry(cmd("memory-hygiene/scripts/ts/memory-hygiene-stop-hook.ts")),
+          execHookEntry("memory-hygiene/scripts/ts/memory-hygiene-stop-hook.ts"),
+        ],
       },
     });
     run();

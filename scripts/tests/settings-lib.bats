@@ -252,3 +252,106 @@ assert 'SessionStart' in d['hooks'], 'SessionStart key lost'
 "
   [ "$status" -eq 0 ]
 }
+
+# ---------------------------------------------------------------------------
+# Exec form: COMMAND + ARGS_JSON (no shell). The hook's identity is both.
+# ---------------------------------------------------------------------------
+
+@test "exec form: registers command with args, and is idempotent" {
+  printf '{}' >"$SETTINGS"
+  ensure_hook_registered "Stop" "" "node" "$SETTINGS" '["/p/a b/x.ts"]'
+  ensure_hook_registered "Stop" "" "node" "$SETTINGS" '["/p/a b/x.ts"]'
+  run python3 -c "
+import json
+d = json.load(open('$SETTINGS'))
+hooks = [h for e in d['hooks']['Stop'] for h in e['hooks']]
+assert hooks == [{'type': 'command', 'command': 'node', 'args': ['/p/a b/x.ts']}], hooks
+"
+  [ "$status" -eq 0 ]
+}
+
+@test "exec form: same command with different args is a different hook" {
+  printf '{}' >"$SETTINGS"
+  ensure_hook_registered "Stop" "" "node" "$SETTINGS" '["/p/one.ts"]'
+  ensure_hook_registered "Stop" "" "node" "$SETTINGS" '["/p/two.ts"]'
+  run python3 -c "
+import json
+d = json.load(open('$SETTINGS'))
+assert len([h for e in d['hooks']['Stop'] for h in e['hooks']]) == 2
+"
+  [ "$status" -eq 0 ]
+}
+
+@test "exec form: deregister removes only the exec hook, not a shell-form one with the same command text" {
+  printf '{}' >"$SETTINGS"
+  ensure_hook_registered "Stop" "" "node" "$SETTINGS"
+  ensure_hook_registered "Stop" "" "node" "$SETTINGS" '["/p/x.ts"]'
+  ensure_hook_deregistered "Stop" "node" "$SETTINGS" '["/p/x.ts"]'
+  run python3 -c "
+import json
+d = json.load(open('$SETTINGS'))
+hooks = [h for e in d['hooks']['Stop'] for h in e['hooks']]
+assert hooks == [{'type': 'command', 'command': 'node'}], hooks
+"
+  [ "$status" -eq 0 ]
+}
+
+@test "exec form: hook_registration_state distinguishes args" {
+  printf '{}' >"$SETTINGS"
+  ensure_hook_registered "Stop" "" "node" "$SETTINGS" '["/p/x.ts"]'
+  run hook_registration_state "Stop" "node" "$SETTINGS" '["/p/x.ts"]'
+  [ "$status" -eq 0 ]
+  run hook_registration_state "Stop" "node" "$SETTINGS" '["/p/y.ts"]'
+  [ "$status" -eq 1 ]
+  run hook_registration_state "Stop" "node" "$SETTINGS"
+  [ "$status" -eq 1 ]
+}
+
+# ---------------------------------------------------------------------------
+# migrate_hook_to_exec_form
+# ---------------------------------------------------------------------------
+
+@test "migrate: rewrites a shell-form hook in place, keeping position and other keys" {
+  cat >"$SETTINGS" <<'JSON'
+{"hooks": {"Stop": [{"hooks": [
+  {"type": "command", "command": "first"},
+  {"type": "command", "command": "node \"/p/x.ts\"", "timeout": 5},
+  {"type": "command", "command": "last"}]}]}}
+JSON
+  run migrate_hook_to_exec_form "Stop" 'node "/p/x.ts"' node '["/p/x.ts"]' "$SETTINGS"
+  [ "$status" -eq 0 ]
+  [[ "$output" == *"Migrated Stop hook to exec form"* ]]
+  run python3 -c "
+import json
+d = json.load(open('$SETTINGS'))
+hooks = d['hooks']['Stop'][0]['hooks']
+assert [h['command'] for h in hooks] == ['first', 'node', 'last'], hooks
+assert hooks[1] == {'type': 'command', 'command': 'node', 'args': ['/p/x.ts'], 'timeout': 5}, hooks[1]
+"
+  [ "$status" -eq 0 ]
+}
+
+@test "migrate: drops the shell-form duplicate when the exec form is already in the same entry" {
+  cat >"$SETTINGS" <<'JSON'
+{"hooks": {"Stop": [{"hooks": [
+  {"type": "command", "command": "node \"/p/x.ts\""},
+  {"type": "command", "command": "node", "args": ["/p/x.ts"]}]}]}}
+JSON
+  migrate_hook_to_exec_form "Stop" 'node "/p/x.ts"' node '["/p/x.ts"]' "$SETTINGS"
+  run python3 -c "
+import json
+d = json.load(open('$SETTINGS'))
+hooks = d['hooks']['Stop'][0]['hooks']
+assert hooks == [{'type': 'command', 'command': 'node', 'args': ['/p/x.ts']}], hooks
+"
+  [ "$status" -eq 0 ]
+}
+
+@test "migrate: no-op and silent when nothing matches, and does not rewrite the file" {
+  printf '{"hooks":{"Stop":[{"hooks":[{"type":"command","command":"other"}]}]}}' >"$SETTINGS"
+  before="$(cat "$SETTINGS")"
+  run migrate_hook_to_exec_form "Stop" 'node "/p/x.ts"' node '["/p/x.ts"]' "$SETTINGS"
+  [ "$status" -eq 0 ]
+  [ -z "$output" ]
+  [ "$(cat "$SETTINGS")" = "$before" ]
+}
