@@ -1,0 +1,52 @@
+# Run: claude plugin eval plugins/gha-ci-audit --case workflow-authoring-fires-on-edit
+# Shared run/grant facts: docs/contributing.md, "Plugin evals". No grant needed (Skill only).
+# Should-fire half of the gha-workflow-authoring boundary; the should-not-fire half is
+# workflow-authoring-quiet-on-other-ci. Every grader is free, so the case is tagged quick.
+# Can fail: skill_fired scores 0 if the description stops matching a plain "edit this workflow"
+# prompt that never names the skill. names_actionlint and hands_off_to_human check phrases
+# from the skill's Steps ("Run `actionlint`", "Hand the PR to a human"); the prompt names
+# neither. Unverified: a no-plugin reply may mention actionlint by habit, so the first run
+# should show whether names_actionlint separates the arms.
+schema_version: "1.1"
+name: workflow-authoring-fires-on-edit
+description: >
+  Asked to add a job to an existing GitHub Actions workflow, without naming the skill, the
+  model invokes gha-workflow-authoring and its plan runs actionlint and leaves the PR for a
+  human to merge. expected_outcome: PASS when the skill is invoked and the reply names
+  actionlint and a human merge; FAIL when the skill is not invoked or either is missing.
+tags: [gha-ci-audit, trigger, quick]
+
+execution:
+  prompt: |
+    I need to add a `docs` job to `.github/workflows/ci.yml` that runs `pnpm docs:build` on
+    Node 22 after checkout. Before editing anything, list the steps you would take from
+    edit through merge, including every check you would run. Answer in your reply; don't
+    create files or run commands.
+  max_turns: 6
+  allowed_tools:
+    - Skill
+
+graders:
+  # Steps: the skill fired on a prompt that never names it. An indicator in a two-arm run.
+  - name: skill_fired
+    type: tool_used
+    tool: Skill
+    input_match: '"skill"\s*:\s*"(?:[\w-]+:)?gha-workflow-authoring"'
+    min: 1
+    arm: with-only
+
+  # Result: Steps 3, run actionlint after the edit.
+  - name: names_actionlint
+    type: regex
+    target: last_message
+    pattern: 'actionlint'
+    flags: i
+    match: contains
+
+  # Result: Steps 4, the workflow-touching PR goes to a human to merge.
+  - name: hands_off_to_human
+    type: regex
+    target: last_message
+    pattern: '(?:human|person|maintainer|owner)[^.\n]{0,60}(?:merg|approv|review)|(?:merg|approv)[^.\n]{0,60}(?:human|person|maintainer|owner)'
+    flags: i
+    match: contains
