@@ -20,3 +20,4 @@ node_modules/
 # config from, so ~/.claude/settings.local.json can easily accumulate
 # machine-specific paths before a global gitignore is even in place.
 .claude/settings.local.json
+.claude/worktrees/
