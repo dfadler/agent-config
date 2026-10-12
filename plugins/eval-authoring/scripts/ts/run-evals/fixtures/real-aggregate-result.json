@@ -1,0 +1,353 @@
+{
+  "schemaVersion": 1,
+  "claudeVersion": "2.1.288",
+  "startedAt": "2026-10-11T22:55:06.810Z",
+  "durationSeconds": 23,
+  "costUsd": 0.184809,
+  "partial": false,
+  "suite": {
+    "root": "/repo",
+    "ablation": "with-without",
+    "modelOverride": "claude-sonnet-5-5",
+    "judgeModel": "claude-sonnet-5-5",
+    "caseFilter": "capture-routes-person-note",
+    "threshold": 1,
+    "concurrency": 1,
+    "plugins": [
+      {
+        "name": "second-brain",
+        "version": "0.1.0",
+        "path": "/repo"
+      }
+    ]
+  },
+  "cases": [
+    {
+      "name": "capture-routes-person-note",
+      "dir": "evals/capture-routes-person-note",
+      "source": "case_yaml",
+      "promptMarkdown": "SECOND_BRAIN_VAULT_PATH is set to /vault. Today is 2026-10-05. Add to my\nsecond brain what I know about Priya Raman: staff engineer on Search,\njoined in 2024, prefers async updates, owns the search rollout plan.\n\nDon't call any tools other than skills (the vault is not connected here). Reply with the\nvault-relative path of the note on the first line, then the full note in\none markdown code block, and nothing else.\n",
+      "runsPerCase": 3,
+      "timeoutSeconds": 300,
+      "maxTurns": 6,
+      "graders": [
+        {
+          "name": "skill_fired",
+          "type": "tool_used",
+          "weight": 1,
+          "config": {
+            "tool": "Skill",
+            "input_match": "\"skill\"\\s*:\\s*\"(?:[\\w-]+:)?capture\"",
+            "min": 1,
+            "arm": "with-only"
+          }
+        },
+        {
+          "name": "people_path_without_date",
+          "type": "regex",
+          "weight": 1,
+          "config": {
+            "target": "last_message",
+            "pattern": "^`?(?:/vault/)?50 People/Priya Raman\\.md`?\\s*$",
+            "flags": "m",
+            "match": "contains"
+          }
+        },
+        {
+          "name": "date_frontmatter",
+          "type": "regex",
+          "weight": 1,
+          "config": {
+            "target": "last_message",
+            "pattern": "^date:\\s*[\\x22\\x27]?2026-10-05",
+            "flags": "m",
+            "match": "contains"
+          }
+        },
+        {
+          "name": "tags_frontmatter",
+          "type": "regex",
+          "weight": 1,
+          "config": {
+            "target": "last_message",
+            "pattern": "^tags:\\s*\\[",
+            "flags": "m",
+            "match": "contains"
+          }
+        }
+      ],
+      "arms": {
+        "with": [
+          {
+            "score": 1,
+            "passed": true,
+            "turns": 3,
+            "costUsd": 0.0363222,
+            "judgeCostUsd": 0,
+            "durationSeconds": 4,
+            "startedAt": "2026-10-11T22:55:06.833Z",
+            "error": null,
+            "tracePath": "/tmp/e-XXXX/run0/trace.jsonl",
+            "skippedPaidGraders": false,
+            "graders": [
+              {
+                "name": "skill_fired",
+                "passed": true,
+                "weight": 1,
+                "explanation": "Skill called 1x (expected 1..∞)",
+                "withOnly": true,
+                "scored": false
+              },
+              {
+                "name": "people_path_without_date",
+                "passed": true,
+                "weight": 1,
+                "explanation": "matched ^`?(?:/vault/)?50 People/Priya Raman\\.md`?\\s*$",
+                "withOnly": false,
+                "scored": true
+              },
+              {
+                "name": "date_frontmatter",
+                "passed": true,
+                "weight": 1,
+                "explanation": "matched ^date:\\s*[\\x22\\x27]?2026-10-05",
+                "withOnly": false,
+                "scored": true
+              },
+              {
+                "name": "tags_frontmatter",
+                "passed": true,
+                "weight": 1,
+                "explanation": "matched ^tags:\\s*\\[",
+                "withOnly": false,
+                "scored": true
+              }
+            ]
+          },
+          {
+            "score": 1,
+            "passed": true,
+            "turns": 3,
+            "costUsd": 0.0354742,
+            "judgeCostUsd": 0,
+            "durationSeconds": 3,
+            "startedAt": "2026-10-11T22:55:10.758Z",
+            "error": null,
+            "tracePath": "/tmp/e-XXXX/run1/trace.jsonl",
+            "skippedPaidGraders": false,
+            "graders": [
+              {
+                "name": "skill_fired",
+                "passed": true,
+                "weight": 1,
+                "explanation": "Skill called 1x (expected 1..∞)",
+                "withOnly": true,
+                "scored": false
+              },
+              {
+                "name": "people_path_without_date",
+                "passed": true,
+                "weight": 1,
+                "explanation": "matched ^`?(?:/vault/)?50 People/Priya Raman\\.md`?\\s*$",
+                "withOnly": false,
+                "scored": true
+              },
+              {
+                "name": "date_frontmatter",
+                "passed": true,
+                "weight": 1,
+                "explanation": "matched ^date:\\s*[\\x22\\x27]?2026-10-05",
+                "withOnly": false,
+                "scored": true
+              },
+              {
+                "name": "tags_frontmatter",
+                "passed": true,
+                "weight": 1,
+                "explanation": "matched ^tags:\\s*\\[",
+                "withOnly": false,
+                "scored": true
+              }
+            ]
+          },
+          {
+            "score": 1,
+            "passed": true,
+            "turns": 3,
+            "costUsd": 0.0362068,
+            "judgeCostUsd": 0,
+            "durationSeconds": 4,
+            "startedAt": "2026-10-11T22:55:14.055Z",
+            "error": null,
+            "tracePath": "/tmp/e-XXXX/run2/trace.jsonl",
+            "skippedPaidGraders": false,
+            "graders": [
+              {
+                "name": "skill_fired",
+                "passed": true,
+                "weight": 1,
+                "explanation": "Skill called 1x (expected 1..∞)",
+                "withOnly": true,
+                "scored": false
+              },
+              {
+                "name": "people_path_without_date",
+                "passed": true,
+                "weight": 1,
+                "explanation": "matched ^`?(?:/vault/)?50 People/Priya Raman\\.md`?\\s*$",
+                "withOnly": false,
+                "scored": true
+              },
+              {
+                "name": "date_frontmatter",
+                "passed": true,
+                "weight": 1,
+                "explanation": "matched ^date:\\s*[\\x22\\x27]?2026-10-05",
+                "withOnly": false,
+                "scored": true
+              },
+              {
+                "name": "tags_frontmatter",
+                "passed": true,
+                "weight": 1,
+                "explanation": "matched ^tags:\\s*\\[",
+                "withOnly": false,
+                "scored": true
+              }
+            ]
+          }
+        ],
+        "without": [
+          {
+            "score": 0.3333333333333333,
+            "passed": false,
+            "turns": 1,
+            "costUsd": 0.0252386,
+            "judgeCostUsd": 0,
+            "durationSeconds": 4,
+            "startedAt": "2026-10-11T22:55:17.727Z",
+            "error": null,
+            "tracePath": "/tmp/e-XXXX/run0/trace.jsonl",
+            "skippedPaidGraders": false,
+            "graders": [
+              {
+                "name": "people_path_without_date",
+                "passed": false,
+                "weight": 1,
+                "explanation": "pattern not found in last_message",
+                "withOnly": false,
+                "scored": true
+              },
+              {
+                "name": "date_frontmatter",
+                "passed": false,
+                "weight": 1,
+                "explanation": "pattern not found in last_message",
+                "withOnly": false,
+                "scored": true
+              },
+              {
+                "name": "tags_frontmatter",
+                "passed": true,
+                "weight": 1,
+                "explanation": "matched ^tags:\\s*\\[",
+                "withOnly": false,
+                "scored": true
+              }
+            ]
+          },
+          {
+            "score": 0.3333333333333333,
+            "passed": false,
+            "turns": 1,
+            "costUsd": 0.0256486,
+            "judgeCostUsd": 0,
+            "durationSeconds": 4,
+            "startedAt": "2026-10-11T22:55:21.230Z",
+            "error": null,
+            "tracePath": "/tmp/e-XXXX/run1/trace.jsonl",
+            "skippedPaidGraders": false,
+            "graders": [
+              {
+                "name": "people_path_without_date",
+                "passed": false,
+                "weight": 1,
+                "explanation": "pattern not found in last_message",
+                "withOnly": false,
+                "scored": true
+              },
+              {
+                "name": "date_frontmatter",
+                "passed": false,
+                "weight": 1,
+                "explanation": "pattern not found in last_message",
+                "withOnly": false,
+                "scored": true
+              },
+              {
+                "name": "tags_frontmatter",
+                "passed": true,
+                "weight": 1,
+                "explanation": "matched ^tags:\\s*\\[",
+                "withOnly": false,
+                "scored": true
+              }
+            ]
+          },
+          {
+            "score": 0.3333333333333333,
+            "passed": false,
+            "turns": 1,
+            "costUsd": 0.0259186,
+            "judgeCostUsd": 0,
+            "durationSeconds": 4,
+            "startedAt": "2026-10-11T22:55:25.185Z",
+            "error": null,
+            "tracePath": "/tmp/e-XXXX/run2/trace.jsonl",
+            "skippedPaidGraders": false,
+            "graders": [
+              {
+                "name": "people_path_without_date",
+                "passed": false,
+                "weight": 1,
+                "explanation": "pattern not found in last_message",
+                "withOnly": false,
+                "scored": true
+              },
+              {
+                "name": "date_frontmatter",
+                "passed": false,
+                "weight": 1,
+                "explanation": "pattern not found in last_message",
+                "withOnly": false,
+                "scored": true
+              },
+              {
+                "name": "tags_frontmatter",
+                "passed": true,
+                "weight": 1,
+                "explanation": "matched ^tags:\\s*\\[",
+                "withOnly": false,
+                "scored": true
+              }
+            ]
+          }
+        ]
+      },
+      "aggregates": {
+        "score": 1,
+        "passRate": 1,
+        "scoreWithout": 0.3333333333333333,
+        "passRateWithout": 0,
+        "delta": 0.6666666666666667
+      }
+    }
+  ],
+  "aggregates": {
+    "casesTotal": 1,
+    "casesPassed": 1,
+    "overallScore": 1,
+    "overallPassRate": 1,
+    "meanDelta": 0.6666666666666667
+  }
+}

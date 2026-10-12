@@ -1,3 +1,4 @@
+import { readFileSync } from "node:fs";
 import { describe, expect, it } from "vitest";
 import { EXIT_OK, EXIT_PARTIAL, EXIT_USAGE } from "./exit-codes.ts";
 import { main, parseArgs } from "./run-evals.ts";
@@ -7,6 +8,7 @@ import {
   BLOCK_END,
   BLOCK_START,
   caseRow,
+  finalReply,
   quoteSafe,
   redact,
   renderBlock,
@@ -16,7 +18,19 @@ import {
 
 const FAKE_TOKEN = `ghp_${"a1B2c3D4e5".repeat(3)}`;
 
-/** A recorded two-arm result: one with-arm run whose grader `g` failed, replying with a token. */
+const TRACE_PATH = "/t/trace.jsonl";
+const LONG_REPLY = `here it is: token=${FAKE_TOKEN} and more ${"x ".repeat(400)}`;
+/** A trace in the real stream-json shape whose last assistant message is LONG_REPLY. */
+const TRACE = [
+  { type: "assistant", message: { content: [{ type: "text", text: "earlier" }] } },
+  { type: "assistant", message: { content: [{ type: "text", text: LONG_REPLY }] } },
+  { type: "result" },
+]
+  .map((e) => JSON.stringify(e))
+  .join("\n");
+const readTrace = (p: string) => (p === TRACE_PATH ? TRACE : undefined);
+
+/** A recorded two-arm result: one with-arm run whose grader `g` failed, whose trace replies with a token. */
 const failing = (name: string, extra: Record<string, unknown> = {}): string =>
   JSON.stringify({
     schemaVersion: 1,
@@ -31,7 +45,7 @@ const failing = (name: string, extra: Record<string, unknown> = {}): string =>
             {
               score: 0.5,
               error: null,
-              lastMessage: `here it is: token=${FAKE_TOKEN} and more ${"x ".repeat(400)}`,
+              tracePath: TRACE_PATH,
               graders: [
                 { name: "g", passed: false, explanation: "reply lacked 'hi'" },
                 { name: "ok", passed: true },
@@ -50,7 +64,7 @@ const caseOf = (args: readonly string[]): string =>
 
 const setup = (opts: FakeIoOptions = {}) => {
   const root = makePlugin([{ name: "alpha" }, { name: "beta" }, { name: "alpine" }]);
-  return { root, ...fakeIo({ onCli: (args) => ({ result: failing(caseOf(args)) }), ...opts }) };
+  return { root, ...fakeIo({ files: { [TRACE_PATH]: TRACE }, onCli: (args) => ({ result: failing(caseOf(args)) }), ...opts }) };
 };
 
 const deps = (s: { io: ReturnType<typeof fakeIo>["io"] }) => ({ io: s.io, pluginsDir: "/p" });
@@ -76,15 +90,38 @@ describe("redact and quoteSafe", () => {
 
 describe("caseRow", () => {
   it("reads the arms, delta and failed graders of the plugin arm", () => {
-    const row = caseRow("alpha", failing("alpha"));
+    const row = caseRow("alpha", failing("alpha"), readTrace);
     expect(row).toMatchObject({ with: 0.5, without: 0.25, delta: 0.25 });
     expect(row?.failed).toHaveLength(1);
     expect(row?.failed[0]).toMatchObject({ run: 1, grader: "g", explanation: "reply lacked 'hi'" });
+    expect(row?.failed[0]?.reply).toBe(LONG_REPLY);
+  });
+  it("leaves the reply out when the trace is unreadable", () => {
+    expect(caseRow("alpha", failing("alpha"))?.failed[0]?.reply).toBeUndefined();
   });
   it("is undefined for unreadable text or a different case", () => {
     expect(caseRow("alpha", "not json")).toBeUndefined();
     expect(caseRow("other", failing("alpha"))).toBeUndefined();
     expect(caseRow("alpha", undefined)).toBeUndefined();
+  });
+});
+
+describe("real recorded result", () => {
+  const fx = (n: string) => readFileSync(new URL(`./fixtures/${n}`, import.meta.url), "utf8");
+  const trace = fx("real-trace.jsonl");
+  it("reads the final assistant text from a real trace", () => {
+    expect(finalReply(trace)).toMatch(/^50 People\/Priya Raman\.md\n/);
+    expect(finalReply("")).toBeUndefined();
+  });
+  it("attaches the trace reply to a failed grader of the real aggregate shape", () => {
+    // Every recorded with-plugin run passed; flip the first run's first scored grader.
+    const flip = /("name": "people_path_without_date",\s+"passed": )true/;
+    const text = fx("real-aggregate-result.json").replace(flip, "$1false");
+    expect(text).not.toBe(fx("real-aggregate-result.json"));
+    const row = caseRow("capture-routes-person-note", text, () => trace);
+    expect(row?.failed).toHaveLength(1);
+    expect(row?.failed[0]).toMatchObject({ run: 1, grader: "people_path_without_date" });
+    expect(row?.failed[0]?.reply).toContain("# Priya Raman");
   });
 });
 

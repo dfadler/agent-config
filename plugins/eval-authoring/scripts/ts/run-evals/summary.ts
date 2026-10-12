@@ -9,15 +9,6 @@ export const BLOCK_END = "<!-- run-evals:end -->";
 const REPLY_MAX = 300;
 const REPLACEMENT = "[REDACTED]";
 
-/** Result keys that may hold a run's final reply. UNCONFIRMED: the CLI's schema is not documented; the first string found is used. */
-const REPLY_KEYS: readonly string[] = [
-  "lastMessage",
-  "finalMessage",
-  "reply",
-  "response",
-  "output",
-];
-
 /** Anything token-like, replaced before text is quoted. Conservative: a long unbroken run is redacted too. */
 const SECRET_PATTERNS: readonly RegExp[] = [
   /\b(api[_-]?key|token|secret|password|passwd|authorization)(\s*[:=]\s*)(?:Bearer\s+)?\S+/gi,
@@ -69,6 +60,17 @@ const parse = (text: string | undefined): Rec | undefined => {
   }
 };
 
+/** The text of the last assistant message in a `trace.jsonl` (stream-json lines); undefined when there is none. */
+export const finalReply = (trace: string | undefined): string | undefined => {
+  const texts = (trace ?? "").split("\n").flatMap((line) => {
+    const e = parse(line);
+    const content = isRec(e) && e["type"] === "assistant" && isRec(e["message"]) ? list(e["message"]["content"]) : [];
+    const t = content.flatMap((b) => (isRec(b) && b["type"] === "text" && typeof b["text"] === "string" ? [b["text"]] : []));
+    return t.length > 0 ? [t.join("\n")] : [];
+  });
+  return texts.at(-1);
+};
+
 export interface FailedGrader {
   readonly run: number;
   readonly grader: string;
@@ -88,10 +90,11 @@ export interface CaseRow {
   readonly skillRuns: number;
 }
 
-/** Read the one case row from an invocation's `aggregate-result.json` text; undefined when unreadable. */
+/** Read the one case row from an invocation's `aggregate-result.json` text; undefined when unreadable. The reply of a failed run comes from its trace via `readFile`; without one it is left out. */
 export const caseRow = (
   caseName: string,
   text: string | undefined,
+  readFile: (path: string) => string | undefined = () => undefined,
 ): CaseRow | undefined => {
   const c = list(parse(text)?.["cases"]).find(
     (x) => isRec(x) && x["name"] === caseName,
@@ -112,9 +115,8 @@ export const caseRow = (
     delta: num(agg["delta"]),
     failed: runs.flatMap((r, i) => {
       if (!isRec(r)) return [];
-      const reply = REPLY_KEYS.map((k) => r[k]).find(
-        (v): v is string => typeof v === "string" && v !== "",
-      );
+      const tracePath = r["tracePath"];
+      const reply = typeof tracePath === "string" ? finalReply(readFile(tracePath)) : undefined;
       return list(r["graders"]).flatMap((g) =>
         isRec(g) && g["passed"] === false
           ? [
