@@ -1,0 +1,40 @@
+# Run: claude plugin eval plugins/gha-ci-audit --case workflow-authoring-quiet-on-other-ci
+# Shared run/grant facts: docs/contributing.md, "Plugin evals". No grant needed (Skill only).
+# Should-not-fire half of the gha-workflow-authoring boundary: a near-miss that shares "CI
+# workflow" and YAML with the skill's description but edits GitLab CI, not GitHub Actions.
+# Can fail: the Skill check scores 0 if gha-workflow-authoring fires on any CI YAML edit;
+# writes_the_stage scores 0 if the reply has no stage. A regression guard, so a no-plugin arm
+# passes it by default and shows no delta by design.
+schema_version: "1.1"
+name: workflow-authoring-quiet-on-other-ci
+description: >
+  A request to edit a GitLab CI pipeline must not invoke gha-workflow-authoring, since the
+  skill covers GitHub Actions only. expected_outcome: PASS when the skill is not invoked and
+  the reply contains `pnpm test`; FAIL when the skill is invoked or the reply has no stage.
+  Regression guard: a no-plugin run is expected to pass, so the Delta is zero by design.
+tags: [gha-ci-audit, trigger, quick]
+
+execution:
+  prompt: |
+    Add a `test` stage that runs `pnpm test` to my `.gitlab-ci.yml`, which currently has only
+    a `build` stage. Reply with the full YAML in one code block and nothing else; don't
+    create files or run commands.
+  max_turns: 6
+  allowed_tools:
+    - Skill
+
+graders:
+  - name: gha_workflow_authoring_not_invoked
+    type: tool_used
+    tool: Skill
+    input_match: '"skill"\s*:\s*"(?:[\w-]+:)?gha-workflow-authoring"'
+    min: 0
+    max: 0
+    arm: both
+
+  - name: writes_the_stage
+    type: regex
+    target: last_message
+    pattern: 'test:[\s\S]*script:[\s\S]*pnpm test'
+    match: contains
+    arm: both

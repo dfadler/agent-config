@@ -33,8 +33,10 @@ automatically, with no per-project copy to keep in sync.
     user-attachments endpoint so they render inline in PR/issue bodies.
   - `gh-untrusted/` — read GitHub issues, PRs and review threads as labeled JSON
     with hidden-text warnings, so third-party text is treated as data. Needs Node 22.18+.
-  - `gha-ci-audit/` — audit GitHub Actions usage for any repository: workflow
-    volumes, critical-path analysis, cost/performance improvement opportunities.
+  - `gha-ci-audit/` — audit GitHub Actions usage for any repository (workflow
+    volumes, critical-path analysis, cost/performance opportunities), plus the
+    `gha-workflow-authoring` skill: SHA-pinning, `timeout-minutes`, `actionlint`
+    and human-merge rules that fire on any `.github/workflows/` edit.
   - `playwright/` — skill and agent for headless Playwright scripting: `.webm`
     recording, real key presses, Storybook play functions, frame extraction.
     Needs Node and the `playwright` package.
