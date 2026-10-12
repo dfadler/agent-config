@@ -65,5 +65,7 @@ graders:
   - name: writes_report_to_inbox
     type: regex
     target: last_message
-    pattern: '00 Inbox/2026-10-05 Sync Report\.md'
+    # Date-agnostic: the harness context says a different "today" than the prompt, and the
+    # model sometimes uses that one (traces). The skill supplies the path shape, not the date.
+    pattern: '00 Inbox/\d{4}-\d{2}-\d{2} Sync Report\.md'
     match: contains
