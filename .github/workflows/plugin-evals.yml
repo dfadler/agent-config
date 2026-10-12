@@ -12,9 +12,10 @@ name: Plugin evals
 # 7 partial/untrustworthy, other codes setup problems.
 #
 # Each per-case aggregate-result.json is then read by scripts/ts/check-plugin-eval.ts
-# (#583) for the extra validity checks (both arms) and the warn-only delta signal:
-#   check-plugin-eval.ts --cli-exit N --threshold T aggregate-result.json
-# exit 0 pass, 1 regression, 7 inconclusive, 2 bad args. Inconclusive fails the
+# (#583) for the extra validity checks (both arms) and the delta gate (floor 0, #585):
+#   check-plugin-eval.ts --cli-exit N --threshold T --delta-floor 0 aggregate-result.json
+# A case with delta < 0 is a regression; a missing delta is no signal.
+# Exit 0 pass, 1 regression, 7 inconclusive, 2 bad args. Inconclusive fails the
 # job too, but is reported as inconclusive rather than as a regression.
 
 on:
@@ -142,7 +143,7 @@ jobs:
           while IFS= read -r f; do
             found=1
             node scripts/ts/check-plugin-eval.ts \
-              --cli-exit "$cli" --threshold 1 "$f" 2>&1 | tee -a "$GITHUB_STEP_SUMMARY"
+              --cli-exit "$cli" --threshold 1 --delta-floor 0 "$f" 2>&1 | tee -a "$GITHUB_STEP_SUMMARY"
             rc="${PIPESTATUS[0]}"
             [ "$rc" -gt "$worst" ] && worst="$rc"
           done < <(find "$OUT_DIR" -name aggregate-result.json | sort)

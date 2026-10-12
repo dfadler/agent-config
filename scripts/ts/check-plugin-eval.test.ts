@@ -103,6 +103,13 @@ describe("check-plugin-eval", () => {
     expect(codeOf(check("0", result(), ["--delta-floor", "0.1"]))).toBe(0);
   });
 
+  it("--delta-floor 0 (the CI setting, #585): -0.01 fails, 0 passes, no delta passes", () => {
+    const f = ["--delta-floor", "0"];
+    expect(codeOf(check("0", result({ delta: -0.01 }), f))).toBe(1);
+    expect(codeOf(check("0", result({ delta: 0 }), f))).toBe(0);
+    expect(codeOf(check("0", result(), f))).toBe(0);
+  });
+
   it("an invalid run stays inconclusive under --delta-floor", () => {
     const bad = result({ partial: true, delta: -1 });
     expect(codeOf(check("0", bad, ["--delta-floor", "0.1"]))).toBe(7);
