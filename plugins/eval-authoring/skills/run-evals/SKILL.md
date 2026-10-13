@@ -52,10 +52,11 @@ it, do not rebuild any of that.
    case runs in its own CLI invocation (`--case` takes one glob) under exactly its own
    grants. The wrapper never passes `--scaffold`, `--json` or `--report`; it reads
    `aggregate-result.json` from a per-case directory under `<eval-dir>/results/`.
-4. **Run or hand off.** Check whether `EVAL_ALLOW_AGENT_RUNS` is set:
-   `echo "${EVAL_ALLOW_AGENT_RUNS:-}"`. If it is **not** set (empty or unset), give the
-   exact non-dry-run command to run in the user's own shell and stop — do not run it
-   from this session. Tell them they can set `EVAL_ALLOW_AGENT_RUNS=1` (e.g. in
+4. **Run or hand off.** Check whether `EVAL_ALLOW_AGENT_RUNS` is exactly `1`:
+   `[ "${EVAL_ALLOW_AGENT_RUNS:-}" = "1" ] && echo yes || echo no`.
+   If the value is anything other than the string `1` (unset, empty, `0`, `true`, etc.),
+   give the exact non-dry-run command to run in the user's own shell and stop — do not
+   run it from this session. Tell them they can set `EVAL_ALLOW_AGENT_RUNS=1` (e.g. in
    `.claude/settings.json` env block) to allow agent sessions to run directly.
 
    If `EVAL_ALLOW_AGENT_RUNS` **is** set, run it from this session. The run needs a

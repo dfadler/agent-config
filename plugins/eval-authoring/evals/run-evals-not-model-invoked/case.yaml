@@ -25,7 +25,7 @@ graders:
   - name: hands_off
     type: regex
     target: last_message
-    pattern: 'run-evals|claude plugin eval|your (own )?shell|logged[- ]in'
+    pattern: 'node\s+\S*run-evals|claude\s+plugin\s+eval\s+\S|/run-evals\b'
     flags: i
     match: contains
 
