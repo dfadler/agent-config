@@ -59,6 +59,10 @@ checkout, gh pr merge), name a package manager the lockfile says is unused,
 point at a vanished path or are one-off literal commands; and the worktree
 count and disk use under .claude/worktrees plus whether worktree.autoPrune
 (or WORKTREE_AUTO_PRUNE) is set. Only the current project is checked.
+
+It also reports (never edits) whether the node on PATH meets package.json
+engines.node, and whether mcp__terminal__run_in_terminal is in
+permissions.allow in ~/.claude/settings.json (needed to launch eval runs).
 USAGE
 }
 
@@ -1521,6 +1525,80 @@ check_worktree_hygiene() {
   fi
 }
 
+# --------------------------------------------------------------------------
+# Node floor
+#
+# package.json engines.node (">=MAJOR.MINOR") is the floor for the TypeScript
+# scripts under plugins/*/scripts/ts/ and scripts/ts/. .nvmrc pins only the
+# major, so `nvm use` can land on a 22.x below it. Report only.
+# --------------------------------------------------------------------------
+check_node_floor() {
+  local pkg="$REPO_ROOT/package.json" range ver want_maj want_min have_maj have_min
+  [[ -f "$pkg" ]] || return 0
+  if ! command -v jq >/dev/null 2>&1; then
+    echo "⚠ jq not found -- skipping the Node floor check" >&2
+    return 0
+  fi
+  range="$(jq -r ".engines.node // empty" "$pkg" 2>/dev/null)" || return 0
+  [[ "$range" =~ ^\>=([0-9]+)\.([0-9]+)(\.[0-9]+)?$ ]] || return 0
+  want_maj="${BASH_REMATCH[1]}"
+  want_min="${BASH_REMATCH[2]}"
+  if ! command -v node >/dev/null 2>&1; then
+    echo "ℹ node is not on PATH -- the TypeScript scripts need Node $range (package.json engines.node)" >&2
+    return 0
+  fi
+  ver="$(node -p "process.versions.node" 2>/dev/null)" || return 0
+  [[ "$ver" =~ ^([0-9]+)\.([0-9]+) ]] || return 0
+  have_maj="${BASH_REMATCH[1]}"
+  have_min="${BASH_REMATCH[2]}"
+  if ((have_maj > want_maj || (have_maj == want_maj && have_min >= want_min))); then
+    echo "✓ node $ver satisfies package.json engines.node ($range)"
+    return 0
+  fi
+  {
+    echo "⚠ node $ver on PATH is below package.json engines.node ($range)"
+    echo "  The TypeScript scripts under plugins/*/scripts/ts/ may silently do nothing on it:"
+    echo "  seen on Node 22.17, the lint CLI and run-evals.ts --help printed nothing and exited 0"
+    echo "  (cause unverified; possibly the \`if (import.meta.main)\` entrypoint guard)."
+    if [[ "$(tr -d "[:space:]" <"$REPO_ROOT/.nvmrc" 2>/dev/null)" =~ ^v?[0-9]+$ ]]; then
+      echo "  .nvmrc pins only the major version, so \`nvm use\` does not enforce the floor and"
+      echo "  can land on an older $want_maj.x. Run \`nvm install $want_maj\` then \`nvm use $want_maj\`,"
+      echo "  and check \`node --version\`."
+    fi
+  } >&2
+}
+
+# --------------------------------------------------------------------------
+# Eval-run permission
+#
+# Agents launch `claude plugin eval` runs through the terminal tool. Report
+# whether ~/.claude/settings.json allows it. Report only: this script never
+# writes permission rules, so there is deliberately no --fix for it.
+# --------------------------------------------------------------------------
+check_eval_run_permission() {
+  local file="$HOME/.claude/settings.json" tool="mcp__terminal__run_in_terminal" rules=""
+  if ! command -v jq >/dev/null 2>&1; then
+    echo "⚠ jq not found -- skipping the eval-run permission check" >&2
+    return 0
+  fi
+  if [[ -f "$file" ]] && ! rules="$(jq -r ".permissions.allow[]? | strings" "$file" 2>/dev/null)"; then
+    echo "⚠ could not parse $file -- skipping the eval-run permission check" >&2
+    return 0
+  fi
+  if grep -Fxq -e "$tool" -e "mcp__terminal" -e "mcp__terminal__*" <<<"$rules"; then
+    echo "✓ $tool is in permissions.allow ($file)"
+    return 0
+  fi
+  {
+    echo "ℹ $tool is not in permissions.allow in $file"
+    echo "  Without it, agents may be unable to launch eval runs through the terminal tool,"
+    echo "  and auto mode may deny the call. To allow it, add this line to the"
+    echo "  \"permissions\": { \"allow\": [ ... ] } array (doctor never edits permissions):"
+    echo "    \"$tool\""
+    echo "  Optional: it lets an agent run commands in your terminal, so add it only if you want that."
+  } >&2
+}
+
 check_project() {
   local proj
   proj="$(git rev-parse --show-toplevel 2>/dev/null)" || proj="$PWD"
@@ -1571,6 +1649,8 @@ check_companion_plugin "aws-core@" "aws-core" "aws-core" "aws-core" \
 
 check_rtk
 check_playwright_cli
+check_node_floor
+check_eval_run_permission
 check_require_worktree_hook
 
 # ponytail: DietrichGebert/ponytail isn't in the official marketplace; its own
