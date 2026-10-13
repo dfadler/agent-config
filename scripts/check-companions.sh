@@ -1534,7 +1534,11 @@ check_worktree_hygiene() {
 # --------------------------------------------------------------------------
 check_node_floor() {
   local pkg="$REPO_ROOT/package.json" range ver want_maj want_min have_maj have_min
-  command -v jq >/dev/null 2>&1 && [[ -f "$pkg" ]] || return 0
+  [[ -f "$pkg" ]] || return 0
+  if ! command -v jq >/dev/null 2>&1; then
+    echo "⚠ jq not found -- skipping the Node floor check" >&2
+    return 0
+  fi
   range="$(jq -r ".engines.node // empty" "$pkg" 2>/dev/null)" || return 0
   [[ "$range" =~ ^\>=([0-9]+)\.([0-9]+)(\.[0-9]+)?$ ]] || return 0
   want_maj="${BASH_REMATCH[1]}"

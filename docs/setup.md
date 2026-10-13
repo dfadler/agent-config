@@ -65,7 +65,7 @@ on PATH with `package.json` `engines.node` (currently `>=22.18`) and warns when 
 the scripts under `plugins/*/scripts/ts/` may then silently do nothing (seen on 22.17: the
 lint CLI and `run-evals.ts --help` printed nothing and exited 0; the cause is unverified).
 It also notes that `.nvmrc` pins only the major version, so `nvm use` does not enforce the
-floor. The eval-run check reports whether `mcp__terminal__run_in_terminal` is in
+floor. The eval-run check reports whether an allow rule matches `mcp__terminal__run_in_terminal` (the exact entry, `mcp__terminal` or `mcp__terminal__*`) in
 `permissions.allow` in `~/.claude/settings.json`; without it agents may be unable to launch
 eval runs through the terminal tool, and auto mode may deny the call. It prints the line to
 add and never writes it: `--fix` does not touch permission rules, and allowing the tool lets
