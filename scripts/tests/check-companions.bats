@@ -856,3 +856,94 @@ EOF
   assert_failure
   assert_output_contains "playwright-cli is not on PATH"
 }
+
+# --- node floor and eval-run permission checks -------------------------------
+#
+# Both are report-only. The fixture package.json carries the floor; a stubbed
+# node prints the version under test, so no real Node or network is involved.
+
+shim_node_version() {
+  NODE_SHIM_BIN="$SANDBOX/node-shim"
+  mkdir -p "$NODE_SHIM_BIN"
+  printf "#!/usr/bin/env bash\necho \"%s\"\n" "$1" > "$NODE_SHIM_BIN/node"
+  chmod +x "$NODE_SHIM_BIN/node"
+}
+
+write_node_fixtures() {
+  printf "{\"engines\":{\"node\":\">=22.18\"}}\n" > "$FAKE_REPO/package.json"
+  printf "22\n" > "$FAKE_REPO/.nvmrc"
+}
+
+@test "node below the engines floor: warns, says may, and flags .nvmrc" {
+  write_node_fixtures
+  shim_node_version 22.17.0
+  PATH="$NODE_SHIM_BIN:$PATH" run_companions
+  assert_success
+  assert_output_contains "node 22.17.0 on PATH is below package.json engines.node (>=22.18)"
+  assert_output_contains "may silently do nothing"
+  assert_output_contains ".nvmrc pins only the major version"
+}
+
+@test "node at the engines floor: reports a pass, no warning" {
+  write_node_fixtures
+  shim_node_version 22.18.0
+  PATH="$NODE_SHIM_BIN:$PATH" run_companions
+  assert_success
+  assert_output_contains "node 22.18.0 satisfies package.json engines.node (>=22.18)"
+  refute_output_contains "below package.json engines.node"
+}
+
+@test "node above the floor on a later major passes" {
+  write_node_fixtures
+  shim_node_version 24.1.0
+  PATH="$NODE_SHIM_BIN:$PATH" run_companions
+  assert_success
+  assert_output_contains "node 24.1.0 satisfies"
+}
+
+@test "no package.json: node floor check is skipped silently" {
+  shim_node_version 20.0.0
+  PATH="$NODE_SHIM_BIN:$PATH" run_companions
+  assert_success
+  refute_output_contains "engines.node"
+}
+
+@test "eval-run permission absent: reports it and prints the line to add" {
+  mkdir -p "$HOME/.claude"
+  printf "{\"permissions\":{\"allow\":[\"Bash(ls *)\"]}}\n" > "$HOME/.claude/settings.json"
+  run_companions
+  assert_success
+  assert_output_contains "mcp__terminal__run_in_terminal is not in permissions.allow"
+  assert_output_contains "doctor never edits permissions"
+  assert_output_contains "\"mcp__terminal__run_in_terminal\""
+}
+
+@test "eval-run permission absent with no settings file: still reported" {
+  run_companions
+  assert_success
+  assert_output_contains "mcp__terminal__run_in_terminal is not in permissions.allow"
+}
+
+@test "eval-run permission present: reports a pass" {
+  mkdir -p "$HOME/.claude"
+  printf "{\"permissions\":{\"allow\":[\"mcp__terminal__run_in_terminal\"]}}\n" > "$HOME/.claude/settings.json"
+  run_companions
+  assert_success
+  assert_output_contains "mcp__terminal__run_in_terminal is in permissions.allow"
+  refute_output_contains "is not in permissions.allow"
+}
+
+@test "eval-run permission: a mcp__terminal__* wildcard counts" {
+  mkdir -p "$HOME/.claude"
+  printf "{\"permissions\":{\"allow\":[\"mcp__terminal__*\"]}}\n" > "$HOME/.claude/settings.json"
+  run_companions
+  assert_success
+  assert_output_contains "is in permissions.allow"
+}
+
+@test "eval-run permission: --fix never writes the rule" {
+  mkdir -p "$HOME/.claude"
+  printf "{\"permissions\":{\"allow\":[\"Bash(ls *)\"]}}\n" > "$HOME/.claude/settings.json"
+  run_companions --fix
+  ! grep -q mcp__terminal "$HOME/.claude/settings.json"
+}

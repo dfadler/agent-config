@@ -60,6 +60,18 @@ path or are one-off literals, and the worktree count, disk use and `worktree.aut
 state under `.claude/worktrees`, listing any worktree that is locked, named `keep` or holds
 gitignored content (the prune hook's rules). Only the current project is checked.
 
+Two more report-only checks cover the TypeScript tooling. The Node check compares the `node`
+on PATH with `package.json` `engines.node` (currently `>=22.18`) and warns when it is older:
+the scripts under `plugins/*/scripts/ts/` may then silently do nothing (seen on 22.17: the
+lint CLI and `run-evals.ts --help` printed nothing and exited 0; the cause is unverified).
+It also notes that `.nvmrc` pins only the major version, so `nvm use` does not enforce the
+floor. The eval-run check reports whether `mcp__terminal__run_in_terminal` is in
+`permissions.allow` in `~/.claude/settings.json`; without it agents may be unable to launch
+eval runs through the terminal tool, and auto mode may deny the call. It prints the line to
+add and never writes it: `--fix` does not touch permission rules, and allowing the tool lets
+an agent run commands in your terminal, so the choice is yours. Neither check changes a bare
+run's exit status.
+
 See [`docs/plugin-loading.md`](./plugin-loading.md) for how the linked plugin
 directory actually gets picked up by Claude Code and why its contents load
 under the `<plugin>:<name>` namespace.
