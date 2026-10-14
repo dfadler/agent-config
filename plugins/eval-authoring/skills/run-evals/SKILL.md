@@ -117,6 +117,34 @@ rate comes from logged-in runs ($0.04 to $0.12 a run, judge calls included; deri
 costs. If a run reports exit 7 with the ceiling hit, its scores are partial: trim the
 cases rather than reading them as failures.
 
+## Faster feedback
+
+Levers, biggest first. Times and costs are rough figures from one 9-case plugin
+(`--runs 5 -j 3` = 90 runs, ~16 min, ~$10); yours will differ.
+
+1. **Raise concurrency (`-j`).** More runs in parallel: `-j 6` took that suite to ~8 min;
+   `-j 9` is likelier to hit rate limits. The wrapper has no `-j` flag, so this lever is
+   the raw `claude plugin eval <plugin> --runs 5 -j 6` command, not a tier.
+2. **Target one case.** `--case <name>` on the wrapper (or the case directory as the
+   target of the raw command) runs that case only: 10 runs instead of 90.
+3. **Skip the baseline arm.** The wrapper's `quick` tier is plugin arm only (raw:
+   `--ablation none`). It halves the runs but drops the Δ column: use it to see a
+   with-arm score rise after a cause-file or grader fix, never to claim a delta.
+4. **Fewer runs (`--runs 3`).** A directional smoke test (~54 runs, ~6 min, ~$6 on the
+   suite above). At 3 runs a 0.20 swing is noise.
+
+| Goal | Command | Est. |
+|---|---|---|
+| Iterate on one case | `run-evals.ts <plugin> quick --case <name>` (raw: `<case-dir> --runs 3 --ablation none -j 5`) | ~1 min, ~$0.70 |
+| Full suite, pushed | raw: `<plugin> --runs 5 -j 6` | ~8 min |
+| Pre-merge | `run-evals.ts <plugin> thorough` (raw: `--runs 5 -j 5`) | ~10 min |
+
+All child runs share your Claude rate limit. If runs fail or stall, drop `-j` by 1 or 2;
+a burst of sessions started close together can also throttle briefly.
+
+**Delta claims:** quote a Δ in a PR description only from 5 runs per arm with both arms
+(`thorough`); a `quick` or 3-run result is for iterating.
+
 ## Gotchas
 
 - In worktree-isolated sessions in this repo, a PreToolUse hook blocks Bash commands
