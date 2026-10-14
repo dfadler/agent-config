@@ -71,6 +71,23 @@ describe("scan-feedback-memories", () => {
     expect(scan().out).toBe("");
   });
 
+  it("--incidents lists records, filtered by class, newest first", () => {
+    const dir = join(home, ".claude", "incidents");
+    mkdirSync(dir, { recursive: true });
+    writeFileSync(join(dir, "2026-01-01-a.md"), "# a\nclass: stale-pin\n");
+    writeFileSync(join(dir, "2026-02-01-b.md"), "# b\nclass: other\n");
+    writeFileSync(join(dir, "2026-03-01-c.md"), "# c\nclass: stale-pin\n");
+    const all = scan(["--incidents"]).out.trimEnd().split("\n");
+    expect(all.map((l) => l.split("\t")[1])).toEqual(["stale-pin", "other", "stale-pin"]);
+    const hit = scan(["--incidents", "stale-pin"]).out.trimEnd().split("\n");
+    expect(hit.map((l) => l.split("\t")[0])).toEqual(["2026-03-01", "2026-01-01"]);
+    expect(scan(["--incidents", "nope"]).out).toBe("");
+  });
+
+  it("--incidents with no directory is not an error", () => {
+    expect(scan(["--incidents"])).toEqual({ code: 0, out: "", err: "" });
+  });
+
   it("-h and --help print usage and exit 0", () => {
     memory("proj-a", "f", "feedback", "x");
     expect(scan(["-h"])).toEqual({ code: 0, out: USAGE, err: "" });

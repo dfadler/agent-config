@@ -14,6 +14,7 @@ import { homedir } from "node:os";
 import { basename, dirname, join } from "node:path";
 
 export const USAGE = `Usage: scan-feedback-memories.ts [-h|--help]
+       scan-feedback-memories.ts --incidents [CLASS]
 
 Lists this machine's feedback-type auto-memory files (metadata.type:
 feedback in the file's frontmatter) across every Claude Code project,
@@ -26,6 +27,11 @@ Tab-separated output, newest first:
 
 Read each printed path directly (e.g. with the Read tool) to judge its
 content; this script only locates candidates, it does not interpret them.
+
+--incidents lists the private incident records in ~/.claude/incidents/
+(newest first: <date>\t<class>\t<path>). With CLASS, only records whose
+"class:" field equals it: a hit means an earlier incident had the same
+failure class, so the rule shipped for it did not hold.
 `;
 
 const pad = (n: number): string => String(n).padStart(2, "0");
@@ -80,6 +86,23 @@ export interface Ctx {
 export const main = (argv: readonly string[], ctx: Ctx): number => {
   if (argv[0] === "-h" || argv[0] === "--help") {
     ctx.out(USAGE);
+    return 0;
+  }
+  if (argv[0] === "--incidents" && argv.length <= 2) {
+    const dir = join(ctx.home, ".claude", "incidents");
+    let names: string[];
+    try {
+      names = readdirSync(dir).filter((n) => n.endsWith(".md"));
+    } catch {
+      return 0; // no incident has been recorded yet
+    }
+    const rows = names.flatMap((n) => {
+      const cls = /^class:\s*(\S+)/m.exec(readFileSync(join(dir, n), "utf8"))?.[1] ?? "";
+      return argv[1] === undefined || argv[1] === cls
+        ? [[n.slice(0, 10), cls, join(dir, n)].join("\t")]
+        : [];
+    });
+    if (rows.length > 0) ctx.out(`${rows.sort().reverse().join("\n")}\n`);
     return 0;
   }
   if (argv.length > 0) {
