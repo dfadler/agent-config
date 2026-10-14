@@ -22,6 +22,22 @@ trigger boundary and costs what it is worth (definition and checks:
 the mechanical rules; its messages say what to change. This skill covers what a script
 cannot decide.
 
+## Independence
+
+Cases written in the same session as the skill share its blind spots: a wrong fact or
+trigger boundary in the skill reappears in the cases, so they score self-agreement, not
+quality ([#715](https://github.com/dfadler/agent-config/issues/715)).
+
+- Commit the skill, then write cases in a fresh session that reads only the committed
+  skill (trigger description and output contract). If that is impossible, wait and
+  return to it later.
+- Check domain facts in graders against primary docs or source, not the skill text.
+- Same-session cases that all pass first try, or take under a minute each, probably do
+  not test the boundary. A few independent cases beat many co-authored ones.
+- A baseline of 0.90 or more means the prompt leaks the answer (step 7).
+- A must-not-fire case that fires in over 20% of runs after two skill revisions is a
+  scope bug: fix the trigger description, not the case.
+
 ## Steps
 
 1. **Read the plugin first.** Read the `SKILL.md` or agent file under test, its manifest,
