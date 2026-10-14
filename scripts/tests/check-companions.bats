@@ -990,3 +990,12 @@ make_plugin_skill() {
   assert_success
   assert_output_contains "\${CLAUDE_PLUGIN_ROOT}/scripts/ts/gone.ts"
 }
+
+@test "plugin script paths: a reference escaping the plugin root is flagged even when the target exists" {
+  make_plugin_skill demo-plugin "../../scripts/ts/outside.ts"
+  mkdir -p "$FAKE_REPO/scripts/ts"
+  touch "$FAKE_REPO/scripts/ts/outside.ts"
+  run_companions
+  assert_success
+  assert_output_contains "references \${CLAUDE_PLUGIN_ROOT}/../../scripts/ts/outside.ts"
+}

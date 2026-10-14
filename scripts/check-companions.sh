@@ -1607,7 +1607,7 @@ check_plugin_script_paths() {
     rel_skill="${skill#"$REPO_ROOT/plugins/"}"
     plugin_root="$REPO_ROOT/plugins/${rel_skill%%/*}"
     while IFS= read -r ref; do
-      [[ -e "$plugin_root/$ref" ]] && continue
+      [[ "$ref" != *..* && -e "$plugin_root/$ref" ]] && continue
       echo "⚠ ${skill#"$REPO_ROOT/"} references \${CLAUDE_PLUGIN_ROOT}/$ref, which does not exist under ${plugin_root#"$REPO_ROOT/"}/." >&2
     done < <(grep -oE '\$\{?CLAUDE_PLUGIN_ROOT\}?/[^[:space:]"`]+' "$skill" | sed -E 's#^\$\{?CLAUDE_PLUGIN_ROOT\}?/##' | sort -u)
   done < <(find "$REPO_ROOT/plugins" -name SKILL.md)
