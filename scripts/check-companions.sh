@@ -1599,6 +1599,20 @@ check_eval_run_permission() {
   } >&2
 }
 
+# SKILL.md files reference runtime scripts as ${CLAUDE_PLUGIN_ROOT}/<path>; a
+# path that isn't in the plugin's tree fails only when the skill runs.
+check_plugin_script_paths() {
+  local skill rel_skill plugin_root ref
+  while IFS= read -r skill; do
+    rel_skill="${skill#"$REPO_ROOT/plugins/"}"
+    plugin_root="$REPO_ROOT/plugins/${rel_skill%%/*}"
+    while IFS= read -r ref; do
+      [[ -e "$plugin_root/$ref" ]] && continue
+      echo "⚠ ${skill#"$REPO_ROOT/"} references \${CLAUDE_PLUGIN_ROOT}/$ref, which does not exist under ${plugin_root#"$REPO_ROOT/"}/." >&2
+    done < <(grep -oE '\$\{?CLAUDE_PLUGIN_ROOT\}?/[^[:space:]"`]+' "$skill" | sed -E 's#^\$\{?CLAUDE_PLUGIN_ROOT\}?/##' | sort -u)
+  done < <(find "$REPO_ROOT/plugins" -name SKILL.md)
+}
+
 check_project() {
   local proj
   proj="$(git rev-parse --show-toplevel 2>/dev/null)" || proj="$PWD"
@@ -1652,6 +1666,7 @@ check_playwright_cli
 check_node_floor
 check_eval_run_permission
 check_require_worktree_hook
+check_plugin_script_paths
 
 # ponytail: DietrichGebert/ponytail isn't in the official marketplace; its own
 # .claude-plugin/marketplace.json names both the marketplace and the plugin
