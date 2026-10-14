@@ -28,13 +28,15 @@ Cases written in the same session as the skill share its blind spots: a wrong fa
 trigger boundary in the skill reappears in the cases, so they score self-agreement, not
 quality ([#715](https://github.com/dfadler/agent-config/issues/715)).
 
-- Commit the skill, then write cases in a fresh session that reads only the committed
-  skill (trigger description and output contract). If that is impossible, wait and
-  return to it later.
+- Commit the skill, then write cases in a fresh session that works from the committed
+  files (step 1: skill, manifest, existing cases, `grants.yaml`) and not from the
+  session that wrote the skill; take the trigger description and output contract from
+  the committed skill. If that is impossible, wait and return to it later.
 - Check domain facts in graders against primary docs or source, not the skill text.
 - Same-session cases that all pass first try, or take under a minute each, probably do
   not test the boundary. A few independent cases beat many co-authored ones.
-- A baseline of 0.90 or more means the prompt leaks the answer (step 7).
+- A baseline of 0.90 or more signals the case may be solvable without the plugin; check
+  whether the prompt leaks the answer before rewriting or dropping it (step 7).
 - A must-not-fire case that fires in over 20% of runs after two skill revisions is a
   scope bug: fix the trigger description, not the case.
 
@@ -77,8 +79,8 @@ quality ([#715](https://github.com/dfadler/agent-config/issues/715)).
    mocks](references/fixtures-and-mocks.md). Testing a plugin's agents:
    [agents](references/agents.md).
 7. **Check the baseline.** Before trusting a new case, run it once without the plugin. A
-   baseline score of 0.9 or more means the prompt hands over the answer: rewrite it or
-   drop the case. A case that cannot separate the arms is a regression guard, not
+   baseline score of 0.9 or more means the case may be solvable without the plugin:
+   inspect the prompt for a leaked answer, then rewrite it or drop the case. A case that cannot separate the arms is a regression guard, not
    evidence the skill helps.
 8. **Lint.** `node ${CLAUDE_SKILL_DIR}/../../scripts/ts/lint/cli.ts <plugin-path>` (Node 22
    or later). Fix every error. Fix each warning or write down why it is intended.
