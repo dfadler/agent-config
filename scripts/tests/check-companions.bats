@@ -947,3 +947,46 @@ write_node_fixtures() {
   run_companions --fix
   ! grep -q mcp__terminal "$HOME/.claude/settings.json"
 }
+
+# --- plugin script paths -----------------------------------------------------
+
+make_plugin_skill() {
+  local plugin="$1" ref="$2"
+  mkdir -p "$FAKE_REPO/plugins/$plugin/skills/demo"
+  printf 'run: node "${CLAUDE_PLUGIN_ROOT}/%s" arg\n' "$ref" \
+    > "$FAKE_REPO/plugins/$plugin/skills/demo/SKILL.md"
+}
+
+@test "plugin script paths: warns when a referenced script is missing" {
+  make_plugin_skill demo-plugin "scripts/ts/missing.ts"
+  run_companions
+  assert_success
+  assert_output_contains "plugins/demo-plugin/skills/demo/SKILL.md references \${CLAUDE_PLUGIN_ROOT}/scripts/ts/missing.ts"
+}
+
+@test "plugin script paths: silent when the referenced script exists" {
+  make_plugin_skill demo-plugin "scripts/ts/present.ts"
+  mkdir -p "$FAKE_REPO/plugins/demo-plugin/scripts/ts"
+  touch "$FAKE_REPO/plugins/demo-plugin/scripts/ts/present.ts"
+  run_companions
+  assert_success
+  refute_output_contains "CLAUDE_PLUGIN_ROOT"
+}
+
+@test "plugin script paths: resolves against the plugin root, not the repo root" {
+  make_plugin_skill demo-plugin "scripts/ts/shared.ts"
+  mkdir -p "$FAKE_REPO/scripts/ts"
+  touch "$FAKE_REPO/scripts/ts/shared.ts"
+  run_companions
+  assert_success
+  assert_output_contains "does not exist under plugins/demo-plugin"
+}
+
+@test "plugin script paths: the bare \$CLAUDE_PLUGIN_ROOT form is checked too" {
+  mkdir -p "$FAKE_REPO/plugins/demo-plugin/skills/demo"
+  printf 'node "$CLAUDE_PLUGIN_ROOT/scripts/ts/gone.ts"\n' \
+    > "$FAKE_REPO/plugins/demo-plugin/skills/demo/SKILL.md"
+  run_companions
+  assert_success
+  assert_output_contains "\${CLAUDE_PLUGIN_ROOT}/scripts/ts/gone.ts"
+}
