@@ -80,7 +80,9 @@ quality.
    [agents](references/agents.md).
 7. **Check the baseline.** Before trusting a new case, run it once without the plugin. A
    baseline score of 0.9 or more means the case may be solvable without the plugin:
-   inspect the prompt for a leaked answer, then rewrite it or drop the case. A case that cannot separate the arms is a regression guard, not
+   inspect the prompt for a leaked answer, then rewrite it or drop the case. When
+   answering a user about such a case, open with that check (does the prompt give the
+   answer away?) and do not open with a keep, rewrite or drop verdict. A case that cannot separate the arms is a regression guard, not
    evidence the skill helps.
 8. **Lint.** `node ${CLAUDE_SKILL_DIR}/../../scripts/ts/lint/cli.ts <plugin-path>` (Node 22
    or later). Fix every error. Fix each warning or write down why it is intended.
