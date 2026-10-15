@@ -8,6 +8,8 @@
 # "check" and "prompt"; the pattern above was widened after reading those replies.
 # Run 1 note: the first prompt did not read as case authoring, so the skill fired in 1 of 3 runs.
 # no_flat_leak_claim passed in every run of that run, so inspects_prompt carries the signal.
+# Order (inspect before deciding) is not graded: an llm judge split on near-identical replies, so
+# it stays unverified. inspects_prompt only checks that inspecting the prompt is mentioned.
 # Can fail: a no-plugin reply may call the prompt leaky outright or never say to inspect it.
 # Likely delta: uncertain, a plain model may already hedge (#690); unmeasured until a two-arm run.
 schema_version: "1.1"
@@ -55,13 +57,3 @@ graders:
     pattern: '(?<!\b(?:whether|if|may|might|could|not|never|does|n.t)\s+(?:be\s+)?(?:that\s+)?(?:the\s+)?)\b(?:prompt|case)\b[^.\n]{0,30}\b(?:leaks?|hands? over|gives? away|reveals?)\b[^.\n]{0,20}\banswer'
     flags: i
     match: not_contains
-
-  # Paid, because "Drop the case. Inspect the prompt later." matches inspects_prompt; the order
-  # of inspecting and deciding is semantic. Narrow: one judgement on the final reply.
-  - name: inspects_before_deciding
-    type: llm
-    criteria: >
-      PASS if the reply lists examining the prompt, for example whether it gives away the answer,
-      as a step to take before rewriting or dropping the case. FAIL if it tells the user to
-      rewrite or drop the case with no such step, or mentions examining the prompt only after
-      that recommendation.
