@@ -4,6 +4,8 @@
 # Sabotage map: restore "means the prompt hands over the answer" in step 7 and
 # no_flat_leak_claim should fail in the with arm; delete the inspect-the-prompt clause and
 # inspects_prompt should fail.
+# The first inspects_prompt regex missed replies that put a period or line break between
+# "check" and "prompt"; the pattern above was widened after reading those replies.
 # Run 1 note: the first prompt did not read as case authoring, so the skill fired in 1 of 3 runs.
 # no_flat_leak_claim passed in every run of that run, so inspects_prompt carries the signal.
 # Can fail: a no-plugin reply may call the prompt leaky outright or never say to inspect it.
@@ -42,7 +44,7 @@ graders:
   - name: inspects_prompt
     type: regex
     target: last_message
-    pattern: '(?:inspect|check|read|review|look at|examine)[^.\n]{0,40}\bprompt\b'
+    pattern: '(?:inspect|check|read|review|look at|examine)[\s\S]{0,80}\bprompt\b|does the prompt (?:give|hand|leak|reveal)'
     flags: i
     match: contains
 
@@ -50,6 +52,16 @@ graders:
   - name: no_flat_leak_claim
     type: regex
     target: last_message
-    pattern: '(?<!(?:\bnot|n.t|\bnever|\bno|\bmay|\bmight|\bcould|\bwhether|\bif|\bdoes)\b[^.\n]{0,30})\b(?:prompt|case)\b[^.\n]{0,30}\b(?:leaks?|hands? over|gives? away|reveals?)\b[^.\n]{0,20}\banswer'
+    pattern: '(?<!\b(?:whether|if|may|might|could|not|never|does|n.t)\s+(?:be\s+)?(?:that\s+)?(?:the\s+)?)\b(?:prompt|case)\b[^.\n]{0,30}\b(?:leaks?|hands? over|gives? away|reveals?)\b[^.\n]{0,20}\banswer'
     flags: i
     match: not_contains
+
+  # Paid, because "Drop the case. Inspect the prompt later." matches inspects_prompt; the order
+  # of inspecting and deciding is semantic. Narrow: one judgement on the final reply.
+  - name: inspects_before_deciding
+    type: llm
+    criteria: >
+      PASS if the reply lists examining the prompt, for example whether it gives away the answer,
+      as a step to take before rewriting or dropping the case. FAIL if it tells the user to
+      rewrite or drop the case with no such step, or mentions examining the prompt only after
+      that recommendation.

@@ -49,3 +49,13 @@ graders:
     pattern: '\bcommit(?:ted)?\b'
     flags: i
     match: contains
+
+  # Paid, because the regexes above accept "draft the cases here, use a fresh session later";
+  # the order of the proposed steps is semantic. Narrow: one judgement on the final reply.
+  - name: authoring_starts_in_fresh_session
+    type: llm
+    criteria: >
+      PASS if the reply proposes that the eval cases be written in a fresh or separate session
+      (after the skill is committed) and does not start drafting cases in this conversation.
+      FAIL if the reply starts drafting cases here, or says to draft them here and use a fresh
+      session only later.
