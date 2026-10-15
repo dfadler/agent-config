@@ -1,0 +1,13 @@
+schema_version: "1.1"
+name: llm-focus
+execution:
+  prompt: Do the thing.
+graders:
+  - type: regex
+    target: last_message
+    pattern: done
+  - type: llm
+    focus: last_message
+    criteria: >
+      PASS if the reply says it is done.
+      FAIL if the reply says nothing.

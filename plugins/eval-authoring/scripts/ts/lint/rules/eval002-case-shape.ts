@@ -27,7 +27,7 @@ export const rule: Rule = {
   id: "EVAL002",
   severity: "error",
   title:
-    "Unknown prompt.md key; case.yaml missing schema_version or name; run fields at the top level",
+    "Unknown prompt.md or grader key; case.yaml missing schema_version or name; run fields at the top level",
   source: fromDocs("the case.yaml and prompt.md field tables"),
   checkCase: (c, { schema }) => {
     const unknownPromptKeys: readonly Problem[] = c.keys
@@ -35,6 +35,20 @@ export const rule: Rule = {
       .map((k) => ({
         message: `Unknown prompt.md frontmatter key '${k.name}'.`,
         fix: `Remove it or fix the spelling. Accepted keys: ${schema.promptMdKeys.map((s) => s.name).join(", ")}.`,
+        loc: k.loc,
+      }));
+
+    // The CLI rejects an unrecognized grader key when it loads the case (seen on an `llm`
+    // grader with `target:`; the key is `focus`), so this fails the whole case, not one grader.
+    const byType = schema.graderTypes
+      .map((t) => `${t.type}: ${t.keys.map((s) => s.name).join(", ")}`)
+      .join("; ");
+    const common = schema.graderCommonKeys.map((s) => s.name).join(", ");
+    const unknownGraderKeys: readonly Problem[] = c.keys
+      .filter((k) => k.origin === "grader" && k.status === "unknown")
+      .map((k) => ({
+        message: `Unknown grader key '${k.name}'; \`claude plugin eval\` refuses to load the case.`,
+        fix: `Remove it or use the key this grader type takes. Every grader: ${common}. By type: ${byType}.`,
         loc: k.loc,
       }));
 
@@ -47,7 +61,9 @@ export const rule: Rule = {
       }));
 
     const caseYamlFile = c.caseYamlFile;
-    if (caseYamlFile === undefined) return [...unknownPromptKeys, ...misplaced];
+    if (caseYamlFile === undefined) {
+      return [...unknownPromptKeys, ...unknownGraderKeys, ...misplaced];
+    }
 
     const wanted = schema.caseYamlSchemaVersion;
     const versionProblems: readonly Problem[] =
@@ -79,6 +95,7 @@ export const rule: Rule = {
       ...versionProblems,
       ...missingRequired,
       ...unknownPromptKeys,
+      ...unknownGraderKeys,
       ...misplaced,
     ];
   },
