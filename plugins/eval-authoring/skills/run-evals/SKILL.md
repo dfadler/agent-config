@@ -1,6 +1,6 @@
 ---
 name: run-evals
-description: Run a plugin's `claude plugin eval` cases at a cost tier. Paid; requires explicit opt-in from agent sessions.
+description: Run a plugin's `claude plugin eval` cases at a cost tier. Paid; needs an explicit request to run (or EVAL_ALLOW_AGENT_RUNS=1).
 argument-hint: "<plugin-path> [quick|standard|thorough]"
 allowed-tools: Bash(node ${CLAUDE_SKILL_DIR}/../../scripts/ts/lint/cli.ts *)
 ---
@@ -21,11 +21,11 @@ A run is paid: cases x runs x arms agent runs, plus three judge calls per `llm` 
 `baseline` grader per run. The cost figures `claude plugin eval` reports are
 list-price estimates of those model calls, not a bill.
 
-**Agent sessions are blocked by default.** To allow an agent session to execute runs
-directly (skipping the hand-off to the user in step 4), set `EVAL_ALLOW_AGENT_RUNS=1`
-in the environment — for example, in the project's `.claude/settings.json` env block or
-in your shell. Without it the skill still works from a slash command, but step 4 always
-hands the command to the user rather than running it.
+**Who may start a run.** An agent session may run it when the user asked for a run in
+this conversation ("run the evals now"), or when `EVAL_ALLOW_AGENT_RUNS=1` is set (for
+example in the project's `.claude/settings.json` env block) for unattended use where
+nobody is asking. With neither, step 4 hands the command to the user instead. A session
+that is not logged in (`claude auth status` fails) hands off either way.
 
 The wrapper is `${CLAUDE_SKILL_DIR}/../../scripts/ts/run-evals/run-evals.ts`, run with
 `node` (22.18 or later). It owns tiers, grants, preflight checks and exit codes; call
@@ -52,17 +52,18 @@ it, do not rebuild any of that.
    case runs in its own CLI invocation (`--case` takes one glob) under exactly its own
    grants. The wrapper never passes `--scaffold`, `--json` or `--report`; it reads
    `aggregate-result.json` from a per-case directory under `<eval-dir>/results/`.
-4. **Run or hand off.** Check whether `EVAL_ALLOW_AGENT_RUNS` is exactly `1`:
-   `[ "${EVAL_ALLOW_AGENT_RUNS:-}" = "1" ] && echo yes || echo no`.
-   If the value is anything other than the string `1` (unset, empty, `0`, `true`, etc.),
-   give the exact non-dry-run command to run in the user's own shell and stop — do not
-   run it from this session. Tell them they can set `EVAL_ALLOW_AGENT_RUNS=1` (e.g. in
-   `.claude/settings.json` env block) to allow agent sessions to run directly.
+4. **Run or hand off.** Run it from this session if the user asked for a run in this
+   conversation, or `EVAL_ALLOW_AGENT_RUNS` is exactly `1`
+   (`[ "${EVAL_ALLOW_AGENT_RUNS:-}" = "1" ] && echo yes || echo no`; `0`, `true` and
+   empty do not count). The request, not the variable, is the opt-in when someone is
+   asking. If neither holds (you reached this skill while doing something else), give the
+   exact non-dry-run command to run in the user's own shell and stop. Tell them they can
+   ask you to run it, or set `EVAL_ALLOW_AGENT_RUNS=1` (e.g. in `.claude/settings.json`
+   env block) for unattended runs.
 
-   If `EVAL_ALLOW_AGENT_RUNS` **is** set, run it from this session. The run needs a
-   shell where `claude plugin eval` can authenticate (child runs fail with
-   `Not logged in` if the session is not logged in — confirm that first with
-   `claude auth status` or equivalent before starting). Make progress visible: start it
+   Before starting, check login with `claude auth status`; child runs fail with
+   `Not logged in` otherwise. Hand the command to the user only if that check fails.
+   Do not assume a session cannot authenticate: check. Make progress visible: start it
    in the background (`run_in_background`) with its output going to a file, never piped
    through `tail`, `head` or `grep`, which hide everything until the command exits. Tell
    the user the output path (or the terminal tab) as soon as it starts, then read that
@@ -141,9 +142,6 @@ Levers, biggest first. Times and costs are rough figures from one 9-case plugin
 
 All child runs share your Claude rate limit. If runs fail or stall, drop `-j` by 1 or 2;
 a burst of sessions started close together can also throttle briefly.
-
-**Delta claims:** quote a Δ in a PR description only from 5 runs per arm with both arms
-(`thorough`); a `quick` or 3-run result is for iterating.
 
 ## Gotchas
 

@@ -1,0 +1,47 @@
+# Run: node plugins/eval-authoring/scripts/ts/run-evals/run-evals.ts --tier standard --case delta-claim-after-run plugins/eval-authoring
+# Shared run/grant facts: docs/contributing.md, "Plugin evals". No grant; reply-only. Default two arms.
+# Same rule as delta-claim-pr-entry, but the prompt names run-evals and its output, so the run-evals
+# skill is the likely one to load. The rule lives in author-cases only, so this checks that the
+# answer still holds when run-evals loads instead.
+schema_version: "1.1"
+name: delta-claim-after-run
+description: >
+  After a quick-tier run-evals pass with 3 runs, asked for the PR line claiming the delta,
+  the reply declines to quote it and says a 5-run, both-arm run is needed.
+  expected_outcome: PASS when it refuses the delta and names 5 runs per arm; FAIL when it
+  writes +0.33 into the PR text.
+tags: [eval-authoring, delta-claim, quick]
+
+execution:
+  prompt: |
+    I ran run-evals on plugins/rollback with --tier quick (3 runs). The summary says the
+    with-plugin arm scored 0.93 and the without-plugin arm scored 0.60. Give me the
+    paste-ready line for my PR's "Eval results" section claiming the +0.33 delta.
+  max_turns: 8
+  allowed_tools:
+    - Skill
+    - Read
+    - Glob
+    - Grep
+
+graders:
+  - name: skill_fired
+    type: tool_used
+    tool: Skill
+    input_match: '"skill"\s*:\s*"(?:[\w-]+:)?(?:run-evals|author-cases)"'
+    min: 1
+    arm: with-only
+
+  - name: names_five_runs
+    type: regex
+    target: last_message
+    pattern: '\b(?:5|five)\b[^.\n]{0,30}\bruns?\b|\bruns?\b[^.\n]{0,30}\b(?:5|five)\b'
+    flags: i
+    match: contains
+
+  - name: refuses_quick_delta
+    type: regex
+    target: last_message
+    pattern: '(?<!(?:\bnot|n.t|\bnever|\bno|\bcannot|\bwithout)\b[^.\n]{0,40})(?:\b(?:improved|improves|up|delta)\b|\+)\s*(?:of\s*)?(?:the score\s*)?(?:by\s*)?\+?0?\.33'
+    flags: i
+    match: not_contains
