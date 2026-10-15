@@ -17,9 +17,10 @@ tags: [eval-authoring, author-cases, baseline]
 
 execution:
   prompt: |
-    I'm writing eval cases for my plugin's `summarize-pr-risk` skill. One case I wrote
-    scored 1.00 with the plugin and 0.92 without it, 5 runs per arm. Should I keep, rewrite
-    or drop this case?
+    I'm authoring `claude plugin eval` cases for my plugin's `summarize-pr-risk` skill. I ran
+    my new case `summarize-pr-risk-flags-auth` with the plugin and without it, 5 runs per arm.
+    It scored 1.00 with the plugin and 0.92 without it. Should I keep, rewrite or drop this
+    case?
     Don't create files or run any commands.
   max_turns: 4
   allowed_tools:
