@@ -26,7 +26,7 @@ cannot decide.
 
 Cases written in the same session as the skill share its blind spots: a wrong fact or
 trigger boundary in the skill reappears in the cases, so they score self-agreement, not
-quality ([#715](https://github.com/dfadler/agent-config/issues/715)).
+quality.
 
 - Commit the skill, then write cases in a fresh session that works from the committed
   files (step 1: skill, manifest, existing cases, `grants.yaml`) and not from the
