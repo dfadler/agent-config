@@ -1,0 +1,74 @@
+# Run: node plugins/eval-authoring/scripts/ts/run-evals/run-evals.ts --tier standard --case run-evals-speed-levers plugins/eval-authoring
+# Shared run/grant facts: docs/contributing.md, "Plugin evals". No grant; reply-only. Default two arms.
+# Covers the run-evals "Faster feedback" section (#714). The prompt names no flag, so the
+# graders look for the figures only that section carries.
+# Sabotage map (delete the sentence, grader drops): "The wrapper has no `-j` flag" ->
+# concurrency_is_raw_cli; the `quick` tier / `--ablation none` bullet -> skips_baseline_arm;
+# "At 3 runs a 0.20 swing is noise" -> fewer_runs_caveat. skill_fired is with-arm only.
+# Unknown until a two-arm run: whether the baseline already knows -j and --ablation (a high
+# baseline makes these regression guards, not evidence the section helps).
+schema_version: "1.1"
+name: run-evals-speed-levers
+description: >
+  Asked how to get faster feedback from a slow eval suite while iterating on one grader,
+  the reply names concurrency as a raw-CLI flag the wrapper lacks, skipping the baseline
+  arm, and the 3-run noise caveat. expected_outcome: PASS when the reply covers concurrency
+  via the raw command and the plugin-arm-only option; FAIL when it only says "run fewer cases".
+tags: [eval-authoring, run-evals, quick]
+
+execution:
+  prompt: |
+    My plugin has 9 eval cases and a full two-arm run at 5 runs per arm takes about 16
+    minutes. I'm tweaking one grader in a single case and re-running constantly. What can I
+    change to get feedback faster? Don't create files or run any commands.
+  max_turns: 8
+  allowed_tools:
+    - Skill
+    - Read
+    - Glob
+    - Grep
+
+graders:
+  - name: skill_fired
+    type: tool_used
+    tool: Skill
+    input_match: '"skill"\s*:\s*"(?:[\w-]+:)?run-evals"'
+    min: 1
+    arm: with-only
+
+  - name: targets_one_case
+    type: regex
+    target: last_message
+    pattern: '--case\b|single case|one case|case director'
+    flags: i
+    match: contains
+
+  - name: concurrency_flag
+    type: regex
+    target: last_message
+    pattern: '(?:^|[\s`])-j\b|--jobs|concurren|in parallel'
+    flags: i
+    match: contains
+
+  # Only the skill says the wrapper lacks the flag (raw `claude plugin eval` instead).
+  - name: concurrency_is_raw_cli
+    type: regex
+    target: last_message
+    pattern: 'claude plugin eval[^\n]{0,80}-j|(?:wrapper|run-evals\.ts)[^.\n]{0,60}(?:no|lacks?|doesn.t|without|not)[^.\n]{0,30}(?:-j|concurren|flag)|raw (?:CLI|command)'
+    flags: i
+    match: contains
+
+  - name: skips_baseline_arm
+    type: regex
+    target: last_message
+    pattern: '--ablation\s+none|plugin[ -]arm only|(?:skip|drop|without)[^.\n]{0,30}(?:baseline|without-plugin|no-plugin) arm|\bquick\b[^.\n]{0,40}(?:tier|plugin)'
+    flags: i
+    match: contains
+
+  # Polarity: skipping the baseline loses the delta; a reply that offers it must say so.
+  - name: warns_delta_lost
+    type: regex
+    target: last_message
+    pattern: '(?:no|lose|loses|drops?|without|can.t (?:claim|quote|report))[^.\n]{0,30}(?:delta|Δ)|(?:delta|Δ)[^.\n]{0,40}(?:not|n.t|unavailable|missing|gone)'
+    flags: i
+    match: contains
