@@ -36,12 +36,14 @@ graders:
     min: 1
     arm: with-only
 
-  # PASS if the reply does not start with a verdict word. FAIL if its first words are
-  # "Rewrite it", "Drop it", "Keep it" (bold or plain). Anchored at the start of the reply.
+  # PASS if the reply does not start with a verdict. FAIL if it opens with a verdict word, bare
+  # ("Rewrite it") or after a short lead-in ("Short answer: rewrite", "I'd drop it", "You should
+  # keep it"). Anchored at the start; the lead-in is bounded so a later "keep" cannot fail a reply
+  # that opens with the check.
   - name: no_verdict_opener
     type: regex
     target: last_message
-    pattern: '^[\s*#_>-]*(?:rewrite|drop|keep|delete|remove)\b'
+    pattern: '^[\s*#_>-]*(?:(?:short answer|verdict|answer|recommendation|tl;?dr)\s*[:\-]\s*|(?:i(?:''d| would| recommend)|you should|just|please)\s+)?(?:rewrit(?:e|ing)|dropp?(?:ing)?|keep(?:ing)?|delet(?:e|ing)|remov(?:e|ing))\b'
     flags: i
     match: not_contains
 
