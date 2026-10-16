@@ -116,6 +116,17 @@ draft them there: tell the user to commit the skill and start a fresh session, t
   routing sits at a 1.00 baseline and cannot register a skill change (#690: two such
   cases, delta 0.00 at 10 runs per arm). Prefer a case whose prompt does not name the
   answer, or one that grades the `Agent` calls the skill is meant to change.
+- Facts a skill or case asserts must be checked first (#713: five were false). A platform
+  claim gets a source link or is marked as inference. A project fact (path, constant,
+  helper, font, setting scope) is confirmed by a code search before it is written.
+- Every area the skill covers gets near-miss cases (shared vocabulary, belongs elsewhere),
+  not only the skill as a whole. Keep some natural-phrasing trigger prompts without
+  stuffed trigger words and treat their fire rate as the primary signal.
+- Grade behavior that helps a user, not a verbatim phrase the skill happens to contain.
+  Use an `llm` grader last, with concrete PASS and FAIL wording (the noisiest graders in
+  #713 were model-judged).
+- A Skill `input_match` must allow an optional `plugin:` prefix (EVAL022); installed
+  plugins are called as `plugin:name`.
 - Whether a case is useful is only known after a two-arm run (Δ above zero, graders
   discriminating). The lint cannot show that; say so rather than claiming it.
 - Action-based grading (grade the commands Claude runs, not its prose) needs a `Bash` grant
