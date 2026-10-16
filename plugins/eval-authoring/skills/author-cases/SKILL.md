@@ -22,6 +22,25 @@ trigger boundary and costs what it is worth (definition and checks:
 the mechanical rules; its messages say what to change. This skill covers what a script
 cannot decide.
 
+## Independence
+
+Cases written in the same session as the skill share its blind spots: a wrong fact or
+trigger boundary in the skill reappears in the cases, so they score self-agreement, not
+quality. If asked to write cases in the session that wrote or edited the skill, do not
+draft them there: tell the user to commit the skill and start a fresh session, then stop.
+
+- Commit the skill, then write cases in a fresh session that works from the committed
+  files (step 1: skill, manifest, existing cases, `grants.yaml`) and not from the
+  session that wrote the skill; take the trigger description and output contract from
+  the committed skill. If that is impossible, wait and return to it later.
+- Check domain facts in graders against primary docs or source, not the skill text.
+- Same-session cases that all pass first try, or take under a minute each, probably do
+  not test the boundary. A few independent cases beat many co-authored ones.
+- A baseline of 0.90 or more signals the case may be solvable without the plugin; check
+  whether the prompt leaks the answer before rewriting or dropping it (step 7).
+- A must-not-fire case that fires in over 20% of runs after two skill revisions is a
+  scope bug: fix the trigger description, not the case.
+
 ## Steps
 
 1. **Read the plugin first.** Read the `SKILL.md` or agent file under test, its manifest,
@@ -61,8 +80,10 @@ cannot decide.
    mocks](references/fixtures-and-mocks.md). Testing a plugin's agents:
    [agents](references/agents.md).
 7. **Check the baseline.** Before trusting a new case, run it once without the plugin. A
-   baseline score of 0.9 or more means the prompt hands over the answer: rewrite it or
-   drop the case. A case that cannot separate the arms is a regression guard, not
+   baseline score of 0.9 or more means the case may be solvable without the plugin:
+   inspect the prompt for a leaked answer, then rewrite it or drop the case. When
+   answering a user about such a case, open with that check (does the prompt give the
+   answer away?) and do not open with a keep, rewrite or drop verdict. A case that cannot separate the arms is a regression guard, not
    evidence the skill helps.
 8. **Lint.** `node ${CLAUDE_SKILL_DIR}/../../scripts/ts/lint/cli.ts <plugin-path>` (Node 22
    or later). Fix every error. Fix each warning or write down why it is intended.

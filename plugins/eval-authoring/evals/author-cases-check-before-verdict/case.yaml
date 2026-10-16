@@ -1,0 +1,56 @@
+# Run: claude plugin eval plugins/eval-authoring --case author-cases-check-before-verdict --runs 5 --trust-plugin --no-publish
+# Covers step 7 and the Independence bullet: with a 0.92 baseline, the reply opens with the check
+# (does the prompt give the answer away?) and does not open with a keep/rewrite/drop verdict.
+# Follow-up to #717, where an llm judge could not grade this order reliably; this uses a free
+# regex on the opening of the reply instead. Reply-only; EVAL009 info is intentional.
+# Sabotage map: delete the "do not open with a verdict" sentence in step 7 and
+# no_verdict_opener should fail in the with arm.
+# Can fail: replies in #717 opened with "**Rewrite it.**" and listed the checks second.
+# Likely delta: positive only if the new sentence changes the opening; unmeasured until a run.
+schema_version: "1.1"
+name: author-cases-check-before-verdict
+description: >
+  Given an eval case that scores 0.92 without the plugin, the reply does not open with a keep,
+  rewrite or drop verdict. expected_outcome: PASS when the opening is not a verdict; FAIL when the
+  reply starts with "Rewrite it", "Drop it" or "Keep it".
+tags: [eval-authoring, author-cases, baseline]
+
+execution:
+  prompt: |
+    I'm authoring `claude plugin eval` cases for my plugin's `summarize-pr-risk` skill. I ran
+    my new case `summarize-pr-risk-flags-auth` with the plugin and without it, 5 runs per arm.
+    It scored 1.00 with the plugin and 0.92 without it. Should I keep, rewrite or drop this
+    case?
+    Don't create files or run any commands.
+  max_turns: 4
+  allowed_tools:
+    - Skill
+    - Read
+    - Glob
+
+graders:
+  - name: skill_fired
+    type: tool_used
+    tool: Skill
+    input_match: '"skill"\s*:\s*"(?:[\w-]+:)?author-cases"'
+    min: 1
+    arm: with-only
+
+  # PASS if the reply does not start with a verdict. FAIL if it opens with a verdict word, bare
+  # ("Rewrite it") or after a short lead-in ("Short answer: rewrite", "I'd drop it", "You should
+  # keep it"). Anchored at the start; the lead-in is bounded so a later "keep" cannot fail a reply
+  # that opens with the check.
+  - name: no_verdict_opener
+    type: regex
+    target: last_message
+    pattern: '^[\s*#_>-]*(?:(?:short answer|verdict|answer|recommendation|tl;?dr)\s*[:\-]\s*|(?:i(?:''d| would| recommend)|you should|just|please)\s+)?(?:rewrit(?:e|ing)|dropp?(?:ing)?|keep(?:ing)?|delet(?:e|ing)|remov(?:e|ing))\b'
+    flags: i
+    match: not_contains
+
+  # The reply still names the prompt check somewhere (guards against an empty or off-topic reply).
+  - name: names_prompt_check
+    type: regex
+    target: last_message
+    pattern: '(?:inspect|check|read|review|look at|examine)[\s\S]{0,80}\bprompt\b|does the prompt (?:give|hand|leak|reveal)'
+    flags: i
+    match: contains

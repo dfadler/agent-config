@@ -1,0 +1,64 @@
+# Run: claude plugin eval plugins/eval-authoring --case author-cases-fresh-session-for-cases --runs 5 --trust-plugin --no-publish
+# Covers the Independence bullet (#715): cases for a skill are written in a fresh session from the
+# committed files, not the session that wrote the skill. Reply-only; EVAL009 info is intentional.
+# Sabotage map: delete the "Commit the skill, then write cases in a fresh session" bullet and
+# fresh_session_named should fail in the with arm.
+# Can fail: a no-plugin reply starts writing cases at once and never names a fresh session.
+# Likely delta: positive if the prompt does not name the answer; unmeasured until a two-arm run.
+schema_version: "1.1"
+name: author-cases-fresh-session-for-cases
+description: >
+  When asked to write eval cases for a skill authored earlier in the same conversation, the reply
+  says to commit the skill and write the cases in a fresh session. expected_outcome: PASS when
+  author-cases fires and the reply names a fresh/new/separate session and committing; FAIL when
+  it proceeds to write cases in the same session.
+tags: [eval-authoring, author-cases, independence]
+
+execution:
+  prompt: |
+    We just finished writing the `changelog-groups` skill for my plugin in this conversation,
+    and I like where it ended up. Now let's write its eval cases, starting with the
+    should-fire prompts. How do you want to proceed?
+    Don't create files or run any commands.
+  max_turns: 4
+  allowed_tools:
+    - Skill
+    - Read
+    - Glob
+
+graders:
+  - name: skill_fired
+    type: tool_used
+    tool: Skill
+    input_match: '"skill"\s*:\s*"(?:[\w-]+:)?author-cases"'
+    min: 1
+    arm: with-only
+
+  # PASS if the reply says the cases belong in a fresh, new or separate session.
+  # FAIL if it just starts drafting cases here.
+  - name: fresh_session_named
+    type: regex
+    target: last_message
+    pattern: '(?:fresh|new|separate|different|clean)[ -](?:claude )?(?:session|conversation|context)'
+    flags: i
+    match: contains
+
+  - name: commit_named
+    type: regex
+    target: last_message
+    pattern: '\bcommit(?:ted)?\b'
+    flags: i
+    match: contains
+
+  # Paid, because the regexes above accept "draft the cases here, use a fresh session later";
+  # the order of the proposed steps is semantic. Narrow: one judgement on the final reply.
+  - name: authoring_starts_in_fresh_session
+    type: llm
+    criteria: >
+      PASS if the reply tells the user to commit the skill and write the eval cases in a fresh
+      or separate session, and the reply itself contains no drafted case: no case file, no
+      example prompt written for this skill, and no grader. General advice about how the fresh
+      session should work (the order of steps, the kinds of prompts or graders to write,
+      commands to run) is not drafting and does not lower the result.
+      FAIL if the reply contains a drafted case, example prompt or grader for this skill, or
+      says to draft the cases in this conversation and use a fresh session only later.
