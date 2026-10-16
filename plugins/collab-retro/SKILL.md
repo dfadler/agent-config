@@ -3,7 +3,10 @@ name: collab-retro
 description: |
   ALWAYS invoke when given feedback memories (or asked for a retro) and asked
   whether any recurring pattern deserves a GitHub issue, including when the answer
-  is that nothing qualifies. Retrospective over how Claude and the user have been working together across
+  is that nothing qualifies. ALSO invoke when the user asks for a "retro" on one
+  costly interaction (a closed or reverted PR, wasted rounds, "you did it again"),
+  even when the transcript is pasted: it defines the incident mode (private record,
+  recurrence check, "why didn't an existing rule fire?", ask before shipping). Retrospective over how Claude and the user have been working together across
   sessions: scans this machine's `feedback`-type auto-memory entries (corrections
   and confirmed approaches, not just this conversation), filters for ones that are
   recurring and fixable via this repo's own config/skills/docs rather than a one-off
