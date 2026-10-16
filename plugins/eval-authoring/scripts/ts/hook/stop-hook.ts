@@ -94,7 +94,7 @@ export const reasonFor = (gaps: readonly Gap[]): string =>
     ),
     "Before you finish:",
     "1. Add or update cases that cover the change (load the author-cases skill) and lint them.",
-    "2. Get the after score and compare it with the baseline: run `run-evals` if you can authenticate, otherwise hand the user the run command (agent sessions often cannot run paid evals).",
+    "2. Get the after score and compare it with the baseline: check `claude auth status`, then run `run-evals` if you are logged in and the user asked for a run; otherwise hand the user the run command.",
     "3. Put the results in the PR's 'Eval results' section and flag any drop in delta or pass rate.",
     "If evals genuinely do not apply (docs-only, typo, no behavior change), say so in one line in your final reply and stop.",
   ].join("\n");

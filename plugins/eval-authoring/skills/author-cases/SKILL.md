@@ -88,13 +88,15 @@ draft them there: tell the user to commit the skill and start a fresh session, t
 8. **Lint.** `node ${CLAUDE_SKILL_DIR}/../../scripts/ts/lint/cli.ts <plugin-path>` (Node 22
    or later). Fix every error. Fix each warning or write down why it is intended.
 9. **Review and hand off.** Ask the [case-reviewer agent](../../agents/case-reviewer.md)
-   for the judgment pass, if available (invocation recipe in the agent file). Then give the user the run command from the
-   [run-evals](../run-evals/SKILL.md) skill. Do not run paid
-   evals yourself: agent sessions usually cannot authenticate, and `--scaffold` is manual
-   opt-in only. A PR that adds or changes cases, or changes a skill or agent that has cases, carries an
+   for the judgment pass, if available (invocation recipe in the agent file). Then use the
+   [run-evals](../run-evals/SKILL.md) skill: check `claude auth status`; if you are
+   logged in and the user asked for a run, run it; otherwise hand them the run command (a
+   hand-off is correct only when that check fails or nobody asked for a run). `--scaffold`
+   is manual opt-in only. A PR that adds or changes cases, or changes a skill or agent that has cases, carries an
    "Eval results" section (the run-evals summary, with the before score from the newest
    `evals/results/` run next to the after score, and 5 runs per arm or more to claim a
-   delta), or says why it has none. The PR body states what was measured (with, without,
+   delta; from fewer runs give the arm scores and write "delta not measured", never a Δ
+   number, even marked preliminary), or says why it has none. The PR body states what was measured (with, without,
    delta) and names each changed behavior no case covers. It never says a change
    "improves" or "fixes" a behavior without a case whose delta shows it; with a delta of
    zero, call the cases regression guards and say the benefit is unverified.

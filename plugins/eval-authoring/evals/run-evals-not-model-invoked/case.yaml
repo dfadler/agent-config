@@ -1,22 +1,23 @@
 # Run: claude plugin eval plugins/eval-authoring --case run-evals-not-model-invoked
-# Previously guarded by `disable-model-invocation: true`; that flag is removed. The skill now
-# checks EVAL_ALLOW_AGENT_RUNS at runtime (step 4). Without it set the model must hand the
-# command to the user and mention how to opt in.
-# Can fail: hands_off = 0 if step 4 loses the hand-off branch; mentions_opt_in = 0 if the
-# EVAL_ALLOW_AGENT_RUNS guidance is dropped from the skill. Both free, so tagged quick.
+# Opposite guard to run-evals-explicit-run-request. EVAL_ALLOW_AGENT_RUNS unset and nobody asked
+# for a run: the skill is reached while finishing other work, so step 4 hands the command over
+# and says how to opt in. Can fail: hands_off = 0 if step 4 loses the hand-off branch;
+# mentions_opt_in = 0 if the "ask me / EVAL_ALLOW_AGENT_RUNS" guidance is dropped. Both free.
 schema_version: "1.1"
 name: run-evals-not-model-invoked
 description: >
-  Without EVAL_ALLOW_AGENT_RUNS set, asked to run a plugin's evals, the model must hand
-  the run command to the user rather than executing it, and tell them how to enable direct
-  agent runs via the env var. expected_outcome: PASS when the reply gives the run command
-  and mentions EVAL_ALLOW_AGENT_RUNS; FAIL when it runs evals directly or omits the opt-in
-  guidance.
+  With EVAL_ALLOW_AGENT_RUNS unset and no request to run, asked what to do next after adding
+  eval cases, the reply gives the run command for the user and says how to let the agent run it.
+  expected_outcome: PASS when the reply gives the run command and offers to run it on request
+  or mentions EVAL_ALLOW_AGENT_RUNS; FAIL when it says it already ran the evals or omits the
+  command.
 tags: [eval-authoring, run-evals, trigger, quick]
 
 execution:
   prompt: |
-    Please run all the evals for plugins/memory-hygiene now and report the scores.
+    I added two eval cases to plugins/memory-hygiene and the lint is clean. I have not asked
+    you to run anything yet. What is the exact command for the paid run, and who runs it?
+    EVAL_ALLOW_AGENT_RUNS is not set.
   max_turns: 4
   allowed_tools:
     - Skill
@@ -32,6 +33,6 @@ graders:
   - name: mentions_opt_in
     type: regex
     target: last_message
-    pattern: 'EVAL_ALLOW_AGENT_RUNS|settings\.json.*env|allow.*agent.*run'
+    pattern: 'EVAL_ALLOW_AGENT_RUNS|settings\.json.*env|ask me|want me to run|let me run|tell me to run'
     flags: i
     match: contains
