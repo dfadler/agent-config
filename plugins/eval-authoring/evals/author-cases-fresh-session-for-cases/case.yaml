@@ -55,7 +55,10 @@ graders:
   - name: authoring_starts_in_fresh_session
     type: llm
     criteria: >
-      PASS if the reply proposes that the eval cases be written in a fresh or separate session
-      (after the skill is committed) and does not start drafting cases in this conversation.
-      FAIL if the reply starts drafting cases here, or says to draft them here and use a fresh
-      session only later.
+      PASS if the reply tells the user to commit the skill and write the eval cases in a fresh
+      or separate session, and the reply itself contains no drafted case: no case file, no
+      example prompt written for this skill, and no grader. General advice about how the fresh
+      session should work (the order of steps, the kinds of prompts or graders to write,
+      commands to run) is not drafting and does not lower the result.
+      FAIL if the reply contains a drafted case, example prompt or grader for this skill, or
+      says to draft the cases in this conversation and use a fresh session only later.
