@@ -1,0 +1,45 @@
+# Run: claude plugin eval plugins/fan-out --case fan-out-states-budget-and-leaf-rule --runs 3 --trust-plugin --no-publish
+# Shared run/grant facts: docs/contributing.md, "Plugin evals". No grant; reply-only.
+# Should-fire case (#729): an explicit fan-out request gets a stated split plus a bounded budget.
+# Run with --ablation with-without. skill_fired is with-arm only and not scored (diagnostic).
+# Can fail: states_budget fails without a numeric cap on agents/depth; plans_parallel fails
+# if no parallel sub-agents are proposed.
+schema_version: "1.1"
+name: fan-out-states-budget-and-leaf-rule
+description: >
+  Asked to fan out a five-part audit across sub-agents that may spawn their own, the reply
+  plans parallel agents and states a concrete cap on depth or total agents.
+  expected_outcome: PASS when it proposes parallel agents and a numeric limit; FAIL when it
+  spawns without any stated bound.
+tags: [fan-out, trigger, quick]
+
+execution:
+  prompt: |
+    Fan this out across parallel sub-agents, and let them spawn their own helpers if they
+    need to: audit the five packages under packages/ (auth, billing, search, notifications,
+    exports) for uses of the deprecated `legacyFetch` helper and report what to migrate.
+    Describe your plan in four sentences, no commands.
+  max_turns: 4
+  allowed_tools:
+    - Skill
+
+graders:
+  - name: skill_fired
+    type: tool_used
+    tool: Skill
+    input_match: '"skill"\s*:\s*"(?:[\w-]+:)?fan-out"'
+    min: 1
+
+  - name: plans_parallel
+    type: regex
+    target: last_message
+    pattern: '(?=.*(?:parallel|concurrent|simultaneous|at once|together|in one message|one wave|fan(?:s|ned|ning)? out))(?=.*agent)'
+    flags: is
+    match: contains
+
+  - name: states_budget
+    type: regex
+    target: last_message
+    pattern: '(?:budget|cap|limit|at most|max(?:imum)?|up to)\W+(?:\w+\W+){0,6}\d+|\d+\s+(?:agents|layers|levels|children)|depth\W+(?:of\W+)?\d'
+    flags: i
+    match: contains
