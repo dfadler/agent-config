@@ -1,0 +1,36 @@
+# Run: claude plugin eval plugins/fan-out --case fan-out-declines-single-question --runs 3 --trust-plugin --no-publish
+# Shared run/grant facts: docs/contributing.md, "Plugin evals". No grant; reply-only.
+# Should-not-fire case (#729): a single bounded question is answered directly even when the
+# user says "fan out". Run with --ablation with-without.
+# Can fail: no_fanout_plan fails if the reply plans multiple parallel sub-agents.
+schema_version: "1.1"
+name: fan-out-declines-single-question
+description: >
+  Asked to fan out a single one-file question, the reply says one agent or a direct answer
+  is enough. expected_outcome: PASS when it declines to split; FAIL when it plans several
+  parallel agents.
+tags: [fan-out, should-not-trigger, quick]
+
+execution:
+  prompt: |
+    Fan out to as many sub-agents as you can to answer this: what does this function do?
+    `function retry(fn, n) { for (let i = 0; i < n; i++) { try { return fn() } catch (e) { if (i === n - 1) throw e } } }`
+    Two sentences on how you'll approach it, no commands.
+  max_turns: 4
+  allowed_tools:
+    - Skill
+
+graders:
+  - name: direct_route
+    type: regex
+    target: last_message
+    pattern: 'directly|single (?:agent|file|question)|one (?:agent|file)|no need|overkill|not worth|read the file|just read'
+    flags: i
+    match: contains
+
+  - name: no_fanout_plan
+    type: regex
+    target: last_message
+    pattern: '(?:\b(?:three|four|five|six|several|multiple|many|\d+)\b[^.]{0,30}(?:parallel|sub-?agents?))(?![^.]{0,30}(?:not|n.t|no need))'
+    flags: i
+    match: not_contains
