@@ -88,6 +88,23 @@ describe("scan-feedback-memories", () => {
     expect(scan(["--incidents"])).toEqual({ code: 0, out: "", err: "" });
   });
 
+  it("--incidents reports a non-ENOENT read error instead of a clean miss", () => {
+    mkdirSync(join(home, ".claude"), { recursive: true });
+    writeFileSync(join(home, ".claude", "incidents"), "not a directory");
+    const r = scan(["--incidents", "stale-pin"]);
+    expect(r.code).toBe(1);
+    expect(r.err).toMatch(/cannot read/);
+  });
+
+  it("--incidents skips a directory named like a record", () => {
+    const dir = join(home, ".claude", "incidents");
+    mkdirSync(join(dir, "2026-04-01-x.md"), { recursive: true });
+    writeFileSync(join(dir, "2026-01-01-a.md"), "class: stale-pin\n");
+    const r = scan(["--incidents", "stale-pin"]);
+    expect(r.code).toBe(0);
+    expect(r.out.trimEnd().split("\n")).toHaveLength(1);
+  });
+
   it("-h and --help print usage and exit 0", () => {
     memory("proj-a", "f", "feedback", "x");
     expect(scan(["-h"])).toEqual({ code: 0, out: USAGE, err: "" });

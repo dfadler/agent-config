@@ -58,7 +58,7 @@ graders:
   - name: says_ignored
     type: regex
     target: last_message
-    pattern: '(?:ignor|not follow|did(?:n.t| not) follow|loaded[^\n]{0,60}(?:but|yet)[^\n]{0,60}(?:ignor|not|did(?:n.t| not))|was (?:in scope|loaded|applicable)|in scope[^\n]{0,60}(?:but|yet))'
+    pattern: '(?:ignor|not follow|did(?:n.t| not) follow|loaded[^\n]{0,60}(?:but|yet)[^\n]{0,60}(?:ignor|not follow|did(?:n.t| not) follow))'
     flags: i
     match: contains
 
@@ -72,6 +72,6 @@ graders:
   - name: asks_before
     type: regex
     target: last_message
-    pattern: '(?:explicit (?:yes|ok|approval)|your (?:yes|ok|approval)|before (?:I |any )?(?:edit|chang|ship|writ)|confirm|ask(?:ing)? (?:you )?first|with your (?:go-ahead|permission))'
+    pattern: '(?:explicit (?:yes|ok|approval)|your (?:yes|ok|approval)|(?:wait|hold) (?:for|until) you|(?:ask|check with) you (?:first|before)|ask(?:ing)? first|with your (?:go-ahead|permission)|(?:may|can|should) I (?:go ahead|proceed|edit|write|ship)|do you want me to)'
     flags: i
     match: contains

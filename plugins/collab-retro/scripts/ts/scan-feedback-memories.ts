@@ -92,18 +92,31 @@ export const main = (argv: readonly string[], ctx: Ctx): number => {
     const dir = join(ctx.home, ".claude", "incidents");
     let names: string[];
     try {
-      names = readdirSync(dir).filter((n) => n.endsWith(".md"));
-    } catch {
-      return 0; // no incident has been recorded yet
+      names = readdirSync(dir, { withFileTypes: true })
+        .filter((e) => e.isFile() && e.name.endsWith(".md"))
+        .map((e) => e.name);
+    } catch (e) {
+      if (e instanceof Error && "code" in e && e.code === "ENOENT") return 0; // no incident has been recorded yet
+      ctx.err(`error: cannot read ${dir}: ${String(e)}\n`);
+      return 1;
     }
+    const unreadable: string[] = [];
     const rows = names.flatMap((n) => {
-      const cls = /^class:\s*(\S+)/m.exec(readFileSync(join(dir, n), "utf8"))?.[1] ?? "";
+      let text: string;
+      try {
+        text = readFileSync(join(dir, n), "utf8");
+      } catch (e) {
+        unreadable.push(n); // report and keep scanning the rest
+        ctx.err(`error: cannot read ${join(dir, n)}: ${String(e)}\n`);
+        return [];
+      }
+      const cls = /^class:\s*(\S+)/m.exec(text)?.[1] ?? "";
       return argv[1] === undefined || argv[1] === cls
         ? [[n.slice(0, 10), cls, join(dir, n)].join("\t")]
         : [];
     });
     if (rows.length > 0) ctx.out(`${rows.sort().reverse().join("\n")}\n`);
-    return 0;
+    return unreadable.length > 0 ? 1 : 0;
   }
   if (argv.length > 0) {
     ctx.err(`error: unexpected argument: ${argv[0] ?? ""}\n${USAGE}`);
