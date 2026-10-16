@@ -136,9 +136,9 @@ Levers, biggest first. Times and costs are rough figures from one 9-case plugin
 
 | Goal | Command | Est. |
 |---|---|---|
-| Iterate on one case | `run-evals.ts <plugin> quick --case <name>` (raw: `<case-dir> --runs 3 --ablation none -j 5`) | ~1 min, ~$0.70 |
+| Iterate on one case | `run-evals.ts --tier quick <plugin> --case <name>` (raw: `<case-dir> --runs 3 --ablation none -j 5`) | ~1 min, ~$0.70 |
 | Full suite, pushed | raw: `<plugin> --runs 5 -j 6` | ~8 min |
-| Pre-merge | `run-evals.ts <plugin> thorough` (raw: `--runs 5 -j 5`) | ~10 min |
+| Pre-merge | `run-evals.ts --tier thorough <plugin>` (raw: `--runs 5 -j 5`) | ~10 min |
 
 All child runs share your Claude rate limit. If runs fail or stall, drop `-j` by 1 or 2;
 a burst of sessions started close together can also throttle briefly.
