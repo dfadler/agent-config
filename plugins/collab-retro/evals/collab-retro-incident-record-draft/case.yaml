@@ -1,0 +1,65 @@
+# Run: claude plugin eval plugins/collab-retro --case collab-retro-incident-record-draft --runs 5 --trust-plugin --no-publish
+# Shared run/grant facts: docs/contributing.md, "Plugin evals". No grant: Skill only. The
+# transcript and the existing memory are pasted; the record is drafted, never written.
+# Should-fire case for "Incident mode" steps 2 and 4: one costly interaction becomes a private
+# record in the skill's fixed shape, with the mandatory "why didn't an existing rule fire?"
+# answered from the pasted memory. The prompt does not name incident mode or the record shape.
+# Can fail: skill_fired fails if the description stops matching a single-incident "retro";
+# record_fields fails if the draft lacks the `class:`, `first-wrong-decision:`, `why-it-didn't:`
+# and `review-after:` fields; why_scope fails if the answer is not "scope" (the pasted memory
+# says UI only); no_secret fails if the pasted token is copied into the record.
+# Skill phrases checked: "Draft the record", "Why didn't an existing rule fire?".
+schema_version: "1.1"
+name: collab-retro-incident-record-draft
+description: >
+  After one costly interaction, the model invokes collab-retro and drafts a private incident
+  record that names the existing too-narrow memory as the rule that should have fired.
+  expected_outcome: PASS when the skill fires and the record has the four fields, why-it-didn't
+  is scope and the token is absent; FAIL otherwise.
+tags: [collab-retro, incident, quick]
+
+execution:
+  prompt: |
+    Retro on what just happened. That PR got closed after four rounds. Short version: the
+    issue said the badge should be 12px. I sent you a screenshot (2026-10-14) showing the
+    badge at 16px in the shipped build. You built to 12px anyway, I said "not even close",
+    you polished it, and the maintainer closed the PR. I'd pasted my API key
+    sk-test-91ab77c0 once while debugging, ignore that.
+
+    I have this memory already, ~/.claude/projects/-Users-me-web/memory/feedback_check_screenshots.md:
+    "When I show a screenshot of a UI bug, check it against the code before editing."
+    It only lives in the web project's memory and is scoped to UI bugs.
+
+    This session was in /Users/me/Development/tooling, session id s-4471. Reply with only the
+    record you would save, nothing else. Do not run commands.
+  max_turns: 6
+  allowed_tools:
+    - Skill
+
+graders:
+  - name: skill_fired
+    type: tool_used
+    tool: Skill
+    input_match: '"skill"\s*:\s*"(?:[\w-]+:)?collab-retro"'
+    min: 1
+    arm: with-only
+
+  - name: record_fields
+    type: regex
+    target: last_message
+    pattern: '(?=[\s\S]*^class:)(?=[\s\S]*first-wrong-decision:)(?=[\s\S]*why-it-didn.t:)(?=[\s\S]*review-after:)'
+    flags: im
+    match: contains
+
+  - name: why_scope
+    type: regex
+    target: last_message
+    pattern: 'why-it-didn.t:\s*\**\s*scope'
+    flags: i
+    match: contains
+
+  - name: no_secret
+    type: regex
+    target: last_message
+    pattern: 'sk-test-91ab77c0'
+    match: not_contains

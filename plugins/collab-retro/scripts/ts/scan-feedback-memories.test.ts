@@ -71,6 +71,40 @@ describe("scan-feedback-memories", () => {
     expect(scan().out).toBe("");
   });
 
+  it("--incidents lists records, filtered by class, newest first", () => {
+    const dir = join(home, ".claude", "incidents");
+    mkdirSync(dir, { recursive: true });
+    writeFileSync(join(dir, "2026-01-01-a.md"), "# a\nclass: stale-pin\n");
+    writeFileSync(join(dir, "2026-02-01-b.md"), "# b\nclass: other\n");
+    writeFileSync(join(dir, "2026-03-01-c.md"), "# c\nclass: stale-pin\n");
+    const all = scan(["--incidents"]).out.trimEnd().split("\n");
+    expect(all.map((l) => l.split("\t")[1])).toEqual(["stale-pin", "other", "stale-pin"]);
+    const hit = scan(["--incidents", "stale-pin"]).out.trimEnd().split("\n");
+    expect(hit.map((l) => l.split("\t")[0])).toEqual(["2026-03-01", "2026-01-01"]);
+    expect(scan(["--incidents", "nope"]).out).toBe("");
+  });
+
+  it("--incidents with no directory is not an error", () => {
+    expect(scan(["--incidents"])).toEqual({ code: 0, out: "", err: "" });
+  });
+
+  it("--incidents reports a non-ENOENT read error instead of a clean miss", () => {
+    mkdirSync(join(home, ".claude"), { recursive: true });
+    writeFileSync(join(home, ".claude", "incidents"), "not a directory");
+    const r = scan(["--incidents", "stale-pin"]);
+    expect(r.code).toBe(1);
+    expect(r.err).toMatch(/cannot read/);
+  });
+
+  it("--incidents skips a directory named like a record", () => {
+    const dir = join(home, ".claude", "incidents");
+    mkdirSync(join(dir, "2026-04-01-x.md"), { recursive: true });
+    writeFileSync(join(dir, "2026-01-01-a.md"), "class: stale-pin\n");
+    const r = scan(["--incidents", "stale-pin"]);
+    expect(r.code).toBe(0);
+    expect(r.out.trimEnd().split("\n")).toHaveLength(1);
+  });
+
   it("-h and --help print usage and exit 0", () => {
     memory("proj-a", "f", "feedback", "x");
     expect(scan(["-h"])).toEqual({ code: 0, out: USAGE, err: "" });

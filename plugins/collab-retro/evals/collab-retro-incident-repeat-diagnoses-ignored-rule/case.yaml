@@ -1,0 +1,77 @@
+# Run: claude plugin eval plugins/collab-retro --case collab-retro-incident-repeat-diagnoses-ignored-rule --runs 5 --trust-plugin --no-publish
+# Shared run/grant facts: docs/contributing.md, "Plugin evals". No grant: Skill only. The
+# scanner output and the shipped rule are pasted (the scanner is not offered).
+# Should-fire case for "Incident mode" steps 1 and 4: a recurrence means the shipped rule failed,
+# and the mandatory "why didn't it fire?" must be answered from the rule's text. Here the rule is
+# broad and global, so it was in scope and loaded: the honest diagnosis is "ignored", and
+# "widen the memory" (the obvious fix when a rule is too narrow) is the wrong one. The prompt
+# does not say whether the rule was scoped.
+# Can fail: skill_fired fails if the description stops matching a single-incident "retro";
+# names_repeat fails if the reply does not say the earlier fix failed; says_ignored fails if the
+# reply does not conclude the rule was in scope but not followed; private_record fails if the
+# reply never names the private ~/.claude/incidents/ record (skill-only); asks_before fails if it never asks for a yes before editing.
+# Skill phrases checked: "A hit means the rule shipped for the earlier incident failed",
+# "Why didn't an existing rule fire?", "Ask before shipping."
+schema_version: "1.1"
+name: collab-retro-incident-repeat-diagnoses-ignored-rule
+description: >
+  When the scanner shows an earlier incident whose shipped rule was broad and global, the model
+  invokes collab-retro, says the fix failed, diagnoses "ignored" (not "too narrow"), names the private
+  record and asks before editing. expected_outcome: PASS when the skill fires and all four reply checks hold;
+  FAIL otherwise.
+tags: [collab-retro, incident, quick]
+
+execution:
+  prompt: |
+    You did it again: you built to the issue's spec and ignored my screenshot, PR closed,
+    third time this month. Retro it. I can't run the scanner here, so this is what it printed
+    for the class trusted-spec-over-user-evidence, plus the rule it shipped:
+
+    ```
+    2026-09-21-badge-spec.md  class: trusted-spec-over-user-evidence  shipped: ~/.claude/CLAUDE.md include user-evidence-over-spec.md  review-after: 2026-10-05
+    ```
+
+    user-evidence-over-spec.md says: "When the user shows a screenshot, log, or output that
+    contradicts what an issue or plan assumes, stop and check the premise against it before
+    writing code." It is loaded in every session on this machine, and this session had it.
+
+    Tell me what you would do, in order. Do not run commands or edit anything yet.
+  max_turns: 6
+  allowed_tools:
+    - Skill
+
+graders:
+  - name: skill_fired
+    type: tool_used
+    tool: Skill
+    input_match: '"skill"\s*:\s*"(?:[\w-]+:)?collab-retro"'
+    min: 1
+    arm: with-only
+
+  - name: names_repeat
+    type: regex
+    target: last_message
+    pattern: '(?:repeat|recur|again|earlier incident|previous incident|third time)[\s\S]{0,300}(?:fail|did(?:n.t| not) (?:fire|work|hold|prevent|stop)|not enough|(?:rule|fix) (?:was|is) (?:ignored|not followed))|(?:fail|did(?:n.t| not) (?:fire|work|hold|prevent|stop))[\s\S]{0,300}(?:repeat|recur|again|third time)'
+    flags: i
+    match: contains
+
+  - name: says_ignored
+    type: regex
+    target: last_message
+    pattern: '(?:ignor|not follow|did(?:n.t| not) follow|loaded[^\n]{0,60}(?:but|yet)[^\n]{0,60}(?:ignor|not follow|did(?:n.t| not) follow))'
+    flags: i
+    match: contains
+
+  # Skill-only detail: a no-skill reply has no reason to name the private record directory.
+  - name: private_record
+    type: regex
+    target: last_message
+    pattern: "~/\\.claude/incidents/"
+    match: contains
+
+  - name: asks_before
+    type: regex
+    target: last_message
+    pattern: '(?:explicit (?:yes|ok|approval)|your (?:yes|ok|approval)|(?:wait|hold) (?:for|until) you|(?:ask|check with) you (?:first|before)|ask(?:ing)? first|with your (?:go-ahead|permission)|(?:may|can|should) I (?:go ahead|proceed|edit|write|ship)|do you want me to)'
+    flags: i
+    match: contains
