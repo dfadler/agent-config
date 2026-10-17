@@ -41,6 +41,6 @@ graders:
   - name: states_budget
     type: regex
     target: last_message
-    pattern: '(?:budget|cap|limit|at most|max(?:imum)?|up to)\W+(?:\w+\W+){0,6}\d+|\d+\s+(?:agents|layers|levels|children)|depth\W+(?:of\W+)?\d'
+    pattern: '(?:budget|cap|limit|at most|max(?:imum)?|up to)\W+(?:\w+\W+){0,6}\d+|\d+\s+(?:agents|layers|levels|children)|depth\W+(?:of\W+)?[0-3]\b'
     flags: i
     match: contains

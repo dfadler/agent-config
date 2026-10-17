@@ -39,6 +39,11 @@ default 20) and nesting (`CLAUDE_CODE_MAX_SUBAGENT_SPAWN_DEPTH`), per the
 [sub-agents docs](https://code.claude.com/docs/en/sub-agents). Stay under those; the
 skill's limits are the tighter, per-run layer on top, so no queue is needed.
 
+The concurrency cap is configurable and shared by the whole tree. If it is set below
+your `width`, treat it as your effective width: spawn that many children, and start the
+remaining subtasks as running ones finish. A spawn refused for the concurrency limit is
+staging, not a failed child.
+
 ## Procedure
 
 1. **Decide whether to fan out.** If the prompt is one question, touches one file, or
@@ -49,7 +54,8 @@ skill's limits are the tighter, per-run layer on top, so no queue is needed.
    count as a surface.
 3. **Divide the budget before spawning.** You hold `budget`. Reserve 1 for yourself,
    give each child a share of the rest (children run in parallel, so shares must sum
-   to at most what you hold). Spawn all children in one message.
+   to at most what you hold). Spawn the first wave of children (up to `width`, or the
+   concurrency cap if lower) in one message.
 4. **Brief each child** with: its subtask, its `depth`/`width`/`budget` remaining
    (`depth` minus 1, its own budget share), and the leaf rule below.
 5. **Leaf rule.** An agent with `depth` 0, `budget` 1, or a subtask that is one
