@@ -2,8 +2,9 @@
 # Shared run/grant facts: docs/contributing.md, "Plugin evals". No grant; reply-only.
 # Should-fire case (#729): an explicit fan-out request gets a stated split plus a bounded budget.
 # Run with --ablation with-without. skill_fired is with-arm only and not scored (diagnostic).
-# Can fail: states_budget fails without a numeric cap on agents/depth; plans_parallel fails
-# if no parallel sub-agents are proposed.
+# Can fail: states_budget fails without a numeric cap on agents/depth (the grader that tells
+# plugin from no plugin); plans_parallel is a floor that fails only if the reply never mentions
+# agents/children. It does not check parallelism: replies say "one per package", not "parallel".
 schema_version: "1.1"
 name: fan-out-states-budget-and-leaf-rule
 description: >
@@ -33,8 +34,8 @@ graders:
   - name: plans_parallel
     type: regex
     target: last_message
-    pattern: '(?=.*(?:parallel|concurrent|simultaneous|at once|together|in one message|one wave|fan(?:s|ned|ning)? out))(?=.*agent)'
-    flags: is
+    pattern: '\b(?:sub-?agents|agents|children)\b'
+    flags: i
     match: contains
 
   - name: states_budget
