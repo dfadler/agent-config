@@ -4,7 +4,8 @@
 # Run with --ablation with-without. skill_fired is with-arm only and not scored (diagnostic).
 # Can fail: states_budget fails without a numeric cap on agents/depth (the grader that tells
 # plugin from no plugin); plans_parallel is a floor that fails only if the reply never mentions
-# agents/children. It does not check parallelism: replies say "one per package", not "parallel".
+# agents/children; allocates_to_packages (llm, judged) fails a reply that declines to fan out
+# or never says which agent takes which package. Neither checks real parallel execution.
 schema_version: "1.1"
 name: fan-out-states-budget-and-leaf-rule
 description: >
@@ -12,7 +13,7 @@ description: >
   plans parallel agents and states a concrete cap on depth or total agents.
   expected_outcome: PASS when it proposes parallel agents and a numeric limit; FAIL when it
   spawns without any stated bound.
-tags: [fan-out, trigger, quick]
+tags: [fan-out, trigger]
 
 execution:
   prompt: |
@@ -37,6 +38,21 @@ graders:
     pattern: '\b(?:sub-?agents|agents|children)\b'
     flags: i
     match: contains
+
+  - name: allocates_to_packages
+    type: llm
+    criteria: |
+      PASS if the response proposes to hand the audit to more than one sub-agent and ties
+      the split to the packages, for example one agent per package or per group of packages
+      (auth, billing, search, notifications, exports). Wording like "parallel" is not
+      required.
+
+      FAIL if any of these hold:
+      - The response declines to use sub-agents, or says it will do the audit itself or
+        one package at a time.
+      - It mentions agents or a budget but never says which agent takes which part of the
+        audit.
+      - It proposes a single sub-agent for all five packages.
 
   - name: states_budget
     type: regex
