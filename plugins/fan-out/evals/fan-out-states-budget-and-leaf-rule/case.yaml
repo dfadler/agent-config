@@ -1,0 +1,62 @@
+# Run: claude plugin eval plugins/fan-out --case fan-out-states-budget-and-leaf-rule --runs 3 --trust-plugin --no-publish
+# Shared run/grant facts: docs/contributing.md, "Plugin evals". No grant; reply-only.
+# Should-fire case (#729): an explicit fan-out request gets a stated split plus a bounded budget.
+# Run with --ablation with-without. skill_fired is with-arm only and not scored (diagnostic).
+# Can fail: states_budget fails without a numeric cap on agents/depth (the grader that tells
+# plugin from no plugin); plans_parallel is a floor that fails only if the reply never mentions
+# agents/children; allocates_to_packages (llm, judged) fails a reply that declines to fan out
+# or never says which agent takes which package. Neither checks real parallel execution.
+schema_version: "1.1"
+name: fan-out-states-budget-and-leaf-rule
+description: >
+  Asked to fan out a five-part audit across sub-agents that may spawn their own, the reply
+  plans parallel agents and states a concrete cap on depth or total agents.
+  expected_outcome: PASS when it proposes parallel agents and a numeric limit; FAIL when it
+  spawns without any stated bound.
+tags: [fan-out, trigger]
+
+execution:
+  prompt: |
+    Fan this out across parallel sub-agents, and let them spawn their own helpers if they
+    need to: audit the five packages under packages/ (auth, billing, search, notifications,
+    exports) for uses of the deprecated `legacyFetch` helper and report what to migrate.
+    Describe your plan in four sentences, no commands.
+  max_turns: 4
+  allowed_tools:
+    - Skill
+
+graders:
+  - name: skill_fired
+    type: tool_used
+    tool: Skill
+    input_match: '"skill"\s*:\s*"(?:[\w-]+:)?fan-out"'
+    min: 1
+
+  - name: plans_parallel
+    type: regex
+    target: last_message
+    pattern: '\b(?:sub-?agents|agents|children)\b'
+    flags: i
+    match: contains
+
+  - name: allocates_to_packages
+    type: llm
+    criteria: |
+      PASS if the response proposes to hand the audit to more than one sub-agent and ties
+      the split to the packages, for example one agent per package or per group of packages
+      (auth, billing, search, notifications, exports). Wording like "parallel" is not
+      required.
+
+      FAIL if any of these hold:
+      - The response declines to use sub-agents, or says it will do the audit itself or
+        one package at a time.
+      - It mentions agents or a budget but never says which agent takes which part of the
+        audit.
+      - It proposes a single sub-agent for all five packages.
+
+  - name: states_budget
+    type: regex
+    target: last_message
+    pattern: '(?:budget|cap|limit|at most|max(?:imum)?|up to)\W+(?:\w+\W+){0,6}\d+|\d+\s+(?:agents|layers|levels|children)|depth\W+(?:of\W+)?[0-3]\b'
+    flags: i
+    match: contains
