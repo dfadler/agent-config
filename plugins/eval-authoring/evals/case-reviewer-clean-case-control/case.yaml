@@ -1,0 +1,117 @@
+# Run: node plugins/eval-authoring/scripts/ts/run-evals/run-evals.ts --tier quick plugins/eval-authoring
+# (quick tier: one run, plugin arm only, `--ablation none`; the no-plugin arm cannot dispatch a
+# plugin agent.) Grant: Write, in grants.yaml.
+# Clean-case control for case-reviewer-flags-planted-weak-case (#748). That case shows the
+# reviewer reports defects; this one shows it reports none when there are none, so a reviewer that
+# flags everything cannot pass both. The two files below follow the plugin's own guidance: natural
+# prompts, a should-fire and a near-miss case, free graders, no llm grader.
+# Can fail: reviewer_dispatched fails if the model reviews the files itself; says_clean fails if
+# the reviewer invents blocking findings or never gives a verdict; no_invented_defect fails if it
+# calls the free graders vague or the suite lopsided.
+# Unmeasured: false-positive rate (TNR). Record it from a thorough run, then re-check after a
+# model change; paired planted case gives the true-positive side.
+schema_version: "1.1"
+name: case-reviewer-clean-case-control
+description: >
+  The case-reviewer agent, given a small suite with nothing wrong, says it is clean and does not
+  invent a defect. expected_outcome: PASS when the agent is dispatched and the reply gives a clean
+  verdict with no vagueness or missing-boundary finding; FAIL when it is not dispatched or it
+  reports a defect that is not there.
+tags: [eval-authoring, case-reviewer, agent, quick]
+
+execution:
+  prompt: |
+    Please create these two files exactly as written, then run the eval-authoring
+    case-reviewer agent on the evals directory and tell me what it found.
+
+    File evals/release-notes-fires/case.yaml:
+
+    ```
+    schema_version: "1.1"
+    name: release-notes-fires
+    description: >
+      A changelog pasted into chat gets release notes that name every breaking change.
+      expected_outcome: PASS when the skill is invoked and the reply names the breaking change;
+      FAIL when it is not invoked or the breaking change is missing.
+    tags: [release-notes, trigger, quick]
+    execution:
+      prompt: |
+        Here is our changelog, can you turn it into something users can read?
+        - fix: login redirect loop
+        - BREAKING: rename `export` command to `download`
+      max_turns: 4
+      allowed_tools: [Skill]
+    graders:
+      - name: skill_fired
+        type: tool_used
+        tool: Skill
+        input_match: '"skill"\s*:\s*"(?:[\w-]+:)?release-notes"'
+        min: 1
+        arm: with-only
+      - name: names_breaking_change
+        type: regex
+        target: last_message
+        pattern: 'download'
+        flags: i
+        match: contains
+    ```
+
+    File evals/release-notes-quiet/case.yaml:
+
+    ```
+    schema_version: "1.1"
+    name: release-notes-quiet
+    description: >
+      A request to review a diff, which shares the word changelog, must not invoke the skill.
+      expected_outcome: PASS when release-notes is not invoked; FAIL when it is.
+    tags: [release-notes, trigger, quick]
+    execution:
+      prompt: |
+        Can you check whether my CHANGELOG.md has an entry for every merged pull request?
+      max_turns: 4
+      allowed_tools: [Skill]
+    graders:
+      - name: skill_not_fired
+        type: tool_used
+        tool: Skill
+        input_match: '"skill"\s*:\s*"(?:[\w-]+:)?release-notes"'
+        min: 0
+        max: 0
+        arm: both
+    ```
+  max_turns: 14
+  allowed_tools:
+    - Agent
+    - Write
+    - Read
+    - Glob
+    - Grep
+
+graders:
+  - name: reviewer_dispatched
+    type: tool_used
+    tool: Agent
+    input_match: "case-reviewer"
+    min: 1
+
+  - name: files_created
+    type: file_exists
+    path: "evals/release-notes-*/case.yaml"
+    exists: true
+
+  # Verdict: the reviewer's all-clear, in its own words.
+  - name: says_clean
+    type: regex
+    target: last_message
+    pattern: "\\bclean\\b|no (?:blocking |significant |real )?(?:findings|issues|problems|defects)|nothing to (?:flag|fix)"
+    flags: i
+    match: contains
+
+  # Polarity: an invented defect on a clean suite. Negated phrases ("not vague") are tolerated
+  # by requiring the finding words to sit right after a word that asserts the problem.
+  - name: no_invented_defect
+    type: regex
+    target: last_message
+    pattern: "(?<!\\bnot\\s)(?<!\\bno\\s)\\b(?:vague|subjective|tautolog\\w+|vacuous)\\s+(?:criteri|grader|pattern)|no (?:negative|non-firing|should-not)[\\s\\w-]{0,20}prompt"
+    flags: i
+    match: not_contains

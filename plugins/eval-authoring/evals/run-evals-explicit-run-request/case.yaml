@@ -1,36 +1,47 @@
 # Run: node plugins/eval-authoring/scripts/ts/run-evals/run-evals.ts --tier standard --case run-evals-explicit-run-request plugins/eval-authoring
-# Shared run/grant facts: docs/contributing.md, "Plugin evals". No grant; reply-only. Default two arms.
+# Shared run/grant facts: docs/contributing.md, "Plugin evals". Grants: grants.yaml (Bash narrowed to
+# the lint, the wrapper's --dry-run and `claude auth status`; a real paid run is not granted, so a
+# denied attempt still shows in the trace). Default two arms.
 # Guards the 2026-10-14 failure: with EVAL_ALLOW_AGENT_RUNS unset, a user who says "run the evals
-# now" was handed the command because the skill treated the variable as the only opt-in. The
-# reply must check login and start the run itself. Reply-only (Skill tool), so the reply
-# states the first command instead of executing it.
+# now" was handed the command because the skill treated the variable as the only opt-in. Reworked
+# for #747: the prompt no longer says the model cannot execute tools; it is given Bash and the trace
+# shows whether it started the wrapper itself (tool_used) after linting (tool_order).
+# Unverified until a run: that a denied (ungranted) Bash call still appears in the trace.
 schema_version: "1.1"
 name: run-evals-explicit-run-request
 description: >
-  Asked in chat to run a plugin's evals now, with no env opt-in, the reply checks login with
-  the run itself rather than telling the user to run it.
-  expected_outcome: PASS when it names the wrapper command as what it will run; FAIL when it
-  tells the user to run the command in their own shell. The login check is not graded: a
-  reply-only model starts with lint, so it never reaches that step (checks_login failed 5/5
-  on both the old and new skill text).
+  Asked in chat to run a plugin's evals now, with no env opt-in, the model starts the wrapper
+  itself, after the lint, instead of telling the user to run it. expected_outcome: PASS when the
+  trace has a Bash call to run-evals.ts after a lint call and the reply does not hand the command
+  off; FAIL when it tells the user to run the command in their own shell.
 tags: [eval-authoring, run-evals, trigger, quick]
 
 execution:
   prompt: |
     Run the quick tier evals for plugins/memory-hygiene now and report the scores.
-    EVAL_ALLOW_AGENT_RUNS is not set. In this check you cannot execute tools, so say in
-    your reply what you do next.
-  max_turns: 6
+    EVAL_ALLOW_AGENT_RUNS is not set.
+  max_turns: 10
   allowed_tools:
     - Skill
+    - Bash
 
 graders:
-  - name: names_wrapper
-    type: regex
-    target: last_message
-    pattern: 'run-evals(?:\.ts)?[^\n]{0,80}(?:--tier\s+quick|\bquick\b)|--tier\s+quick'
-    flags: i
-    match: contains
+  # Steps: the wrapper was started from this session.
+  - name: wrapper_started
+    type: tool_used
+    tool: Bash
+    input_match: 'run-evals\.ts'
+    min: 1
+
+  # Steps: lint came first (run-evals step 2 before step 3's dry-run).
+  - name: lint_before_wrapper
+    type: tool_order
+    before:
+      tool: Bash
+      input_match: 'lint/cli\.ts'
+    after:
+      tool: Bash
+      input_match: 'run-evals\.ts'
 
   - name: does_not_hand_off
     type: regex

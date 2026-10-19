@@ -3,7 +3,8 @@
 # (does the prompt give the answer away?) and does not open with a keep/rewrite/drop verdict.
 # Follow-up to #717, where an llm judge could not grade this order reliably; this uses a free
 # regex on the opening of the reply instead. Reply-only; EVAL009 info is intentional.
-# Sabotage map: delete the "do not open with a verdict" sentence in step 7 and
+# Merged with the former author-cases-high-baseline-is-signal (#745): same scenario, so its
+# no_flat_leak_claim polarity check lives here. Sabotage map: delete the "do not open with a verdict" sentence in step 7 and
 # no_verdict_opener should fail in the with arm.
 # Can fail: replies in #717 opened with "**Rewrite it.**" and listed the checks second.
 # Likely delta: positive only if the new sentence changes the opening; unmeasured until a run.
@@ -54,3 +55,11 @@ graders:
     pattern: '(?:inspect|check|read|review|look at|examine)[\s\S]{0,80}\bprompt\b|does the prompt (?:give|hand|leak|reveal)'
     flags: i
     match: contains
+
+  # Polarity: only an unhedged "the prompt leaks/hands over the answer" fails.
+  - name: no_flat_leak_claim
+    type: regex
+    target: last_message
+    pattern: '(?<!\b(?:whether|if|may|might|could|not|never|does|n.t)\s+(?:be\s+)?(?:that\s+)?(?:the\s+)?)\b(?:prompt|case)\b[^.\n]{0,30}\b(?:leaks?|hands? over|gives? away|reveals?)\b[^.\n]{0,20}\banswer'
+    flags: i
+    match: not_contains
