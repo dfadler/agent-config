@@ -70,8 +70,15 @@ draft them there: tell the user to commit the skill and start a fresh session, t
    The prompt must carry its inputs inline: the workspace is empty and a case has no
    `Write` grant by default, so a check that the reply names a file or line number is
    cheap for a no-plugin baseline to pass.
+   A trace-level `tool_used` or `tool_order` grader is required beside any `llm` grader
+   that judges a sequence ("asked before running"): a reply can claim an order that never
+   happened ([graders](references/graders.md#sequence-claims)).
 5. **Write PASS and FAIL conditions** for any `llm` grader: `PASS if <observable thing>.`
-   `FAIL if <observable thing>.` Concrete enough that two judges agree.
+   `FAIL if <observable thing>.` Concrete enough that two judges agree. Also put a
+   reference-good and a known-bad reply in the case header (a comment), and confirm by
+   reading that every grader passes the first and at least one fails the second; a grader
+   that cannot fail the known-bad reply approves everything. See
+   [rubrics](references/graders.md#rubrics-for-llm-graders).
 6. **Record grants.** If `allowed_tools` names `Bash`, `Write`, `Edit`, `WebFetch` or
    `WebSearch`, add the exact `--allow-tools` entry for that case to
    `<eval dir>/grants.yaml` ([format](../../docs/grants-format.md)). Keep each entry as
@@ -94,9 +101,10 @@ draft them there: tell the user to commit the skill and start a fresh session, t
    hand-off is correct only when that check fails or nobody asked for a run). `--scaffold`
    is manual opt-in only. A PR that adds or changes cases, or changes a skill or agent that has cases, carries an
    "Eval results" section (the run-evals summary, with the before score from the newest
-   `evals/results/` run next to the after score, and 5 runs per arm or more to claim a
-   delta; from fewer runs give the arm scores and write "delta not measured", never a Δ
-   number, even marked preliminary), or says why it has none. The PR body states what was measured (with, without,
+   `evals/results/` run next to the after score, and a delta claimed only for a plugin with
+   about 20 or more cases: runs shrink within-case noise, only cases shrink the standard
+   error of a delta; a smaller suite is a regression guard, so give the arm scores and
+   write "delta not measured", never a Δ number, even marked preliminary), or says why it has none. The PR body states what was measured (with, without,
    delta) and names each changed behavior no case covers. It never says a change
    "improves" or "fixes" a behavior without a case whose delta shows it; with a delta of
    zero, call the cases regression guards and say the benefit is unverified.
