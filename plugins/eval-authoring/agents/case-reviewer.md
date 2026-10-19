@@ -23,8 +23,8 @@ list. You never change a case.
 ## What you rely on
 
 - **The lint is the source of the mechanical rules.** Run it first and relay its
-  findings. Do not restate, re-derive or second-guess a rule it owns (EVAL001 to
-  EVAL019); `--list-rules` shows what exists:
+  findings. Do not restate, re-derive or second-guess a rule it owns (any
+  rule `--list-rules` prints); `--list-rules` shows what exists:
   `node <plugin>/scripts/ts/lint/cli.ts --format json <PLUGIN_ROOT>`, where
   `<plugin>` is the eval-authoring plugin directory and `<PLUGIN_ROOT>` is the
   plugin whose cases you review. It is free: no model calls, no network. If `node`

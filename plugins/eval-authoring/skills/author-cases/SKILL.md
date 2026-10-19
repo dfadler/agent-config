@@ -37,9 +37,10 @@ draft them there: tell the user to commit the skill and start a fresh session, t
 - Same-session cases that all pass first try, or take under a minute each, probably do
   not test the boundary. A few independent cases beat many co-authored ones.
 - A baseline of 0.90 or more signals the case may be solvable without the plugin; check
-  whether the prompt leaks the answer before rewriting or dropping it (step 7).
+  whether the prompt leaks the answer before rewriting or dropping it (step 7). The 0.90
+  is a rule of thumb (little headroom left for the plugin to add), not a measured cutoff.
 - A must-not-fire case that fires in over 20% of runs after two skill revisions is a
-  scope bug: fix the trigger description, not the case.
+  scope bug: fix the trigger description, not the case. Both numbers are rules of thumb.
 
 ## Steps
 
@@ -57,7 +58,7 @@ draft them there: tell the user to commit the skill and start a fresh session, t
    naming the skill: some that should fire it, and some that should not, including
    near-misses that share its vocabulary but want something else. Every should-fire case
    needs a grader on whether the skill fired (see [graders](references/graders.md)).
-4. **Pick graders, free first.** Name what must be true, map it to something observable,
+4. **Pick graders, free first** (a complete pair of cases: [worked example](references/worked-example.md)). Name what must be true, map it to something observable,
    and reach for `llm` or `baseline` only when the property is semantic. The procedure is
    in [graders](references/graders.md). Pair a grader on the result with one on the steps.
    A reply-only skill case has no scored steps grader: `tool_used: Skill` is an unscored
