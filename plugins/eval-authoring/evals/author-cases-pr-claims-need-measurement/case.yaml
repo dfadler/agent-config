@@ -57,6 +57,6 @@ graders:
   - name: no_delta_number
     type: regex
     target: last_message
-    pattern: '(?:Δ|delta|improv\w+|up)\s*(?:of|by|:|=)?\s*[+-]?\s*\d*\.\d+'
+    pattern: '(?:Δ|\b(?:delta|improv\w+|up))\s*(?:of|by|:|=)?\s*[+-]?\s*\d*\.\d+|\bdelta\s*(?:of|by|:|=)?\s*[+-]?\s*\d+'
     flags: i
     match: not_contains

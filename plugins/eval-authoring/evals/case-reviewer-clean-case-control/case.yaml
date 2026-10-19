@@ -112,6 +112,6 @@ graders:
   - name: no_invented_defect
     type: regex
     target: last_message
-    pattern: "(?<!\\bnot\\s)(?<!\\bno\\s)\\b(?:vague|subjective|tautolog\\w+|vacuous)\\s+(?:criteri|grader|pattern)|no (?:negative|non-firing|should-not)[\\s\\w-]{0,20}prompt"
+    pattern: "(?<!\\b(?:no|not|without|nor)[-\\s,]+(?:\\w+[-\\s,]+){0,2})\\b(?:vague|subjective|tautolog\\w+|vacuous)\\s+(?:criteri|grader|pattern)|no (?:negative|non-firing|should-not)[\\s\\w-]{0,20}prompt"
     flags: i
     match: not_contains
