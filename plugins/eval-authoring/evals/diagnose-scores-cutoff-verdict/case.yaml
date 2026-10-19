@@ -1,0 +1,27 @@
+# Run: claude plugin eval plugins/eval-authoring --case diagnose-scores-cutoff-verdict
+# Not run yet: paid, hand-off only. No grant: Skill only.
+# Sabotage map: delete the "Verdict cutoffs" table in diagnose-scores/SKILL.md; a no-plugin model
+# cannot know the 0.05 band or the verdict names, so names_verdict drops.
+# Can fail: names_verdict = 0 unless the reply uses the verdict name no-discrimination.
+schema_version: "1.1"
+name: diagnose-scores-cutoff-verdict
+description: >
+  Asks which diagnose verdict a Delta of -0.03 gets. expected_outcome: PASS when the reply says
+  no-discrimination; FAIL otherwise.
+tags: [eval-authoring, diagnose-scores, quick]
+
+execution:
+  prompt: |
+    The eval-authoring diagnose script gives each case a verdict. My case has a Delta of -0.03.
+    Which verdict does it get? One line, no files, no commands.
+  max_turns: 6
+  allowed_tools:
+    - Skill
+
+graders:
+  - name: names_verdict
+    type: regex
+    target: last_message
+    pattern: 'no-discrimination'
+    flags: i
+    match: contains

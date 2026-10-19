@@ -1,0 +1,36 @@
+# Run: claude plugin eval plugins/eval-authoring --case diagnose-scores-consistent-judge
+# Not run yet: paid, hand-off only. No grant: Skill only; the prompt forbids running anything.
+# Sabotage map: delete the "negative-delta with a consistent judge" bullet in diagnose-scores/SKILL.md
+# and the with arm falls back to "suspect the judge / tighten the rubric", so edits_skill drops.
+# Can fail: edits_skill = 0 if the reply sends the user to the case or rubric; not_rubric = 0 if it
+# tells them to tighten the rubric. Baseline may pass by common sense; Delta is unmeasured.
+schema_version: "1.1"
+name: diagnose-scores-consistent-judge
+description: >
+  A negative Delta where every judge vote agrees. expected_outcome: PASS when the reply says the
+  with-arm replies are worse and the fix is an edit to the skill, not the case or rubric; FAIL otherwise.
+tags: [eval-authoring, diagnose-scores, quick]
+
+execution:
+  prompt: |
+    My eval case for a release-notes skill has a Delta of -0.21. The llm grader gave FAIL in all 24
+    of 24 with-plugin votes and PASS in all 24 without-plugin votes, so the judge is not flipping.
+    What do I change next? Answer in your reply; do not run anything.
+  max_turns: 6
+  allowed_tools:
+    - Skill
+
+graders:
+  - name: edits_skill
+    type: regex
+    target: last_message
+    pattern: '(edit|change|fix|revise)[^.\n]{0,40}\b(skill|SKILL\.md)'
+    flags: i
+    match: contains
+
+  - name: not_rubric
+    type: regex
+    target: last_message
+    pattern: '(tighten|rewrite|loosen)[^.\n]{0,30}(rubric|grader|judge)'
+    flags: i
+    match: not_contains

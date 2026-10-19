@@ -1,0 +1,34 @@
+# Run: claude plugin eval plugins/eval-authoring --case diagnose-scores-fires-on-natural-phrasing
+# Not run yet: paid, hand-off only. No grant: Skill only; the prompt forbids running anything.
+# Sabotage map: remove '"my eval fails", "score 0.4"' from the diagnose-scores description (#750);
+# the plain phrasing may then stop firing the skill. Fire rate is the primary signal.
+# Skill_fired is an unscored indicator in a two-arm run; the regex grades the reply.
+schema_version: "1.1"
+name: diagnose-scores-fires-on-natural-phrasing
+description: >
+  Plain phrasing, no skill name or Delta. expected_outcome: PASS when the skill fires and the
+  reply names the judge as a suspect; FAIL otherwise.
+tags: [eval-authoring, diagnose-scores, trigger, quick]
+
+execution:
+  prompt: |
+    my eval keeps failing, it scores 0.4 but the answers look fine to me. why? Answer in your
+    reply; do not run anything.
+  max_turns: 6
+  allowed_tools:
+    - Skill
+
+graders:
+  - name: skill_fired
+    type: tool_used
+    tool: Skill
+    input_match: '"skill"\s*:\s*"(?:[\w-]+:)?diagnose-scores"'
+    min: 1
+    arm: with-only
+
+  - name: suspects_judge
+    type: regex
+    target: last_message
+    pattern: 'judge|llm grader|rubric'
+    flags: i
+    match: contains
