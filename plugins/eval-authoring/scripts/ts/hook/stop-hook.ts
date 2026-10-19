@@ -1,8 +1,8 @@
 /**
  * Stop hook: when the work in this checkout changes a plugin's skills or
  * agents but not its evals, block the stop once and tell Claude to update the
- * cases and compare scores before and after. Agents rarely volunteer eval
- * work; this makes the omission visible at the moment they would finish.
+ * cases and compare scores before and after. The omission is easy to make and
+ * hard to notice, so this surfaces it at the moment the work would finish.
  *
  * Contract (https://code.claude.com/docs/en/hooks, Stop): stdin JSON carries
  * `cwd` and `stop_hook_active`; stdout `{ decision: "block", reason }` makes
@@ -15,18 +15,22 @@ import { join, relative, resolve, sep } from "node:path";
 import { resolveEvalDir } from "../parser/index.ts";
 import { findPluginRoot } from "./lint-hook.ts";
 
+/** A hung git must not hold the Stop hook open; a timeout throws and the hook no-ops. */
+const GIT_TIMEOUT_MS = 10_000;
+
 const git = (cwd: string, args: readonly string[]): string =>
   execFileSync("git", [...args], {
     cwd,
     encoding: "utf8",
     stdio: ["ignore", "pipe", "ignore"],
+    timeout: GIT_TIMEOUT_MS,
   });
 
 const lines = (s: string): string[] => s.split("\n").filter((l) => l !== "");
 
 /** Files changed vs the merge-base with main (committed or not) plus untracked files, repo-relative. */
 export const changedFiles = (cwd: string): readonly string[] => {
-  const base = ["origin/main", "main"]
+  const base = ["origin/main", "main", "@{upstream}"]
     .map((ref) => {
       try {
         return git(cwd, ["merge-base", "HEAD", ref]).trim();

@@ -51,7 +51,7 @@ findings as JSON ({ claudeCodeVersion, counts, findings: [...] }).
 Exit codes (same taxonomy as the repo's shell scripts):
   0   no errors (warnings and info are reported only)
   1   at least one error finding
-  2   bad arguments, or PLUGIN_ROOT or --eval-dir is not usable
+  2   bad arguments, PLUGIN_ROOT or --eval-dir is not usable, or the suite has no cases
   3   the plugin manifest's experimental.evals is not a usable path
   20  internal error (a rule threw, or the rules failed to load)
 `;
@@ -162,6 +162,13 @@ export const main = (
       outcome.source === "flag" ? EXIT_USAGE : EXIT_CONFIG,
       "",
       `${outcome.reason}\n`,
+    );
+  }
+  if (outcome.report.casesChecked === 0) {
+    return done(
+      EXIT_USAGE,
+      "",
+      `no cases found in ${outcome.report.evalDir}; is --eval-dir right?\n`,
     );
   }
   const text =
