@@ -2,9 +2,10 @@ name: Plugin evals
 
 # Paid `claude plugin eval` runs, per docs/plugin-eval-ci.md (#436, #582).
 #
-# STANDALONE and NON-GATING: not called from ci.yml. Triggers are manual and
-# weekly only. NEVER add `pull_request`: the job passes --trust-plugin next to a
-# subscription token, and this is a public repo.
+# STANDALONE and NON-GATING: not called from ci.yml. Trigger is manual only;
+# the weekly run is a local scheduled task (docs/plugin-eval-ci.md, #738).
+# NEVER add `pull_request`: the job passes --trust-plugin next to a subscription
+# token, and this is a public repo.
 #
 # Runs go through the run-evals wrapper (plugins/eval-authoring/scripts/ts/run-evals),
 # which applies each case's grants.yaml grants, pins the models and tier ceiling,
@@ -19,9 +20,6 @@ name: Plugin evals
 # job too, but is reported as inconclusive rather than as a regression.
 
 on:
-  schedule:
-    # Mondays 04:23 UTC; an off-the-hour minute avoids the top-of-hour queue.
-    - cron: "23 4 * * 1"
   workflow_dispatch:
     inputs:
       plugin:
@@ -168,34 +166,3 @@ jobs:
           path: eval-results/${{ matrix.plugin }}/
           if-no-files-found: warn
           retention-days: 30
-
-  # #738: the weekly run is non-gating, so a red run would go unseen. Open (or
-  # comment on) one issue per failure, the same pattern as vitest-soak.yml.
-  notify:
-    name: notify
-    needs: eval
-    if: ${{ failure() && github.event_name == 'schedule' }}
-    runs-on: ubuntu-latest
-    timeout-minutes: 5
-    permissions:
-      contents: read
-      issues: write
-    steps:
-      - name: Open or update failure issue
-        env:
-          GH_TOKEN: ${{ github.token }}
-          RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
-        run: |
-          set -euo pipefail
-          title="Plugin evals failed"
-          body="The weekly plugin evals run failed: $RUN_URL
-
-          A regression (delta below floor or a grader below threshold) or an inconclusive run (exit 7). The result summary and the \`plugin-eval-*\` artifacts on the run have the per-case verdicts. Non-gating: no merge is blocked."
-          existing=$(gh issue list --repo "$GITHUB_REPOSITORY" --state open \
-            --search "\"$title\" in:title" --json number,title \
-            --jq "[.[] | select(.title == \"$title\")][0].number // empty")
-          if [ -n "$existing" ]; then
-            gh issue comment "$existing" --repo "$GITHUB_REPOSITORY" --body "$body"
-          else
-            gh issue create --repo "$GITHUB_REPOSITORY" --title "$title" --body "$body"
-          fi
