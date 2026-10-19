@@ -94,6 +94,77 @@ const readCaseResult = (c: Rec): CaseResult => {
 };
 
 /**
+ * A zero score (not a mock-stopped run) with no grader detail: what a usage-limit run looks like, with
+ * no `error` set (#735). A genuine zero has failing graders to show for it.
+ */
+export const isSilentZero = (r: {
+  readonly score?: unknown;
+  readonly graders?: unknown;
+  readonly aborted?: unknown;
+}): boolean =>
+  r.score === 0 &&
+  r.aborted !== true &&
+  !(Array.isArray(r.graders) && r.graders.length > 0);
+
+/**
+ * Reasons a parsed result is too implausible to judge (#734, #735): wrong
+ * `schemaVersion`, no cases, a case with no with-runs, or dropped non-object
+ * entries. Empty when plausible. Shared by `readAggregateResult` and the CI
+ * gate, `scripts/ts/check-plugin-eval.ts`; the CI gate adds `silentZeroReasons`.
+ */
+export const implausibleReasons = (doc: Rec): readonly string[] => {
+  const version = doc["schemaVersion"];
+  const cases = arr(doc["cases"]);
+  const recs = cases.filter(isRec);
+  const runsOf = (c: Rec, side: string): readonly unknown[] =>
+    arr(isRec(c["arms"]) ? c["arms"][side] : undefined);
+  const allRuns = recs.flatMap((c) =>
+    (["with", "without"] as const).flatMap((s) => runsOf(c, s)),
+  );
+  const dropped =
+    cases.length - recs.length + allRuns.filter((r) => !isRec(r)).length;
+  return [
+    ...(version === RESULT_SCHEMA_VERSION
+      ? []
+      : [
+          `unsupported schemaVersion ${version === undefined ? "(missing)" : JSON.stringify(version)} (expected ${String(RESULT_SCHEMA_VERSION)})`,
+        ]),
+    ...(!Array.isArray(doc["cases"])
+      ? ["missing cases array"]
+      : cases.length === 0
+        ? ["no cases"]
+        : []),
+    ...recs.flatMap((c) =>
+      runsOf(c, "with").length === 0
+        ? [`${optStr(c["name"]) ?? "(unnamed)"}: no with-arm runs`]
+        : [],
+    ),
+    ...(dropped > 0
+      ? [`${String(dropped)} malformed case or run entries`]
+      : []),
+  ];
+};
+
+/** Only the CI gate rejects these; the diagnosis reads them and judges per run. */
+export const silentZeroReasons = (doc: Rec): readonly string[] => {
+  const runs = arr(doc["cases"])
+    .filter(isRec)
+    .flatMap((c) =>
+      ["with", "without"].flatMap((side) =>
+        arr(isRec(c["arms"]) ? c["arms"][side] : undefined).filter(isRec),
+      ),
+    );
+  return [
+    ...(runs.some((r) => isSilentZero(r))
+      ? ["a run scored 0 with no grader detail (usage limit?)"]
+      : []),
+    ...(runs.length > 0 && runs.every((r) => r["score"] === 0)
+      ? ["every run scored 0"]
+      : []),
+  ];
+};
+
+/**
  * Parse `aggregate-result.json` text (`schemaVersion: 1`, camelCase). Ignores
  * unknown fields and tolerates an omitted `delta`. An unreadable or unsupported
  * document is reported, not thrown. Used by the diagnosis script (#462) and
@@ -110,16 +181,8 @@ export const readAggregateResult = (text: string): ReadResultOutcome => {
   if (!isRec(doc)) {
     return { ok: false, reason: "not a JSON object" };
   }
-  const version = doc["schemaVersion"];
-  if (version !== RESULT_SCHEMA_VERSION) {
-    return {
-      ok: false,
-      reason: `unsupported schemaVersion ${version === undefined ? "(missing)" : JSON.stringify(version)} (expected ${String(RESULT_SCHEMA_VERSION)})`,
-    };
-  }
-  if (!Array.isArray(doc["cases"])) {
-    return { ok: false, reason: "missing cases array" };
-  }
+  const bad = implausibleReasons(doc);
+  if (bad.length > 0) return { ok: false, reason: bad.join("; ") };
   const result: AggregateResult = {
     schemaVersion: RESULT_SCHEMA_VERSION,
     partial: doc["partial"] === true,
