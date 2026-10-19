@@ -34,3 +34,22 @@ describe("EVAL014", () => {
     expect(messages("good-prompt-md")).toEqual([]);
   });
 });
+
+describe("EVAL014 leakage (#744)", () => {
+  it("reports git history made by a scaffold_script", () => {
+    const found = messages("bad-git-history");
+    expect(found).toHaveLength(1);
+    expect(found[0]).toMatch(/commits, branches or tags in git/);
+  });
+
+  it("reports an answer file in add_dirs", () => {
+    const found = messages("bad-add-dirs-answer");
+    expect(found).toHaveLength(1);
+    expect(found[0]).toMatch(/add_dirs entry 'data' contains answer\.md/);
+  });
+
+  it("does not report a clean add_dirs or a git init-only scaffold", () => {
+    expect(messages("good-add-dirs-clean")).toEqual([]);
+    expect(messages("good-case-yaml")).toEqual([]);
+  });
+});

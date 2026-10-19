@@ -4,6 +4,8 @@ Source: the [plugin-evals docs](https://code.claude.com/docs/en/plugin-evals), "
 fixtures and mocks" and "Mock files".
 
 Each run starts in an empty workspace, so put what the task needs in the prompt, or seed it.
+With nothing to read the model tends to hunt the workspace for files, so inline inputs
+beat leaving it empty (89-skills post; see the Eval Research doc, Tools).
 
 ## Faking a CLI or fixture files
 
@@ -19,6 +21,10 @@ non-zero exit scores the run 0.
 - To stub a CLI, have the script write the stub into the workspace and have the prompt
   call it by relative path (`./bin/tool`). It needs `Bash` in `allowed_tools`, a
   `--allow-tools` grant and a `grants.yaml` entry.
+- Keep answers out of reach: the agent can read git history and `add_dirs`, so a script
+  that commits a fix or branch, or an `add_dirs` folder with an answer file or `.git`,
+  leaks it (EVAL014; Anthropic's agent-evals post reports an agent using earlier trials'
+  git history).
 - A `fixtures/bin` directory put on `PATH` is **not** supported: do not use it (EVAL014).
 - `context.add_dirs` lists case-directory folders Claude may read (read-only).
   `context.history_file` resumes a `.jsonl` transcript; such a case runs one arm by default

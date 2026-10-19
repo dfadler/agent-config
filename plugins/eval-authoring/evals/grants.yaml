@@ -5,3 +5,15 @@ schema_version: "1"
 grants:
   case-reviewer-flags-planted-weak-case:
     - "Write"
+  # #747: Bash lets the run-evals refusal cases be graded from the trace. Each entry covers only
+  # the free steps (lint, `claude auth status`, the wrapper's --dry-run); a real paid run is not
+  # granted, so the model cannot start one even if it tries.
+  run-evals-explicit-run-request:
+    - "Bash(node *lint/cli.ts*)"
+    - "Bash(node *run-evals.ts*--dry-run*)"
+    - "Bash(claude auth status)"
+  run-evals-not-model-invoked:
+    - "Bash(node *lint/cli.ts*)"
+    - "Bash(claude auth status)"
+  case-reviewer-clean-case-control:
+    - "Write"

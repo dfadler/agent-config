@@ -1,26 +1,35 @@
 # Run: node plugins/eval-authoring/scripts/ts/run-evals/run-evals.ts --tier thorough --case author-cases-skill-input-match-plugin-prefix plugins/eval-authoring
 # Shared run/grant facts: docs/contributing.md, "Plugin evals". No grant; reply-only. Default two arms.
-# Covers the author-cases Gotcha (#713, EVAL022): a Skill input_match allows an optional `plugin:`
-# prefix. The prompt says the skill belongs to an installed plugin but never gives the call form.
-# skill_fired is with-only. Measured 2026-10-14, 5 runs per arm: with the plugin 1.00 on both
-# this branch's author-cases text and main's, no plugin 0.50. So the Gotcha bullet is not what
-# makes the plugin arm pass (main's skill already does); this is a regression guard for the
-# plugin as a whole, not evidence the bullet helps.
+# Covers the author-cases Gotcha (#713, EVAL022): installed plugins are called as `plugin:name`.
+# Rewritten for #746: the prompt now presents a failing grader and its symptom instead of asking
+# for the answer; it never mentions a prefix. The reply is graded on the grader it hands back
+# (the fixed input_match must accept both call forms), not on a doc phrase.
+# Measured 2026-10-14 on the old prompt: 1.00 with the plugin, 0.50 without; unmeasured since.
 schema_version: "1.1"
 name: author-cases-skill-input-match-plugin-prefix
 description: >
-  Asked for the should-fire grader of a skill in an installed plugin, the reply writes a
-  tool_used Skill input_match whose regex allows an optional plugin: prefix before the skill
-  name. expected_outcome: PASS when the pattern accepts both rollback and deploy-helper:rollback;
-  FAIL when it anchors the bare name right after the opening quote.
+  Given a should-fire grader that never passes in the with-plugin arm although the trace shows
+  the skill being called, the reply hands back a corrected input_match that still matches when
+  the call is namespaced. expected_outcome: PASS when the corrected pattern accepts both
+  `rollback` and `deploy-helper:rollback`; FAIL when it still anchors the bare name right after
+  the opening quote.
 tags: [eval-authoring, author-cases, quick]
 
 execution:
   prompt: |
-    My plugin deploy-helper has a skill called rollback. I'm writing a claude plugin eval
-    case that checks the skill fires when a user says "the release broke prod, undo it".
-    Write just the one tool_used grader for that, in YAML, in a code block. Don't create
-    files or run any commands.
+    My claude plugin eval case for the `rollback` skill in my installed deploy-helper plugin
+    fails every run: skill_fired is 0, yet the transcript clearly shows the skill being
+    called. This is the grader:
+
+    ```yaml
+    - name: skill_fired
+      type: tool_used
+      tool: Skill
+      input_match: '"skill"\s*:\s*"rollback"'
+      min: 1
+    ```
+
+    Give me the corrected grader in a code block. Don't create files or run any commands.
   max_turns: 8
   allowed_tools:
     - Skill
@@ -36,16 +45,9 @@ graders:
     min: 1
     arm: with-only
 
-  - name: has_skill_grader
-    type: regex
-    target: last_message
-    pattern: 'tool_used'
-    flags: i
-    match: contains
-
-  # The optional-prefix group, in any spelling: (?:[\w-]+:)? or (?:deploy-helper:)? or (?:\w+:)?
+  # The fix, in any spelling: an optional group before the name, e.g. (?:[\w-]+:)? or (?:deploy-helper:)?
   - name: prefix_optional
     type: regex
     target: last_message
-    pattern: '\(\?:[^)]{1,40}:\)\?'
+    pattern: '\(\?:[^)]{1,40}:\)\?\s*rollback'
     match: contains

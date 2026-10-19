@@ -1,26 +1,27 @@
 # Run: node plugins/eval-authoring/scripts/ts/run-evals/run-evals.ts --tier standard --case run-evals-speed-levers plugins/eval-authoring
 # Shared run/grant facts: docs/contributing.md, "Plugin evals". No grant; reply-only. Default two arms.
-# Covers the run-evals "Faster feedback" section (#714). The prompt names no flag, so the
-# graders look for the figures only that section carries.
-# Sabotage map (delete the sentence, grader drops): "The wrapper has no `-j` flag" ->
-# concurrency_is_raw_cli; the `quick` tier / `--ablation none` bullet -> skips_baseline_arm;
-# "At 3 runs a 0.20 swing is noise" -> fewer_runs_caveat. skill_fired is with-arm only.
-# Unknown until a two-arm run: whether the baseline already knows -j and --ablation (a high
-# baseline makes these regression guards, not evidence the section helps).
+# Covers the run-evals "Faster feedback" section (#714). Rewritten for #746: the prompt gives no
+# case count, run count or duration, and the graders check the advice (narrow to one case, skip
+# the baseline arm, warn the delta is lost) instead of the section's wording on -j or the 3-run
+# noise caveat. Sabotage map: delete the `quick` tier / `--ablation none` bullet and
+# skips_baseline_arm should drop; delete the warning that skipping the baseline loses the delta and
+# warns_delta_lost should drop. skill_fired is with-arm only.
+# Unknown until a two-arm run: whether the baseline already knows these levers (a high baseline
+# makes this a regression guard, not evidence the section helps).
 schema_version: "1.1"
 name: run-evals-speed-levers
 description: >
-  Asked how to get faster feedback from a slow eval suite while iterating on one grader,
-  the reply names concurrency as a raw-CLI flag the wrapper lacks, skipping the baseline
-  arm, and the 3-run noise caveat. expected_outcome: PASS when the reply covers concurrency
-  via the raw command and the plugin-arm-only option; FAIL when it only says "run fewer cases".
+  Asked how to get faster feedback while iterating on one grader of a slow eval suite, the reply
+  narrows the run to the one case, skips the baseline arm, and says that costs the delta.
+  expected_outcome: PASS when it covers running one case, the plugin-arm-only option and the
+  lost delta; FAIL when it only says "run fewer cases".
 tags: [eval-authoring, run-evals, quick]
 
 execution:
   prompt: |
-    My plugin has 9 eval cases and a full two-arm run at 5 runs per arm takes about 16
-    minutes. I'm tweaking one grader in a single case and re-running constantly. What can I
-    change to get feedback faster? Don't create files or run any commands.
+    Our eval suite for a plugin takes a quarter of an hour per full run, and I'm tweaking one
+    grader in a single case and re-running constantly. What can I change to get feedback
+    faster? Don't create files or run any commands.
   max_turns: 8
   allowed_tools:
     - Skill
@@ -40,21 +41,6 @@ graders:
     type: regex
     target: last_message
     pattern: '--case\b|single case|one case|case director'
-    flags: i
-    match: contains
-
-  - name: concurrency_flag
-    type: regex
-    target: last_message
-    pattern: '(?:^|[\s`])-j\b|--jobs|concurren|in parallel'
-    flags: i
-    match: contains
-
-  # Only the skill says the wrapper lacks the flag (raw `claude plugin eval` instead).
-  - name: concurrency_is_raw_cli
-    type: regex
-    target: last_message
-    pattern: 'claude plugin eval[^\n]{0,80}-j|(?:wrapper|run-evals\.ts)[^.\n]{0,60}(?:no|lacks?|doesn.t|without|not)[^.\n]{0,30}(?:-j|concurren|flag)|raw (?:CLI|command)'
     flags: i
     match: contains
 

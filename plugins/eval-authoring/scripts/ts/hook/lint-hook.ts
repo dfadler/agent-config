@@ -122,9 +122,20 @@ export const relevantFindings = (
   if (scope.firstSegment === undefined) return report.findings;
   const caseDir = resolve(scope.evalDir, scope.firstSegment);
   if (!isCaseDir(caseDir)) return report.findings;
-  return report.findings.filter((f) =>
-    resolve(f.loc.file).startsWith(caseDir + sep),
-  );
+  // Relative paths are relative to the plugin root, not the hook's cwd.
+  // Suite-level findings (grants, manifest, mocks) sit outside every case dir.
+  return report.findings.filter((f) => {
+    const abs = resolve(report.pluginRoot, f.loc.file);
+    if (abs.startsWith(caseDir + sep)) return true;
+    const rel = relative(scope.evalDir, abs);
+    const other = isOutside(rel) ? undefined : rel.split(sep);
+    // Drop only findings inside some other case dir.
+    return !(
+      other !== undefined &&
+      other.length > 1 &&
+      isCaseDir(join(scope.evalDir, other[0] ?? ""))
+    );
+  });
 };
 
 /** The stdout JSON that makes `context` visible to Claude. */

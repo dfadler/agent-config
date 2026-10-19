@@ -104,11 +104,11 @@ describe("readAggregateResult", () => {
     });
   });
 
-  it("tolerates odd shapes inside cases", () => {
+  it("tolerates odd shapes inside runs", () => {
     const out = readAggregateResult(
       JSON.stringify({
         schemaVersion: 1,
-        cases: [7, { arms: { with: [null, { graders: "x", error: 5 }] } }],
+        cases: [{ arms: { with: [{ graders: "x", error: 5 }] } }],
       }),
     );
     expect(out.ok && out.result.cases).toEqual([
@@ -122,6 +122,22 @@ describe("readAggregateResult", () => {
     ["no schemaVersion", '{"cases":[]}', "(missing)"],
     ["wrong schemaVersion", '{"schemaVersion":2,"cases":[]}', "2"],
     ["no cases", '{"schemaVersion":1}', "missing cases"],
+    ["empty cases", '{"schemaVersion":1,"cases":[]}', "no cases"],
+    [
+      "a case with no with-runs",
+      '{"schemaVersion":1,"cases":[{"name":"x","arms":{"without":[{"score":1}]}}]}',
+      "x: no with-arm runs",
+    ],
+    [
+      "a dropped case",
+      '{"schemaVersion":1,"cases":[7,{"arms":{"with":[{}]}}]}',
+      "1 malformed",
+    ],
+    [
+      "a dropped run",
+      '{"schemaVersion":1,"cases":[{"arms":{"with":[null,{}]}}]}',
+      "1 malformed",
+    ],
   ])("reports %s", (_n, text, reason) => {
     const out = readAggregateResult(text);
     expect(out.ok).toBe(false);

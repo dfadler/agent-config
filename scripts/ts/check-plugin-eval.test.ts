@@ -4,6 +4,8 @@ import { cliError, EXIT_FAILURE } from "./lib/exit-codes.ts";
 import { err, ok } from "./lib/result.ts";
 
 const arm = (o: object = {}) => ({
+  score: 1,
+  graders: [{ name: "g", passed: true }],
   error: null,
   skippedPaidGraders: false,
   ...o,
@@ -17,6 +19,7 @@ const result = (
   } = {},
 ) =>
   JSON.stringify({
+    schemaVersion: 1,
     partial: o.partial ?? false,
     cases: [
       {
@@ -91,7 +94,56 @@ describe("check-plugin-eval", () => {
   it("treats a result without a cases array as inconclusive, not a pass", () => {
     expect(codeOf(check("0", "{}"))).toBe(7);
     expect(codeOf(check("0", JSON.stringify({ cases: "x" })))).toBe(7);
-    expect(codeOf(check("0", JSON.stringify({ cases: [] })))).toBe(0);
+  });
+
+  it.each([
+    ["empty cases", { schemaVersion: 1, cases: [] }],
+    ["a missing schemaVersion", { cases: [{ arms: { with: [arm()] } }] }],
+    [
+      "a wrong schemaVersion",
+      { schemaVersion: 2, cases: [{ arms: { with: [arm()] } }] },
+    ],
+    [
+      "a case with no with-runs",
+      { schemaVersion: 1, cases: [{ arms: { without: [arm()] } }] },
+    ],
+    [
+      "a dropped case",
+      { schemaVersion: 1, cases: [7, { arms: { with: [arm()] } }] },
+    ],
+    [
+      "a dropped run",
+      { schemaVersion: 1, cases: [{ arms: { with: [arm(), null] } }] },
+    ],
+  ])("treats %s as inconclusive, never a pass (#734)", (_n, doc) => {
+    expect(codeOf(check("0", JSON.stringify(doc)))).toBe(7);
+  });
+
+  it.each([
+    ["an empty-string error", { error: "" }],
+    ["a score 0 with no graders", { score: 0, graders: [] }],
+    ["a score 0 with graders omitted", { score: 0, graders: undefined }],
+  ])("treats %s as inconclusive (#735)", (_n, withArm) => {
+    expect(codeOf(check("1", result({ withArm })))).toBe(7);
+  });
+
+  it("treats an all-zero run as inconclusive, not a regression or a pass (#735)", () => {
+    const zero = { score: 0, graders: [{ name: "g", passed: false }] };
+    const r = result({ withArm: zero, withoutArm: zero });
+    expect(codeOf(check("1", r))).toBe(7);
+    expect(codeOf(check("0", r, ["--delta-floor", "0"]))).toBe(7);
+  });
+
+  it("keeps a real regression (score 0 with failing graders, without-arm passing)", () => {
+    const r = result({
+      withArm: { score: 0, graders: [{ name: "g", passed: false }] },
+      withoutArm: {},
+    });
+    expect(codeOf(check("1", r))).toBe(1);
+  });
+
+  it("rejects an empty --delta-floor instead of reading it as 0", () => {
+    expect(codeOf(check("0", result(), ["--delta-floor", ""]))).toBe(2);
   });
 
   it("--delta-floor gates a low delta; default stays warn-only", () => {
