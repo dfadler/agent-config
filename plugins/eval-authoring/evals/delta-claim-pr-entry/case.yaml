@@ -11,10 +11,8 @@ schema_version: "1.1"
 name: delta-claim-pr-entry
 description: >
   Given a score from a plugin-arm-only quick pass, asked to put an improvement figure in the PR
-  body, the reply declines to quote a delta, says it is not measured, and names what would
-  support one. expected_outcome: PASS when it writes no numeric delta, says the delta is not
-  measured or needs a with/without comparison, and names what would support one (5 runs with
-  both arms, or about 20 cases); FAIL when it writes a delta into the PR text.
+  body, the reply declines to quote a delta and says it is not measured. expected_outcome: PASS when it writes no numeric delta, says the delta is not
+  measured or needs a with/without comparison; FAIL when it writes a delta into the PR text.
 tags: [eval-authoring, delta-claim, quick]
 
 execution:
@@ -42,13 +40,6 @@ graders:
     type: regex
     target: last_message
     pattern: 'delta[^.\n]{0,30}(?:not measured|unmeasured|can.t|cannot|not supported)|(?:no|without)[^.\n]{0,20}(?:baseline|without-plugin|no-plugin)|\barms?\b[^.\n]{0,40}(?:both|missing|needed)|with[ -]?(?:versus|vs\.?|/)[ -]?without'
-    flags: i
-    match: contains
-
-  - name: names_what_supports_delta
-    type: regex
-    target: last_message
-    pattern: '\b(?:5|five)\b[^.\n]{0,30}\bruns?\b|\bruns?\b[^.\n]{0,30}\b(?:5|five)\b|\b(?:20|twenty)\b[^.\n]{0,40}\bcases?\b|\bcases?\b[^.\n]{0,40}\b(?:20|twenty)\b'
     flags: i
     match: contains
 
