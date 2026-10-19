@@ -94,6 +94,10 @@ describe("check-plugin-eval", () => {
     expect(codeOf(check("0", JSON.stringify({ cases: [] })))).toBe(0);
   });
 
+  it("rejects an empty --delta-floor instead of reading it as 0", () => {
+    expect(codeOf(check("0", result(), ["--delta-floor", ""]))).toBe(2);
+  });
+
   it("--delta-floor gates a low delta; default stays warn-only", () => {
     const low = result({ delta: 0.05 });
     expect(codeOf(check("0", low))).toBe(0);

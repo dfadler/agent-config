@@ -65,28 +65,33 @@ const invalidReasons = (doc: Record<string, unknown>): readonly string[] => [
   }),
 ];
 
-/** Warn-only delta signals; a missing delta is no signal, not a warning. */
-const deltaWarnings = (doc: Record<string, unknown>): readonly string[] =>
+/** Cases whose delta satisfies `bad`, as [name, delta]; a missing delta is no signal. */
+const deltaCases = (
+  doc: Record<string, unknown>,
+  bad: (d: number) => boolean,
+): readonly (readonly [string, number])[] =>
   list(doc["cases"]).flatMap((c) => {
     if (!isRecord(c) || !isRecord(c["aggregates"])) return [];
     const d = c["aggregates"]["delta"];
-    return typeof d === "number" && d <= 0
-      ? [`warning: ${String(c["name"])}: delta ${String(d)} <= 0\n`]
+    return typeof d === "number" && bad(d)
+      ? [[String(c["name"]), d] as const]
       : [];
   });
 
-/** Cases whose delta is below the floor; a missing delta is no signal. */
+/** Warn-only delta signals. */
+const deltaWarnings = (doc: Record<string, unknown>): readonly string[] =>
+  deltaCases(doc, (d) => d <= 0).map(
+    ([n, d]) => `warning: ${n}: delta ${String(d)} <= 0\n`,
+  );
+
+/** Cases whose delta is below the floor. */
 const deltaBreaches = (
   doc: Record<string, unknown>,
   floor: number,
 ): readonly string[] =>
-  list(doc["cases"]).flatMap((c) => {
-    if (!isRecord(c) || !isRecord(c["aggregates"])) return [];
-    const d = c["aggregates"]["delta"];
-    return typeof d === "number" && d < floor
-      ? [`${String(c["name"])}: delta ${String(d)} < floor ${String(floor)}`]
-      : [];
-  });
+  deltaCases(doc, (d) => d < floor).map(
+    ([n, d]) => `${n}: delta ${String(d)} < floor ${String(floor)}`,
+  );
 
 const inconclusive = (why: string): Result<CliError, never> =>
   err(cliError(EXIT_PARTIAL, `inconclusive: ${why}`));
@@ -155,7 +160,12 @@ export const main: Main = (argv, _env, io) =>
         return err(cliError(EXIT_USAGE, `--threshold is required\n\n${USAGE}`));
       }
       const rawFloor = p.flags["delta-floor"];
-      const floor = typeof rawFloor === "string" ? Number(rawFloor) : undefined;
+      const floor = 
+        typeof rawFloor === "string" && rawFloor.trim() !== ""
+          ? Number(rawFloor)
+          : typeof rawFloor === "string"
+            ? Number.NaN
+            : undefined;
       if (floor !== undefined && !Number.isFinite(floor)) {
         return err(
           cliError(EXIT_USAGE, `--delta-floor needs a number\n\n${USAGE}`),
