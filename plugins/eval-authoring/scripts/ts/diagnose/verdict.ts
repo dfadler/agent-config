@@ -5,6 +5,7 @@
  * parsed `aggregate-result.json`; no I/O, no model calls. The #436 delta gate
  * can import `diagnose` and read `verdict`.
  */
+import { isSilentZero } from "../parser/result.ts";
 import type {
   AggregateResult,
   CaseResult,
@@ -105,8 +106,8 @@ export const DEFAULT_THRESHOLDS: Thresholds = {
   highVariance: 0.25,
 };
 
-const isErrored = (r: RunResult): boolean =>
-  typeof r.error === "string" && r.error.length > 0;
+// Any string `error` counts, `""` included (#735).
+const isErrored = (r: RunResult): boolean => typeof r.error === "string";
 
 const mean = (xs: readonly number[]): number | undefined =>
   xs.length === 0
@@ -126,7 +127,10 @@ const fmt = (n: number): string => String(round(n));
 /** Runs that can be compared: no error, judges not skipped, a numeric score. */
 const usable = (runs: readonly RunResult[]): readonly number[] =>
   runs.flatMap((r) =>
-    isErrored(r) || r.skippedPaidGraders === true || r.score === undefined
+    isErrored(r) ||
+    isSilentZero(r) ||
+    r.skippedPaidGraders === true ||
+    r.score === undefined
       ? []
       : [r.score],
   );
@@ -356,10 +360,10 @@ const unusable = (
   arm: string,
 ): Judged | undefined => {
   if (runs.length === 0 || usable(runs).length > 0) return undefined;
-  if (runs.some(isErrored)) {
+  if (runs.some((r) => isErrored(r) || isSilentZero(r))) {
     return {
       verdict: "run-error",
-      reason: `no ${arm} run is usable and some errored, so this is a failed run, not a regression`,
+      reason: `no ${arm} run is usable and some errored or scored a silent 0, so this is a failed run, not a regression`,
       findings: [],
     };
   }

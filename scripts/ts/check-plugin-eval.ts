@@ -5,6 +5,10 @@
 //
 // Exit codes: 0 pass, 1 regression (valid run, CLI exit non-zero against the
 // threshold), 7 inconclusive (invalid run, so not a regression), 2 usage.
+import {
+  implausibleReasons,
+  silentZeroReasons,
+} from "../../plugins/eval-authoring/scripts/ts/parser/result.ts";
 import { parseArgs, type Parsed } from "./lib/args.ts";
 import {
   cliError,
@@ -29,7 +33,9 @@ Decide pass / regression / inconclusive for a \`claude plugin eval\` run.
   RESULT.json      The run's aggregate-result.json.
 
 Inconclusive (exit 7, not a regression): CLI exit 2, \`partial: true\`, any
-\`skippedPaidGraders\`, any \`arms.with[].error\` or \`arms.without[].error\`, or an unreadable result.
+\`skippedPaidGraders\`, any \`arms.with[].error\` or \`arms.without[].error\`, an implausible result
+(no cases, a case with no with-arm runs, wrong \`schemaVersion\`, a score-0 run with
+no grader detail, all runs 0: a usage limit looks like this), or an unreadable result.
 Regression (exit 1): a valid run where the CLI exited non-zero.
 Delta is warn-only; a missing delta means no signal. Exit 2: bad arguments.
 
@@ -113,7 +119,11 @@ const decide = (
   if (!isRecord(doc)) return inconclusive("result is not a JSON object");
   if (!Array.isArray(doc["cases"]))
     return inconclusive("result is missing a cases array");
-  const bad = invalidReasons(doc);
+  const bad = [
+    ...implausibleReasons(doc),
+    ...silentZeroReasons(doc),
+    ...invalidReasons(doc),
+  ];
   if (bad.length > 0) return inconclusive(bad.join("; "));
   const warns = deltaWarnings(doc).join("");
   const breaches = floor === undefined ? [] : deltaBreaches(doc, floor);
