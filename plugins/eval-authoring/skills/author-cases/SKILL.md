@@ -76,8 +76,10 @@ draft them there: tell the user to commit the skill and start a fresh session, t
 5. **Write PASS and FAIL conditions** for any `llm` grader: `PASS if <observable thing>.`
    `FAIL if <observable thing>.` Concrete enough that two judges agree. Also put a
    reference-good and a known-bad reply in the case header (a comment), and confirm by
-   reading that every grader passes the first and at least one fails the second; a grader
-   that cannot fail the known-bad reply approves everything. See
+   reading that every reply-targeted grader (`regex`, `llm`) passes the first and at least one
+   fails the second; a grader that cannot fail the known-bad reply approves everything.
+   Replies say nothing about `tool_used`, `tool_order` or `file_exists`: check those
+   against a representative trace or artifact. See
    [rubrics](references/graders.md#rubrics-for-llm-graders).
 6. **Record grants.** If `allowed_tools` names `Bash`, `Write`, `Edit`, `WebFetch` or
    `WebSearch`, add the exact `--allow-tools` entry for that case to

@@ -41,8 +41,16 @@ graders:
   - name: has_tool_order_grader
     type: regex
     target: last_message
-    pattern: 'type:\s*tool_order|tool_order'
+    pattern: 'type:\s*tool_order'
     flags: i
+    match: contains
+
+  # A drafted llm grader with PASS/FAIL conditions, not a mention of the rules.
+  - name: drafts_llm_rubric
+    type: regex
+    target: last_message
+    pattern: 'type:\s*llm.*PASS if.*FAIL if'
+    flags: s
     match: contains
 
   - name: rubric_requires_quote

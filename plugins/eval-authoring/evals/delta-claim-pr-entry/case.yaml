@@ -11,7 +11,7 @@ description: >
   Given a result from a plugin-arm-only 3-run quick pass, asked to put a delta in the PR
   body, the reply declines to quote a delta and says what run would support one.
   expected_outcome: PASS when it says a quick or 3-run result cannot back a delta and names
-  5 runs with both arms; FAIL when it writes a delta into the PR text.
+  what would support one (5 runs with both arms, or about 20 cases); FAIL when it writes a delta into the PR text.
 tags: [eval-authoring, delta-claim, quick]
 
 execution:
@@ -42,10 +42,10 @@ graders:
     flags: i
     match: contains
 
-  - name: names_five_runs
+  - name: names_what_supports_delta
     type: regex
     target: last_message
-    pattern: '\b(?:5|five)\b[^.\n]{0,30}\bruns?\b|\bruns?\b[^.\n]{0,30}\b(?:5|five)\b'
+    pattern: '\b(?:5|five)\b[^.\n]{0,30}\bruns?\b|\bruns?\b[^.\n]{0,30}\b(?:5|five)\b|\b(?:20|twenty)\b[^.\n]{0,40}\bcases?\b|\bcases?\b[^.\n]{0,40}\b(?:20|twenty)\b'
     flags: i
     match: contains
 
