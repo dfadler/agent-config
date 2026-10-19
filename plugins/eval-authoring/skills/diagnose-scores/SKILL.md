@@ -71,8 +71,8 @@ Partial results (the script prints `PARTIAL`) are left out of trends; say so.
 
 ## Verdict cutoffs
 
-The numbers behind the verdicts, as set in `scripts/ts/diagnose/verdict.ts`
-(`DEFAULT_THRESHOLDS`) on main. Scores run 0 to 1; Δ is the with-arm mean minus the
+The numbers behind the verdicts, as set in
+`plugins/eval-authoring/scripts/ts/diagnose/verdict.ts` (`DEFAULT_THRESHOLDS`). Scores run 0 to 1; Δ is the with-arm mean minus the
 without-arm mean over usable runs.
 
 | Verdict | Rule |
