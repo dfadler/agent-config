@@ -1,0 +1,38 @@
+# Run: node plugins/eval-authoring/scripts/ts/run-evals/run-evals.ts --tier quick plugins/eval-authoring
+# Natural-phrasing should-fire case (#745): the request names neither the skill nor trigger words
+# from its description. Reply-only, so the Skill check is an unscored indicator (EVAL009 info is
+# intentional; see author-cases step 4). Read its fire rate across runs, not one run.
+# Can fail: skill_fired fails on any run where the description does not match this phrasing;
+# the result regex fails if the reply never addresses the request.
+schema_version: "1.1"
+name: run-evals-fires-natural-go-ahead
+description: >
+  A natural request to run a plugin's evals, without naming it, must invoke it.
+  expected_outcome: PASS when the model invokes run-evals and the reply addresses the request;
+  FAIL when it answers without the skill.
+tags: [eval-authoring, run-evals, trigger, quick]
+
+execution:
+  prompt: |
+    Go ahead and run the standard tier on plugins/release-notes now.
+    This is a check of your first step only: say what you do first.
+  max_turns: 6
+  allowed_tools:
+    - Skill
+    - Read
+    - Glob
+
+graders:
+  - name: skill_fired
+    type: tool_used
+    tool: Skill
+    input_match: '"skill"\s*:\s*"(?:[\w-]+:)?run-evals"'
+    min: 1
+    arm: with-only
+
+  - name: addresses_request
+    type: regex
+    target: last_message
+    pattern: 'run-evals|--tier|plugin eval|lint'
+    flags: i
+    match: contains

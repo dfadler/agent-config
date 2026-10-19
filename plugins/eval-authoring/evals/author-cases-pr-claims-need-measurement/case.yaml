@@ -1,26 +1,28 @@
 # Run: node plugins/eval-authoring/scripts/ts/run-evals/run-evals.ts --tier standard --case author-cases-pr-claims-need-measurement plugins/eval-authoring
 # Shared run/grant facts: docs/contributing.md, "Plugin evals". No grant; reply-only.
-# Covers the author-cases step 7 and 9 rules that a PR changing skill text reports with/without/delta
-# and does not claim an improvement the evals do not show. Run with the default two arms.
-# Can fail: reports_baseline_gap fails if the reply never says the without-plugin run is
-# missing; no_improvement_claim fails if the reply states the change improves or proves the
-# behavior; skill_fired (with-arm only) fails if the description stops matching.
+# Covers the author-cases step 7 and 9 rule that a PR changing skill text reports what was
+# measured and does not claim an improvement the evals do not show. Rewritten for #746: the prompt
+# no longer states run counts or a score, and the graders check the claim made (no improvement
+# claim, no delta number, the missing baseline named), not the 5-runs or 0.9 figures from the docs.
+# Can fail: reports_baseline_gap fails if the reply never says the baseline is missing;
+# no_improvement_claim fails on an unnegated "improves/proves"; no_delta_number fails when a
+# numeric delta is written; skill_fired (with-arm only) fails if the description stops matching.
 schema_version: "1.1"
 name: author-cases-pr-claims-need-measurement
 description: >
   Given a skill-text change with one passing eval case and no without-plugin run, the reply
-  drafts the verification section without claiming an improvement and names the missing
-  baseline. expected_outcome: PASS when it flags the missing without-plugin run or delta and
-  makes no improvement claim; FAIL when it says the change improves or is proven to work.
+  drafts the verification section without claiming an improvement or a numeric delta and
+  names the missing baseline. expected_outcome: PASS when it flags the missing without-plugin
+  run and writes no improvement claim or delta number; FAIL otherwise.
 tags: [eval-authoring, author-cases, quick]
 
 execution:
   prompt: |
     I changed plugins/deploy-helper/skills/rollback/SKILL.md to add one rule: "always
     snapshot the database before rolling back". I also added one eval case,
-    rollback-snapshots-first, and it scored 1.00 in 3 runs with the plugin. Write the
-    Summary and Verified sections of my PR description. Don't create files or run any
-    commands.
+    rollback-snapshots-first, and it passes with the plugin. I'm about to open the PR.
+    Write the Summary and Verified sections of my PR description. Don't create files or
+    run any commands.
   max_turns: 8
   allowed_tools:
     - Skill
@@ -39,26 +41,7 @@ graders:
   - name: reports_baseline_gap
     type: regex
     target: last_message
-    pattern: '(?:without|no)[ -]plugin|baseline|delta|unverified|not (?:yet )?(?:measured|verified|run)|haven.t (?:been )?run'
-    flags: i
-    match: contains
-
-  # The two figures only author-cases steps 7 and 9 teach (5 runs per arm to claim a delta; a
-  # no-plugin baseline at or above 0.9 means the case does not discriminate).
-  - name: states_five_run_minimum
-    type: regex
-    target: last_message
-    pattern: '\b(?:5|five)\b[^.\n]{0,30}\bruns?\b|\bruns?\b[^.\n]{0,30}\b(?:5|five)\b'
-    flags: i
-    match: contains
-
-  # Matches the 0.9 figure or the meaning: a high baseline makes the case a regression guard
-  # (the prompt gives the answer away). The literal-figure-only version scored four correct
-  # paraphrases as misses; this alternation was written after reading those replies.
-  - name: states_baseline_gate
-    type: regex
-    target: last_message
-    pattern: '0\.9\b|90 ?%|regression guard|(?:baseline|without[ -](?:the )?plugin|no-plugin)[^.\n]{0,80}(?:near|high|also (?:scores?|passes?|1\.00)|already)|(?:near|high)[^.\n]{0,40}baseline|prompt[^.\n]{0,40}(?:gives? away|hands? over|leaks?)'
+    pattern: '(?:without|no)[ -]plugin|baseline|unverified|not (?:yet )?(?:measured|verified|run)|haven.t (?:been )?run|delta not measured'
     flags: i
     match: contains
 
@@ -67,5 +50,13 @@ graders:
     type: regex
     target: last_message
     pattern: '(?<!(?:\bnot|n.t|\bnever|\bno|\bnor|\bwithout|cannot)\b[^.\n]{0,40})\b(?:improves?|improved|proves?|proven|demonstrates?|confirms?)\b[^.\n]{0,40}\b(?:rollback|change|rule|skill|behavio[u]?r|works?)'
+    flags: i
+    match: not_contains
+
+  # A numeric delta ("Δ +0.4", "delta of 0.3", "up by 0.25") cannot come from one with-plugin pass.
+  - name: no_delta_number
+    type: regex
+    target: last_message
+    pattern: '(?:Δ|\b(?:delta|improv\w+|up))\s*(?:of|by|:|=)?\s*[+-]?\s*\d*\.\d+|\bdelta\s*(?:of|by|:|=)?\s*[+-]?\s*\d+'
     flags: i
     match: not_contains
