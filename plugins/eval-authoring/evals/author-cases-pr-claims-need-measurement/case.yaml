@@ -43,12 +43,13 @@ graders:
     flags: i
     match: contains
 
-  # The two figures only author-cases steps 7 and 9 teach (5 runs per arm to claim a delta; a
-  # no-plugin baseline at or above 0.9 means the case does not discriminate).
-  - name: states_five_run_minimum
+  # The two figures only author-cases steps 7 and 9 teach (a delta needs about 20 cases, since
+  # only cases shrink the delta's error; a no-plugin baseline at or above 0.9 means the case
+  # does not discriminate).
+  - name: states_case_count_minimum
     type: regex
     target: last_message
-    pattern: '\b(?:5|five)\b[^.\n]{0,30}\bruns?\b|\bruns?\b[^.\n]{0,30}\b(?:5|five)\b'
+    pattern: '\b(?:20|twenty)\b[^.\n]{0,40}\bcases?\b|\bcases?\b[^.\n]{0,40}\b(?:20|twenty)\b'
     flags: i
     match: contains
 

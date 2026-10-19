@@ -1,0 +1,67 @@
+# Run: node plugins/eval-authoring/scripts/ts/run-evals/run-evals.ts --tier standard --case author-cases-rubric-and-sequence-graders plugins/eval-authoring
+# No grant; reply-only. Covers author-cases steps 4 and 5 (#740, #741, #742): a sequence claim
+# ("asked before running") gets a tool_order/tool_used grader beside the llm grader, and the llm
+# rubric requires a quoted span for FAIL, a no-fire list and a known-bad reply.
+# The prompt asks for an llm grader: without it the reply has no rubric to apply the quote and no-fire
+# rules to (first run scored 0.60 for that reason, not a skill defect).
+# Can fail: has_tool_order_grader fails if the drafted case judges the sequence by prose alone;
+# rubric_requires_quote fails if the rubric has no quoted-evidence rule; has_no_fire_list fails
+# if there is no "do not fail for" list; names_known_bad_reply fails if no known-bad reply is
+# drafted; skill_fired (with-arm only) fails if the description stops matching.
+schema_version: "1.1"
+name: author-cases-rubric-and-sequence-graders
+description: >
+  Asked to draft a case for a skill that must ask before running a destructive command, the
+  reply pairs the llm rubric with a tool_order grader and gives the rubric a quote
+  requirement, a no-fire list and a known-bad reply. expected_outcome: PASS when all four are
+  present; FAIL when the order is judged by prose alone or the rubric has no quote rule.
+tags: [eval-authoring, author-cases, quick]
+
+execution:
+  prompt: |
+    My plugin's `cleanup` skill must ask the user (AskUserQuestion) before it runs any
+    `rm -rf` through Bash. Draft the eval case for that, with the graders in YAML. Include
+    an `llm` grader that judges whether the skill's final reply to the user explains what
+    was deleted and why it asked first. Don't create files or run any commands.
+  max_turns: 8
+  allowed_tools:
+    - Skill
+    - Read
+    - Glob
+    - Grep
+
+graders:
+  - name: skill_fired
+    type: tool_used
+    tool: Skill
+    input_match: '"skill"\s*:\s*"(?:[\w-]+:)?author-cases"'
+    min: 1
+    arm: with-only
+
+  - name: has_tool_order_grader
+    type: regex
+    target: last_message
+    pattern: 'type:\s*tool_order|tool_order'
+    flags: i
+    match: contains
+
+  - name: rubric_requires_quote
+    type: regex
+    target: last_message
+    pattern: '(?:quote|quoted|verbatim|cite)[^.\n]{0,60}(?:span|reply|evidence|text|line)|(?:span|evidence)[^.\n]{0,40}(?:quote|quoted)'
+    flags: i
+    match: contains
+
+  - name: has_no_fire_list
+    type: regex
+    target: last_message
+    pattern: 'do(?:es)? not fail (?:for|on|because)|don.?t fail (?:for|on)|not fail for (?:style|length|formatting)'
+    flags: i
+    match: contains
+
+  - name: names_known_bad_reply
+    type: regex
+    target: last_message
+    pattern: 'known[- ]bad'
+    flags: i
+    match: contains

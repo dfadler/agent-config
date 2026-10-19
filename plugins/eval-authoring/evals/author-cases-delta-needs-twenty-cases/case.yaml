@@ -1,0 +1,60 @@
+# Run: node plugins/eval-authoring/scripts/ts/run-evals/run-evals.ts --tier standard --case author-cases-delta-needs-twenty-cases plugins/eval-authoring
+# No grant; reply-only. Covers author-cases step 9 (#739): a delta is claimed only for a plugin
+# with about 20 or more cases, because runs shrink within-case noise but only cases shrink the
+# standard error of a delta. A 3-case suite reports arm scores and "delta not measured".
+# Can fail: states_delta_not_measured fails if the reply writes a delta figure as a result
+# instead of declining it; states_case_count_reason fails if the reply gives the old
+# "more runs" fix instead of the case count; skill_fired (with-arm only) fails if the
+# description stops matching.
+schema_version: "1.1"
+name: author-cases-delta-needs-twenty-cases
+description: >
+  Given a 3-case suite with 10 runs per arm and a user who wants a delta in the PR body, the
+  reply declines to cite a delta and says a delta needs about 20 cases. expected_outcome:
+  PASS when it gives arm scores, writes delta not measured and names the case count; FAIL when
+  it presents a delta as the result or says more runs would fix it.
+tags: [eval-authoring, author-cases, quick]
+
+execution:
+  prompt: |
+    My plugin deploy-helper has 3 eval cases. I ran them 10 times per arm: with the plugin
+    they score 0.93, without it 0.60. Write the "Eval results" line for my PR description
+    and include the delta so reviewers see the improvement. Don't create files or run any
+    commands.
+  max_turns: 8
+  allowed_tools:
+    - Skill
+    - Read
+    - Glob
+    - Grep
+
+graders:
+  - name: skill_fired
+    type: tool_used
+    tool: Skill
+    input_match: '"skill"\s*:\s*"(?:[\w-]+:)?author-cases"'
+    min: 1
+    arm: with-only
+
+  # Declines the Δ: "delta not measured" or an equivalent refusal to cite one.
+  - name: states_delta_not_measured
+    type: regex
+    target: last_message
+    pattern: 'delta (?:is )?not (?:measured|claimed|reported)|(?:no|not|without) (?:a )?(?:reliable |measured )?delta|(?:can.?t|cannot|won.?t|shouldn.?t|not) (?:\w+ ){0,3}(?:cite|claim|report|state|give)[^.\n]{0,20}delta'
+    flags: i
+    match: contains
+
+  # The reason only #739 teaches: case count, about 20.
+  - name: states_case_count_reason
+    type: regex
+    target: last_message
+    pattern: '\b(?:20|twenty)\b[^.\n]{0,40}\bcases?\b|\bcases?\b[^.\n]{0,40}\b(?:20|twenty)\b'
+    flags: i
+    match: contains
+
+  - name: no_unqualified_delta_figure
+    type: regex
+    target: last_message
+    pattern: '(?:Δ|delta)\s*[:=]?\s*\+?0?\.33'
+    flags: i
+    match: not_contains

@@ -89,3 +89,13 @@ graders:
     flags: i
     match: contains
     weight: 0.5
+
+  # Third planted defect (#740): the case has no reference-good or known-bad reply in its
+  # header. Half weight because a differently worded finding can miss it.
+  - name: notes_missing_known_bad
+    type: regex
+    target: last_message
+    pattern: 'known[- ]bad|reference[- ]good|no (?:example|sample)[\s\w-]{0,20}(?:reply|replies|response)'
+    flags: i
+    match: contains
+    weight: 0.5
