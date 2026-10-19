@@ -5,6 +5,9 @@
 # the reviewer then reads. Bash is not granted, so the reviewer cannot run the lint; the
 # planted defects are ones the lint cannot see (EVAL006 only checks that PASS and FAIL
 # appear, and the weak criteria contain both words).
+# #748: a third planted defect that appears nowhere in the prompt's prose, a regex of `.*` that
+# every reply matches; notes_tautological_grader needs the reviewer to say so. Seeded-bad and
+# TPR/TNR runs: see case-reviewer-clean-case-control.
 # Can fail: a reviewer that answers "Clean", a main model that reviews the files itself
 # instead of dispatching the agent, or a relay that drops the finding fails reviewer_dispatched
 # or flags_vague_criterion. The words "polished" and "on-brand" are in the prompt too, so
@@ -48,6 +51,17 @@ execution:
     PASS if the release notes feel polished and on-brand.
     FAIL if the release notes feel off.
     ```
+
+    File evals/release-notes-basic/graders/has_text.md:
+
+    ```
+    ---
+    type: regex
+    target: last_message
+    pattern: ".*"
+    match: contains
+    ---
+    ```
   max_turns: 12
   allowed_tools:
     - Agent
@@ -86,6 +100,15 @@ graders:
     type: regex
     target: last_message
     pattern: "no (negative|non-firing|non-triggering|should-not)[\\s\\w-]{0,20}prompt|(only|single|one)( positive| should-fire)? prompt|never (shows|tests|checks)[\\s\\S]{0,60}(not fire|should not|not trigger)"
+    flags: i
+    match: contains
+    weight: 0.5
+
+  # Third planted defect: `.*` matches every reply. Half weight: wording regex.
+  - name: notes_tautological_grader
+    type: regex
+    target: last_message
+    pattern: "(\\.\\*|has_text)[\\s\\S]{0,300}(always|any reply|every|matches everything|tautolog|vacuous|cannot fail|never fail)|(always|matches everything|tautolog|vacuous|cannot fail|never fail)[\\s\\S]{0,300}(\\.\\*|has_text)"
     flags: i
     match: contains
     weight: 0.5

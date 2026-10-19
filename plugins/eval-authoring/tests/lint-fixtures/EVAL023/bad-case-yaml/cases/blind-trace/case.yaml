@@ -1,0 +1,11 @@
+schema_version: "1.1"
+name: blind-trace
+execution:
+  prompt: Do the thing.
+  max_turns: 30
+graders:
+  - type: "regex"
+    pattern: "done"
+  - type: "llm"
+    criteria: "PASS if the reply names the file. FAIL if it names none or a different file."
+    focus: "trace"

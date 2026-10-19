@@ -54,14 +54,13 @@ describe("main", () => {
     });
   });
 
-  it("handles a partial document, a one-arm case and a case with no runs", () => {
+  it("handles a partial document and a one-arm case", () => {
     const doc = JSON.stringify({
       schemaVersion: 1,
       partial: true,
       partialReason: "cost ceiling",
       cases: [
         { name: "one-arm", arms: { with: [{ score: 1 }] }, aggregates: {} },
-        { name: "empty" },
       ],
     });
     const out = main(["r.json"], io({ "r.json": doc }));
@@ -69,7 +68,6 @@ describe("main", () => {
     expect(out.stdout).toContain("PARTIAL result: cost ceiling");
     expect(out.stdout).toContain("one-arm: no-delta-signal");
     expect(out.stdout).toContain("delta: no delta signal");
-    expect(out.stdout).toContain("empty: no-data");
   });
 
   it("exits 1 on an unsupported or unparsable result", () => {

@@ -2,9 +2,10 @@ name: Plugin evals
 
 # Paid `claude plugin eval` runs, per docs/plugin-eval-ci.md (#436, #582).
 #
-# STANDALONE and NON-GATING: not called from ci.yml. Triggers are manual and
-# weekly only. NEVER add `pull_request`: the job passes --trust-plugin next to a
-# subscription token, and this is a public repo.
+# STANDALONE and NON-GATING: not called from ci.yml. Trigger is manual only;
+# the weekly run is a local scheduled task (docs/plugin-eval-ci.md, #738).
+# NEVER add `pull_request`: the job passes --trust-plugin next to a subscription
+# token, and this is a public repo.
 #
 # Runs go through the run-evals wrapper (plugins/eval-authoring/scripts/ts/run-evals),
 # which applies each case's grants.yaml grants, pins the models and tier ceiling,
@@ -19,9 +20,6 @@ name: Plugin evals
 # job too, but is reported as inconclusive rather than as a regression.
 
 on:
-  schedule:
-    # Mondays 04:23 UTC; an off-the-hour minute avoids the top-of-hour queue.
-    - cron: "23 4 * * 1"
   workflow_dispatch:
     inputs:
       plugin:
@@ -146,6 +144,10 @@ jobs:
               --cli-exit "$cli" --threshold 1 --delta-floor 0 "$f" 2>&1 | tee -a "$GITHUB_STEP_SUMMARY"
             rc="${PIPESTATUS[0]}"
             [ "$rc" -gt "$worst" ] && worst="$rc"
+            # #738: a case with no delta (plugin-arm-only, --ablation none) skips the
+            # delta gate; list it so "ungated by delta" is visible, not silent.
+            jq -r '.cases[]? | select((.aggregates.delta // null) == null) | "- ungated by delta (no-plugin arm absent): \(.name)"' "$f" \
+              | tee -a "$GITHUB_STEP_SUMMARY"
           done < <(find "$OUT_DIR" -name aggregate-result.json | sort)
           if [ "$found" -eq 0 ]; then
             echo "::error::No aggregate-result.json under $OUT_DIR (wrapper exit $wrapper_exit)"

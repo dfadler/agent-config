@@ -14,6 +14,7 @@ import {
   findPluginRoot,
   hookOutput,
   parseInput,
+  relevantFindings,
   runHook,
   scopeOf,
   type LintFn,
@@ -235,6 +236,36 @@ describe("helpers", () => {
     expect(scopeOf(join(root, "evals/grants.yaml"))?.firstSegment).toBeUndefined();
   });
 
+  it("relevantFindings keeps suite-level findings, resolves against the plugin root, drops other cases", () => {
+    const root = makePlugin();
+    const scope = scopeOf(join(root, "evals/bad/case.yaml"));
+    if (scope === undefined) throw new Error("expected a scope");
+    const f = (file: string) => ({
+      ruleId: "X",
+      severity: "error" as const,
+      message: "",
+      fix: "",
+      source: "",
+      loc: { file, line: 1 },
+      caseDirName: undefined,
+    });
+    const report = {
+      pluginRoot: root,
+      evalDir: scope.evalDir,
+      casesChecked: 2,
+      claudeCodeVersion: "0",
+      findings: [
+        f("evals/bad/case.yaml"),
+        f("evals/good/case.yaml"),
+        f("evals/grants.yaml"),
+        f(".claude-plugin/plugin.json"),
+      ],
+    };
+    expect(
+      relevantFindings(report, scope).map((x) => x.loc.file),
+    ).toEqual(["evals/bad/case.yaml", "evals/grants.yaml", ".claude-plugin/plugin.json"]);
+  });
+
   it("hookOutput is the documented JSON shape", () => {
     expect(JSON.parse(hookOutput("x"))).toEqual({
       hookSpecificOutput: { hookEventName: "PostToolUse", additionalContext: "x" },
@@ -277,7 +308,7 @@ describe("lint-on-edit.sh (the shipped entry point)", () => {
     const r = run(event(join(root, "evals/bad/case.yaml")), empty);
     expect(r.status).toBe(0);
     expect(r.stdout).toBe("");
-    expect(r.stderr).toBe("");
+    expect(r.stderr).toContain("needs node 22.18");
   });
 
   it("exits 0 when node exists but fails (too old to run .ts)", () => {

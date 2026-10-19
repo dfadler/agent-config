@@ -111,7 +111,7 @@ describe("missing signal", () => {
     const v = diagnoseCase(
       caseOf([1], [0], 1, {
         withRuns: [run(1)],
-        withoutRuns: [run(0)],
+        withoutRuns: [run(0.5)],
       }),
     );
     expect(v.verdict).toBe("discriminates");
@@ -175,6 +175,34 @@ describe("errors and skipped judges", () => {
     );
     expect(v.with.usedRuns).toBe(2);
     expect(kinds(v)).toContain("aborted");
+  });
+
+  it.each([
+    ["a score 0 with no grader detail", { graders: [] }],
+    ["a score 0 with graders omitted", {}],
+  ])("treats %s as a failed run, not a negative delta (#735)", (_n, over) => {
+    const v = diagnoseCase(
+      caseOf([], [], -1, {
+        withRuns: [run(0, over), run(0, over)],
+        withoutRuns: [run(1)],
+      }),
+    );
+    expect(v.verdict).toBe("run-error");
+  });
+
+  it("treats an empty-string error as errored even with a nonzero score (#735)", () => {
+    const v = diagnoseCase(
+      caseOf([], [], 0.5, {
+        withRuns: [run(0.5, { error: "" })],
+        withoutRuns: [run(0.2)],
+      }),
+    );
+    expect(v.verdict).toBe("run-error");
+  });
+
+  it("keeps a score 0 that has failing graders", () => {
+    const v = diagnoseCase(caseOf([0, 0], [1, 1], -1));
+    expect(v.verdict).toBe("negative-delta");
   });
 
   it("leaves skipped-judge runs out and says so", () => {
