@@ -1,0 +1,9 @@
+schema_version: "1.1"
+name: bare-reply-judge
+execution:
+  prompt: Do the thing.
+graders:
+  - type: "tool_used"
+    tool: "Read"
+  - type: "llm"
+    criteria: "PASS if the reply names the file. FAIL if it names none or a different file."

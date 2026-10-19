@@ -5,6 +5,10 @@
 //
 // Exit codes: 0 pass, 1 regression (valid run, CLI exit non-zero against the
 // threshold), 7 inconclusive (invalid run, so not a regression), 2 usage.
+import {
+  implausibleReasons,
+  silentZeroReasons,
+} from "../../plugins/eval-authoring/scripts/ts/parser/result.ts";
 import { parseArgs, type Parsed } from "./lib/args.ts";
 import {
   cliError,
@@ -29,7 +33,9 @@ Decide pass / regression / inconclusive for a \`claude plugin eval\` run.
   RESULT.json      The run's aggregate-result.json.
 
 Inconclusive (exit 7, not a regression): CLI exit 2, \`partial: true\`, any
-\`skippedPaidGraders\`, any \`arms.with[].error\` or \`arms.without[].error\`, or an unreadable result.
+\`skippedPaidGraders\`, any \`arms.with[].error\` or \`arms.without[].error\`, an implausible result
+(no cases, a case with no with-arm runs, wrong \`schemaVersion\`, a score-0 run with
+no grader detail, all runs 0: a usage limit looks like this), or an unreadable result.
 Regression (exit 1): a valid run where the CLI exited non-zero.
 Delta is warn-only; a missing delta means no signal. Exit 2: bad arguments.
 
@@ -65,28 +71,33 @@ const invalidReasons = (doc: Record<string, unknown>): readonly string[] => [
   }),
 ];
 
-/** Warn-only delta signals; a missing delta is no signal, not a warning. */
-const deltaWarnings = (doc: Record<string, unknown>): readonly string[] =>
+/** Cases whose delta satisfies `bad`, as [name, delta]; a missing delta is no signal. */
+const deltaCases = (
+  doc: Record<string, unknown>,
+  bad: (d: number) => boolean,
+): readonly (readonly [string, number])[] =>
   list(doc["cases"]).flatMap((c) => {
     if (!isRecord(c) || !isRecord(c["aggregates"])) return [];
     const d = c["aggregates"]["delta"];
-    return typeof d === "number" && d <= 0
-      ? [`warning: ${String(c["name"])}: delta ${String(d)} <= 0\n`]
+    return typeof d === "number" && bad(d)
+      ? [[String(c["name"]), d] as const]
       : [];
   });
 
-/** Cases whose delta is below the floor; a missing delta is no signal. */
+/** Warn-only delta signals. */
+const deltaWarnings = (doc: Record<string, unknown>): readonly string[] =>
+  deltaCases(doc, (d) => d <= 0).map(
+    ([n, d]) => `warning: ${n}: delta ${String(d)} <= 0\n`,
+  );
+
+/** Cases whose delta is below the floor. */
 const deltaBreaches = (
   doc: Record<string, unknown>,
   floor: number,
 ): readonly string[] =>
-  list(doc["cases"]).flatMap((c) => {
-    if (!isRecord(c) || !isRecord(c["aggregates"])) return [];
-    const d = c["aggregates"]["delta"];
-    return typeof d === "number" && d < floor
-      ? [`${String(c["name"])}: delta ${String(d)} < floor ${String(floor)}`]
-      : [];
-  });
+  deltaCases(doc, (d) => d < floor).map(
+    ([n, d]) => `${n}: delta ${String(d)} < floor ${String(floor)}`,
+  );
 
 const inconclusive = (why: string): Result<CliError, never> =>
   err(cliError(EXIT_PARTIAL, `inconclusive: ${why}`));
@@ -113,7 +124,11 @@ const decide = (
   if (!isRecord(doc)) return inconclusive("result is not a JSON object");
   if (!Array.isArray(doc["cases"]))
     return inconclusive("result is missing a cases array");
-  const bad = invalidReasons(doc);
+  const bad = [
+    ...implausibleReasons(doc),
+    ...silentZeroReasons(doc),
+    ...invalidReasons(doc),
+  ];
   if (bad.length > 0) return inconclusive(bad.join("; "));
   const warns = deltaWarnings(doc).join("");
   const breaches = floor === undefined ? [] : deltaBreaches(doc, floor);
@@ -155,7 +170,12 @@ export const main: Main = (argv, _env, io) =>
         return err(cliError(EXIT_USAGE, `--threshold is required\n\n${USAGE}`));
       }
       const rawFloor = p.flags["delta-floor"];
-      const floor = typeof rawFloor === "string" ? Number(rawFloor) : undefined;
+      const floor = 
+        typeof rawFloor === "string" && rawFloor.trim() !== ""
+          ? Number(rawFloor)
+          : typeof rawFloor === "string"
+            ? Number.NaN
+            : undefined;
       if (floor !== undefined && !Number.isFinite(floor)) {
         return err(
           cliError(EXIT_USAGE, `--delta-floor needs a number\n\n${USAGE}`),

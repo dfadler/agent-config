@@ -187,6 +187,13 @@ describe("formatting", () => {
 });
 
 describe("cli main", () => {
+  it("exits 2 when the suite has no cases (wrong --eval-dir must not look clean)", () => {
+    mkdirSync(join(root, "evals"));
+    const r = main([root], rules);
+    expect(r.code).toBe(2);
+    expect(r.stderr).toContain("no cases found");
+  });
+
   const rules = [rule()];
   const errorRule = rule({
     id: "EVAL902",
@@ -251,9 +258,6 @@ describe("cli main", () => {
     expect(r.stdout).toContain("'ghost'");
   });
 
-  it("an empty plugin root lints clean", () => {
-    expect(main([root], rules).stdout).toContain("0 case(s)");
-  });
 });
 
 describe("mainWithDiscoveredRules", () => {

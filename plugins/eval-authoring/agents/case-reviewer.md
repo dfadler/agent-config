@@ -95,6 +95,8 @@ Run after the lint, on each case. Skip anything the lint already reported.
    or `baseline` grader should have a one-line comment beside it saying why a free
    grader cannot decide it, so flag a paid grader with no stated reason; and flag a
    case whose graders are all free but is not tagged `quick`.
+   Also flag a case that allows `Read` or `Glob` with no `scaffold_script` and no inline
+   inputs in the prompt: the model hunts an empty workspace for files.
 7. **Stable signal.** Could two reasonable judges disagree on the criteria? Flag
    conditions that hinge on wording choices or subjective degree.
 

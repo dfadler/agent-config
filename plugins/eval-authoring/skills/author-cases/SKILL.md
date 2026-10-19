@@ -45,7 +45,9 @@ draft them there: tell the user to commit the skill and start a fresh session, t
 
 1. **Read the plugin first.** Read the `SKILL.md` or agent file under test, its manifest,
    and any existing cases and `grants.yaml`. Write criteria from what the files say the
-   plugin does, not from a summary of it.
+   plugin does, not from a summary of it. Start each case from a real failing transcript
+   (a session where the plugin misbehaved or was missed) when one exists; invented
+   prompts come second.
 2. **Generate or start blank.** `claude plugin eval init` proposes prompts and graders,
    trials them and writes the files, but it is interactive and needs a logged-in shell:
    ask the user to run it, then review what it wrote. `claude plugin eval init --bare
@@ -90,7 +92,9 @@ draft them there: tell the user to commit the skill and start a fresh session, t
    [agents](references/agents.md).
 7. **Check the baseline.** Before trusting a new case, run it once without the plugin. A
    baseline score of 0.9 or more means the case may be solvable without the plugin:
-   inspect the prompt for a leaked answer, then rewrite it or drop the case. When
+   inspect the prompt for a leaked answer, and the workspace too: a `scaffold_script`
+   that commits a fix or `add_dirs` holding an answer file are readable by the agent
+   (EVAL014). Then rewrite it or drop the case. When
    answering a user about such a case, open with that check (does the prompt give the
    answer away?) and do not open with a keep, rewrite or drop verdict. A case that cannot separate the arms is a regression guard, not
    evidence the skill helps.

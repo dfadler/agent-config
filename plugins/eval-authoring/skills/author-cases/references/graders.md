@@ -24,11 +24,16 @@ short calls per grader per run) and add variance. There are no custom-code grade
 2. **Try the free grader.** The test for `llm`: can you write a free check that passes
    every correct reply and fails every wrong one you can think of? If not, the property
    is semantic (tone, relevance, whether a refusal is appropriate) and `llm` is justified.
-3. **Keep paid graders narrow:** short output only, at most one per case unless the
+3. **Guard the judge:** a reply can talk an `llm` judge into a pass, and an `llm` on
+   `trace` reads only the first and last 12 messages (EVAL023). Put the rubric in the
+   criteria, back it with a `regex` on `last_message` plus a negative regex for
+   rubric-echo phrases, keep `max_turns` at 12 or less when judging `trace`, and add one
+   adversarial case whose reply claims a perfect score and must score 0.
+4. **Keep paid graders narrow:** short output only, at most one per case unless the
    dimensions are independent, and paired with free graders.
-4. **Say why** with a one-line comment beside any paid grader. Comments are not parsed;
+5. **Say why** with a one-line comment beside any paid grader. Comments are not parsed;
    the [case-reviewer](../../../agents/case-reviewer.md) checks this.
-5. **Tag a case `quick`** when all its graders are free, so the wrapper's quick tier can
+6. **Tag a case `quick`** when all its graders are free, so the wrapper's quick tier can
    run it at no judge cost. EVAL017 keeps the tag honest.
 
 For long output such as a generated file, use a `regex` over the file, not an `llm`.
