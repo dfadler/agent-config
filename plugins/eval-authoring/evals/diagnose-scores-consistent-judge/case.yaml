@@ -1,30 +1,50 @@
-# Run: claude plugin eval plugins/eval-authoring --case diagnose-scores-consistent-judge
-# Not run yet: paid, hand-off only. No grant: Skill only; the prompt forbids running anything.
-# Sabotage map: delete the "negative-delta with a consistent judge" bullet in diagnose-scores/SKILL.md
-# and the with arm falls back to "suspect the judge / tighten the rubric", so edits_skill drops.
-# Can fail: edits_skill = 0 if the reply sends the user to the case or rubric; not_rubric = 0 if it
-# tells them to tighten the rubric. Baseline may pass by common sense; Delta is unmeasured.
+# Run: claude plugin eval plugins/eval-authoring --case diagnose-scores-consistent-judge --keep-temp
+# Grant: Bash(node *diagnose.ts *) in grants.yaml, so the skill can run its script (the sandbox has
+# no Bash otherwise, so the skill stopped at step 2 and never reached its Interpretation text).
+# Fixture: results-fixture/aggregate-result.json (read-only via add_dirs): negative-delta, every
+# friendly_tone vote FAIL in the with arm and PASS in the without arm. The script does not say the
+# votes are unanimous; the skill's "consistent judge" bullet is what turns that into "edit the skill".
+# Compare with-arm scores of this branch's skill against main's skill, not with against without: the
+# no-plugin model reads the JSON and reaches "edit the skill" too (Δ -0.17 on the first run).
+# Not graded: whether the script ran. Bash is still denied for the model's cd/ls/head pipelines,
+# a tool_used call counts even when denied, and the verdict label also appears in the skill text.
+# Sabotage map: delete that bullet in diagnose-scores/SKILL.md; the with arm falls back to
+# "suspect the judge, tighten the rubric", so edits_skill drops and not_rubric fails.
+# Unverified: how add_dirs is exposed in the sandbox; check the first --keep-temp trace.
 schema_version: "1.1"
 name: diagnose-scores-consistent-judge
 description: >
-  A negative Delta where every judge vote agrees. expected_outcome: PASS when the reply says the
-  with-arm replies are worse and the fix is an edit to the skill, not the case or rubric; FAIL otherwise.
-tags: [eval-authoring, diagnose-scores, quick]
+  A negative Delta result file whose judge votes all agree. expected_outcome: PASS when the skill
+  runs its script and the reply says to edit the skill, not the case or rubric; FAIL otherwise.
+tags: [eval-authoring, diagnose-scores]
+
+context:
+  add_dirs: [results-fixture]
 
 execution:
   prompt: |
-    My eval case for a release-notes skill has a Delta of -0.21. The llm grader gave FAIL in all 24
-    of 24 with-plugin votes and PASS in all 24 without-plugin votes, so the judge is not flipping.
-    What do I change next? Answer in your reply; do not run anything.
-  max_turns: 6
+    My eval results for a release-notes skill are in the results-fixture directory you can read.
+    One case scored worse with the plugin than without. What should I change next? Answer in your
+    reply.
+  max_turns: 10
   allowed_tools:
     - Skill
+    - Read
+    - Glob
+    - Bash
 
 graders:
+  - name: skill_fired
+    type: tool_used
+    tool: Skill
+    input_match: '"skill"\s*:\s*"(?:[\w-]+:)?diagnose-scores"'
+    min: 1
+    arm: with-only
+
   - name: edits_skill
     type: regex
     target: last_message
-    pattern: '(edit|change|fix|revise)[^.\n]{0,40}\b(skill|SKILL\.md)'
+    pattern: '(edit|change|fix|revise|update)[^.\n]{0,40}\b(skill|SKILL\.md)'
     flags: i
     match: contains
 

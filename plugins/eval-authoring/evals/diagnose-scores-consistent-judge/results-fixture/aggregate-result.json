@@ -1,0 +1,336 @@
+{
+  "schemaVersion": 1,
+  "claudeVersion": "2.1.287",
+  "startedAt": "2026-10-02T00:00:00Z",
+  "durationSeconds": 60,
+  "costUsd": 0.5,
+  "partial": false,
+  "suite": {
+    "root": "plugins/example/evals"
+  },
+  "cases": [
+    {
+      "name": "release-notes-tone",
+      "aggregates": {
+        "score": 0.5,
+        "passRate": 0,
+        "scoreWithout": 1,
+        "passRateWithout": 1,
+        "delta": -0.5
+      },
+      "arms": {
+        "with": [
+          {
+            "score": 0.5,
+            "passed": false,
+            "turns": 3,
+            "costUsd": 0.04,
+            "judgeCostUsd": 0.01,
+            "durationSeconds": 30,
+            "error": null,
+            "tracePath": "results/trace.jsonl",
+            "skippedPaidGraders": false,
+            "graders": [
+              {
+                "name": "mentions_version",
+                "type": "regex",
+                "passed": true,
+                "weight": 1,
+                "explanation": "regex matched",
+                "withOnly": false,
+                "scored": true
+              },
+              {
+                "name": "friendly_tone",
+                "passed": false,
+                "weight": 1,
+                "explanation": "judge votes: FAIL FAIL FAIL",
+                "withOnly": false,
+                "scored": true
+              }
+            ]
+          },
+          {
+            "score": 0.5,
+            "passed": false,
+            "turns": 3,
+            "costUsd": 0.04,
+            "judgeCostUsd": 0.01,
+            "durationSeconds": 30,
+            "error": null,
+            "tracePath": "results/trace.jsonl",
+            "skippedPaidGraders": false,
+            "graders": [
+              {
+                "name": "mentions_version",
+                "type": "regex",
+                "passed": true,
+                "weight": 1,
+                "explanation": "regex matched",
+                "withOnly": false,
+                "scored": true
+              },
+              {
+                "name": "friendly_tone",
+                "passed": false,
+                "weight": 1,
+                "explanation": "judge votes: FAIL FAIL FAIL",
+                "withOnly": false,
+                "scored": true
+              }
+            ]
+          },
+          {
+            "score": 0.5,
+            "passed": false,
+            "turns": 3,
+            "costUsd": 0.04,
+            "judgeCostUsd": 0.01,
+            "durationSeconds": 30,
+            "error": null,
+            "tracePath": "results/trace.jsonl",
+            "skippedPaidGraders": false,
+            "graders": [
+              {
+                "name": "mentions_version",
+                "type": "regex",
+                "passed": true,
+                "weight": 1,
+                "explanation": "regex matched",
+                "withOnly": false,
+                "scored": true
+              },
+              {
+                "name": "friendly_tone",
+                "passed": false,
+                "weight": 1,
+                "explanation": "judge votes: FAIL FAIL FAIL",
+                "withOnly": false,
+                "scored": true
+              }
+            ]
+          },
+          {
+            "score": 0.5,
+            "passed": false,
+            "turns": 3,
+            "costUsd": 0.04,
+            "judgeCostUsd": 0.01,
+            "durationSeconds": 30,
+            "error": null,
+            "tracePath": "results/trace.jsonl",
+            "skippedPaidGraders": false,
+            "graders": [
+              {
+                "name": "mentions_version",
+                "type": "regex",
+                "passed": true,
+                "weight": 1,
+                "explanation": "regex matched",
+                "withOnly": false,
+                "scored": true
+              },
+              {
+                "name": "friendly_tone",
+                "passed": false,
+                "weight": 1,
+                "explanation": "judge votes: FAIL FAIL FAIL",
+                "withOnly": false,
+                "scored": true
+              }
+            ]
+          },
+          {
+            "score": 0.5,
+            "passed": false,
+            "turns": 3,
+            "costUsd": 0.04,
+            "judgeCostUsd": 0.01,
+            "durationSeconds": 30,
+            "error": null,
+            "tracePath": "results/trace.jsonl",
+            "skippedPaidGraders": false,
+            "graders": [
+              {
+                "name": "mentions_version",
+                "type": "regex",
+                "passed": true,
+                "weight": 1,
+                "explanation": "regex matched",
+                "withOnly": false,
+                "scored": true
+              },
+              {
+                "name": "friendly_tone",
+                "passed": false,
+                "weight": 1,
+                "explanation": "judge votes: FAIL FAIL FAIL",
+                "withOnly": false,
+                "scored": true
+              }
+            ]
+          }
+        ],
+        "without": [
+          {
+            "score": 1,
+            "passed": true,
+            "turns": 3,
+            "costUsd": 0.04,
+            "judgeCostUsd": 0.01,
+            "durationSeconds": 30,
+            "error": null,
+            "tracePath": "results/trace.jsonl",
+            "skippedPaidGraders": false,
+            "graders": [
+              {
+                "name": "mentions_version",
+                "type": "regex",
+                "passed": true,
+                "weight": 1,
+                "explanation": "regex matched",
+                "withOnly": false,
+                "scored": true
+              },
+              {
+                "name": "friendly_tone",
+                "passed": true,
+                "weight": 1,
+                "explanation": "judge votes: PASS PASS PASS",
+                "withOnly": false,
+                "scored": true
+              }
+            ]
+          },
+          {
+            "score": 1,
+            "passed": true,
+            "turns": 3,
+            "costUsd": 0.04,
+            "judgeCostUsd": 0.01,
+            "durationSeconds": 30,
+            "error": null,
+            "tracePath": "results/trace.jsonl",
+            "skippedPaidGraders": false,
+            "graders": [
+              {
+                "name": "mentions_version",
+                "type": "regex",
+                "passed": true,
+                "weight": 1,
+                "explanation": "regex matched",
+                "withOnly": false,
+                "scored": true
+              },
+              {
+                "name": "friendly_tone",
+                "passed": true,
+                "weight": 1,
+                "explanation": "judge votes: PASS PASS PASS",
+                "withOnly": false,
+                "scored": true
+              }
+            ]
+          },
+          {
+            "score": 1,
+            "passed": true,
+            "turns": 3,
+            "costUsd": 0.04,
+            "judgeCostUsd": 0.01,
+            "durationSeconds": 30,
+            "error": null,
+            "tracePath": "results/trace.jsonl",
+            "skippedPaidGraders": false,
+            "graders": [
+              {
+                "name": "mentions_version",
+                "type": "regex",
+                "passed": true,
+                "weight": 1,
+                "explanation": "regex matched",
+                "withOnly": false,
+                "scored": true
+              },
+              {
+                "name": "friendly_tone",
+                "passed": true,
+                "weight": 1,
+                "explanation": "judge votes: PASS PASS PASS",
+                "withOnly": false,
+                "scored": true
+              }
+            ]
+          },
+          {
+            "score": 1,
+            "passed": true,
+            "turns": 3,
+            "costUsd": 0.04,
+            "judgeCostUsd": 0.01,
+            "durationSeconds": 30,
+            "error": null,
+            "tracePath": "results/trace.jsonl",
+            "skippedPaidGraders": false,
+            "graders": [
+              {
+                "name": "mentions_version",
+                "type": "regex",
+                "passed": true,
+                "weight": 1,
+                "explanation": "regex matched",
+                "withOnly": false,
+                "scored": true
+              },
+              {
+                "name": "friendly_tone",
+                "passed": true,
+                "weight": 1,
+                "explanation": "judge votes: PASS PASS PASS",
+                "withOnly": false,
+                "scored": true
+              }
+            ]
+          },
+          {
+            "score": 1,
+            "passed": true,
+            "turns": 3,
+            "costUsd": 0.04,
+            "judgeCostUsd": 0.01,
+            "durationSeconds": 30,
+            "error": null,
+            "tracePath": "results/trace.jsonl",
+            "skippedPaidGraders": false,
+            "graders": [
+              {
+                "name": "mentions_version",
+                "type": "regex",
+                "passed": true,
+                "weight": 1,
+                "explanation": "regex matched",
+                "withOnly": false,
+                "scored": true
+              },
+              {
+                "name": "friendly_tone",
+                "passed": true,
+                "weight": 1,
+                "explanation": "judge votes: PASS PASS PASS",
+                "withOnly": false,
+                "scored": true
+              }
+            ]
+          }
+        ]
+      }
+    }
+  ],
+  "aggregates": {
+    "casesTotal": 2,
+    "casesPassed": 1,
+    "overallScore": 0.917,
+    "overallPassRate": 0.667,
+    "meanDelta": 0.125
+  }
+}
