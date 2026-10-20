@@ -73,6 +73,30 @@ for example "must not invoke the skill" (`min: 0`, `max: 0`). If every grader wo
 excluded they score normally, and `--ablation none` excludes nothing. A Δ near zero with
 the Skill grader failing means the skill's `description` is not triggering on that phrasing.
 
+## Sequence claims
+
+A claim about order ("asked before running", "ran X before Y") judged from the final
+reply alone can be asserted by the reply without having happened. Keep prose graders for
+content, but put a trace-level `tool_used` or `tool_order` grader beside any `llm` grader
+that judges a sequence (needs the tool granted; mind the #474 caveat below):
+
+```yaml
+  - name: asked_before_running
+    type: tool_order
+    before: AskUserQuestion
+    after: { tool: Bash, input_match: 'rm -rf' }
+```
+
+## Rubrics for `llm` graders
+
+The default failure of a judge is approving everything (Anthropic's
+[define-outcomes docs](https://platform.claude.com/docs/en/managed-agents/define-outcomes)):
+
+- FAIL requires a quoted span from the reply per criterion; no quote, no pass.
+- Add a no-fire list ("do not fail for style, length or formatting") so it does not
+  thrash on nits.
+- Describe the goal, not a command: a prescribed command fails silently when missing.
+
 ## Regex robustness
 
 A regex on `last_message` fails in ways a case author does not see until a run:

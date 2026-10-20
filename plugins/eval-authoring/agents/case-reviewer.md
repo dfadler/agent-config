@@ -100,6 +100,14 @@ Run after the lint, on each case. Skip anything the lint already reported.
 7. **Stable signal.** Could two reasonable judges disagree on the criteria? Flag
    conditions that hinge on wording choices or subjective degree.
 
+8. **Known-bad reply.** Does each `llm` case header hold a reference-good and a
+   known-bad reply, and would at least one applicable grader fail the known-bad one?
+   Flag a missing one.
+9. **Rubric shape (judge advice).** Does FAIL require a quoted span, does the
+   rubric have a "do not fail for" list, and does it prescribe a command rather than
+   a goal? Does a sequence claim have a
+   `tool_used` or `tool_order` grader beside it?
+
 Do not claim what a run would show. Whether a case really discriminates needs a
 paid two-arm run and the diagnosis script; write "needs a run" for those.
 

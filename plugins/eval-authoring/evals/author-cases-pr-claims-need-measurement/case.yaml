@@ -45,6 +45,27 @@ graders:
     flags: i
     match: contains
 
+  # The two figures only author-cases steps 7 and 9 teach (a delta needs about 20 cases, since
+  # only cases shrink the delta's error; a no-plugin baseline at or above 0.9 means the case
+  # does not discriminate). The last alternative accepts the paraphrase "a suite of one case can't
+  # support a delta" (the reply states the rule without the figure; seen at HEAD, 2 of 2 runs).
+  - name: states_case_count_minimum
+    type: regex
+    target: last_message
+    pattern: '\b(?:20|twenty)\b[^.\n]{0,40}\bcases?\b|\bcases?\b[^.\n]{0,40}\b(?:20|twenty)\b|\b(?:one|1|single|too few|few) (?:eval )?cases?\b[^.\n]{0,60}\b(?:can.?t|cannot|not enough|too (?:few|small)|insufficient)[^.\n]{0,40}\bdelta'
+    flags: i
+    match: contains
+
+  # Matches the 0.9 figure or the meaning: a high baseline makes the case a regression guard
+  # (the prompt gives the answer away). The literal-figure-only version scored four correct
+  # paraphrases as misses; this alternation was written after reading those replies.
+  - name: states_baseline_gate
+    type: regex
+    target: last_message
+    pattern: '0\.9\b|90 ?%|regression guard|(?:baseline|without[ -](?:the )?plugin|no-plugin)[^.\n]{0,80}(?:near|high|also (?:scores?|passes?|1\.00)|already)|(?:near|high)[^.\n]{0,40}baseline|prompt[^.\n]{0,40}(?:gives? away|hands? over|leaks?)'
+    flags: i
+    match: contains
+
   # Polarity: reports_baseline_gap also matches "the delta proves it works".
   - name: no_improvement_claim
     type: regex
