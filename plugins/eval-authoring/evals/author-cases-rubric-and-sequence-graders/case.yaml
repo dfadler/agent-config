@@ -4,6 +4,9 @@
 # rubric requires a quoted span for FAIL, a no-fire list and a known-bad reply.
 # The prompt asks for an llm grader: without it the reply has no rubric to apply the quote and no-fire
 # rules to (first run scored 0.60 for that reason, not a skill defect).
+# The user asks for the order to be judged by an llm grader, so a trace grader beside it is
+# the skill's addition (step 4, #741), not something the prompt already requests. main's
+# graders.md already documents tool_order, so asking for the order outright let the baseline pass.
 # Can fail: has_tool_order_grader fails if the drafted case judges the sequence by prose alone;
 # rubric_requires_quote fails if the rubric has no quoted-evidence rule; has_no_fire_list fails
 # if there is no "do not fail for" list; names_known_bad_reply fails if no known-bad reply is
@@ -20,9 +23,10 @@ tags: [eval-authoring, author-cases, quick]
 execution:
   prompt: |
     My plugin's `cleanup` skill must ask the user (AskUserQuestion) before it runs any
-    `rm -rf` through Bash. Draft the eval case for that, with the graders in YAML. Include
-    an `llm` grader that judges whether the skill's final reply to the user explains what
-    was deleted and why it asked first. Don't create files or run any commands.
+    `rm -rf` through Bash. Draft the eval case for that, with the graders in YAML. I want one
+    `llm` grader that reads the transcript and judges whether the skill asked the user
+    before running `rm -rf`, and says what was deleted. Don't create files or run any
+    commands.
   max_turns: 8
   allowed_tools:
     - Skill
