@@ -3,13 +3,16 @@
 # Sabotage map: delete the "Verdict cutoffs" table in diagnose-scores/SKILL.md; a no-plugin model
 # cannot know the 0.05 band or the verdict names, so names_verdict drops.
 # Can fail: names_verdict = 0 unless the reply uses the verdict name no-discrimination.
-# Note (PR 761): this is a vocabulary check. A model without the skill cannot guess the label
+# Scope (PR 761 review): this tests recall of the documented -0.05 neutral band (the "Verdict
+# cutoffs" table), not the diagnosis workflow. With no result file the skill's own step 1 says to
+# stop and ask for a run, and it forbids guessing a verdict, so this prompt deliberately asks only
+# what the cutoff is. It is a vocabulary check. A model without the skill cannot guess the label
 # `no-discrimination`; a pass does not show the table helps a user.
 schema_version: "1.1"
 name: diagnose-scores-cutoff-verdict
 description: >
-  Asks which diagnose verdict a Delta of -0.03 gets. expected_outcome: PASS when the reply says
-  no-discrimination; FAIL otherwise.
+  Recall of the documented cutoff, not the diagnosis workflow: asks which diagnose verdict a Delta
+  of -0.03 gets. expected_outcome: PASS when the reply says no-discrimination; FAIL otherwise.
 tags: [eval-authoring, diagnose-scores, quick]
 
 execution:

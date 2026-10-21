@@ -32,6 +32,6 @@ graders:
   - name: asks_for_result_file
     type: regex
     target: last_message
-    pattern: 'aggregate-result'
+    pattern: '(?:need|send|share|provide|paste|point|attach|give|where|which|path|location)[^.\n]{0,120}aggregate-result\.json|aggregate-result\.json[^.\n]{0,120}(?:path|share|provide|paste|send|attach|file you|from your)'
     flags: i
     match: contains

@@ -56,8 +56,13 @@ graders:
   - name: per_case_advice
     type: llm
     criteria: >
-      PASS if the reply tells the user to change the skill's text or behavior (not the eval case
-      or its grader) for release-notes-tone, AND tells the user to fix the grader's rubric or judge
-      (tighten PASS and FAIL wording, or change the judge model) for changelog-style.
-      FAIL if the reply gives the same advice for both cases, advises a rubric or judge change for
-      release-notes-tone, advises a skill change for changelog-style, or names only one case.
+      PASS if the reply says, for release-notes-tone, that the unanimous votes mean the judge is
+      stable, so re-running or retuning the judge will not change the result, and the next step is
+      to read the judge's explanation or a with-arm transcript, or to change the skill (saying the
+      cause could be either the replies or the rubric until that is read is fine); AND tells the
+      user, for changelog-style, to fix the grader's rubric or judge (tighten PASS and FAIL
+      wording, or change the judge model).
+      FAIL if the reply gives the same advice for both cases, makes re-running the judge,
+      changing the judge model or tightening the rubric the first step for release-notes-tone,
+      calls the release-notes-tone result judge noise, advises a skill change for changelog-style,
+      or names only one case.

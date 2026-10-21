@@ -3,11 +3,15 @@
 # Sabotage map: delete "Not for running evals (run-evals) or writing cases (author-cases)" from the
 # diagnose-scores description (#750). Near-miss: shares "eval" and "score" vocabulary but wants a run.
 # Regression guard: the no-plugin arm passes by default, so Delta is zero by design.
+# Scope (PR 761 review): the prompt asks which command to use and not to run anything, so this is
+# the command-inquiry boundary. An actual execution request is covered by
+# run-evals-explicit-run-request, where the run-evals skill must fire and diagnose-scores must not
+# take over; this case stays a prompt-only check so it needs no Bash grant.
 schema_version: "1.1"
 name: diagnose-scores-stays-quiet-on-run-request
 description: >
-  A request to run evals and report the score must not invoke diagnose-scores. expected_outcome:
-  PASS when the skill is not invoked; FAIL otherwise.
+  Command-inquiry boundary: a request to run evals and say which command to use must not invoke
+  diagnose-scores. expected_outcome: PASS when the skill is not invoked; FAIL otherwise.
 tags: [eval-authoring, diagnose-scores, trigger, quick]
 
 execution:

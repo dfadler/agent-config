@@ -45,10 +45,12 @@ interprets the verdict.
   explanation), the rubric is unstable: re-run with `--judge-model sonnet` and tighten the
   PASS and FAIL conditions.
 - **`negative-delta` with a consistent judge:** if every vote agrees (say 24 of 24 FAIL in
-  the with arm) the judge is not the problem; the with-arm replies really are worse and
-  they vary between runs. Read the with-arm transcript (or the `mock-recordings/` below) to
-  see what the skill made the model do. The next step is an edit to the skill's text, not
-  to the case.
+  the with arm) the judge is stable, so re-running it or changing `--judge-model` will not
+  move the score. Unanimity does not say which side is wrong: the with-arm replies may really
+  be worse, or the rubric may consistently reject acceptable replies. Read the judge's
+  explanation and a with-arm transcript (or the `mock-recordings/` below) to decide. If the
+  replies are worse, the next step is an edit to the skill's text, not to the case; if they
+  look right, fix the rubric's PASS and FAIL conditions.
 - **`no-discrimination` with a `tool_used: Skill` grader failing in the with arm:** the
   skill's description did not trigger on the prompt. Compare the two and propose a
   description change. If the Skill grader passes and Δ is still about zero, the model does
