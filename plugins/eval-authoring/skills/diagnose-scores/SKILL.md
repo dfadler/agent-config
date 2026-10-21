@@ -82,8 +82,8 @@ without-arm mean over usable runs.
 |---|---|
 | `negative-delta` | Δ ≤ -0.05 |
 | `no-discrimination` | -0.05 < Δ < 0.05 |
-| `weak-signal` | Δ ≥ 0.05 but Δ ≤ 2 standard errors (unknown noise skips this test) |
-| `discriminates` | Δ > 2 standard errors |
+| `weak-signal` | Δ ≥ 0.05 and Δ ≤ 2 standard errors (only when both arms' standard deviations are known) |
+| `discriminates` | Δ ≥ 0.05 and Δ > 2 standard errors; with unknown noise, any Δ ≥ 0.05 |
 | `high-variance` finding | an arm's run-score standard deviation is above 0.25 |
 
 The 0.05 band, the 2 standard errors and the 0.25 SD are rules of thumb the script chose,
