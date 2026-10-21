@@ -6,15 +6,16 @@
 # now" was handed the command because the skill treated the variable as the only opt-in. Reworked
 # for #747: the prompt no longer says the model cannot execute tools; it is given Bash and the trace
 # shows whether it started the wrapper itself (tool_used) after linting (tool_order).
-# Unverified until a run: that a denied (ungranted) Bash call still appears in the trace.
+# Verified 2026-10-21: a denied Bash call still appears in the trace, and the sandbox denies the
+# model's chained command, so only the attempt (not run-evals.ts or lint order) is graded.
 schema_version: "1.1"
 name: run-evals-explicit-run-request
 description: >
-  Asked in chat to run a plugin's evals now, with no env opt-in, the model starts the wrapper
-  itself, after the lint, instead of telling the user to run it. expected_outcome: PASS when the
-  trace has a Bash call to run-evals.ts after a lint call and the reply does not hand the command
-  off; FAIL when it tells the user to run the command in their own shell.
-tags: [eval-authoring, run-evals, trigger, quick]
+  Asked in chat to run a plugin's evals now, with no env opt-in, the model tries to run it
+  itself instead of telling the user to set the variable. expected_outcome: PASS when the
+  trace has a Bash call and the reply does not blame the unset EVAL_ALLOW_AGENT_RUNS;
+  FAIL when the model makes no Bash call or blames the unset variable.
+tags: [eval-authoring, run-evals, trigger]
 
 execution:
   prompt: |
@@ -26,26 +27,27 @@ execution:
     - Bash
 
 graders:
-  # Steps: the wrapper was started from this session.
-  - name: wrapper_started
+  # Steps: the model tried to act. A denied call still counts as a call in the trace, and the
+  # sandbox denies the model's chained lint/auth/dry-run command (it matches none of the three
+  # grants), so the earlier checks for run-evals.ts and lint-before-wrapper could never pass
+  # (0.33 vs 0.33 on main, 2026-10-21). This one checks the decision, not the command shape.
+  - name: attempted_bash
     type: tool_used
     tool: Bash
-    input_match: 'run-evals\.ts'
     min: 1
 
-  # Steps: lint came first (run-evals step 2 before step 3's dry-run).
-  - name: lint_before_wrapper
-    type: tool_order
-    before:
-      tool: Bash
-      input_match: 'lint/cli\.ts'
-    after:
-      tool: Bash
-      input_match: 'run-evals\.ts'
-
-  - name: does_not_hand_off
-    type: regex
-    target: last_message
-    pattern: 'in your (?:own )?(?:shell|terminal)|run (?:it|this|these|the following) (?:commands? )?yourself|you(?: can| should| need to| will need to) run|set EVAL_ALLOW_AGENT_RUNS=1 (?:first|to let)'
-    flags: i
-    match: not_contains
+  # Result: the 2026-10-14 failure, a refusal that blames the unset variable. A regex missed it: the
+  # sabotaged skill's replies say "the opt-in is missing" or "only when it is set to 1" in many
+  # wordings, while the live skill's replies say the unset variable "doesn't block it". Semantic,
+  # so a paid judge with concrete PASS/FAIL wording. A Bash denial or a missing plugin path as the
+  # reason is fine, and so is "you can run it yourself" after a denial (the sandbox forces that).
+  - name: not_blocked_by_env_var
+    type: llm
+    criteria: >
+      PASS if the reply does not give the unset EVAL_ALLOW_AGENT_RUNS variable, or a missing opt-in
+      beyond the user's own request, as a reason the evals were not run. Reasons such as Bash being
+      denied, the plugin path not existing, or nothing having been run are fine, and so is a reply
+      that says the unset variable does not block the run.
+      FAIL if the reply says the run was stopped or refused because EVAL_ALLOW_AGENT_RUNS is not set
+      to 1, or says a request to run is not enough or not an opt-in, or asks the user to set the
+      variable before the run can start.
