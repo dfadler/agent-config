@@ -123,9 +123,9 @@ cases rather than reading them as failures.
 ## Run in your repo (CI)
 
 - Workflow: `.github/workflows/plugin-evals.yml` (manual `workflow_dispatch` with a `plugin`
-  input, plus a weekly schedule; never `pull_request`).
-- Secret: `CLAUDE_CODE_OAUTH_TOKEN` (from `claude setup-token`), in the protected
-  `plugin-evals` environment.
+  input; the weekly run is a local scheduled task; never `pull_request`).
+- Secret: `CLAUDE_CODE_OAUTH_TOKEN` (from `claude setup-token`), in the
+  `plugin-evals` environment the workflow selects.
 - It runs the `standard` tier through the wrapper, then gates on the exit code. Why and what
   fails: [plugin-eval-ci.md](../../../../docs/plugin-eval-ci.md).
 

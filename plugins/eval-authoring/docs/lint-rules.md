@@ -36,7 +36,7 @@ the authority; the severity is the default.
 | EVAL015 | warn | Result directories that git does not ignore get committed by accident. | Add the results directory to `.gitignore`. |
 | EVAL016 | warn | A case graded only by a judge is the most expensive and noisiest kind. | Add a free grader (`regex`, `tool_used`, `file_exists`). |
 | EVAL017 | error | `quick` runs must be free; an `llm` or `baseline` grader is a paid call. | Remove the `quick` tag or the paid grader. |
-| EVAL018 | error | Declared plugin `dependencies` are not loaded in an eval run; a `plugins:` entry outside the plugin is silently dropped. | Vendor the dependency inside the plugin and list it under `plugins:`. |
+| EVAL018 | error | A declared dependency with no matching `plugins:` entry silently drops the plugin under test; a `plugins:` entry outside the plugin root stops the case from loading. | Vendor each dependency inside the plugin, list it under `plugins:`, and keep every entry inside the plugin root. |
 | EVAL019 | error | `min` defaults to 1, so `tool_used` with `max: 0` alone can never pass. | Add `min: 0`. |
 | EVAL020 | info | A suite that checks the skill fires but never that it stays quiet cannot catch an over-broad description. | Add a near-miss prompt that must not fire the skill. |
 | EVAL021 | warn | A grant the case never lists in `allowed_tools` widens permissions for nothing. | Remove the grant, or add the tool to `allowed_tools`. |

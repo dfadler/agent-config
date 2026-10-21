@@ -42,7 +42,8 @@ node plugins/eval-authoring/scripts/ts/diagnose/diagnose.ts <results-dir>/aggreg
 
 Every script takes `--help` (flags, output, exit codes). CI runs the free lint on every
 PR (`pnpm run lint-plugin-evals`). Paid runs are a separate, non-gating workflow
-(`.github/workflows/plugin-evals.yml`: manual and weekly, never on `pull_request`);
+(`.github/workflows/plugin-evals.yml`: manual only, never on `pull_request`; the weekly run is a
+local scheduled task);
 design in [plugin-eval-ci.md](../../docs/plugin-eval-ci.md).
 
 Stable-signal checklist: explicit PASS and FAIL conditions in `llm` criteria, free graders
