@@ -105,13 +105,13 @@ graders:
     weight: 0.5
 
   # Third planted defect (#740): the case has no reference-good or known-bad reply in its
-  # header. Both fixtures must be named, "known-good" or "a good and a bad
-  # example reply" counting as "reference-good" (the reviewer uses all three), or a generic missing-sample-reply finding. Half weight
-  # because a differently worded finding can miss it.
+  # header. Naming either missing fixture, or the missing sample replies in general, counts:
+  # the reviewer words this finding differently almost every run, so requiring both exact
+  # terms failed valid findings. Half weight because a differently worded finding can miss it.
   - name: notes_missing_known_bad
     type: regex
     target: last_message
-    pattern: '(?:(?=[\s\S]*known[- ]bad)(?=[\s\S]*(?:(?:reference|known)[- ]good|good (?:and|or) (?:a )?bad))|no (?:example|sample)[\s\w-]{0,20}(?:reply|replies|response))'
+    pattern: '(?:known|reference)[- ](?:bad|good)|\b(?:good|bad)(?: example)? repl|reference repl|no (?:example|sample|reference)[\s\w-]{0,20}(?:reply|replies|response)'
     flags: i
     match: contains
     weight: 0.5
