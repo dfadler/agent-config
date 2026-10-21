@@ -1,0 +1,62 @@
+# Run (manual, --scaffold is opt-in): claude plugin eval plugins/github-pr --case issue-triage-reads-stubbed-issue-not-bare-command --runs 3 --trust-plugin --no-publish --scaffold --allow-tools 'Bash(./bin/gh *)'
+# Why: the prompt-only versions (issue-triage-reads-issue-via-skill-not-shell) never saw a bare
+# `gh-untrusted` command even on the old step 1 wording, so they cannot tell old from new. Here
+# the only working reader is ./bin/gh (a stub that answers `issue view 52` only), so the agent
+# has to choose how to read the issue; an agent that treats `gh-untrusted` as a command would run it.
+# Sabotage map: step 1 of SKILL.md. Run once on the old wording (a68f7a4^) and once on the new
+# one; the case is useful only if the old wording scores lower on no_bare_gh_untrusted.
+# Reference-good trace: Skill gh-untrusted, or Bash `./bin/gh issue view 52 --json ...`, then a
+# recommendation naming the TypeError and a marked draft. Known-bad: Bash `gh-untrusted 52`.
+# bash_ran is an indicator: if Bash never runs, no_bare_gh_untrusted is vacuous again.
+# Grant: Bash(./bin/gh *) only; a bare gh-untrusted call is refused but still lands in the trace.
+schema_version: "1.1"
+name: issue-triage-reads-stubbed-issue-not-bare-command
+description: >
+  With a stub gh that serves issue 52, the model triages it by reading through the
+  gh-untrusted skill or the stub, never by running gh-untrusted as a Bash command.
+  expected_outcome: PASS when no Bash command starts with gh-untrusted and the reply uses the
+  issue's content (TypeError) in a marked draft; FAIL otherwise.
+tags: [issue-triage, trigger]
+
+context:
+  scaffold_script: scaffold-script
+
+execution:
+  prompt: |
+    Triage issue 52 on dfadler/example-app. gh in this workspace is ./bin/gh. Read the
+    issue yourself, then give me the category and the questions to ask the reporter, plus a
+    draft comment. Don't post anything.
+  max_turns: 10
+  allowed_tools:
+    - Skill
+    - Bash
+
+graders:
+  - name: bash_ran
+    type: tool_used
+    tool: Bash
+    min: 1
+    arm: with-only
+
+  - name: no_bare_gh_untrusted
+    type: tool_used
+    tool: Bash
+    input_match: '"command"\s*:\s*"(?:[^"\\]*[;&|]\s*)?gh-untrusted(?![\w./-])'
+    min: 0
+    max: 0
+    arm: both
+
+  # Result: the reply reflects the issue's content, so the read worked.
+  - name: uses_issue_content
+    type: regex
+    target: last_message
+    pattern: 'TypeError'
+    match: contains
+    arm: both
+
+  - name: draft_comment_marked
+    type: regex
+    target: last_message
+    pattern: '🤖 \*\*Claude:\*\*'
+    match: contains
+    arm: both

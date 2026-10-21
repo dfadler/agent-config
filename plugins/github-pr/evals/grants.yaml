@@ -10,3 +10,5 @@ grants:
     - "Bash(gh issue *)"
   issue-triage-sweep-reads-via-skill-not-shell:
     - "Bash(gh issue *)"
+  issue-triage-reads-stubbed-issue-not-bare-command:
+    - "Bash(./bin/gh *)"
