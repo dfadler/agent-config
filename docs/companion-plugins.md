@@ -356,7 +356,7 @@ playwright-cli install --skills -g
 
 `check_playwright_cli` (`scripts/check-companions.sh`) reports whether the CLI is on
 PATH, its version, and whether the skill is installed globally. `setup.sh
---install-deps` also runs the `npm install -g` step, only when Node 22 or later is on PATH (the
+--install-deps` also runs the `npm install -g` step, only when Node 24 is on PATH (the
 repo pins 24 in `.nvmrc`); a bare run never installs it. The skill install is left to you, since
 it is either global or per project. The generated skill files are refreshed by
 re-running the install after each `@playwright/cli` update. The `playwright` npm package

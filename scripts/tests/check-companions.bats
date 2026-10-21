@@ -810,16 +810,16 @@ EOF
   refute_output_contains "install --skills -g"
 }
 
-@test "--install-deps refuses to install playwright-cli under node older than 22" {
-  shim_node_npm 20
+@test "--install-deps refuses to install playwright-cli under node older than 24" {
+  shim_node_npm 22
   PATH="$PW_SHIM_BIN:$(path_without_playwright)" run_companions --install-deps
   assert_failure
-  assert_output_contains "this repo needs Node 22 or later"
+  assert_output_contains "this repo needs Node 24"
   [ ! -e "$SANDBOX/npm-calls" ]
 }
 
-@test "--install-deps installs playwright-cli with npm under node 22" {
-  shim_node_npm 22
+@test "--install-deps installs playwright-cli with npm under node 24" {
+  shim_node_npm 24
   PATH="$PW_SHIM_BIN:$(path_without_playwright)" run_companions --install-deps
   assert_success
   assert_output_contains "@playwright/cli installed"
@@ -827,14 +827,14 @@ EOF
 }
 
 @test "a bare run never installs playwright-cli" {
-  shim_node_npm 22
+  shim_node_npm 24
   PATH="$PW_SHIM_BIN:$(path_without_playwright)" run_companions
   assert_success
   [ ! -e "$SANDBOX/npm-calls" ]
 }
 
 @test "--install-deps fails when npm is not on PATH" {
-  shim_node_npm 22
+  shim_node_npm 24
   rm "$PW_SHIM_BIN/npm"
   PATH="$PW_SHIM_BIN:$(path_without_playwright)" run_companions --install-deps
   assert_failure
@@ -842,7 +842,7 @@ EOF
 }
 
 @test "--install-deps fails when npm install -g fails" {
-  shim_node_npm 22
+  shim_node_npm 24
   printf '#!/usr/bin/env bash\nexit 1\n' > "$PW_SHIM_BIN/npm"
   PATH="$PW_SHIM_BIN:$(path_without_playwright)" run_companions --install-deps
   assert_failure
@@ -850,7 +850,7 @@ EOF
 }
 
 @test "--install-deps fails when npm succeeds but playwright-cli is still not on PATH" {
-  shim_node_npm 22
+  shim_node_npm 24
   printf '#!/usr/bin/env bash\nexit 0\n' > "$PW_SHIM_BIN/npm"
   PATH="$PW_SHIM_BIN:$(path_without_playwright)" run_companions --install-deps
   assert_failure
