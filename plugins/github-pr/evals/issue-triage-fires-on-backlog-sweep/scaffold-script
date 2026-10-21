@@ -1,0 +1,21 @@
+#!/usr/bin/env bash
+# Writes a stub gh into ./bin. Serves three open issues; anything else fails like an
+# unauthenticated gh. The issue text lives here, not in the prompt, so a reply that
+# quotes it proves the agent read the issues.
+set -euo pipefail
+mkdir -p bin
+cat > bin/gh <<'STUB'
+#!/usr/bin/env bash
+list='[{"number":11,"title":"Crash when config file is missing","state":"OPEN","author":{"login":"alice"},"body":"Running `app start` without config.yaml crashes: ENOENT: no such file or directory, open config.yaml. Stack trace: at loadConfig (src/config.ts:14). Repro: delete config.yaml, run app start.","comments":[]},
+{"number":12,"title":"App crashes without config.yaml","state":"OPEN","author":{"login":"bob"},"body":"Same ENOENT stack trace at loadConfig (src/config.ts:14) when config.yaml is absent. Filed after #11.","comments":[]},
+{"number":13,"title":"Make it faster","state":"OPEN","author":{"login":"carol"},"body":"It feels slow.","comments":[]}]'
+if [ "${1:-}" = "issue" ] && [ "${2:-}" = "list" ]; then
+  echo "$list"; exit 0
+fi
+if [ "${1:-}" = "issue" ] && [ "${2:-}" = "view" ]; then
+  echo "$list" | python3 -c "import json,sys; n=int(sys.argv[1]); print(json.dumps([i for i in json.load(sys.stdin) if i['number']==n][0]))" "${3:-0}" 2>/dev/null && exit 0
+fi
+echo "gh: unsupported in this workspace: $*" >&2
+exit 1
+STUB
+chmod +x bin/gh

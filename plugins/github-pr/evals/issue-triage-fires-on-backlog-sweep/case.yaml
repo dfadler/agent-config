@@ -1,36 +1,78 @@
-# Run: claude plugin eval plugins/github-pr --case issue-triage-fires-on-backlog-sweep --runs 3 --trust-plugin --no-publish
-# Shared run/grant facts: docs/contributing.md, "Plugin evals". No grant: Skill only.
-# Should-fire case: a sweep over open issues rather than one number.
-# Can fail: skill_fired fails if the description stops matching the sweep wording. The bucket
-# graders pass without the skill body (sabotage-checked), so this case tests the trigger only.
+# Run (manual, --scaffold is opt-in): claude plugin eval plugins/github-pr --case issue-triage-fires-on-backlog-sweep --runs 3 --trust-plugin --no-publish --scaffold --allow-tools 'Bash(./bin/gh *)'
+# Grant: Bash(./bin/gh *) only. Should-fire case: a sweep over open issues, natural phrasing.
+# Reworked from an inline-data version whose prompt named the buckets, so its scored regexes
+# matched the prompt and the skill never needed to fire (traced: skill fired 0x, 1.00/1.00).
+# Now the issue text lives in a gh stub (scaffold-script) and the prompt does not name the
+# skill's bucket labels ("likely duplicate" is the skill's wording, step "For a sweep").
+# Can fail: read_content fails if the agent never reads the issues (ENOENT is only in the stub);
+# finds_duplicate fails if #12 is not tied to #11; bucket_likely_duplicate fails if the skill's
+# bucket name is not used ("Likely duplicate"; a baseline writes "Duplicate"). triage_fired and
+# bash_ran are indicators. A "needs info" grader was dropped: the model echoes the prompt's
+# own phrase ("need more from the reporter"), so it never matched even with the skill.
+# Sabotage map: "For a sweep, sort issues into ready, needs info, and likely duplicate" in SKILL.md.
+# Reference-good: Skill(issue-triage), then ./bin/gh issue list, then three one-line buckets.
+# Known-bad: a reply that never calls ./bin/gh (read_content fails) or that sorts without
+# naming the duplicate pair (finds_duplicate fails).
 schema_version: "1.1"
 name: issue-triage-fires-on-backlog-sweep
 description: >
-  Asked which open issues are ready, need info, or look like duplicates, the model invokes
-  issue-triage. expected_outcome: PASS when the skill fires; FAIL otherwise.
-tags: [issue-triage, trigger, quick]
+  Asked which open issues are ready, need info or look like duplicates, with the issues
+  served by a gh stub, the model reads them, invokes issue-triage and sorts them using its
+  bucket names. expected_outcome: PASS when the reply quotes content only the stub holds,
+  ties #12 to #11 as a duplicate and uses the skill's "likely duplicate" bucket; FAIL otherwise.
+tags: [issue-triage, trigger]
+
+context:
+  scaffold_script: scaffold-script
 
 execution:
   prompt: |
-    Sweep these open issues of dfadler/example-app; do not run commands or post anything.
-    Your final message must sort them into ready, needs info and likely duplicate.
-
-    1. "Crash when config file is missing": has a stack trace and repro steps.
-    2. "App crashes without config.yaml": same stack trace as 1, filed later.
-    3. "Make it faster": no details.
-  max_turns: 4
+    Go through the open issues on dfadler/example-app and tell me which ones are ready to
+    pick up, which need more from the reporter, and which look like duplicates. gh in this
+    workspace is ./bin/gh. Just report back; don't touch anything.
+  max_turns: 10
   allowed_tools:
     - Skill
+    - Bash
 
 graders:
-  - name: skill_fired
+  - name: triage_fired
     type: tool_used
     tool: Skill
     input_match: '"skill"\s*:\s*"(?:[\w-]+:)?issue-triage"'
     min: 1
     arm: with-only
 
-  - name: sorted_into_buckets
+  - name: bash_ran
+    type: tool_used
+    tool: Bash
+    min: 1
+    arm: with-only
+
+  - name: no_bare_gh_untrusted
+    type: tool_used
+    tool: Bash
+    input_match: '"command"\s*:\s*"(?:[^"\\]*[;&|]\s*)?gh-untrusted(?![\w./-])'
+    min: 0
+    max: 0
+    arm: both
+
+  - name: read_content
+    type: regex
+    target: last_message
+    pattern: 'ENOENT|loadConfig'
+    match: contains
+    arm: both
+
+  - name: finds_duplicate
+    type: regex
+    target: last_message
+    pattern: '(?=[\s\S]*\b12\b)(?=[\s\S]*duplicate)'
+    flags: i
+    match: contains
+    arm: both
+
+  - name: bucket_likely_duplicate
     type: regex
     target: last_message
     pattern: 'likely duplicate'
@@ -38,10 +80,3 @@ graders:
     match: contains
     arm: both
 
-  - name: needs_info_bucket
-    type: regex
-    target: last_message
-    pattern: 'needs info'
-    flags: i
-    match: contains
-    arm: both
