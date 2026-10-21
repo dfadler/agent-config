@@ -99,7 +99,7 @@ graders:
   - name: notes_missing_boundary
     type: regex
     target: last_message
-    pattern: "no (negative|non-firing|non-triggering|should-not)[\\s\\w-]{0,20}prompt|(only|single|one)( positive| should-fire)? prompt|never (shows|tests|checks)[\\s\\S]{0,60}(not fire|should not|not trigger)"
+    pattern: "no (negative|non-firing|non-triggering|should-not)[\\s\\w-]{0,20}prompt|(only|single|one)( a| one)?( positive| should-fire)? prompt|never (shows|tests|checks)[\\s\\S]{0,60}(not fire|should not|not trigger)"
     flags: i
     match: contains
     weight: 0.5
@@ -120,7 +120,7 @@ graders:
   - name: notes_tautological_grader
     type: regex
     target: last_message
-    pattern: "(\\.\\*|has_text)[\\s\\S]{0,300}(always|any reply|every|matches everything|tautolog|vacuous|cannot fail|never fail)|(always|matches everything|tautolog|vacuous|cannot fail|never fail)[\\s\\S]{0,300}(\\.\\*|has_text)"
+    pattern: "(\\.\\*|has_text)[\\s\\S]{0,300}(always|any reply|every|matches (everything|any|all)|tautolog|vacuous|can(not|.?t| never) fail|never fails?)|(always|any reply|every|matches (everything|any|all)|tautolog|vacuous|can(not|.?t| never) fail|never fails?)[\\s\\S]{0,300}(\\.\\*|has_text)"
     flags: i
     match: contains
     weight: 0.5
