@@ -3,6 +3,8 @@
 # Sabotage map: delete the "Verdict cutoffs" table in diagnose-scores/SKILL.md; a no-plugin model
 # cannot know the 0.05 band or the verdict names, so names_verdict drops.
 # Can fail: names_verdict = 0 unless the reply uses the verdict name no-discrimination.
+# Note (PR 761): this is a vocabulary check. A model without the skill cannot guess the label
+# `no-discrimination`; a pass does not show the table helps a user.
 schema_version: "1.1"
 name: diagnose-scores-cutoff-verdict
 description: >

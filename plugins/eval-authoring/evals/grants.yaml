@@ -17,7 +17,3 @@ grants:
     - "Bash(claude auth status)"
   case-reviewer-clean-case-control:
     - "Write"
-  # Lets diagnose-scores run its free, read-only script on the fixture (no model calls).
-  diagnose-scores-consistent-judge:
-    - "Bash(node *diagnose.ts *)"
-    - "Bash(cd *)"
