@@ -17,8 +17,9 @@ tags: [issue-triage, trigger, quick]
 execution:
   prompt: |
     Go through the open issues on dfadler/example-app and tell me which ones are ready to
-    pick up, which need more info from the reporter, and which look like duplicates. Just
-    report back; don't touch anything.
+    pick up, which need more info from the reporter, and which look like duplicates. Fetch
+    them yourself by running whatever commands you need. Just report back; don't touch
+    anything.
   max_turns: 10
   allowed_tools:
     - Skill
@@ -29,6 +30,12 @@ graders:
     type: tool_used
     tool: Skill
     input_match: '"skill"\s*:\s*"(?:[\w-]+:)?issue-triage"'
+    min: 1
+    arm: with-only
+
+  - name: bash_ran
+    type: tool_used
+    tool: Bash
     min: 1
     arm: with-only
 
