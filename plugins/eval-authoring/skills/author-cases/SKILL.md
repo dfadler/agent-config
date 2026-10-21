@@ -1,6 +1,6 @@
 ---
 name: author-cases
-description: ALWAYS invoke this skill first when a plugin's skill or agent was just changed and the question is what to do about its evals, because it sets the order - update the cases, then compare before and after scores. Write or fix `claude plugin eval` cases - graders, mocks, fixtures, thresholds, should-trigger and should-not-trigger prompts. Use when adding eval cases or graders to a plugin, or when writing the PR description for a change to a plugin's skill or agent text that has eval cases.
+description: Write or fix `claude plugin eval` cases - graders, mocks, fixtures, thresholds, should-trigger and should-not-trigger prompts. Use when adding evals to a new plugin or skill ("add evals to my plugin"), adding graders to existing cases, or writing the PR description for a change to a skill or agent that has eval cases. ALWAYS invoke it first when a plugin's skill or agent was just changed and the question is what to do about its evals, because it sets the order - update the cases, then compare before and after scores. Not for running evals (run-evals), explaining a score (diagnose-scores) or unit tests of plugin code.
 argument-hint: "<plugin-path> [skill-or-agent]"
 ---
 

@@ -1,0 +1,68 @@
+# Run: claude plugin eval plugins/eval-authoring --case diagnose-scores-two-negative-cases --keep-temp
+# Harder fixture for #751: two negative-delta cases that need different advice. release-notes-tone has
+# unanimous FAIL votes in the with arm (the replies are worse: edit the skill). changelog-style has
+# split votes (the rubric is unstable: tighten the PASS/FAIL wording). The script flags the split
+# but not the unanimity, so only the skill's "consistent judge" bullet separates the two.
+# Compare this branch's skill against main's skill, not with against without (#761).
+# The results are pasted into the prompt: add_dirs was not visible to the model in this case's first
+# run (every reply said results-fixture did not exist, all runs scored 0), and Bash is denied anyway.
+# Sabotage map: delete the "consistent judge" bullet in diagnose-scores/SKILL.md; the old text says
+# "suspect the judge first" for every negative-delta, so release-notes-tone gets rubric advice.
+schema_version: "1.1"
+name: diagnose-scores-two-negative-cases
+description: >
+  A result file with two negative-delta cases, one with unanimous judge votes and one with split
+  votes. expected_outcome: PASS when the reply sends release-notes-tone to a skill edit and
+  changelog-style to a rubric fix; FAIL otherwise.
+tags: [eval-authoring, diagnose-scores]
+
+execution:
+  prompt: |
+    Two cases in my eval results scored worse with the plugin than without. Here is the output of
+    the diagnose script and the judge votes from the result file (no files to open):
+
+    release-notes-tone: negative-delta
+      delta: -0.5; with: 0.5 (sd 0) over 5/5 runs; without: 1 (sd 0) over 5/5 runs; scored graders: 2
+      grader friendly_tone (llm), judge votes, with arm, runs 1 to 5: FAIL FAIL FAIL in every run
+      grader friendly_tone, without arm: PASS PASS PASS in every run
+
+    changelog-style: negative-delta
+      delta: -0.5; with: 0.5 (sd 0) over 5/5 runs; without: 1 (sd 0) over 5/5 runs; scored graders: 2
+      grader concise_style (llm), judge votes, with arm: FAIL PASS FAIL, PASS FAIL PASS,
+      FAIL FAIL PASS, PASS PASS FAIL, FAIL PASS PASS
+      grader concise_style, without arm: PASS PASS PASS in every run
+
+    For each case, what should I change next? Answer in your reply.
+  max_turns: 10
+  allowed_tools:
+    - Skill
+
+graders:
+  - name: skill_fired
+    type: tool_used
+    tool: Skill
+    input_match: '"skill"\s*:\s*"(?:[\w-]+:)?diagnose-scores"'
+    min: 1
+    arm: with-only
+
+  - name: names_both_cases
+    type: regex
+    target: last_message
+    pattern: 'release-notes-tone[\s\S]*changelog-style|changelog-style[\s\S]*release-notes-tone'
+    flags: i
+    match: contains
+
+  # Paid: which fix goes with which case is semantic, and a regex cannot pair them.
+  - name: per_case_advice
+    type: llm
+    criteria: >
+      PASS if the reply says, for release-notes-tone, that the unanimous votes mean the judge is
+      stable, so re-running or retuning the judge will not change the result, and the next step is
+      to read the judge's explanation or a with-arm transcript, or to change the skill (saying the
+      cause could be either the replies or the rubric until that is read is fine); AND tells the
+      user, for changelog-style, to fix the grader's rubric or judge (tighten PASS and FAIL
+      wording, or change the judge model).
+      FAIL if the reply gives the same advice for both cases, makes re-running the judge,
+      changing the judge model or tightening the rubric the first step for release-notes-tone,
+      calls the release-notes-tone result judge noise, advises a skill change for changelog-style,
+      or names only one case.

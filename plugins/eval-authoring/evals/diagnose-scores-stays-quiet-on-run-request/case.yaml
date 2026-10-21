@@ -1,0 +1,32 @@
+# Run: claude plugin eval plugins/eval-authoring --case diagnose-scores-stays-quiet-on-run-request
+# Not run yet: paid, hand-off only. No grant: Skill only.
+# Sabotage map: delete "Not for running evals (run-evals) or writing cases (author-cases)" from the
+# diagnose-scores description (#750). Near-miss: shares "eval" and "score" vocabulary but wants a run.
+# Regression guard: the no-plugin arm passes by default, so Delta is zero by design.
+# Scope (PR 761 review): the prompt asks which command to use and not to run anything, so this is
+# the command-inquiry boundary. An actual execution request is covered by
+# run-evals-explicit-run-request, where the run-evals skill must fire and diagnose-scores must not
+# take over; this case stays a prompt-only check so it needs no Bash grant.
+schema_version: "1.1"
+name: diagnose-scores-stays-quiet-on-run-request
+description: >
+  Command-inquiry boundary: a request to run evals and say which command to use must not invoke
+  diagnose-scores. expected_outcome: PASS when the skill is not invoked; FAIL otherwise.
+tags: [eval-authoring, diagnose-scores, trigger, quick]
+
+execution:
+  prompt: |
+    Please run the evals for my plugin and tell me the score when done. Just say in one sentence
+    what command you would use; do not run anything.
+  max_turns: 4
+  allowed_tools:
+    - Skill
+
+graders:
+  - name: diagnose_not_fired
+    type: tool_used
+    tool: Skill
+    input_match: '"skill"\s*:\s*"(?:[\w-]+:)?diagnose-scores"'
+    min: 0
+    max: 0
+    arm: both

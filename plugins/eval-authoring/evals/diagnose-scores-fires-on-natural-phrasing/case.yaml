@@ -1,0 +1,37 @@
+# Run: claude plugin eval plugins/eval-authoring --case diagnose-scores-fires-on-natural-phrasing
+# Not run yet: paid, hand-off only. No grant: Skill only; the prompt forbids running anything.
+# Sabotage map: remove '"my eval fails", "score 0.4"' from the diagnose-scores description (#750);
+# the plain phrasing may then stop firing the skill. Fire rate is the primary signal.
+# Sabotage check (2026-10-21): with a dead description the skill fired 0x in 5 of 5 runs but the old
+# grader (judge|rubric) still scored 1.00, because any model names the judge. The reply grader is now
+# the skill's own step 1 (it looks for aggregate-result.json), which a model without the skill does
+# not name. skill_fired stays an unscored indicator in a two-arm run.
+schema_version: "1.1"
+name: diagnose-scores-fires-on-natural-phrasing
+description: >
+  Plain phrasing, no skill name or Delta. expected_outcome: PASS when the skill fires and the
+  reply asks for the aggregate-result.json file; FAIL otherwise.
+tags: [eval-authoring, diagnose-scores, trigger, quick]
+
+execution:
+  prompt: |
+    my eval keeps failing, it scores 0.4 but the answers look fine to me. why? Answer in your
+    reply; do not run anything.
+  max_turns: 6
+  allowed_tools:
+    - Skill
+
+graders:
+  - name: skill_fired
+    type: tool_used
+    tool: Skill
+    input_match: '"skill"\s*:\s*"(?:[\w-]+:)?diagnose-scores"'
+    min: 1
+    arm: with-only
+
+  - name: asks_for_result_file
+    type: regex
+    target: last_message
+    pattern: '(?:need|send|share|provide|paste|point|attach|give|where|which|path|location)[^.\n]{0,120}aggregate-result\.json|aggregate-result\.json[^.\n]{0,120}(?:path|share|provide|paste|send|attach|file you|from your)'
+    flags: i
+    match: contains
