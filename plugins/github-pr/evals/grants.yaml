@@ -6,3 +6,7 @@ grants:
     - "Bash(gh *)"
   pr-babysit-delegates-to-pr-checks-and-pr-comments:
     - "Bash(gh *)"
+  issue-triage-fires-on-backlog-sweep:
+    - "Bash(./bin/gh *)"
+  issue-triage-reads-stubbed-issue-not-bare-command:
+    - "Bash(./bin/gh *)"

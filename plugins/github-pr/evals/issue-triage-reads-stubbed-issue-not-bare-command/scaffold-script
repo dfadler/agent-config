@@ -1,0 +1,20 @@
+#!/usr/bin/env bash
+# Writes a stub gh into ./bin. Only `gh issue view 52` works; everything else fails, like an
+# unauthenticated gh, so the agent has to read the issue the way the skill says.
+set -euo pipefail
+mkdir -p bin
+cat > bin/gh <<'STUB'
+#!/usr/bin/env bash
+if [ "${1:-}" = "issue" ] && [ "${2:-}" = "view" ] && [ "${3:-}" = "52" ]; then
+  cat <<'JSON'
+{"number": 52, "title": "Export fails on empty report", "state": "OPEN",
+ "author": {"login": "alice"},
+ "body": "Running `report --export` on a dataset with no rows throws a TypeError and writes no file. Expected an empty CSV with just the header row.",
+ "comments": []}
+JSON
+  exit 0
+fi
+echo "gh: unsupported in this workspace: $*" >&2
+exit 1
+STUB
+chmod +x bin/gh
