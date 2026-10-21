@@ -30,10 +30,12 @@ graders:
   # Steps: the model tried to act. A denied call still counts as a call in the trace, and the
   # sandbox denies the model's chained lint/auth/dry-run command (it matches none of the three
   # grants), so the earlier checks for run-evals.ts and lint-before-wrapper could never pass
-  # (0.33 vs 0.33 on main, 2026-10-21). This one checks the decision, not the command shape.
+  # (0.33 vs 0.33 on main, 2026-10-21). This one checks the decision, not the command shape: a Bash call whose command names the
+  # plugin, the lint, the login check or the eval runner (an unrelated `ls` does not count).
   - name: attempted_bash
     type: tool_used
     tool: Bash
+    input_match: 'memory-hygiene|run-evals|lint/cli|auth status|plugin eval'
     min: 1
 
   # Result: the 2026-10-14 failure, a refusal that blames the unset variable. A regex missed it: the

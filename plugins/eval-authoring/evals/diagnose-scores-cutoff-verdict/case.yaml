@@ -6,7 +6,12 @@
 # Scope (PR 761 review): this tests recall of the documented -0.05 neutral band (the "Verdict
 # cutoffs" table), not the diagnosis workflow. With no result file the skill's own step 1 says to
 # stop and ask for a run, and it forbids guessing a verdict, so this prompt deliberately asks only
-# what the cutoff is. It is a vocabulary check. A model without the skill cannot guess the label
+# what the cutoff is. It is a vocabulary check. Keep the prompt phrased as a user's own case. Wording that frames it as a recall question
+# ("this is a recall question about the documented table", 2026-10-21) made the model refuse to guess
+# and ask permission to load the skill instead of loading it: 0.20 with when it named the table,
+# 0.00 when it did not (the replies say they cannot recall the label). The original phrasing scored
+# 1.00 / 0.00.
+# A model without the skill cannot guess the label
 # `no-discrimination`; a pass does not show the table helps a user.
 schema_version: "1.1"
 name: diagnose-scores-cutoff-verdict

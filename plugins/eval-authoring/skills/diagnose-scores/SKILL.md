@@ -45,8 +45,9 @@ interprets the verdict.
   explanation), the rubric is unstable: re-run with `--judge-model sonnet` and tighten the
   PASS and FAIL conditions.
 - **`negative-delta` with a consistent judge:** if every vote agrees (say 24 of 24 FAIL in
-  the with arm) the judge is stable, so re-running it or changing `--judge-model` will not
-  move the score. Unanimity does not say which side is wrong: the with-arm replies may really
+  the with arm) the judge is stable, so re-running it with the same configuration is
+  unlikely to move the score (a different `--judge-model` is only a sensitivity check, not a
+  fix). Unanimity does not say which side is wrong: the with-arm replies may really
   be worse, or the rubric may consistently reject acceptable replies. Read the judge's
   explanation and a with-arm transcript (or the `mock-recordings/` below) to decide. If the
   replies are worse, the next step is an edit to the skill's text, not to the case; if they
@@ -79,10 +80,10 @@ without-arm mean over usable runs.
 
 | Verdict | Rule |
 |---|---|
-| `negative-delta` | Δ is -0.05 or lower |
-| `no-discrimination` | Δ is between -0.05 and 0.05 |
-| `weak-signal` | Δ is 0.05 or higher but within 2 standard errors of zero (unknown noise skips this test) |
-| `discriminates` | Δ is more than 2 standard errors above zero |
+| `negative-delta` | Δ ≤ -0.05 |
+| `no-discrimination` | -0.05 < Δ < 0.05 |
+| `weak-signal` | Δ ≥ 0.05 but Δ ≤ 2 standard errors (unknown noise skips this test) |
+| `discriminates` | Δ > 2 standard errors |
 | `high-variance` finding | an arm's run-score standard deviation is above 0.25 |
 
 The 0.05 band, the 2 standard errors and the 0.25 SD are rules of thumb the script chose,
