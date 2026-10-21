@@ -6,3 +6,7 @@ grants:
     - "Bash(gh *)"
   pr-babysit-delegates-to-pr-checks-and-pr-comments:
     - "Bash(gh *)"
+  issue-triage-reads-issue-via-skill-not-shell:
+    - "Bash(gh issue *)"
+  issue-triage-sweep-reads-via-skill-not-shell:
+    - "Bash(gh issue *)"

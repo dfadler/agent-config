@@ -1,0 +1,41 @@
+# Run: claude plugin eval plugins/github-pr --case issue-triage-sweep-reads-via-skill-not-shell --runs 3 --trust-plugin --no-publish --allow-tools 'Bash(gh issue *)'
+# Shared run/grant facts: docs/contributing.md, "Plugin evals". Grant: Bash(gh issue *) only.
+# Should-fire, natural phrasing with no skill name: a backlog sweep that needs the issues read.
+# Same failure as issue-triage-reads-issue-via-skill-not-shell (step 1 read as a shell command).
+# Sabotage map: step 1 of SKILL.md; reverting it to "Read the issue with `gh-untrusted`" should
+# start failing no_bare_gh_untrusted. triage_fired fails if the description stops matching.
+# Reference-good trace: Skill(issue-triage), then Skill(gh-untrusted) or `gh issue list/view`.
+# Known-bad trace: Bash `gh-untrusted issue 3`. Trace-checked only; graders do not read replies.
+schema_version: "1.1"
+name: issue-triage-sweep-reads-via-skill-not-shell
+description: >
+  Asked which open issues are ready to work and which look like duplicates, the model invokes
+  issue-triage and never runs gh-untrusted as a Bash command. expected_outcome: PASS when
+  issue-triage fires and no Bash command starts with gh-untrusted; FAIL otherwise.
+tags: [issue-triage, trigger, quick]
+
+execution:
+  prompt: |
+    Go through the open issues on dfadler/example-app and tell me which ones are ready to
+    pick up, which need more info from the reporter, and which look like duplicates. Just
+    report back; don't touch anything.
+  max_turns: 10
+  allowed_tools:
+    - Skill
+    - Bash
+
+graders:
+  - name: triage_fired
+    type: tool_used
+    tool: Skill
+    input_match: '"skill"\s*:\s*"(?:[\w-]+:)?issue-triage"'
+    min: 1
+    arm: with-only
+
+  - name: no_bare_gh_untrusted
+    type: tool_used
+    tool: Bash
+    input_match: '"command"\s*:\s*"(?:[^"\\]*[;&|]\s*)?gh-untrusted(?![\w./-])'
+    min: 0
+    max: 0
+    arm: both
