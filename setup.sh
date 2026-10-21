@@ -36,7 +36,7 @@ run is rejected rather than guessing which one wins.
 
   --install-deps     Also install a missing dependency (python3 -m pip
                      install --user pyte), when the interpreter allows it, and
-                     playwright-cli (npm install -g @playwright/cli, Node 22).
+                     playwright-cli (npm install -g @playwright/cli, Node 22 or later).
   --fix              Backward-compatible forward to './doctor.sh --fix', the
                      primary way to repair drift (rtk's exclude_commands
                      config, a displaced require-worktree hook, dangling

@@ -814,7 +814,7 @@ EOF
   shim_node_npm 20
   PATH="$PW_SHIM_BIN:$(path_without_playwright)" run_companions --install-deps
   assert_failure
-  assert_output_contains "this repo uses Node 22"
+  assert_output_contains "this repo needs Node 22 or later"
   [ ! -e "$SANDBOX/npm-calls" ]
 }
 

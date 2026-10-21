@@ -36,7 +36,7 @@ can also run it directly (also reachable as ./doctor.sh from the repo root).
   --install-deps   Also install a missing pyte dependency (python3 -m pip
                    install --user pyte), when the interpreter allows it, and
                    a missing playwright-cli (npm install -g @playwright/cli,
-                   Node 22 on PATH required).
+                   Node 22 or later on PATH required).
   --fix            Also apply other known fixes for a problem this script
                    detects, instead of only reporting it (currently: adding
                    "git", prettier, eslint, vitest to rtk's own exclude_commands config when rtk's
@@ -1090,8 +1090,8 @@ install_playwright_cli() {
   }
   node_major="$(node -p 'process.versions.node.split(".")[0]' 2>/dev/null || echo 0)"
   if [[ "$node_major" -lt 22 ]]; then
-    echo "Not installing @playwright/cli: node on PATH is v$node_major, this repo uses Node 22 (.nvmrc)." >&2
-    echo "  Put Node 22 first on PATH (e.g. nvm use 22) and re-run." >&2
+    echo "Not installing @playwright/cli: node on PATH is v$node_major, this repo needs Node 22 or later (.nvmrc pins 24)." >&2
+    echo "  Put Node 22 or later first on PATH (e.g. nvm use) and re-run." >&2
     return 1
   fi
   echo "Installing @playwright/cli: npm install -g @playwright/cli@latest"
