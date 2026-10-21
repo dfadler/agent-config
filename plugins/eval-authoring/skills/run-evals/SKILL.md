@@ -94,7 +94,9 @@ it, do not rebuild any of that.
 
 ## What the tier values mean
 
-Every tier passes `--threshold 1` (the CLI default is also 1.0). A run's score is the
+Every tier passes `--threshold 1` (the CLI default is also 1.0). It was chosen so one failed
+grader is never averaged away; that is a design choice (see
+[plugin-eval-ci.md](../../../../docs/plugin-eval-ci.md)), not a measured optimum. A run's score is the
 fraction of its graders that passed, weighted, and a case's score is the mean over its
 runs; a case passes when that is at least the threshold, and any case below it makes the
 CLI exit 1 ([docs](https://code.claude.com/docs/en/plugin-evals#how-a-case-is-scored)).
@@ -118,6 +120,15 @@ rate comes from logged-in runs ($0.04 to $0.12 a run, judge calls included; deri
 costs. If a run reports exit 7 with the ceiling hit, its scores are partial: trim the
 cases rather than reading them as failures.
 
+## Run in your repo (CI)
+
+- Workflow: `.github/workflows/plugin-evals.yml` (manual `workflow_dispatch` with a `plugin`
+  input; the weekly run is a local scheduled task; never `pull_request`).
+- Secret: `CLAUDE_CODE_OAUTH_TOKEN` (from `claude setup-token`), in the
+  `plugin-evals` environment the workflow selects.
+- It runs the `standard` tier through the wrapper, then gates on the exit code. Why and what
+  fails: [plugin-eval-ci.md](../../../../docs/plugin-eval-ci.md).
+
 ## Faster feedback
 
 Levers, biggest first. Times and costs are rough figures from one 9-case plugin
@@ -138,7 +149,10 @@ Levers, biggest first. Times and costs are rough figures from one 9-case plugin
 |---|---|---|
 | Iterate on one case | `run-evals.ts --tier quick <plugin> --case <name>` (raw: `<case-dir> --runs 3 --ablation none -j 5`) | ~1 min, ~$0.70 |
 | Full suite, pushed | raw: `<plugin> --runs 5 -j 6` | ~8 min |
-| Pre-merge | `run-evals.ts --tier thorough <plugin>` (raw: `--runs 5 -j 5`) | ~10 min |
+| Pre-merge | `run-evals.ts --tier thorough <plugin>` (raw: `--runs 5 -j 6`) | ~8 min |
+
+Only `-j 3` (16 min) and `-j 6` (8 min) were timed; the `-j 5` in the first row is a guess
+(a one-case run has too few runs to use it), and `-j 9` is untested. The wrapper sets no `-j`.
 
 All child runs share your Claude rate limit. If runs fail or stall, drop `-j` by 1 or 2;
 a burst of sessions started close together can also throttle briefly.

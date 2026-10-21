@@ -52,9 +52,10 @@ The shared parser rejects, with the offending key or entry in the message:
 - **Grant set** of a case: its entries, de-duplicated and sorted. Two cases have
   *identical grants* when their grant sets are equal; a case with no entry has the empty
   set.
-- **Run group**: all cases sharing one grant set. The wrapper makes one run per group,
-  selecting its cases with `--case <glob>` (a glob per case name; the CLI's `--help`
-  lists the flag). Each group runs under exactly its own grants, never a union.
+- **Run group**: all cases sharing one grant set. The wrapper does not batch a group: the
+  CLI's `--case` takes one glob, so it makes one CLI invocation per case, each under
+  exactly that case's grants, never a union. (Cases with identical grants could share a
+  run; the wrapper does not do this.)
 - The lint checks each case against its own grant set: EVAL004 flags an `allowed_tools`
   entry in the five tools with no matching grant, and EVAL005 flags a `tool_used` grader
   whose tool is not granted.
@@ -74,15 +75,14 @@ grants:
     - "Bash(npx --yes cowsay@latest *)"
 ```
 
-The two cases have different grant sets, so the wrapper makes two runs:
+The wrapper makes one invocation per case, so these two cases run separately:
 
 ```
 claude plugin eval plugins/fetch-execute-guide --case fetch-execute-asks-first --allow-tools "Bash(npx *)"
 claude plugin eval plugins/fetch-execute-guide --case fetch-execute-runs-with-permission --allow-tools "Bash(npx --yes cowsay@latest *)"
 ```
 
-Had both cases been granted `Bash(npx *)`, they would share one run with
-`--case "fetch-execute-*"`. Running them together under a union would let
+Running them together under a union (one `--allow-tools` for both) would let
 `fetch-execute-asks-first` execute `npx --yes cowsay@latest`, which that case exists to
 forbid.
 

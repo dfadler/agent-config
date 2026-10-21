@@ -17,7 +17,7 @@ checks what a script can; the rest needs a paid run.
 
 | Component | Role |
 |---|---|
-| [`scripts/ts/lint/`](scripts/ts/lint/cli.ts) | The single source of the rules (EVAL001 to EVAL021, `--list-rules`). Free, no model calls. Everything else calls it. |
+| [`scripts/ts/lint/`](scripts/ts/lint/cli.ts) | The single source of the rules (`--list-rules` prints every rule; [what each means](docs/lint-rules.md#rules)). Free, no model calls. Everything else calls it. |
 | [`hooks/`](hooks/hooks.json) | PostToolUse hook on `Write\|Edit`: lints after Claude edits a file under a plugin's eval directory and reports findings back as context. Report only, always exits 0, no-ops elsewhere and under `tests/`. |
 | [`hooks/` Stop](hooks/scripts/eval-gap-on-stop.sh) | Blocks a stop once when a plugin's `skills/` or `agents/` changed (vs `main`) with no change under its eval directory. The reason asks for updated cases and a before/after score comparison (baseline = newest `evals/results/` directory), or a one-line why-not. The retry passes, so it never loops. |
 | [`skills/author-cases`](skills/author-cases/SKILL.md) | Writing cases: graders (free first), mocks, fixtures, should-fire and should-not-fire prompts. |
@@ -40,17 +40,20 @@ node plugins/eval-authoring/scripts/ts/run-evals/run-evals.ts --tier quick --dry
 node plugins/eval-authoring/scripts/ts/diagnose/diagnose.ts <results-dir>/aggregate-result.json
 ```
 
-Every script takes `--help` (flags, output, exit codes). CI today runs only the free lint
-(`pnpm run lint-plugin-evals`); a gate on paid runs is an open investigation in
-[#436](https://github.com/dfadler/agent-config/issues/436), not a finished recipe.
+Every script takes `--help` (flags, output, exit codes). CI runs the free lint on every
+PR (`pnpm run lint-plugin-evals`). Paid runs are a separate, non-gating workflow
+(`.github/workflows/plugin-evals.yml`: manual only, never on `pull_request`; the weekly run is a
+local scheduled task);
+design in [plugin-eval-ci.md](../../docs/plugin-eval-ci.md).
 
 Stable-signal checklist: explicit PASS and FAIL conditions in `llm` criteria, free graders
 first, repeated runs agree; split judge votes in `report.html` mean an unstable rubric.
 
 A case cannot grant itself `Bash`, `Write`, `Edit`, `WebFetch` or `WebSearch`; the operator
 passes `--allow-tools`, which applies to the whole run. Record each case's grant in
-`evals/grants.yaml` (see the [format](docs/grants-format.md)); the wrapper then makes one run
-per distinct grant set so a narrow case never inherits a broader grant.
+`evals/grants.yaml` (see the [format](docs/grants-format.md)); the wrapper then makes one CLI
+invocation per case, each under only its own grants, so a narrow case never inherits a
+broader grant.
 
 Cost: a run is cases x runs x arms agent runs plus three judge calls per `llm` or `baseline`
 grader per run. `quick` runs only cases tagged `quick` (free graders), once, plugin arm only;
