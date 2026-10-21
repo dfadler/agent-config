@@ -1,6 +1,6 @@
 ---
 name: run-evals
-description: Run a plugin's `claude plugin eval` cases at a cost tier. Paid; needs an explicit request to run (or EVAL_ALLOW_AGENT_RUNS=1). Not for writing cases (author-cases) or explaining a score (diagnose-scores).
+description: Run a plugin's `claude plugin eval` cases at a cost tier, and answer questions about running them - tiers, cost ceilings, concurrency (`-j`), speed, CI, exit codes. Paid; needs an explicit request to run (or EVAL_ALLOW_AGENT_RUNS=1). Not for writing cases (author-cases) or explaining a score (diagnose-scores).
 argument-hint: "<plugin-path> [quick|standard|thorough]"
 allowed-tools: Bash(node ${CLAUDE_SKILL_DIR}/../../scripts/ts/lint/cli.ts *)
 ---
