@@ -39,8 +39,9 @@ it, do not rebuild any of that.
      while iterating on a case.
    - `standard` (default): every case, 3 runs, with and without the plugin. Use before
      merging a change to cases or to the plugin.
-   - `thorough`: every case, 5 runs. Use when a `standard` verdict looks noisy, or
-     before a release.
+   - `thorough`: every case, 5 runs. Use before a release, or to back a delta claim. A
+     noisy `standard` verdict is better answered with more cases than more runs; read the
+     replies before paying for `thorough`.
 
    If the user named no tier, use `standard`, and say so.
 2. **Lint first** (free, no model calls):
