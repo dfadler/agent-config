@@ -152,6 +152,9 @@ export interface SummaryInput {
   }[];
 }
 
+/** Below this many cases a suite's delta is too noisy to call (see author-cases guidance). */
+export const DELTA_CASE_FLOOR = 20;
+
 const fmt = (n: number | undefined): string => (n === undefined ? "-" : n.toFixed(2));
 const cell = (s: string): string => s.replace(/\|/g, "\\|");
 
@@ -161,6 +164,7 @@ export const renderSummary = (s: SummaryInput): string => {
   const unfired = s.cases.flatMap((c) =>
     c.row !== undefined && c.row.skillMissed > 0 ? [{ caseName: c.caseName, row: c.row }] : [],
   );
+  const hasDelta = s.cases.some((c) => c.row?.delta !== undefined);
   return [
     "## Eval results",
     "",
@@ -173,6 +177,9 @@ export const renderSummary = (s: SummaryInput): string => {
         `| ${cell(c.caseName)} | ${fmt(c.row?.with)} | ${fmt(c.row?.without)} | ${fmt(c.row?.delta)} | ${String(c.exit)}${c.row === undefined ? " (no readable result)" : ""} |`,
     ),
     ...s.unstarted.map((n) => `| ${cell(n)} | not run | | | |`),
+    ...(hasDelta && s.cases.length + s.unstarted.length < DELTA_CASE_FLOOR
+      ? ["", `Delta not significant below ${String(DELTA_CASE_FLOOR)} cases (this suite has ${String(s.cases.length + s.unstarted.length)}).`]
+      : []),
     ...(unfired.length === 0
       ? []
       : [

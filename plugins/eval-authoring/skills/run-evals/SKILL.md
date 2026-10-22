@@ -78,7 +78,9 @@ it, do not rebuild any of that.
    edit`. It is off by default, refuses `--dry-run`, and `--yes` skips only the question.
 5. **Relay the result.** The run ends with a Markdown summary (per-case with, without and
    delta, tier, models, cost, the command, and the redacted, truncated reply of each
-   failed grader); paste it under an "Eval results" heading. Report the wrapper's output and exit code without
+   failed grader; plus a "Delta not significant below 20 cases" footer when the suite is
+   smaller than that, which you keep next to any delta you quote); paste it under an
+   "Eval results" heading. Report the wrapper's output and exit code without
    reinterpreting; relay its preflight errors verbatim. Exit codes:
    - `0`: passed, results trustworthy.
    - `1`: below threshold, load failure, or no cases.
