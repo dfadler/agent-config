@@ -311,3 +311,16 @@ describe("--pr", () => {
     expect(await main(argv(s), deps(s))).toBe(EXIT_PARTIAL);
   });
 });
+
+describe("delta footer", () => {
+  const render = (n: number) =>
+    renderSummary({
+      plugin: "p", tier: "t", model: "m", judgeModel: "j", spentUsd: 0, ceilingUsd: 1,
+      exit: 0, command: "c", unstarted: [],
+      cases: Array.from({ length: n }, (_, i) => ({ caseName: `c${String(i)}`, exit: 0, row: caseRow(`c${String(i)}`, failing(`c${String(i)}`)) })),
+    });
+  it("warns below the case floor and stays quiet at it", () => {
+    expect(render(2)).toContain("Delta not significant below 20 cases (this suite has 2).");
+    expect(render(20)).not.toContain("Delta not significant");
+  });
+});
