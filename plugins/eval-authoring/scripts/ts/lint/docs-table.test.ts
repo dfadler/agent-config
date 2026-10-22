@@ -1,0 +1,19 @@
+/** #765: the rule table in docs/lint-rules.md must list exactly the rules `--list-rules` prints. */
+import { readFileSync } from "node:fs";
+import { join } from "node:path";
+import { expect, it } from "vitest";
+import { mainWithDiscoveredRules } from "./cli.ts";
+
+const ids = (text: string, re: RegExp): string[] =>
+  [...new Set([...text.matchAll(re)].map((m) => m[1] as string))].sort();
+
+it("docs/lint-rules.md table matches --list-rules", async () => {
+  const doc = readFileSync(
+    join(import.meta.dirname, "..", "..", "..", "docs", "lint-rules.md"),
+    "utf8",
+  );
+  const documented = ids(doc, /^\| (EVAL\d+) \|/gm);
+  const listed = ids((await mainWithDiscoveredRules(["--list-rules"])).stdout, /^(EVAL\d+)\s/gm);
+  expect(listed.length).toBeGreaterThan(0);
+  expect(documented).toEqual(listed);
+});
