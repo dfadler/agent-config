@@ -48,6 +48,13 @@ prompt is even reached, whether the action should be attempted at all, and
 gives the model (and the user, when the prompt appears) a shared standard
 for what "yes" actually means.
 
+## Protected-remote hook
+
+The plugin also ships a PreToolUse `Bash` hook (`scripts/ts/protected-remote-hook.ts`)
+that asks before `gh pr create`, `gh issue create`, `gh issue comment` or `git push`
+targets a repo whose owner is not the authenticated `gh` user, e.g. a fork's parent.
+Add orgs with `GH_PUBLISH_OWNERS=acme,other`; skip it with `GH_PUBLISH_GUARD=off`.
+
 ## What counts as a publish action
 
 - Creating an issue or PR (`gh issue create`, `gh pr create`, or the
