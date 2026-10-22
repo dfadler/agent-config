@@ -311,3 +311,18 @@ describe("--pr", () => {
     expect(await main(argv(s), deps(s))).toBe(EXIT_PARTIAL);
   });
 });
+
+describe("delta footer", () => {
+  const mk = (n: number) =>
+    renderSummary({
+      plugin: "p", tier: "t", model: "m", judgeModel: "j", spentUsd: 0, ceilingUsd: 1, exit: 0, command: "c", unstarted: [],
+      cases: Array.from({ length: n }, (_, i) => ({
+        caseName: `c${String(i)}`, exit: 0,
+        row: { caseName: `c${String(i)}`, with: 1, without: 0, delta: 1, failed: [], skillMissed: 0, skillRuns: 0 },
+      })),
+    });
+  it("appears below 20 cases and not at 20", () => {
+    expect(mk(19)).toContain("Delta not significant below 20 cases (this run has 19)");
+    expect(mk(20)).not.toContain("Delta not significant");
+  });
+});

@@ -77,7 +77,7 @@ it, do not rebuild any of that.
    marked block, asks, then replaces the `run-evals` block in the PR body with `gh pr
    edit`. It is off by default, refuses `--dry-run`, and `--yes` skips only the question.
 5. **Relay the result.** The run ends with a Markdown summary (per-case with, without and
-   delta, tier, models, cost, the command, and the redacted, truncated reply of each
+   delta (plus a "Delta not significant below 20 cases" line when the run has fewer than 20), tier, models, cost, the command, and the redacted, truncated reply of each
    failed grader); paste it under an "Eval results" heading. Report the wrapper's output and exit code without
    reinterpreting; relay its preflight errors verbatim. Exit codes:
    - `0`: passed, results trustworthy.
