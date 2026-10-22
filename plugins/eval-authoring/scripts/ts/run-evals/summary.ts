@@ -173,6 +173,9 @@ export const renderSummary = (s: SummaryInput): string => {
         `| ${cell(c.caseName)} | ${fmt(c.row?.with)} | ${fmt(c.row?.without)} | ${fmt(c.row?.delta)} | ${String(c.exit)}${c.row === undefined ? " (no readable result)" : ""} |`,
     ),
     ...s.unstarted.map((n) => `| ${cell(n)} | not run | | | |`),
+    ...(s.tier === "thorough"
+      ? []
+      : ["", `Delta not measured at tier \`${s.tier}\`: report arm scores only, not a delta, in a PR (even marked preliminary). Re-run at \`thorough\` for a delta.`]),
     ...(unfired.length === 0
       ? []
       : [
