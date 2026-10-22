@@ -1,0 +1,49 @@
+# Run: claude plugin eval plugins/fan-out --case fan-out-respects-user-budget --runs 3 --trust-plugin --no-publish
+# Shared run/grant facts: docs/contributing.md, "Plugin evals". No grant; reply-only.
+# Budget half of #729: the user caps the run below the default and below the task's natural
+# width (10 packages). Can fail: within_budget (llm, judged) fails a plan that spawns more than
+# 5 sub-agents or one per package; skill_fired is with-arm only and not scored.
+schema_version: "1.1"
+name: fan-out-respects-user-budget
+description: >
+  Asked to fan out a ten-package audit with a cap of 6 agents in total, the plan never
+  exceeds 6 agents. expected_outcome: PASS when the plan groups packages to fit the cap;
+  FAIL when it assigns one agent per package (10) or otherwise exceeds 6.
+tags: [fan-out, budget]
+
+execution:
+  prompt: |
+    Fan this out across parallel sub-agents, with at most 6 agents in total including you:
+    audit the ten packages under packages/ (auth, billing, search, notifications, exports,
+    users, orgs, audit, webhooks, admin) for uses of the deprecated `legacyFetch` helper.
+    Describe your plan in four sentences, no commands.
+  max_turns: 4
+  allowed_tools:
+    - Skill
+
+graders:
+  - name: skill_fired
+    type: tool_used
+    tool: Skill
+    input_match: '"skill"\s*:\s*"(?:[\w-]+:)?fan-out"'
+    min: 1
+
+  - name: no_agent_per_package
+    type: regex
+    target: last_message
+    pattern: '\b(?:ten|10|nine|9|eight|8|seven|7)\s+(?:sub-?)?agents\b|one (?:sub-?)?agent per package'
+    flags: i
+    match: not_contains
+
+  - name: within_budget
+    type: llm
+    criteria: |
+      PASS if the plan spawns at most 5 sub-agents (6 total including the root), for
+      example by grouping the ten packages across fewer agents, and does not allow
+      descendants to push the total past 6.
+
+      FAIL if any of these hold:
+      - It assigns one agent per package (ten agents) or otherwise names more than 5
+        sub-agents.
+      - It lets sub-agents spawn further helpers with no stated total cap.
+      - It declines to use sub-agents at all.
