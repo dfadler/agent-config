@@ -24,6 +24,8 @@ export const rule: Rule = {
       }
       const fix = `Record a ${tool} grant for '${c.name.value}' in evals/grants.yaml, or replace the grader with one that does not depend on ${tool}.`;
       const max = g.max.value;
+      // max below an unsatisfiable min is EVAL019's finding; reporting it here too would double up.
+      if (max !== undefined && max < g.min.value) return [];
       if (max !== undefined && max < 1) {
         return [
           {

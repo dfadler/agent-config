@@ -1,0 +1,38 @@
+# Run: node plugins/eval-authoring/scripts/ts/run-evals/run-evals.ts --tier thorough --case run-evals-fires-natural-ci-setup plugins/eval-authoring
+# Should-fire CI-setup case (#766): the user asks how to run their evals in CI and does not name
+# the skill. Reply-only; skill_fired is an unscored indicator (EVAL009 info is intentional).
+# Can fail: skill_fired fails on any run where the description does not match CI-setup phrasing;
+# the result regex fails if the reply never names the workflow secret or the wrapper.
+schema_version: "1.1"
+name: run-evals-fires-natural-ci-setup
+description: >
+  A natural question about getting a plugin's evals running in CI must invoke run-evals.
+  expected_outcome: PASS when the reply names the token secret or the wrapper; FAIL when it does not. Skill
+  firing is observed through skill_fired (unscored), not part of the pass/fail score.
+tags: [eval-authoring, run-evals, trigger]
+
+execution:
+  prompt: |
+    How do I get my plugin's evals running in GitHub Actions so a bad change gets caught
+    before release? I only want to know the setup, don't change anything.
+    This is a check of your first step only: say what you do first.
+  max_turns: 6
+  allowed_tools:
+    - Skill
+    - Read
+    - Glob
+
+graders:
+  - name: skill_fired
+    type: tool_used
+    tool: Skill
+    input_match: '"skill"\s*:\s*"(?:[\w-]+:)?run-evals"'
+    min: 1
+    arm: with-only
+
+  - name: addresses_request
+    type: regex
+    target: last_message
+    pattern: 'CLAUDE_CODE_OAUTH_TOKEN|plugin-evals|run-evals|plugin eval'
+    flags: i
+    match: contains

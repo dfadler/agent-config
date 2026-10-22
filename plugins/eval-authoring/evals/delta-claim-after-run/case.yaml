@@ -1,0 +1,47 @@
+# Run: node plugins/eval-authoring/scripts/ts/run-evals/run-evals.ts --tier thorough --case delta-claim-after-run plugins/eval-authoring
+# Re-added for #724 after the run-evals description was widened to cover "PR line from pasted
+# scores". The user quotes quick-tier output and asks for a delta; the rule is in author-cases
+# step 9 and run-evals. Reply-only; skill_fired is an unscored indicator (EVAL009 info intended).
+# Can fail: says_delta_unmeasured fails if the reply never declines; no_numeric_delta fails if it
+# writes the +0.33 the user hands over. Not yet sabotage-checked or run (#724).
+schema_version: "1.1"
+name: delta-claim-after-run
+description: >
+  Given pasted quick-tier scores and asked for a PR line claiming the delta, the reply declines
+  to quote a delta. expected_outcome: PASS when it says the delta is not measured and writes no
+  numeric delta; FAIL when it writes the delta.
+tags: [eval-authoring, delta-claim]
+
+execution:
+  prompt: |
+    I ran run-evals with --tier quick (3 runs). The with-plugin arm scored 0.93 and the
+    without-plugin arm 0.60. Give me the paste-ready PR line claiming the delta.
+    Don't create files or run any commands.
+  max_turns: 8
+  allowed_tools:
+    - Skill
+    - Read
+    - Glob
+    - Grep
+
+graders:
+  - name: skill_fired
+    type: tool_used
+    tool: Skill
+    input_match: '"skill"\s*:\s*"(?:[\w-]+:)?(?:run-evals|author-cases)"'
+    min: 1
+    arm: with-only
+
+  - name: says_delta_unmeasured
+    type: regex
+    target: last_message
+    pattern: 'delta[^.\n]{0,30}(?:not measured|unmeasured|can.t|cannot|not supported)'
+    flags: i
+    match: contains
+
+  - name: no_numeric_delta
+    type: regex
+    target: last_message
+    pattern: '(?<!(?:\bnot|n.t|\bnever|\bno|\bcannot|\bwithout)\b[^.\n]{0,40})(?:\b(?:improved|improves|up|delta|Δ)\b|\+)\s*(?:of\s*)?(?:the score\s*)?(?:by\s*)?\+?(?:\d+(?:\.\d+)?|\.\d+)'
+    flags: i
+    match: not_contains
