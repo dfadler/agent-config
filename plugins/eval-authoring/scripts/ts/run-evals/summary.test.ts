@@ -150,6 +150,19 @@ describe("skill_fired", () => {
   });
 });
 
+describe("delta note", () => {
+  const md = (tier: string): string =>
+    renderSummary({
+      plugin: "p", tier, model: "m", judgeModel: "j", spentUsd: 0, ceilingUsd: 1,
+      exit: 0, command: "c", unstarted: [], cases: [],
+    });
+  it("says the delta is not measured below thorough, and only there", () => {
+    expect(md("quick")).toContain("Delta not measured at tier `quick`");
+    expect(md("standard")).toContain("Delta not measured at tier `standard`");
+    expect(md("thorough")).not.toContain("Delta not measured");
+  });
+});
+
 describe("withBlock", () => {
   const block = renderBlock("NEW");
   it("appends when there is no block, and replaces in place when there is", () => {
