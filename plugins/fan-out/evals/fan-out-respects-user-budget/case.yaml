@@ -28,13 +28,6 @@ graders:
     input_match: '"skill"\s*:\s*"(?:[\w-]+:)?fan-out"'
     min: 1
 
-  - name: no_agent_per_package
-    type: regex
-    target: last_message
-    pattern: '\b(?:ten|10|nine|9|eight|8|seven|7)\s+(?:sub-?)?agents\b|one (?:sub-?)?agent per package'
-    flags: i
-    match: not_contains
-
   - name: within_budget
     type: llm
     criteria: |

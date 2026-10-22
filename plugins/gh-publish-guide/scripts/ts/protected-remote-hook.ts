@@ -19,6 +19,8 @@ const GIT_PUSH = /^git\s+(?:-C\s+\S+\s+)?push\b/;
 export const ownerOf = (url: string): string | undefined =>
   /github\.com[:/]([^/\s]+)\/[^/\s]+/.exec(url.trim())?.[1];
 
+const gitIn = (dir?: string): string[] => (dir === undefined ? [] : ["-C", dir]);
+
 const words = (s: string): string[] => s.split(/\s+/).filter((w) => w !== "");
 
 /** The `-R`/`--repo` value in a gh command, as `owner/name`. */
@@ -37,16 +39,21 @@ export const checkCommand = (
   if (/^(1|true|yes)$/.test(env["GH_PROTECTED_REMOTE_OVERRIDE"] ?? "")) {
     return undefined;
   }
-  const originUrl = run("git", ["remote", "get-url", "origin"]);
-  const origin = originUrl.status === 0 ? ownerOf(originUrl.stdout) : undefined;
-  if (origin === undefined) return undefined; // no origin: no baseline to compare with
-  const allowed = new Set([
-    origin.toLowerCase(),
-    ...(env["GH_PROTECTED_REMOTE_ALLOW"] ?? "")
-      .split(",")
-      .map((o) => o.trim().toLowerCase())
-      .filter((o) => o !== ""),
-  ]);
+  const extra = (env["GH_PROTECTED_REMOTE_ALLOW"] ?? "")
+    .split(",")
+    .map((o) => o.trim().toLowerCase())
+    .filter((o) => o !== "");
+  // Owners we may publish to: the owner of `origin` in `dir` (the hook's cwd
+  // when undefined) plus the env allowlist. Undefined: no baseline to compare with.
+  const allowedIn = (dir?: string): Set<string> | undefined => {
+    const u = run("git", [...gitIn(dir), "remote", "get-url", "origin"]);
+    const origin = u.status === 0 ? ownerOf(u.stdout) : undefined;
+    return origin === undefined
+      ? undefined
+      : new Set([origin.toLowerCase(), ...extra]);
+  };
+  let allowed = allowedIn();
+  if (allowed === undefined) return undefined;
   // ponytail: splits on ; & | only, so a command hidden in a subshell is not seen.
   for (const part of command.split(/&&|\|\||;|\|/).map((p) => p.trim())) {
     const w = words(part);
@@ -70,12 +77,29 @@ export const checkCommand = (
         target = v.status === 0 ? v.stdout.trim() : undefined;
       }
     } else if (GIT_PUSH.test(part)) {
-      const args = w
-        .slice(w.indexOf("push") + 1)
-        .filter((a) => !a.startsWith("-"));
-      const remote = args[0] ?? "origin";
+      const dir = w[1] === "-C" ? w[2] : undefined;
+      const a = allowedIn(dir);
+      if (a === undefined) continue;
+      allowed = a;
+      const rest = w.slice(w.indexOf("push") + 1);
+      const i = rest.indexOf("--repo");
+      const repo =
+        i !== -1
+          ? rest[i + 1]
+          : rest.find((x) => x.startsWith("--repo="))?.slice(7);
+      let remote = repo ?? rest.find((x) => !x.startsWith("-"));
+      if (remote === undefined) {
+        // Bare push: the branch's push target, else origin.
+        const pt = run("git", [
+          ...gitIn(dir),
+          "rev-parse",
+          "--abbrev-ref",
+          "@{push}",
+        ]);
+        remote = (pt.status === 0 ? pt.stdout.trim().split("/")[0] : "") || "origin";
+      }
       const u = /^[\w.-]+$/.test(remote)
-        ? run("git", ["remote", "get-url", "--push", remote])
+        ? run("git", [...gitIn(dir), "remote", "get-url", "--push", remote])
         : { status: 0, stdout: remote };
       target = u.status === 0 ? ownerOf(u.stdout) : undefined;
     } else continue;

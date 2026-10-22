@@ -55,4 +55,21 @@ describe("checkPlugin", () => {
     expect(exitCode(r, false)).toBe(0);
     expect(exitCode(r, true)).toBe(1);
   });
+  it("reports a regex-only case without header replies as missing", () => {
+    addCase("r", "", REGEX);
+    const r = checkPlugin(root);
+    expect(r[0]?.status).toBe("missing");
+    expect(exitCode(r, true)).toBe(1);
+  });
+  it("throws when the plugin has no cases", () => {
+    expect(() => checkPlugin(root)).toThrow(/no eval cases/);
+  });
+  it("reads the header of a prompt.md case", () => {
+    const dir = join(root, "evals", "pm");
+    mkdirSync(join(dir, "graders"), { recursive: true });
+    writeFileSync(join(dir, "prompt.md"), "---\n# good-reply: hi\n# bad-reply: nope\nname: pm\n---\nhi\n");
+    writeFileSync(join(dir, "graders", "g.md"), "---\nname: says_hi\ntype: regex\npattern: 'hi'\n---\n");
+    const r = checkPlugin(root);
+    expect(r[0]?.status).toBe("ok");
+  });
 });

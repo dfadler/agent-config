@@ -161,6 +161,17 @@ describe("delta note", () => {
     expect(md("standard")).toContain("Delta not measured at tier `standard`");
     expect(md("thorough")).not.toContain("Delta not measured");
   });
+  it("hides delta cells below thorough and shows them at thorough", () => {
+    const row = caseRow("c", failing("c"));
+    const cells = (tier: string): string =>
+      renderSummary({
+        plugin: "p", tier, model: "m", judgeModel: "j", spentUsd: 0, ceilingUsd: 1,
+        exit: 0, command: "c", unstarted: [], cases: [{ caseName: "c", exit: 0, row }],
+      }).split("\n").find((l) => l.startsWith("| c |")) ?? "";
+    expect(row?.delta).toBeDefined();
+    expect(cells("standard")).toContain(`| ${(row?.without ?? 0).toFixed(2)} | - |`);
+    expect(cells("thorough")).not.toContain("| - |");
+  });
 });
 
 describe("withBlock", () => {
@@ -212,7 +223,7 @@ describe("printed summary", () => {
     await main([s.root, "--case", "beta"], deps(s));
     const text = s.out.join("");
     expect(text).toContain("## Eval results");
-    expect(text).toContain("| beta | 0.50 | 0.25 | 0.25 | 0 |");
+    expect(text).toContain("| beta | 0.50 | 0.25 | - | 0 |");
     expect(text).toContain("tier `standard`");
     expect(text).toContain("Cost $0.2500");
     expect(text).toMatch(/run-evals\.ts \S+ --case beta/);
@@ -328,7 +339,7 @@ describe("--pr", () => {
 describe("delta footer", () => {
   const render = (n: number) =>
     renderSummary({
-      plugin: "p", tier: "t", model: "m", judgeModel: "j", spentUsd: 0, ceilingUsd: 1,
+      plugin: "p", tier: "thorough", model: "m", judgeModel: "j", spentUsd: 0, ceilingUsd: 1,
       exit: 0, command: "c", unstarted: [],
       cases: Array.from({ length: n }, (_, i) => ({ caseName: `c${String(i)}`, exit: 0, row: caseRow(`c${String(i)}`, failing(`c${String(i)}`)) })),
     });

@@ -12,6 +12,9 @@ const urls: Record<string, string> = {
 };
 const run: Run = (cmd, args) => {
   if (cmd === "git") {
+    if (args.includes("@{push}")) {
+      return args.includes("/cfg") ? { status: 0, stdout: "upstream/main\n" } : { status: 1, stdout: "" };
+    }
     return { status: 0, stdout: urls[args.at(-1) ?? ""] ?? "" };
   }
   // gh repo view: the parent for pr create, the user's own repo otherwise
@@ -44,6 +47,11 @@ describe("checkCommand", () => {
     expect(checkCommand("git push upstream main", run, {})).toMatch(/'them'/);
     expect(checkCommand("git push -u origin main", run, {})).toBeUndefined();
     expect(checkCommand("git push", run, {})).toBeUndefined();
+  });
+  it("follows --repo, -C and a configured push target", () => {
+    expect(checkCommand("git push --repo=upstream main", run, {})).toMatch(/'them'/);
+    expect(checkCommand("git push --repo upstream", run, {})).toMatch(/'them'/);
+    expect(checkCommand("git -C /cfg push", run, {})).toMatch(/'them'/);
   });
   it("sees a chained command", () => {
     expect(checkCommand("git status && git push upstream x", run, {})).toMatch(

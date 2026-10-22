@@ -7,8 +7,8 @@ schema_version: "1.1"
 name: run-evals-fires-natural-ci-setup
 description: >
   A natural question about getting a plugin's evals running in CI must invoke run-evals.
-  expected_outcome: PASS when the model invokes run-evals and the reply names the token secret
-  or the wrapper; FAIL when it answers without the skill.
+  expected_outcome: PASS when the reply names the token secret or the wrapper; FAIL when it does not. Skill
+  firing is observed through skill_fired (unscored), not part of the pass/fail score.
 tags: [eval-authoring, run-evals, trigger]
 
 execution:

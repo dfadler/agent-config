@@ -11,7 +11,7 @@
  * Every regex grader must pass the good reply and at least one must fail the
  * bad one. `llm` graders cannot be run offline: a case with only those is
  * reported "unchecked". A case with an `llm` grader and no header replies is
- * reported "missing"; that is an error only with --require.
+ * reported "missing" (so is a regex-only case); that is an error only with --require.
  */
 import { readFileSync } from "node:fs";
 import { readSuite, type EvalCase, type RegexGrader } from "./parser/index.ts";
@@ -25,7 +25,10 @@ export interface Replies {
 export const headerReplies = (yaml: string): Replies => {
   const found = new Map<string, string[]>();
   let current: string[] | undefined;
-  for (const line of yaml.split("\n")) {
+  const lines = yaml.split("\n");
+  // prompt.md cases keep the header as comments just inside the `---` frontmatter.
+  if (lines[0]?.trim() === "---") lines.shift();
+  for (const line of lines) {
     if (!line.startsWith("#")) break;
     const m = /^# (good|bad)-reply:\s?(.*)$/.exec(line);
     if (m !== null) {
@@ -65,12 +68,13 @@ const regexGraders = (c: EvalCase): readonly RegexGrader[] =>
 
 export const checkCase = (c: EvalCase, replies: Replies): CaseReport => {
   const name = c.dirName;
-  const hasLlm = c.graders.some((g) => g.type === "llm" || g.type === "baseline");
+  const checkable =
+    regexGraders(c).length > 0 || c.graders.some((g) => g.type === "llm" || g.type === "baseline");
   const { good, bad } = replies;
   if (good === undefined && bad === undefined) {
-    return hasLlm
+    return checkable
       ? { name, status: "missing", detail: "no good-reply/bad-reply in the header" }
-      : { name, status: "skipped", detail: "no llm grader" };
+      : { name, status: "skipped", detail: "no llm or last_message regex grader" };
   }
   if (good === undefined || bad === undefined) {
     return { name, status: "missing", detail: `header lacks ${good === undefined ? "good" : "bad"}-reply` };
@@ -89,11 +93,17 @@ export const checkCase = (c: EvalCase, replies: Replies): CaseReport => {
   return { name, status: "ok", detail: "good passes, bad fails" };
 };
 
-export const checkPlugin = (pluginRoot: string): readonly CaseReport[] =>
-  readSuite(pluginRoot).cases.map((c) => {
-    const file = c.caseYamlFile;
+export const checkPlugin = (pluginRoot: string): readonly CaseReport[] => {
+  const suite = readSuite(pluginRoot);
+  if (suite.cases.length === 0) {
+    const why = suite.issues.map((i) => i.message).join("; ");
+    throw new Error(`no eval cases found under ${pluginRoot}${why === "" ? "" : `: ${why}`}`);
+  }
+  return suite.cases.map((c) => {
+    const file = c.caseYamlFile ?? c.promptFile;
     return checkCase(c, headerReplies(file === undefined ? "" : readFileSync(file, "utf8")));
   });
+};
 
 /** Exit 1 on a `fail`, or on `missing` when `require` is set. */
 export const exitCode = (reports: readonly CaseReport[], require: boolean): number =>
@@ -103,7 +113,13 @@ if (import.meta.main) {
   const args = process.argv.slice(2);
   const require = args.includes("--require");
   const root = args.find((a) => !a.startsWith("--")) ?? ".";
-  const reports = checkPlugin(root);
+  let reports: readonly CaseReport[];
+  try {
+    reports = checkPlugin(root);
+  } catch (e) {
+    process.stderr.write(`${e instanceof Error ? e.message : String(e)}\n`);
+    process.exit(2);
+  }
   for (const r of reports) {
     if (r.status !== "skipped") process.stdout.write(`${r.status.padEnd(9)} ${r.name}: ${r.detail}\n`);
   }

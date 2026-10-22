@@ -3,7 +3,7 @@
 # Should-not-fire half of the boundary (#729): one bounded question with no parallelizable parts.
 # Regression guard: a baseline also answers directly, so the delta is 0 by design.
 # Can fail: no_fan_out_fired fails if the skill over-triggers on a single question;
-# answers_directly fails a reply that never gives the command.
+# answers_directly fails a reply that never gives the command with main as the merge target.
 schema_version: "1.1"
 name: fan-out-stays-quiet-on-single-question
 description: >
@@ -33,7 +33,7 @@ graders:
   - name: answers_directly
     type: regex
     target: last_message
-    pattern: 'git\s+branch\s+.*--merged'
+    pattern: 'git\s+branch\s+.*--merged[\s=]+(?:origin/)?main\b'
     match: contains
     arm: both
     weight: 0.5
