@@ -1,0 +1,39 @@
+# Run: claude plugin eval plugins/fan-out --case fan-out-stays-quiet-on-single-question --runs 3 --trust-plugin --no-publish
+# Shared run/grant facts: docs/contributing.md, "Plugin evals". No grant; reply-only.
+# Should-not-fire half of the boundary (#729): one bounded question with no parallelizable parts.
+# Regression guard: a baseline also answers directly, so the delta is 0 by design.
+# Can fail: no_fan_out_fired fails if the skill over-triggers on a single question;
+# answers_directly fails a reply that never gives the command.
+schema_version: "1.1"
+name: fan-out-stays-quiet-on-single-question
+description: >
+  A single factual question is not parallelizable, so fan-out must not fire. expected_outcome:
+  PASS when the skill is not invoked and the reply answers directly; FAIL when the skill is
+  invoked. Regression guard: Delta 0 by design.
+tags: [fan-out, trigger, quick]
+
+execution:
+  prompt: |
+    What git command shows which branches are already merged into main? Answer with the
+    command in one bash code block and no other text. Don't run anything.
+  max_turns: 4
+  allowed_tools:
+    - Skill
+
+graders:
+  - name: no_fan_out_fired
+    type: tool_used
+    tool: Skill
+    input_match: '"skill"\s*:\s*"(?:[\w-]+:)?fan-out"'
+    min: 0
+    max: 0
+    arm: both
+
+  # Completion check, not a skill property (tautological for a baseline).
+  - name: answers_directly
+    type: regex
+    target: last_message
+    pattern: 'git\s+branch\s+.*--merged'
+    match: contains
+    arm: both
+    weight: 0.5
