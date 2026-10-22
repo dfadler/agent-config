@@ -1,6 +1,6 @@
 ---
 name: run-evals
-description: Run a plugin's `claude plugin eval` cases at a cost tier, and answer questions about running them - tiers, cost ceilings, concurrency (`-j`), speed, CI, exit codes. Paid; needs an explicit request to run (or EVAL_ALLOW_AGENT_RUNS=1). Not for writing cases (author-cases) or explaining a score (diagnose-scores).
+description: Run a plugin's `claude plugin eval` cases at a cost tier, and answer questions about running them - tiers, cost ceilings, concurrency (`-j`), speed, setting up evals in CI, exit codes, and writing a PR line from pasted run-evals scores. Paid; needs an explicit request to run (or EVAL_ALLOW_AGENT_RUNS=1). Not for writing cases (author-cases) or explaining a score (diagnose-scores).
 argument-hint: "<plugin-path> [quick|standard|thorough]"
 allowed-tools: Bash(node ${CLAUDE_SKILL_DIR}/../../scripts/ts/lint/cli.ts *)
 ---
@@ -91,6 +91,11 @@ it, do not rebuild any of that.
      result that could not be read). Its scores are unreliable; never report it
      as a pass.
    - `20`: internal error. `130` and `143`: interrupted or terminated.
+
+**A PR line from pasted scores.** When the user quotes `quick` or 3-run (`standard`)
+scores and wants a delta in the PR, give the arm scores and write "delta not measured":
+no delta number, even marked preliminary. A delta needs a with-and-without comparison at
+`thorough`. The wrapper's summary says the same under its table.
 
 ## What the tier values mean
 
