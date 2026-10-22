@@ -78,8 +78,10 @@ draft them there: tell the user to commit the skill and start a fresh session, t
    happened ([graders](references/graders.md#sequence-claims)).
 5. **Write PASS and FAIL conditions** for any `llm` grader: `PASS if <observable thing>.`
    `FAIL if <observable thing>.` Concrete enough that two judges agree. Also put a
-   reference-good and a known-bad reply in the case header (a comment), and confirm by
-   reading that every reply-targeted grader (`regex`, `llm`) passes the first and at least one
+   reference-good and a known-bad reply in the case header (`# good-reply: ...` and
+   `# bad-reply: ...` comments; free offline check:
+   `node ${CLAUDE_SKILL_DIR}/../../scripts/ts/check-replies.ts <plugin-path>`, which runs the
+   `regex` graders on both), and confirm that every reply-targeted grader (`regex`, `llm`) passes the first and at least one
    fails the second; a grader that cannot fail the known-bad reply approves everything.
    Replies say nothing about `tool_used`, `tool_order` or `file_exists`: check those
    against a representative trace or artifact. See
