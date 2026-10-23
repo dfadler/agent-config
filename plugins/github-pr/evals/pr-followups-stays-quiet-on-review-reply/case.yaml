@@ -1,0 +1,28 @@
+# Run: claude plugin eval plugins/github-pr --case pr-followups-stays-quiet-on-review-reply --runs 3 --trust-plugin --no-publish
+# Shared run/grant facts: docs/contributing.md, "Plugin evals". No grant: Skill only.
+# Should-not-fire half: replying to a review thread is pr-comments' job, not pr-followups.
+# Can fail: the skill firing fails pr_followups_not_fired. Regression guard, Delta about 0.
+schema_version: "1.1"
+name: pr-followups-stays-quiet-on-review-reply
+description: >
+  A request to word a reply to a review comment must not invoke pr-followups.
+  expected_outcome: regression guard, Delta about 0 by design. PASS when pr-followups does
+  not fire; FAIL when it fires.
+tags: [pr-followups, trigger, quick]
+
+execution:
+  prompt: |
+    A reviewer wrote "please rename `d` to `delayMs`" on my PR and I did it in abc1234.
+    Write the one-line reply. Do not run commands or post anything.
+  max_turns: 4
+  allowed_tools:
+    - Skill
+
+graders:
+  - name: pr_followups_not_fired
+    type: tool_used
+    tool: Skill
+    input_match: '"skill"\s*:\s*"(?:[\w-]+:)?pr-followups"'
+    min: 0
+    max: 0
+    arm: both
