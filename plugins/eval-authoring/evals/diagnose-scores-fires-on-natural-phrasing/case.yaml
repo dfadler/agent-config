@@ -5,12 +5,13 @@
 # Sabotage check (2026-10-21): with a dead description the skill fired 0x in 5 of 5 runs but the old
 # grader (judge|rubric) still scored 1.00, because any model names the judge. The reply grader is now
 # the skill's own step 1 (it looks for aggregate-result.json), which a model without the skill does
-# not name. skill_fired stays an unscored indicator in a two-arm run.
+# not name. The pattern is the bare file name (2026-10-22: a verb-plus-name pattern missed 1 of 5
+# fired runs; the reply was not kept). Asking is not required for a trigger case. skill_fired stays an unscored indicator in a two-arm run.
 schema_version: "1.1"
 name: diagnose-scores-fires-on-natural-phrasing
 description: >
   Plain phrasing, no skill name or Delta. expected_outcome: PASS when the skill fires and the
-  reply asks for the aggregate-result.json file; FAIL otherwise.
+  reply names the aggregate-result.json file; FAIL otherwise.
 tags: [eval-authoring, diagnose-scores, trigger, quick]
 
 execution:
@@ -32,6 +33,6 @@ graders:
   - name: asks_for_result_file
     type: regex
     target: last_message
-    pattern: '(?:need|send|share|provide|paste|point|attach|give|where|which|path|location)[^.\n]{0,120}aggregate-result\.json|aggregate-result\.json[^.\n]{0,120}(?:path|share|provide|paste|send|attach|file you|from your)'
+    pattern: 'aggregate-result\.json'
     flags: i
     match: contains

@@ -48,13 +48,6 @@ prompt is even reached, whether the action should be attempted at all, and
 gives the model (and the user, when the prompt appears) a shared standard
 for what "yes" actually means.
 
-## Protected-remote hook
-
-The plugin also ships a PreToolUse `Bash` hook (`scripts/ts/protected-remote-hook.ts`)
-that asks before `gh pr create`, `gh issue create`, `gh issue comment` or `git push`
-targets a repo whose owner is not the authenticated `gh` user, e.g. a fork's parent.
-Add orgs with `GH_PUBLISH_OWNERS=acme,other`; skip it with `GH_PUBLISH_GUARD=off`.
-
 ## What counts as a publish action
 
 - Creating an issue or PR (`gh issue create`, `gh pr create`, or the
@@ -182,3 +175,11 @@ skill's documented flow performs on that PR/issue — a separate confirmation
 for each individual post it makes is not required. This does not extend to
 publish actions outside what the skill's own docs describe (e.g. opening a
 new issue is not covered by having invoked `pr-babysit`).
+
+## Protected-remote hook
+
+The plugin also ships a `PreToolUse` Bash hook (`scripts/ts/protected-remote-hook.ts`)
+that asks before `gh pr create`, `gh issue create`, `gh issue comment` or
+`git push` targets an owner other than `origin`'s (for example a fork's parent).
+It asks and never denies. Add trusted owners with `GH_PROTECTED_REMOTE_ALLOW`
+(comma-separated) or skip the check with `GH_PROTECTED_REMOTE_OVERRIDE=1`.

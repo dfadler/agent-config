@@ -13,7 +13,10 @@ description: >
   pr-comments should consume unresolvedThreads data handed to it in the
   pr-babysit snapshot shape instead of re-querying reviewThreads, and should
   leave a thread with needsAction false alone because its latest comment is
-  already the acting user's own reply.
+  already the acting user's own reply. expected_outcome: PASS when the supplied data is used
+  without a refetch and PRRT_bbb is left alone; FAIL otherwise. Regression guard, delta about
+  0 by design: the prompt hands over the data and says it is current, so a no-skill reply
+  also works from it (traced 2026-10-22, both arms 1.00).
 tags: [pr-comments, composition]
 
 execution:
@@ -73,7 +76,7 @@ graders:
     input_match: 'reviewThreads'
     min: 0
     max: 0
-    arm: with-only
+    arm: both
 
   - name: does_not_reply_to_answered_thread
     type: tool_used
@@ -81,7 +84,7 @@ graders:
     input_match: 'comments/2001/replies|comments/2002/replies|PRRT_bbb'
     min: 0
     max: 0
-    arm: with-only
+    arm: both
 
   - name: handles_pending_and_skips_answered
     type: llm
