@@ -9,6 +9,6 @@ commit or collides with another session.
 - Give a scratch file its full absolute path when you mention it to the user.
 - A file the project needs (a fixture, a test, a doc) is not scratch: it belongs in
   the repo. Only the throwaway kind goes in the scratchpad.
-- No scratchpad named in the environment? Use a fresh
-  `mktemp -d "$HOME/.cache/agent-config/scratch.XXXXXX"` directory (`mkdir -p` the
-  parent first; `$TMPDIR` can point inside the checkout), and clean it up when done.
+- No scratchpad named in the environment? Default to `/tmp`: a fresh
+  `mktemp -d /tmp/scratch.XXXXXX` directory (not bare `$TMPDIR`, which can point
+  inside the checkout), cleaned up when done.
