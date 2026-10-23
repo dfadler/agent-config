@@ -17,3 +17,4 @@ PreToolUse	Edit|Write	worktree-core	worktree-core/scripts/ts/require-worktree-ho
 SessionStart	-	worktree-core	worktree-core/scripts/ts/check-worktree-symlinks-hook.ts	worktree-core/skills/git-worktree-usage/scripts/check-worktree-symlinks-hook.sh
 SessionStart	-	worktree-core	worktree-core/scripts/ts/prune-merged-worktrees-hook.ts	worktree-core/skills/git-worktree-usage/scripts/prune-merged-worktrees-hook.sh
 Stop	-	memory-hygiene	memory-hygiene/scripts/ts/memory-hygiene-stop-hook.ts	memory-hygiene/hooks/scripts/memory-hygiene-stop-hook.sh
+SessionStart	-	collab-retro	collab-retro/scripts/ts/offer-incident-retro-hook.ts	collab-retro/hooks/scripts/offer-incident-retro-hook.sh
