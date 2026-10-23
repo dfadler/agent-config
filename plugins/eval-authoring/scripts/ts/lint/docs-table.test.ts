@@ -5,7 +5,7 @@ import { expect, it } from "vitest";
 import { mainWithDiscoveredRules } from "./cli.ts";
 
 const ids = (text: string, re: RegExp): string[] =>
-  [...new Set([...text.matchAll(re)].map((m) => m[1] as string))].sort();
+  [...new Set([...text.matchAll(re)].flatMap((m) => (m[1] === undefined ? [] : [m[1]])))].sort();
 
 it("docs/lint-rules.md table matches --list-rules", async () => {
   const doc = readFileSync(
