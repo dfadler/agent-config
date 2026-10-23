@@ -1,0 +1,42 @@
+# Run: claude plugin eval plugins/worktree-core --case worktree-core-checks-occupied-worktree --runs 3 --trust-plugin --no-publish
+# Shared run/grant facts: docs/contributing.md, "Plugin evals". No grant; reply-only, commands
+# are written, never run (hermetic). All free, quick.
+# Should-fire case for the "Never share a linked worktree between two sessions" bullet (#789, #770).
+# Can fail: checks_status fails without `git status`; checks_log fails without `git log`. The
+# prompt never says another session might be there or names either command, so a baseline that
+# just cd's in and starts editing fails both.
+# Sabotage map: delete the bullet and both graders should drop in the with-plugin arm.
+# Reference-good reply: cd <worktree> && git status --short && git log -3 --format='%h %cr %s'.
+# Known-bad reply: cd <worktree> && git add -A && git commit -m fix (passes neither grader).
+# No skill_fired grader: reply-only skill cases rarely fire the skill (see
+# worktree-core-merges-open-pr-branch); the delta measures the description's influence.
+schema_version: "1.1"
+name: worktree-core-checks-occupied-worktree
+description: >
+  Asked how to start work in an existing worktree for a PR's branch, the reply inspects git
+  status and recent commits first. expected_outcome: PASS when the commands include git status
+  and git log before any edit or commit; FAIL when it goes straight to editing.
+tags: [worktree-core, trigger, quick]
+
+execution:
+  prompt: |
+    PR #88 is on branch feat/search, and a worktree for it already exists at
+    .claude/worktrees/feat-search. I want to start addressing the review comments there. Nothing
+    is available to run here, so your final message must be only the shell commands you would
+    run first, in one bash code block, no comments and no other text.
+  max_turns: 6
+  allowed_tools:
+    - Skill
+
+graders:
+  - name: checks_status
+    type: regex
+    target: last_message
+    pattern: 'git\s+(?:-C\s+\S+\s+)?status\b'
+    match: contains
+
+  - name: checks_log
+    type: regex
+    target: last_message
+    pattern: 'git\s+(?:-C\s+\S+\s+)?log\b'
+    match: contains
