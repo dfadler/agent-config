@@ -32,5 +32,5 @@ graders:
   - name: proposes_and_asks
     type: regex
     target: last_message
-    pattern: '(?is)jitter.*(confirm|approv|yes|go ahead|ok to)'
+    pattern: '[Jj]itter[\s\S]*([Cc]onfirm|[Aa]pprov|[Yy]es|[Gg]o ahead|[Oo][Kk] to)'
     match: contains
