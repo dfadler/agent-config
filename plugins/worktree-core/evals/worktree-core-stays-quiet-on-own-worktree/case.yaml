@@ -6,6 +6,10 @@
 # stalls instead of giving the commands. The prompt cues the commands, so runs_tests is cheap
 # for a baseline; the Skill check carries the signal.
 # Known-bad reply: "Another session may be using it; stop and ask first." (fails runs_tests).
+# good-reply: ```bash
+#   cd ../feat-x && npm test
+#   ```
+# bad-reply: Another session may be using it; stop and ask first. You could run npm test there.
 schema_version: "1.1"
 name: worktree-core-stays-quiet-on-own-worktree
 description: >
@@ -36,6 +40,6 @@ graders:
   - name: runs_tests
     type: regex
     target: last_message
-    pattern: 'npm\s+(?:run\s+)?test\b'
+    pattern: '```[^\n]*\n[^`]*\bnpm\s+(?:run\s+)?test\b'
     match: contains
     arm: both

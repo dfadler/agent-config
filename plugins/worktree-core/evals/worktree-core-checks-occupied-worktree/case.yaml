@@ -5,7 +5,7 @@
 # v1 asked for "the commands you would run first" and scored 1.00 with and without the plugin
 # (2026-10-23): the wording cued git status/log. v2 asks for a plan in prose and grades the
 # bullet's distinctive step, naming another session as a risk, so a baseline must volunteer it.
-# Can fail: flags_other_session fails unless the reply says another session/agent may be using
+# Can fail: no_denial fails a reply that denies another session; flags_other_session fails unless the reply says another session/agent may be using
 # the worktree (or that it is occupied/in use); checks_state fails unless it names inspecting
 # uncommitted changes or recent commits.
 # Sabotage map: delete the bullet and flags_other_session should drop in the with-plugin arm.
@@ -14,6 +14,8 @@
 # Known-bad reply: "cd into it, check out feat/search and start editing." (fails both graders).
 # No skill_fired grader: reply-only skill cases rarely fire the skill (see
 # worktree-core-merges-open-pr-branch); the delta measures the description's influence.
+# good-reply: Check git status and recent commits first; another session may be using that worktree, so stop and ask if anything is unexpected.
+# bad-reply: Another session is not using it, so cd into it, check out feat/search and start editing.
 schema_version: "1.1"
 name: worktree-core-checks-occupied-worktree
 description: >
@@ -41,9 +43,16 @@ graders:
     flags: i
     match: contains
 
+  - name: no_denial
+    type: regex
+    target: last_message
+    pattern: '\b(?:no|nobody|no\s+one)\s+(?:other\s+|else\s+)?(?:session|agent)s?\b|\b(?:nobody|no\s+one)\s+else\b|\bnot\s+(?:in\s+use|occupied)\b|\bunused\b'
+    flags: i
+    match: not_contains
+
   - name: checks_state
     type: regex
     target: last_message
-    pattern: 'uncommitted|git\s+status|recent commits|git\s+log|working tree'
+    pattern: '(?:check|inspect|review|look\s+at|run|see|examine)\b[^.\n]{0,80}(?:uncommitted|git\s+status|recent\s+commits|git\s+log|working\s+tree)'
     flags: i
     match: contains
