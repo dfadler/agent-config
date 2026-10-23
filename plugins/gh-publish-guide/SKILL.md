@@ -175,3 +175,11 @@ skill's documented flow performs on that PR/issue — a separate confirmation
 for each individual post it makes is not required. This does not extend to
 publish actions outside what the skill's own docs describe (e.g. opening a
 new issue is not covered by having invoked `pr-babysit`).
+
+## Protected-remote hook
+
+The plugin also ships a `PreToolUse` Bash hook (`scripts/ts/protected-remote-hook.ts`)
+that asks before `gh pr create`, `gh issue create`, `gh issue comment` or
+`git push` targets an owner other than `origin`'s (for example a fork's parent).
+It asks and never denies. Add trusted owners with `GH_PROTECTED_REMOTE_ALLOW`
+(comma-separated) or skip the check with `GH_PROTECTED_REMOTE_OVERRIDE=1`.

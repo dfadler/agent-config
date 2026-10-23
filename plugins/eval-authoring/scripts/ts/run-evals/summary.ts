@@ -152,7 +152,7 @@ export interface SummaryInput {
   }[];
 }
 
-/** Below this many cases a delta is noise; the same floor the author-cases guidance gives. */
+/** Below this many cases a suite's delta is too noisy to call (see author-cases guidance). */
 export const DELTA_CASE_FLOOR = 20;
 
 const fmt = (n: number | undefined): string => (n === undefined ? "-" : n.toFixed(2));
@@ -164,6 +164,8 @@ export const renderSummary = (s: SummaryInput): string => {
   const unfired = s.cases.flatMap((c) =>
     c.row !== undefined && c.row.skillMissed > 0 ? [{ caseName: c.caseName, row: c.row }] : [],
   );
+  const showDelta = s.tier === "thorough";
+  const hasDelta = showDelta && s.cases.some((c) => c.row?.delta !== undefined);
   return [
     "## Eval results",
     "",
@@ -173,12 +175,15 @@ export const renderSummary = (s: SummaryInput): string => {
     "| --- | --- | --- | --- | --- |",
     ...s.cases.map(
       (c) =>
-        `| ${cell(c.caseName)} | ${fmt(c.row?.with)} | ${fmt(c.row?.without)} | ${fmt(c.row?.delta)} | ${String(c.exit)}${c.row === undefined ? " (no readable result)" : ""} |`,
+        `| ${cell(c.caseName)} | ${fmt(c.row?.with)} | ${fmt(c.row?.without)} | ${showDelta ? fmt(c.row?.delta) : "-"} | ${String(c.exit)}${c.row === undefined ? " (no readable result)" : ""} |`,
     ),
     ...s.unstarted.map((n) => `| ${cell(n)} | not run | | | |`),
-    ...(s.cases.some((c) => c.row?.delta !== undefined) && s.cases.length + s.unstarted.length < DELTA_CASE_FLOOR
-      ? ["", `Delta not significant below ${String(DELTA_CASE_FLOOR)} cases (this run has ${String(s.cases.length + s.unstarted.length)}).`]
+    ...(hasDelta && s.cases.length + s.unstarted.length < DELTA_CASE_FLOOR
+      ? ["", `Delta not significant below ${String(DELTA_CASE_FLOOR)} cases (this suite has ${String(s.cases.length + s.unstarted.length)}).`]
       : []),
+    ...(s.tier === "thorough"
+      ? []
+      : ["", `Delta not measured at tier \`${s.tier}\`: report arm scores only, not a delta, in a PR (even marked preliminary). Re-run at \`thorough\` for a delta.`]),
     ...(unfired.length === 0
       ? []
       : [

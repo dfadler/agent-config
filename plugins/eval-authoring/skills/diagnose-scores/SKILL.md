@@ -42,8 +42,9 @@ interprets the verdict.
   do not diagnose the skill from those runs.
 - **`negative-delta`:** suspect the judge first. Find the failing `llm` grader in the with
   arm and read its explanation. If the judges disagree (PASS and FAIL votes in one
-  explanation), the rubric is unstable: re-run with `--judge-model sonnet` and tighten the
-  PASS and FAIL conditions.
+  explanation), the rubric is unstable: tighten the PASS and FAIL conditions, then re-run (paid:
+  cases x runs x arms). `--judge-model sonnet` is unmeasured advice, and judge scores
+  compare only at the same pinned judge.
 - **`negative-delta` with a consistent judge:** if every vote agrees (say 24 of 24 FAIL in
   the with arm) the judge is stable, so re-running it with the same configuration is
   unlikely to move the score (a different `--judge-model` is only a sensitivity check, not a

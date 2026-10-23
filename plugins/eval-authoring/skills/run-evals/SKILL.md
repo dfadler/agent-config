@@ -1,6 +1,6 @@
 ---
 name: run-evals
-description: Run a plugin's `claude plugin eval` cases at a cost tier, and answer questions about running them - tiers, cost ceilings, concurrency (`-j`), speed, CI, exit codes. Paid; needs an explicit request to run (or EVAL_ALLOW_AGENT_RUNS=1). Not for writing cases (author-cases) or explaining a score (diagnose-scores).
+description: Run a plugin's `claude plugin eval` cases at a cost tier, and answer questions about running them - tiers, cost ceilings, concurrency (`-j`), speed, setting up evals in CI, exit codes, and writing a PR line from pasted run-evals scores. Paid; needs an explicit request to run (or EVAL_ALLOW_AGENT_RUNS=1). Not for writing cases (author-cases) or explaining a score (diagnose-scores).
 argument-hint: "<plugin-path> [quick|standard|thorough]"
 allowed-tools: Bash(node ${CLAUDE_SKILL_DIR}/../../scripts/ts/lint/cli.ts *)
 ---
@@ -39,8 +39,9 @@ it, do not rebuild any of that.
      while iterating on a case.
    - `standard` (default): every case, 3 runs, with and without the plugin. Use before
      merging a change to cases or to the plugin.
-   - `thorough`: every case, 5 runs. Use when a `standard` verdict looks noisy, or
-     before a release.
+   - `thorough`: every case, 5 runs. Use before a release, or to back a delta claim. A
+     noisy `standard` verdict is better answered with more cases than more runs; read the
+     replies before paying for `thorough`.
 
    If the user named no tier, use `standard`, and say so.
 2. **Lint first** (free, no model calls):
@@ -77,8 +78,10 @@ it, do not rebuild any of that.
    marked block, asks, then replaces the `run-evals` block in the PR body with `gh pr
    edit`. It is off by default, refuses `--dry-run`, and `--yes` skips only the question.
 5. **Relay the result.** The run ends with a Markdown summary (per-case with, without and
-   delta (plus a "Delta not significant below 20 cases" line when the run has fewer than 20), tier, models, cost, the command, and the redacted, truncated reply of each
-   failed grader); paste it under an "Eval results" heading. Report the wrapper's output and exit code without
+   delta, tier, models, cost, the command, and the redacted, truncated reply of each
+   failed grader; plus a "Delta not significant below 20 cases" footer when the suite is
+   smaller than that, which you keep next to any delta you quote); paste it under an
+   "Eval results" heading. Report the wrapper's output and exit code without
    reinterpreting; relay its preflight errors verbatim. Exit codes:
    - `0`: passed, results trustworthy.
    - `1`: below threshold, load failure, or no cases.
@@ -91,6 +94,11 @@ it, do not rebuild any of that.
      result that could not be read). Its scores are unreliable; never report it
      as a pass.
    - `20`: internal error. `130` and `143`: interrupted or terminated.
+
+**A PR line from pasted scores.** When the user quotes `quick` or 3-run (`standard`)
+scores and wants a delta in the PR, give the arm scores and write "delta not measured":
+no delta number, even marked preliminary. A delta needs a with-and-without comparison at
+`thorough`. The wrapper's summary says the same under its table.
 
 ## What the tier values mean
 

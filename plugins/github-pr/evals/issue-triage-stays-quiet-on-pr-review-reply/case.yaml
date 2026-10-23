@@ -1,14 +1,15 @@
 # Run: claude plugin eval plugins/github-pr --case issue-triage-stays-quiet-on-pr-review-reply --runs 3 --trust-plugin --no-publish
 # Shared run/grant facts: docs/contributing.md, "Plugin evals". No grant: Skill only.
 # Should-not-fire: PR review comments belong to pr-comments, not issue triage.
-# Regression guard: a no-plugin arm passes by default, so the Delta is about 0 by design.
+# Regression guard with a positive check: triage_not_fired passes in both arms, but the marker
+# check (neighbor_skill_marker) is expected to give a positive Delta (#780).
 # Can fail: triage_not_fired fails if issue-triage over-triggers (sabotage-checked with a
 # fires-on-everything description). The prompt asks for a concrete result so a skill can fire.
 schema_version: "1.1"
 name: issue-triage-stays-quiet-on-pr-review-reply
 description: >
   A request to reply to review comments on a PR must not invoke issue-triage.
-  expected_outcome: regression guard, Delta about 0 by design. PASS when it does not fire.
+  expected_outcome: regression guard plus a marker check. PASS when it does not fire and the drafts carry the AI marker.
 tags: [issue-triage, trigger, quick]
 
 execution:
@@ -41,3 +42,12 @@ graders:
     match: contains
     arm: both
     weight: 0.5
+
+  # Positive check: pr-comments supplies the AI marker; a no-plugin baseline omits it (traced in
+  # #779), so the guard gets a real delta without changing what it guards (#780).
+  - name: neighbor_skill_marker
+    type: regex
+    target: last_message
+    pattern: '🤖 \*\*Claude:\*\*'
+    match: contains
+    arm: both
