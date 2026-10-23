@@ -44,7 +44,7 @@ const parseClosedUnmerged = (json: string): readonly ClosedPr[] => {
   if (!Array.isArray(raw)) return [];
   return raw.flatMap((p: unknown): ClosedPr[] => {
     if (typeof p !== "object" || p === null) return [];
-    const r = Object.fromEntries(Object.entries(p));
+    const r: Record<string, unknown> = Object.fromEntries(Object.entries(p));
     const merged = r["mergedAt"];
     const { number, title, url } = r;
     if (merged !== null && merged !== undefined && merged !== "") return [];
@@ -59,7 +59,9 @@ export const run = (d: Deps): number => {
   let cwd = "";
   try {
     const input: unknown = JSON.parse(d.stdin);
-    const c = typeof input === "object" && input !== null ? Object.fromEntries(Object.entries(input))["cwd"] : "";
+    const rec: Record<string, unknown> =
+      typeof input === "object" && input !== null ? Object.fromEntries(Object.entries(input)) : {};
+    const c = rec["cwd"];
     cwd = typeof c === "string" ? c : "";
   } catch {
     return 0;
@@ -111,7 +113,7 @@ export const run = (d: Deps): number => {
 const realRun: Run = (cmd, args, cwd) => {
   const r = spawnSync(cmd, [...args], { cwd, encoding: "utf8", timeout: TIMEOUT_MS });
   // status is null when the binary is missing or the timeout killed it.
-  return { status: r.status ?? 1, stdout: r.stdout ?? "" };
+  return { status: r.status ?? 1, stdout: r.stdout };
 };
 
 if (import.meta.main) {

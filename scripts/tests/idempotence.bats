@@ -137,8 +137,8 @@ assert d['theme'] == 'dark', 'unrelated key lost'
 cmds = [' '.join([h['command']] + h.get('args', [])) for ev in d['hooks'].values() for e in ev for h in e['hooks']]
 assert cmds.count('/usr/bin/true') == 1, 'user hook duplicated or lost'
 managed = [c for c in cmds if c != '/usr/bin/true']
-assert len(managed) == 4, 'expected 4 managed hooks, got {}'.format(len(managed))
-assert len(set(managed)) == 4, 'duplicate managed hook'
+assert len(managed) == 5, 'expected 5 managed hooks, got {}'.format(len(managed))
+assert len(set(managed)) == 5, 'duplicate managed hook'
 "
   [ "$status" -eq 0 ]
 }
