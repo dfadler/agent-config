@@ -74,10 +74,11 @@ never commit directly to the main working copy).
   worktree-enforcement hook only checks that a path is a linked worktree, not
   that nobody else is using it, and nothing enforces this rule. Before
   working in an existing worktree (a PR's branch, say), run `git status
-  --short` and `git log -3 --format='%h %ar %s'`. If anything is uncommitted
+  --short` and `git log -3 --format='%h %cr %s'`. If anything is uncommitted
   or newer than your session start, another session may be there: stop and
   ask. If one is, create your own worktree on a child branch of that branch
-  (`worktree-<name>-<you>`), and merge back when done.
+  (`worktree-<name>-<you>`). Merge back only once the owning session has stopped using the target
+  worktree and its branch is clean.
 - **Pick what to parallelize by file surface, not by ticket.** Two tasks
   that both touch shared config (a lint config, `package.json`, a shared
   component) will conflict at merge time even if the sessions never overlap
