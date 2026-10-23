@@ -1,42 +1,49 @@
 # Run: claude plugin eval plugins/worktree-core --case worktree-core-checks-occupied-worktree --runs 3 --trust-plugin --no-publish
-# Shared run/grant facts: docs/contributing.md, "Plugin evals". No grant; reply-only, commands
-# are written, never run (hermetic). All free, quick.
+# Shared run/grant facts: docs/contributing.md, "Plugin evals". No grant; reply-only, nothing runs
+# (hermetic). All free, quick.
 # Should-fire case for the "Never share a linked worktree between two sessions" bullet (#789, #770).
-# Can fail: checks_status fails without `git status`; checks_log fails without `git log`. The
-# prompt never says another session might be there or names either command, so a baseline that
-# just cd's in and starts editing fails both.
-# Sabotage map: delete the bullet and both graders should drop in the with-plugin arm.
-# Reference-good reply: cd <worktree> && git status --short && git log -3 --format='%h %cr %s'.
-# Known-bad reply: cd <worktree> && git add -A && git commit -m fix (passes neither grader).
+# v1 asked for "the commands you would run first" and scored 1.00 with and without the plugin
+# (2026-10-23): the wording cued git status/log. v2 asks for a plan in prose and grades the
+# bullet's distinctive step, naming another session as a risk, so a baseline must volunteer it.
+# Can fail: flags_other_session fails unless the reply says another session/agent may be using
+# the worktree (or that it is occupied/in use); checks_state fails unless it names inspecting
+# uncommitted changes or recent commits.
+# Sabotage map: delete the bullet and flags_other_session should drop in the with-plugin arm.
+# Reference-good reply: "Check git status and recent commits first; another session may be
+# using that worktree, so stop and ask if anything is unexpected."
+# Known-bad reply: "cd into it, check out feat/search and start editing." (fails both graders).
 # No skill_fired grader: reply-only skill cases rarely fire the skill (see
 # worktree-core-merges-open-pr-branch); the delta measures the description's influence.
 schema_version: "1.1"
 name: worktree-core-checks-occupied-worktree
 description: >
-  Asked how to start work in an existing worktree for a PR's branch, the reply inspects git
-  status and recent commits first. expected_outcome: PASS when the commands include git status
-  and git log before any edit or commit; FAIL when it goes straight to editing.
+  Asked how to get started in an existing worktree for a PR's branch, the reply warns that
+  another session may be using it and says to inspect its state first. expected_outcome: PASS
+  when the reply names another session or occupancy as a risk and mentions uncommitted changes
+  or recent commits; FAIL when it goes straight to editing.
 tags: [worktree-core, trigger, quick]
 
 execution:
   prompt: |
-    PR #88 is on branch feat/search, and a worktree for it already exists at
-    .claude/worktrees/feat-search. I want to start addressing the review comments there. Nothing
-    is available to run here, so your final message must be only the shell commands you would
-    run first, in one bash code block, no comments and no other text.
+    PR #88 is on branch feat/search, and there's already a worktree for it at
+    .claude/worktrees/feat-search. I want to start addressing the review comments there. What's
+    your plan for getting started? Answer in two or three sentences of plain text, no code
+    block, and don't run anything.
   max_turns: 6
   allowed_tools:
     - Skill
 
 graders:
-  - name: checks_status
+  - name: flags_other_session
     type: regex
     target: last_message
-    pattern: 'git\s+(?:-C\s+\S+\s+)?status\b'
+    pattern: '(?:another|other|second|concurrent|parallel|running)\s+(?:claude\s+)?(?:session|agent)s?\b|someone else|already (?:in use|occupied)|\boccupied\b|\bin use\b'
+    flags: i
     match: contains
 
-  - name: checks_log
+  - name: checks_state
     type: regex
     target: last_message
-    pattern: 'git\s+(?:-C\s+\S+\s+)?log\b'
+    pattern: 'uncommitted|git\s+status|recent commits|git\s+log|working tree'
+    flags: i
     match: contains
