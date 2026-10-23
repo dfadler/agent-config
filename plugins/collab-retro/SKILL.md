@@ -166,6 +166,11 @@ rounds, a closed or reverted PR, visible frustration), not a pattern across
 memories. Steps 1-6 above do not apply; Step 5's permission gate and Step 3's
 redaction do.
 
+A SessionStart hook (`scripts/ts/offer-incident-retro-hook.ts`) may print a
+note about a PR you closed unmerged or a revert in the last two days. Treat it
+as a prompt to ask, not to act: offer the retro, and on a yes pre-fill
+`trigger: PR closed` or `trigger: revert`.
+
 1. **Check recurrence.** Pick a short `class` slug for the failure (name the
    failure, not the repo, e.g. `trusted-spec-over-user-evidence`), then run
    `node plugins/collab-retro/scripts/ts/scan-feedback-memories.ts --incidents <class>`.
