@@ -13,6 +13,7 @@
 // API, so a layout change makes this warn on legitimate scratchpad writes;
 // loosen SCRATCH_PATTERN then.
 import { readFileSync } from "node:fs";
+import { resolve } from "node:path/posix";
 
 export interface Deps {
   readonly env: Readonly<Record<string, string | undefined>>;
@@ -21,8 +22,11 @@ export interface Deps {
   readonly err: (text: string) => void;
 }
 
-const TEMP_ROOT = /^\/(?:private\/)?(?:tmp|var\/folders)\//;
-const SCRATCH_PATTERN = /^\/(?:private\/)?tmp\/claude-\d+\/.+\/scratchpad(?:\/|$)/;
+const TEMP_ROOT = /^\/(?:private\/)?(?:tmp|var\/tmp|var\/folders)\//;
+// The session scratchpad, or the documented no-scratchpad fallback dir
+// (mktemp -d /tmp/scratch.XXXXXX) from the scratch-files convention.
+const SCRATCH_PATTERN =
+  /^\/(?:private\/)?tmp\/(?:claude-\d+\/.+\/scratchpad|scratch\.[A-Za-z0-9]{6})(?:\/|$)/;
 
 const asObject = (v: unknown): Record<string, unknown> | undefined =>
   typeof v === "object" && v !== null && !Array.isArray(v)
@@ -32,14 +36,20 @@ const asObject = (v: unknown): Record<string, unknown> | undefined =>
 export const run = (d: Deps): number => {
   const mode = d.env["SCRATCH_GUARD"] ?? "warn";
   if (mode !== "warn" && mode !== "block") return 0;
-  let path: unknown;
+  let raw: unknown;
+  let cwd: unknown;
   try {
-    path = asObject(asObject(JSON.parse(d.stdin))?.["tool_input"])?.["file_path"];
+    const input = asObject(JSON.parse(d.stdin));
+    raw = asObject(input?.["tool_input"])?.["file_path"];
+    cwd = input?.["cwd"];
   } catch {
     return 0;
   }
-  if (typeof path !== "string" || !TEMP_ROOT.test(path) || SCRATCH_PATTERN.test(path))
-    return 0;
+  if (typeof raw !== "string") return 0;
+  // Resolve relative paths against cwd and fold "..", so neither
+  // "../tmp/x" nor "scratchpad/../x" slips past the checks.
+  const path = resolve(typeof cwd === "string" && cwd.startsWith("/") ? cwd : "/", raw);
+  if (!TEMP_ROOT.test(path) || SCRATCH_PATTERN.test(path)) return 0;
 
   const msg =
     `${path} is in a system temp directory. Write temporary files to the ` +

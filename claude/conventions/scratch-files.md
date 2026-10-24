@@ -9,7 +9,8 @@ commit or collides with another session.
 - Pass the scratchpad path to every subagent or workflow prompt you write. They do not
   see it otherwise and fall back to `/tmp`.
 - For a Bash command that creates temp files on its own (`mktemp`, `curl -o`), set
-  `TMPDIR` to the scratchpad for that command, or give the path explicitly.
+  `TMPDIR` to the scratchpad for `mktemp`, and give `curl -o` (which ignores `TMPDIR`)
+  an absolute output path under the scratchpad.
 - Give a scratch file its full absolute path when you mention it to the user.
 - A file the project needs (a fixture, a test, a doc) is not scratch: it belongs in
   the repo. Only the throwaway kind goes in the scratchpad.
