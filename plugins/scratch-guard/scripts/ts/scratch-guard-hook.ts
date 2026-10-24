@@ -23,10 +23,15 @@ export interface Deps {
 }
 
 const TEMP_ROOT = /^\/(?:private\/)?(?:tmp|var\/tmp|var\/folders)\//;
-// The session scratchpad, or the documented no-scratchpad fallback dir
-// (mktemp -d /tmp/scratch.XXXXXX) from the scratch-files convention.
-const SCRATCH_PATTERN =
-  /^\/(?:private\/)?tmp\/(?:claude-\d+\/.+\/scratchpad|scratch\.[A-Za-z0-9]{6})(?:\/|$)/;
+// The current session's scratchpad (/tmp/claude-<uid>/<project>/<session_id>/
+// scratchpad; the session dir name equals the hook input's session_id), or the
+// documented no-scratchpad fallback dir (mktemp -d /tmp/scratch.XXXXXX) from
+// the scratch-files convention. Without a session_id any session's scratchpad
+// is accepted.
+const scratchPattern = (session: string): RegExp =>
+  new RegExp(
+    `^/(?:private/)?tmp/(?:claude-\\d+/[^/]+/${session === "" ? "[^/]+" : session}/scratchpad|scratch\\.[A-Za-z0-9]{6})(?:/|$)`,
+  );
 
 const asObject = (v: unknown): Record<string, unknown> | undefined =>
   typeof v === "object" && v !== null && !Array.isArray(v)
@@ -38,10 +43,12 @@ export const run = (d: Deps): number => {
   if (mode !== "warn" && mode !== "block") return 0;
   let raw: unknown;
   let cwd: unknown;
+  let session: unknown;
   try {
     const input = asObject(JSON.parse(d.stdin));
     raw = asObject(input?.["tool_input"])?.["file_path"];
     cwd = input?.["cwd"];
+    session = input?.["session_id"];
   } catch {
     return 0;
   }
@@ -49,7 +56,9 @@ export const run = (d: Deps): number => {
   // Resolve relative paths against cwd and fold "..", so neither
   // "../tmp/x" nor "scratchpad/../x" slips past the checks.
   const path = resolve(typeof cwd === "string" && cwd.startsWith("/") ? cwd : "/", raw);
-  if (!TEMP_ROOT.test(path) || SCRATCH_PATTERN.test(path)) return 0;
+  // Strip to the characters a session id can hold so it is safe in a RegExp.
+  const id = typeof session === "string" ? session.replace(/[^A-Za-z0-9-]/g, "") : "";
+  if (!TEMP_ROOT.test(path) || scratchPattern(id).test(path)) return 0;
 
   const msg =
     `${path} is in a system temp directory. Write temporary files to the ` +

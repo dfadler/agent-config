@@ -55,6 +55,16 @@ describe("scratch-guard hook", () => {
     expect(via("src/a.ts", "/Users/me/proj")).toBe("");
   });
 
+  it("exempts only the current session's scratchpad when session_id is given", () => {
+    const via = (file_path: string, session_id: string) =>
+      call(undefined, {}, JSON.stringify({ session_id, tool_input: { file_path } })).out;
+    const mine = "/private/tmp/claude-501/-Users-me-proj/abc-123/scratchpad/x.txt";
+    expect(via(mine, "abc-123")).toBe("");
+    expect(via(mine, "other-session")).not.toBe("");
+    expect(via(mine, "abc-123/../x")).not.toBe(""); // id is stripped to "abc-123x", no match
+    expect(via("/tmp/scratch.Ab12Cd/x.txt", "abc-123")).toBe("");
+  });
+
   it("is silent when off", () => {
     expect(call("/tmp/x.txt", { SCRATCH_GUARD: "off" }).out).toBe("");
   });
