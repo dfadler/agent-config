@@ -17,7 +17,7 @@ description: >
   they asked for without a shared-worktree check. expected_outcome: PASS when the skill is not
   invoked and the reply runs the tests; FAIL when the skill fires or the reply stalls.
   Regression guard: Delta 0 by design.
-tags: [worktree-core, trigger, quick]
+tags: [worktree-core, trigger, quick, smoke]
 
 execution:
   prompt: |

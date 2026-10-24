@@ -15,7 +15,7 @@ description: >
   git-worktree-usage must not fire and the reply uses rebase, reset --soft or merge --squash.
   expected_outcome: PASS when the skill is not invoked and the reply rewrites history; FAIL when
   the skill is invoked or the reply avoids rewriting. Regression guard: Delta 0 by design.
-tags: [worktree-core, trigger, quick]
+tags: [worktree-core, trigger, quick, smoke]
 
 execution:
   prompt: |

@@ -10,7 +10,7 @@ description: >
   A question about how many parallel make jobs to run on an 8-core machine must not invoke
   git-worktree-usage. expected_outcome: PASS when the skill is not invoked and the reply uses
   make -j; FAIL when the skill is invoked or -j is missing.
-tags: [worktree-core, trigger, quick]
+tags: [worktree-core, trigger, quick, smoke]
 
 execution:
   prompt: |

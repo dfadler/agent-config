@@ -14,7 +14,7 @@ description: >
   fire and the reply neither creates a worktree nor skips the fix. expected_outcome: PASS when
   the skill is not invoked, the reply gives the corrected word and no worktree setup; FAIL
   otherwise. Regression guard: Delta 0 by design.
-tags: [worktree-core, trigger, quick]
+tags: [worktree-core, trigger, quick, smoke]
 
 execution:
   prompt: |
