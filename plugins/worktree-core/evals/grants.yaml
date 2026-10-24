@@ -1,0 +1,5 @@
+schema_version: "1"
+grants:
+  worktree-core-checks-occupied-worktree:
+    - "Bash(git *)"
+    - "Edit"
