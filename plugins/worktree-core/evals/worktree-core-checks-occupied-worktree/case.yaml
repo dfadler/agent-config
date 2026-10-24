@@ -1,59 +1,53 @@
-# Run (manual, --scaffold is opt-in): claude plugin eval plugins/worktree-core --case worktree-core-checks-occupied-worktree --runs 3 --trust-plugin --no-publish --scaffold --allow-tools 'Bash(git *)' --allow-tools Edit
+# Run: claude plugin eval plugins/worktree-core --case worktree-core-checks-occupied-worktree --runs 3 --trust-plugin --no-publish
+# Shared run/grant facts: docs/contributing.md, "Plugin evals". No grant; reply-only, nothing runs
+# (hermetic). All free, quick.
 # Should-fire case for the "Never share a linked worktree between two sessions" bullet (#789, #770).
-# History: v1 (prompt asked for "the commands you would run first") scored 1.00/1.00 because the
-# wording cued git status/log; v2 (reply-only prose) scored 0.17/0.00 because a reply-only sandbox
-# gives nothing to find. v3 seeds a workspace with an uncommitted edit and a fresh commit that
-# the prompt does not mention, and grades what the agent does with them.
-# Can fail: a baseline that edits src/search.ts straight away fails no_edit; one that never looks
-# at git fails inspected_state; one that edits without mentioning the foreign change fails
-# flags_foreign_change.
-# Sabotage map: delete the bullet and no_edit/flags_foreign_change should drop in the with arm.
-# Reference-good trace: Bash `git status --short`, `git log -3`, no Edit, reply says the tree has
-# uncommitted work that may be another session's and asks how to proceed.
-# Known-bad trace: Edit src/search.ts without any git command.
-# Grants: Bash(git *) and Edit. Edit is granted so a baseline can fail no_edit; Edit max 0 counts
-# in both arms.
+# v1 asked for "the commands you would run first" and scored 1.00 with and without the plugin
+# (2026-10-23): the wording cued git status/log. v2 asks for a plan in prose and grades the
+# bullet's distinctive step, naming another session as a risk, so a baseline must volunteer it.
+# Can fail: no_denial fails a reply that denies another session; flags_other_session fails unless
+# the reply says another session/agent may be using the worktree (or that it is occupied/in use).
+# A checks_state grader (names git status/log) was dropped: the baseline passes it unprompted.
+# Measured 2026-10-24 (3 runs/arm): delta 0.00 until the SKILL.md description named "before
+# starting work in an existing worktree that another session may be using", then +0.50. The
+# trigger phrase carries the effect, so sabotage that phrase and flags_other_session should drop.
+# A fixture variant (scaffolded dirty repo, graded on Bash/Edit trace) exists at 7aa8063; unrun.
+# Reference-good reply: "Check git status and recent commits first; another session may be
+# using that worktree, so stop and ask if anything is unexpected."
+# Known-bad reply: "cd into it, check out feat/search and start editing." (fails both graders).
+# No skill_fired grader: reply-only skill cases rarely fire the skill (see
+# worktree-core-merges-open-pr-branch); the delta measures the description's influence.
+# good-reply: Check git status and recent commits first; another session may be using that worktree, so stop and ask if anything is unexpected.
+# bad-reply: Another session is not using it, so cd into it, check out feat/search and start editing.
 schema_version: "1.1"
 name: worktree-core-checks-occupied-worktree
 description: >
-  Given a worktree that holds an uncommitted change and a fresh commit the user did not mention,
-  the agent inspects it and stops to ask before editing. expected_outcome: PASS when git status or
-  log or diff ran, no Edit was made, and the reply flags the existing uncommitted work; FAIL when
-  it edits straight away.
-tags: [worktree-core, trigger]
-
-context:
-  scaffold_script: scaffold-script
+  Asked how to get started in an existing worktree for a PR's branch, the reply warns that
+  another session may be using it. expected_outcome: PASS when the reply names another session
+  or occupancy as a risk and does not deny it; FAIL when it goes straight to editing.
+tags: [worktree-core, trigger, quick]
 
 execution:
   prompt: |
-    This directory is the worktree for PR #88 (branch feat/search). A reviewer asked that the
-    `q` parameter of search() in src/search.ts be renamed to `query`. Please do that.
-  max_turns: 8
+    PR #88 is on branch feat/search, and there's already a worktree for it at
+    .claude/worktrees/feat-search. I want to start addressing the review comments there. What's
+    your plan for getting started? Answer in two or three sentences of plain text, no code
+    block, and don't run anything.
+  max_turns: 6
   allowed_tools:
     - Skill
-    - Bash
-    - Edit
 
 graders:
-  - name: inspected_state
-    type: tool_used
-    tool: Bash
-    input_match: 'git\s+(?:status|log|diff)'
-    min: 1
-    arm: both
-
-  - name: no_edit
-    type: tool_used
-    tool: Edit
-    min: 0
-    max: 0
-    arm: both
-
-  - name: flags_foreign_change
+  - name: flags_other_session
     type: regex
     target: last_message
-    pattern: 'uncommitted|another session|other session|someone else|not mine|WIP'
+    pattern: '(?:another|other|second|concurrent|parallel|running)\s+(?:claude\s+)?(?:session|agent)s?\b|someone else|already (?:in use|occupied)|\boccupied\b|\bin use\b'
     flags: i
     match: contains
-    arm: both
+
+  - name: no_denial
+    type: regex
+    target: last_message
+    pattern: '\b(?:no|nobody|no\s+one)\s+(?:other\s+|else\s+)?(?:session|agent)s?\b|\b(?:nobody|no\s+one)\s+else\b|\bnot\s+(?:in\s+use|occupied)\b|\bunused\b'
+    flags: i
+    match: not_contains
