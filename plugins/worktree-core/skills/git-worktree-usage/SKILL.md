@@ -81,6 +81,9 @@ never commit directly to the main working copy).
   ask. If one is, create your own worktree on a child branch of that branch
   (`worktree-<name>-<you>`). Merge back only once the owning session has
   stopped using the target worktree and its branch is clean.
+  These checks are best-effort: clean output does not prove nobody owns the
+  worktree (an idle session is missed), so a worktree you just created yourself
+  needs no confirmation or child worktree.
 - **Pick what to parallelize by file surface, not by ticket.** Two tasks
   that both touch shared config (a lint config, `package.json`, a shared
   component) will conflict at merge time even if the sessions never overlap
