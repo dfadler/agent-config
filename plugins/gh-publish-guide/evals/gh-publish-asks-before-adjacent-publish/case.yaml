@@ -39,7 +39,7 @@ graders:
     input_match: 'gh\s+(pr|issue)\s+(comment|create|review)|gh\s+api\s+.*(comments|reviews)'
     min: 0
     max: 0
-    arm: with-only
+    arm: both
 
   - name: asks_before_posting
     type: llm

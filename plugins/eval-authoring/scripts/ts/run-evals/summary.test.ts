@@ -150,6 +150,30 @@ describe("skill_fired", () => {
   });
 });
 
+describe("delta note", () => {
+  const md = (tier: string): string =>
+    renderSummary({
+      plugin: "p", tier, model: "m", judgeModel: "j", spentUsd: 0, ceilingUsd: 1,
+      exit: 0, command: "c", unstarted: [], cases: [],
+    });
+  it("says the delta is not measured below thorough, and only there", () => {
+    expect(md("quick")).toContain("Delta not measured at tier `quick`");
+    expect(md("standard")).toContain("Delta not measured at tier `standard`");
+    expect(md("thorough")).not.toContain("Delta not measured");
+  });
+  it("hides delta cells below thorough and shows them at thorough", () => {
+    const row = caseRow("c", failing("c"));
+    const cells = (tier: string): string =>
+      renderSummary({
+        plugin: "p", tier, model: "m", judgeModel: "j", spentUsd: 0, ceilingUsd: 1,
+        exit: 0, command: "c", unstarted: [], cases: [{ caseName: "c", exit: 0, row }],
+      }).split("\n").find((l) => l.startsWith("| c |")) ?? "";
+    expect(row?.delta).toBeDefined();
+    expect(cells("standard")).toContain(`| ${(row?.without ?? 0).toFixed(2)} | - |`);
+    expect(cells("thorough")).not.toContain("| - |");
+  });
+});
+
 describe("withBlock", () => {
   const block = renderBlock("NEW");
   it("appends when there is no block, and replaces in place when there is", () => {
@@ -199,7 +223,7 @@ describe("printed summary", () => {
     await main([s.root, "--case", "beta"], deps(s));
     const text = s.out.join("");
     expect(text).toContain("## Eval results");
-    expect(text).toContain("| beta | 0.50 | 0.25 | 0.25 | 0 |");
+    expect(text).toContain("| beta | 0.50 | 0.25 | - | 0 |");
     expect(text).toContain("tier `standard`");
     expect(text).toContain("Cost $0.2500");
     expect(text).toMatch(/run-evals\.ts \S+ --case beta/);
@@ -309,5 +333,18 @@ describe("--pr", () => {
   it("keeps the worse run exit code when publishing succeeds", async () => {
     const s = prSetup({ confirm: true, onCli: () => ({ result: "garbage" }) });
     expect(await main(argv(s), deps(s))).toBe(EXIT_PARTIAL);
+  });
+});
+
+describe("delta footer", () => {
+  const render = (n: number) =>
+    renderSummary({
+      plugin: "p", tier: "thorough", model: "m", judgeModel: "j", spentUsd: 0, ceilingUsd: 1,
+      exit: 0, command: "c", unstarted: [],
+      cases: Array.from({ length: n }, (_, i) => ({ caseName: `c${String(i)}`, exit: 0, row: caseRow(`c${String(i)}`, failing(`c${String(i)}`)) })),
+    });
+  it("warns below the case floor and stays quiet at it", () => {
+    expect(render(2)).toContain("Delta not significant below 20 cases (this suite has 2).");
+    expect(render(20)).not.toContain("Delta not significant");
   });
 });

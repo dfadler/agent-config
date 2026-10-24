@@ -30,6 +30,19 @@ non-zero exit scores the run 0.
   `context.history_file` resumes a `.jsonl` transcript; such a case runs one arm by default
   when the target is a path.
 
+## Sandbox limits for `gh` cases
+
+An eval run has no `gh` auth and no network, and a plugin's declared dependencies (for
+example `gh-untrusted`) are not installed, so the plugin arm's skill list holds only the
+plugin's own skills plus built-ins. A case that reads a live issue or PR ends with the agent
+unable to proceed, and a `read_via_skill`-style check for a dependency skill cannot pass.
+Stub the read instead: a `scaffold_script` writes `./bin/gh` returning the issue text, the
+prompt says "gh in this workspace is `./bin/gh`", and the case is run with `--scaffold` and
+`--allow-tools 'Bash(./bin/gh *)'`. Worked example:
+`plugins/github-pr/evals/issue-triage-fires-on-backlog-sweep/scaffold-script`. To test the
+`gh issue view --json` fallback path instead, say so in the case comment. Each case
+directory carries its own copy of the stub (sharing one script across cases is untested).
+
 ## Mocking MCP servers
 
 One Markdown file per tool at `evals/mocks/<server>/<tool>.md` (suite-wide) or in a case's

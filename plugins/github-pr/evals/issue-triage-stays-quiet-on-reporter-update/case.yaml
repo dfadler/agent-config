@@ -1,15 +1,16 @@
 # Run: claude plugin eval plugins/github-pr --case issue-triage-stays-quiet-on-reporter-update --runs 3 --trust-plugin --no-publish
 # Shared run/grant facts: docs/contributing.md, "Plugin evals". No grant: Skill only.
 # Should-not-fire: telling a reporter a fix landed is issue-reporter-etiquette's job.
-# Regression guard: a no-plugin arm passes by default, so the Delta is about 0 by design.
+# Regression guard with a positive check: triage_not_fired passes in both arms, but the marker
+# check (neighbor_skill_marker) is expected to give a positive Delta (#780).
 # Can fail: triage_not_fired fails if issue-triage over-triggers (sabotage-checked with a
 # fires-on-everything description). The prompt asks for a concrete result so a skill can fire.
 schema_version: "1.1"
 name: issue-triage-stays-quiet-on-reporter-update
 description: >
   A request to tell the reporter of an issue that it is fixed in a PR must not invoke
-  issue-triage. expected_outcome: regression guard, Delta about 0 by design. PASS when it
-  does not fire.
+  issue-triage. expected_outcome: regression guard plus a marker check. PASS when it does
+  not fire and the draft carries the AI marker.
 tags: [issue-triage, trigger, quick]
 
 execution:
@@ -38,3 +39,12 @@ graders:
     match: contains
     arm: both
     weight: 0.5
+
+  # Positive check: issue-reporter-etiquette supplies the AI marker; a no-plugin baseline omits
+  # it (traced in #779), so the guard gets a real delta without changing what it guards (#780).
+  - name: neighbor_skill_marker
+    type: regex
+    target: last_message
+    pattern: '🤖 \*\*Claude:\*\*'
+    match: contains
+    arm: both
