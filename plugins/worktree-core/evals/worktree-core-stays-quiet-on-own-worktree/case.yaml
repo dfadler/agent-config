@@ -1,0 +1,45 @@
+# Run: claude plugin eval plugins/worktree-core --case worktree-core-stays-quiet-on-own-worktree --runs 3 --trust-plugin --no-publish
+# Shared run/grant facts: docs/contributing.md, "Plugin evals". No grant; reply-only. All free, quick.
+# Should-not-fire near-miss on the occupied-worktree bullet: the user made the worktree a minute
+# ago and no other session exists, so there is nothing to check. Delta 0 by design.
+# Can fail: no_skill_fired fails if the skill fires; runs_tests fails if the reply refuses or
+# stalls instead of giving the commands. The prompt cues the commands, so runs_tests is cheap
+# for a baseline; the Skill check carries the signal.
+# Known-bad reply: "Another session may be using it; stop and ask first." (fails runs_tests).
+# good-reply: ```bash
+#   cd ../feat-x && npm test
+#   ```
+# bad-reply: Another session may be using it; stop and ask first. You could run npm test there.
+schema_version: "1.1"
+name: worktree-core-stays-quiet-on-own-worktree
+description: >
+  A user who just created their own worktree, with no other session running, gets the commands
+  they asked for without a shared-worktree check. expected_outcome: PASS when the skill is not
+  invoked and the reply runs the tests; FAIL when the skill fires or the reply stalls.
+  Regression guard: Delta 0 by design.
+tags: [worktree-core, trigger, quick]
+
+execution:
+  prompt: |
+    I created the worktree ../feat-x a minute ago for my own task and nothing else is running
+    against it. Give the commands to go into it and run the test suite with npm test. Don't run
+    anything; answer in one bash code block, no comments and no other text.
+  max_turns: 6
+  allowed_tools:
+    - Skill
+
+graders:
+  - name: no_skill_fired
+    type: tool_used
+    tool: Skill
+    input_match: '"skill"\s*:\s*"(?:[\w-]+:)?git-worktree-usage"'
+    min: 0
+    max: 0
+    arm: both
+
+  - name: runs_tests
+    type: regex
+    target: last_message
+    pattern: '```[^\n]*\n[^`]*\bnpm\s+(?:run\s+)?test\b'
+    match: contains
+    arm: both
