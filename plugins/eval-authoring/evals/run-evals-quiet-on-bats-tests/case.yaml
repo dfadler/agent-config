@@ -8,7 +8,7 @@ description: >
   A request that shares vocabulary with run-evals but is not about `claude plugin eval` cases must
   not invoke it. expected_outcome: PASS when run-evals is not invoked and the reply addresses the
   request; FAIL when it is invoked.
-tags: [eval-authoring, run-evals, trigger, quick]
+tags: [eval-authoring, run-evals, trigger, quick, smoke]
 
 execution:
   prompt: |

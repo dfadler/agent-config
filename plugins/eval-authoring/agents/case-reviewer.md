@@ -81,7 +81,11 @@ Run after the lint, on each case. Skip anything the lint already reported.
    over-triggers.
 4. **Can fail.** Would at least one scored grader fail if the skill were absent or
    broken? Look for graders any competent reply would pass (a regex on a word the
-   prompt itself contains, a check that the reply is non-empty).
+   prompt itself contains, a check that the reply is non-empty). Also flag a case whose
+   only live signal is a no-plugin-passes Skill "must not fire" check, and a reply-only
+   prompt where nothing observable separates the arms; the fix is a trace-action grader
+   in a fixture workspace, a `smoke` tag with an honest label, or dropping it (EVAL024
+   covers the mechanical part; see author-cases, "Can this case fail?").
 5. **Tells the plugin from no plugin.** Is the property tested something the skill
    adds, or something the model does by default? A default behavior gives a Delta
    of zero in a two-arm run. If the case deliberately tests a default (a safety

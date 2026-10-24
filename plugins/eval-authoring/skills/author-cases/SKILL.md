@@ -76,6 +76,21 @@ draft them there: tell the user to commit the skill and start a fresh session, t
    A trace-level `tool_used` or `tool_order` grader is required beside any `llm` grader
    that judges a sequence ("asked before running"): a reply can claim an order that never
    happened ([graders](references/graders.md#sequence-claims)).
+   **Can this case fail?** Evals that cannot fail are an antipattern (PR 789: a should-not-fire
+   near-miss scored 1.00 with and without the plugin). Before keeping a case, name a reply or
+   trace that would score below 1.00 without the plugin, and check that none of these holds:
+   - every scored grader passes in the no-plugin arm by construction (`tool_used: Skill`
+     `max: 0`, `arm: both`) or is cued by the prompt (a regex on a word the prompt contains,
+     e.g. "run the tests with npm test" graded on `npm test`);
+   - a should-not-fire case whose only live signal is that Skill check: the fire rate is
+     noise at 3 runs;
+   - a reply-only prompt where nothing observable separates the arms: a sandbox that gives
+     the model no reason to volunteer the behavior scores near 0 for both arms, and a prompt
+     that cues the behavior scores 1.00 for both (PR 789: 0.17 vs 0.00, and 1.00 vs 1.00).
+   Instead, grade a trace action (`tool_used` on `Bash`, a `file_exists`) in a fixture
+   workspace whose state makes the behavior necessary without naming it; or keep the case but
+   tag it `smoke` and say it is a cheap trigger-boundary guard with no expected delta (EVAL024
+   skips tagged cases); or drop it.
 5. **Write PASS and FAIL conditions** for any `llm` grader: `PASS if <observable thing>.`
    `FAIL if <observable thing>.` Concrete enough that two judges agree. Also put a
    reference-good and a known-bad reply in the case header (`# good-reply: ...` and
