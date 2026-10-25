@@ -1,4 +1,5 @@
 import { scoreCase, graderCategory } from "../../parser/index.ts";
+import { scoringContextFor } from "../scoring-context.ts";
 import { fromDocs } from "../sources.ts";
 import type { Rule } from "../types.ts";
 
@@ -13,11 +14,9 @@ export const rule: Rule = {
   severity: "info",
   title: "Case pairs a result grader with a steps grader",
   source: fromDocs("graders that give a stable signal"),
-  checkCase: (c, { suite }) => {
+  checkCase: (c, context) => {
     if (c.graders.length === 0) return [];
-    const scoring = scoreCase(c, true, {
-      declaredMockServers: suite.mocks.declaredServers,
-    });
+    const scoring = scoreCase(c, true, scoringContextFor(c, context));
     const scored = scoring.graders.filter((g) => g.scored);
     const result = scored.filter(
       (g) => graderCategory(g.grader) === "result",

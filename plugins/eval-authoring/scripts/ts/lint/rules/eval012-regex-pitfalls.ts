@@ -20,6 +20,13 @@ const tokenize = (pattern: string): readonly Tok[] => {
     if (ch === "\\") {
       out.push({ text: pattern.slice(i, i + 2), escaped: true, index: i });
       i += 2;
+    } else if (ch === "[") {
+      // Skip a character class: its contents are not pattern syntax.
+      i += 1;
+      while (i < pattern.length && pattern.charAt(i) !== "]") {
+        i += pattern.charAt(i) === "\\" ? 2 : 1;
+      }
+      i += 1;
     } else {
       out.push({ text: ch, escaped: false, index: i });
       i += 1;
@@ -28,7 +35,7 @@ const tokenize = (pattern: string): readonly Tok[] => {
   return out;
 };
 
-/** `(?i)`, `(?s)`, `(?im)`: inline flag groups, which JavaScript regexes do not support. */
+/** `(?i)`, `(?s)`, `(?im)`, `(?i:x)`: inline flag groups, which JavaScript regexes do not support (before Node 23). */
 const inlineFlagGroup = (pattern: string): string | undefined => {
   const toks = tokenize(pattern);
   for (let k = 0; k < toks.length; k += 1) {
@@ -43,8 +50,12 @@ const inlineFlagGroup = (pattern: string): string | undefined => {
       j += 1;
     }
     const close = toks[j];
-    if (letters.length > 0 && close?.text === ")" && !close.escaped) {
-      return `(?${letters})`;
+    if (
+      letters.length > 0 &&
+      (close?.text === ")" || close?.text === ":") &&
+      !close.escaped
+    ) {
+      return `(?${letters}${close.text})`;
     }
   }
   return undefined;
@@ -55,7 +66,9 @@ const inlineFlagGroup = (pattern: string): string | undefined => {
  * quote, `=` or `;`, or a whitespace escape, and nothing path-shaped.
  */
 const looksLikeContent = (pattern: string): boolean => {
-  const pathShaped = /\/|\\\.[a-z0-9]+|\.[a-z0-9]{1,5}\$?$/i.test(pattern);
+  const pathShaped =
+    !/[ \t"'=]/.test(pattern) &&
+    /\/|\\\.[a-z0-9]+|\.[a-z0-9]{1,5}\$?$/i.test(pattern);
   return !pathShaped && /[ \t"'=;]|\\[sntr]/.test(pattern);
 };
 
