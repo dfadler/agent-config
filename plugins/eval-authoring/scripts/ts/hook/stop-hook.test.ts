@@ -81,7 +81,7 @@ describe("runStopHook in a real repo", () => {
 
   const ids: string[] = [];
   const sid = (): string => {
-    const id = `t${process.pid}-${ids.length}-${Date.now()}`;
+    const id = `t${String(process.pid)}-${String(ids.length)}-${String(Date.now())}`;
     ids.push(id);
     return id;
   };
