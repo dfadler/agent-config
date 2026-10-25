@@ -10,12 +10,14 @@ description: |
   levels, and PR-splitting sequencing. Also ships two SessionStart hooks that
   self-heal a project's own symlinked-worktree-directory convention and
   auto-prune merged worktrees. Use when creating, entering, or cleaning up a
-  git worktree; deciding how to parallelize agent sessions across a repo;
+  git worktree, including before starting work in an existing worktree that
+  another session may be using; deciding how to parallelize agent sessions across a repo;
   hitting a `git stash` collision between sessions; resolving a merge/rebase
   conflict; splitting an already-written diff into multiple PRs; or a stale
   or wrongly-linked worktree directory needs diagnosing. Do not use for a
   plain `git stash` in a single clone with no other worktrees or sessions,
-  or for rewriting an unpushed branch's history.
+  for rewriting an unpushed branch's history, or for running commands in a
+  worktree the user just created.
 license: MIT
 metadata:
   version: "1.0.0"
@@ -70,6 +72,18 @@ never commit directly to the main working copy).
   it also sits outside Claude Code's automatic stale-worktree sweep,
   regardless of age (see the sweep's documented exceptions in the docs
   linked below). Nothing removes it but a manual `git worktree remove`.
+- **Never share a linked worktree between two sessions.** The
+  worktree-enforcement hook only checks that a path is a linked worktree, not
+  that nobody else is using it, and nothing enforces this rule. Before
+  working in an existing worktree (a PR's branch, say), run `git -C <worktree-path>
+  status --short` and `git -C <worktree-path> log -3 --format='%h %cr %s'`. If anything is uncommitted
+  or newer than your session start, another session may be there: stop and
+  ask. If one is, create your own worktree on a child branch of that branch
+  (`worktree-<name>-<you>`). Merge back only once the owning session has
+  stopped using the target worktree and its branch is clean.
+  These checks are best-effort: clean output does not prove nobody owns the
+  worktree (an idle session is missed), so a worktree you just created yourself
+  needs no confirmation or child worktree.
 - **Pick what to parallelize by file surface, not by ticket.** Two tasks
   that both touch shared config (a lint config, `package.json`, a shared
   component) will conflict at merge time even if the sessions never overlap
