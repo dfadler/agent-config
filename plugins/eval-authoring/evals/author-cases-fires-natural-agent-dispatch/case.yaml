@@ -36,6 +36,6 @@ graders:
   - name: addresses_request
     type: regex
     target: last_message
-    pattern: 'subagent_type|tool_used[\s\S]{0,400}Agent|Agent[\s\S]{0,400}tool_used'
+    pattern: 'case\.yaml|prompt\.md|grader|tool_used|claude plugin eval'
     flags: i
     match: contains

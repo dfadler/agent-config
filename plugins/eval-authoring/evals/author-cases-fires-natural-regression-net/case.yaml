@@ -36,6 +36,6 @@ graders:
   - name: addresses_request
     type: regex
     target: last_message
-    pattern: 'claude plugin eval|before[\s\S]{0,40}after|baseline|regression'
+    pattern: 'case\.yaml|prompt\.md|grader|tool_used|claude plugin eval'
     flags: i
     match: contains

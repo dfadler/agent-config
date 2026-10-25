@@ -36,6 +36,6 @@ graders:
   - name: addresses_request
     type: regex
     target: last_message
-    pattern: 'near[- ]miss|should[ _-]?(not[ _-])?(trigger|fire)|skill_fired|tool_used[\s\S]{0,200}Skill'
+    pattern: 'case\.yaml|prompt\.md|grader|tool_used|claude plugin eval'
     flags: i
     match: contains
