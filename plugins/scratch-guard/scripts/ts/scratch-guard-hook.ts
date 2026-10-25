@@ -2,7 +2,8 @@
 // temp directory that is not the session scratchpad, backing the
 // claude/conventions/scratch-files.md convention.
 //
-// Mode: SCRATCH_GUARD env var (off, warn, block); default warn. Warn adds
+// Mode: SCRATCH_GUARD env var (off, warn, block); default warn, and any
+// other value is treated as warn. Warn adds
 // context for Claude and lets the write proceed; block exits 2.
 //
 // Covers Edit/Write only. Bash writes (redirects, mktemp, curl -o) are not
@@ -39,8 +40,11 @@ const asObject = (v: unknown): Record<string, unknown> | undefined =>
     : undefined;
 
 export const run = (d: Deps): number => {
-  const mode = d.env["SCRATCH_GUARD"] ?? "warn";
-  if (mode !== "warn" && mode !== "block") return 0;
+  // Only an explicit "off" disables the guard; an empty or misspelled value
+  // stays active as "warn" rather than silently turning enforcement off.
+  const setting = d.env["SCRATCH_GUARD"];
+  if (setting === "off") return 0;
+  const mode = setting === "block" ? "block" : "warn";
   let raw: unknown;
   let cwd: unknown;
   let session: unknown;

@@ -65,6 +65,12 @@ describe("scratch-guard hook", () => {
     expect(via("/tmp/scratch.Ab12Cd/x.txt", "abc-123")).toBe("");
   });
 
+  it.each(["", "blok", "WARN"])("treats invalid mode %j as warn", (mode) => {
+    const r = call("/tmp/x.txt", { SCRATCH_GUARD: mode });
+    expect(r.code).toBe(0);
+    expect(r.out).toContain("additionalContext");
+  });
+
   it("is silent when off", () => {
     expect(call("/tmp/x.txt", { SCRATCH_GUARD: "off" }).out).toBe("");
   });
