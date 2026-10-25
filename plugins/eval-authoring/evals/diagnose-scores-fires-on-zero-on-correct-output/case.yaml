@@ -1,0 +1,40 @@
+# Run: node plugins/eval-authoring/scripts/ts/run-evals/run-evals.ts --tier quick plugins/eval-authoring
+# No grant: Skill only; the prompt forbids running anything.
+# Should-fire for the description's "0.00 on output that looks correct". The reply grader is the
+# skill's own step 1 (it reads aggregate-result.json) or its script name (diagnose.ts), which a
+# model without the skill does not name; do not use judge/rubric (any model names the judge,
+# see diagnose-scores-fires-on-natural-phrasing).
+# Can fail: skill_fired = 0 when the description does not match; names_skill_artifact = 0 when the
+# reply is generic advice.
+# Unmeasured: a no-plugin model should fail names_skill_artifact (it has no reason to name the
+# result file or script) so Delta should be positive; skill_fired is an unscored indicator in a
+# two-arm run. Needs a standard run over several repetitions to trust the fire rate.
+schema_version: "1.1"
+name: diagnose-scores-fires-on-zero-on-correct-output
+description: >
+  A 0.00 score on output that looks correct must invoke diagnose-scores. expected_outcome: PASS
+  when the skill fires and the reply names aggregate-result.json or diagnose.ts; FAIL otherwise.
+tags: [eval-authoring, diagnose-scores, trigger, quick]
+
+execution:
+  prompt: |
+    One of my plugin eval cases got 0.00 in every run, but when I read the replies they look
+    totally correct to me. Where do I start? Answer in your reply; do not run anything.
+  max_turns: 6
+  allowed_tools:
+    - Skill
+
+graders:
+  - name: skill_fired
+    type: tool_used
+    tool: Skill
+    input_match: '"skill"\s*:\s*"(?:[\w-]+:)?diagnose-scores"'
+    min: 1
+    arm: with-only
+
+  - name: names_skill_artifact
+    type: regex
+    target: last_message
+    pattern: 'aggregate-result\.json|diagnose\.ts'
+    flags: i
+    match: contains
