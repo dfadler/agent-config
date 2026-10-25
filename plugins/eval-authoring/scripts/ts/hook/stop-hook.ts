@@ -15,8 +15,8 @@ import { join, relative, resolve, sep } from "node:path";
 import { resolveEvalDir } from "../parser/index.ts";
 import { findPluginRoot } from "./lint-hook.ts";
 
-/** A hung git must not hold the Stop hook open; a timeout throws and the hook no-ops. */
-const GIT_TIMEOUT_MS = 10_000;
+/** A hung git must not hold the Stop hook open; a timeout throws and the hook no-ops. 3 calls x 8s stays under the 30s hook timeout. */
+const GIT_TIMEOUT_MS = 8_000;
 
 const git = (cwd: string, args: readonly string[]): string =>
   execFileSync("git", [...args], {
@@ -28,22 +28,15 @@ const git = (cwd: string, args: readonly string[]): string =>
 
 const lines = (s: string): string[] => s.split("\n").filter((l) => l !== "");
 
-/** Files changed vs the merge-base with main (committed or not) plus untracked files, repo-relative. */
-export const changedFiles = (cwd: string): readonly string[] => {
-  const base = ["origin/main", "main", "@{upstream}"]
-    .map((ref) => {
-      try {
-        return git(cwd, ["merge-base", "HEAD", ref]).trim();
-      } catch {
-        return "";
-      }
-    })
-    .find((b) => b !== "");
-  return [
-    ...lines(git(cwd, ["diff", "--name-only", base ?? "HEAD"])),
-    ...lines(git(cwd, ["ls-files", "--others", "--exclude-standard"])),
-  ];
-};
+/**
+ * Uncommitted (staged or not) plus untracked files, repo-relative. Committed
+ * branch history is deliberately ignored: it is not this session's work, so a
+ * read-only turn on a branch with older skill commits is never blocked.
+ */
+export const changedFiles = (cwd: string): readonly string[] => [
+  ...lines(git(cwd, ["diff", "--name-only", "HEAD"])),
+  ...lines(git(cwd, ["ls-files", "--others", "--exclude-standard"])),
+];
 
 const latestResults = (evalDir: string): string | undefined => {
   const dir = join(evalDir, "results");

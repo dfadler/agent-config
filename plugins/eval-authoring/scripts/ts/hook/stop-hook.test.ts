@@ -1,3 +1,4 @@
+import { execFileSync } from "node:child_process";
 import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
@@ -58,6 +59,35 @@ describe("runStopHook", () => {
 
   it("no-ops on malformed input", () => {
     expect(runStopHook("not json")).toBe("");
+  });
+});
+
+describe("runStopHook in a real repo", () => {
+  const git = (cwd: string, ...args: string[]): void => {
+    execFileSync("git", ["-c", "user.name=t", "-c", "user.email=t@t", ...args], { cwd, stdio: "ignore" });
+  };
+  // main has the plugin; a feature branch already committed a skill change with no eval change.
+  const branchWithCommittedSkillChange = (): string => {
+    const top = repoWithPlugin();
+    git(top, "init", "-q", "-b", "main");
+    git(top, "add", "-A");
+    git(top, "commit", "-q", "-m", "base");
+    git(top, "checkout", "-q", "-b", "feature");
+    touch(top, "plugins/p/skills/s/SKILL.md");
+    git(top, "add", "-A");
+    git(top, "commit", "-q", "-m", "skill");
+    return top;
+  };
+
+  it("stays quiet when the skill change was committed before this session", () => {
+    const top = branchWithCommittedSkillChange();
+    expect(runStopHook(JSON.stringify({ cwd: top }))).toBe("");
+  });
+
+  it("blocks on an uncommitted skill change", () => {
+    const top = branchWithCommittedSkillChange();
+    writeFileSync(join(top, "plugins/p/skills/s/SKILL.md"), "edited\n");
+    expect(runStopHook(JSON.stringify({ cwd: top }))).toContain('"decision":"block"');
   });
 });
 
