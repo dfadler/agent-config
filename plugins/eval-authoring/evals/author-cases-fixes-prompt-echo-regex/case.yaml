@@ -1,0 +1,76 @@
+# Run: node plugins/eval-authoring/scripts/ts/run-evals/run-evals.ts --tier standard --case author-cases-fixes-prompt-echo-regex plugins/eval-authoring
+# No grant; reply-only. The broken case is inline (the workspace is empty and seeding needs
+# --scaffold, which is manual opt-in), so it stands in for a broken case under files/.
+# Covers graders.md "Regex robustness" and author-cases step 5: a pattern that matches words the
+# prompt itself contains passes every reply, so the fix is to anchor it to a token the prompt lacks
+# and to test it against a known-bad reply.
+# Can fail: notices_echo fails when the reply never says the pattern matches the prompt's own words;
+# proposes_new_pattern fails when no corrected pattern line is given; tests_known_bad fails when the
+# reply never says to run the grader on a reply that must fail. skill_fired is with-arm only.
+# Unmeasured: the symptom (always 1.00) points at a vacuous grader, so a no-plugin model likely
+# notices the echo; I expect notices_echo near 0.7-0.9 in both arms. The arm gap, if any, should
+# come from tests_known_bad (step 5) which a plain reply rarely states. Expect a small delta.
+schema_version: "1.1"
+name: author-cases-fixes-prompt-echo-regex
+description: >
+  Given an eval case whose only regex grader matches words from its own prompt and scores 1.00
+  every run, the reply says the pattern echoes the prompt, supplies a tighter pattern and says to
+  check it against a reply that must fail. expected_outcome: PASS when all three appear; FAIL
+  when it only suggests adding more runs or a bigger model.
+tags: [eval-authoring, author-cases, quick]
+
+execution:
+  prompt: |
+    This `claude plugin eval` case for my `release-notes` skill scores 1.00 on every run and I
+    don't trust it. What is wrong, and how should the grader change?
+
+    ```yaml
+    execution:
+      prompt: |
+        Turn this changelog into release notes: fixed login bug, added dark mode.
+    graders:
+      - name: makes_release_notes
+        type: regex
+        target: last_message
+        pattern: 'release notes|changelog|login|dark mode'
+        flags: i
+        match: contains
+    ```
+
+    Don't create files or run any commands.
+  max_turns: 8
+  allowed_tools:
+    - Skill
+    - Read
+    - Glob
+    - Grep
+
+graders:
+  - name: skill_fired
+    type: tool_used
+    tool: Skill
+    input_match: '"skill"\s*:\s*"(?:[\w-]+:)?author-cases"'
+    min: 1
+    arm: with-only
+
+  # PASS if the reply says the pattern matches words that are already in the prompt (an echo).
+  - name: notices_echo
+    type: regex
+    target: last_message
+    pattern: '(?:echo|repeat|restat|parrot|contain|appear|already (?:in|says|has))\w*[^.\n]{0,80}(?:prompt|request|input)|(?:prompt|request|input)[^.\n]{0,80}(?:echo|repeat|contain|already|own words)|matches? (?:the |your )?(?:prompt|input)'
+    flags: i
+    match: contains
+
+  - name: proposes_new_pattern
+    type: regex
+    target: last_message
+    pattern: 'pattern:\s*[''"]'
+    match: contains
+
+  # Step 5: run the grader on a reply that must fail.
+  - name: tests_known_bad
+    type: regex
+    target: last_message
+    pattern: 'known[- ]bad|bad reply|(?:reply|output|answer)[^.\n]{0,40}(?:must|should) fail|fail(?:s)? (?:a |the )?(?:bad|wrong|empty)|(?:wrong|empty|unrelated) reply'
+    flags: i
+    match: contains

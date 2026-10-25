@@ -6,6 +6,9 @@
 # instead of declining it; states_case_count_reason fails if the reply gives the old
 # "more runs" fix instead of the case count; skill_fired (with-arm only) fails if the
 # description stops matching.
+# Unmeasured: no_unqualified_delta_figure now also blocks 33%, 33 points and "improvement of 0.33";
+# a no-plugin model usually writes a delta, so it should fail the guard in the without arm (expect
+# ~0.3-0.5 overall without). A with-arm reply saying "a 0.33 delta is not claimed" would be a false fail.
 schema_version: "1.1"
 name: author-cases-delta-needs-twenty-cases
 description: >
@@ -63,6 +66,6 @@ graders:
   - name: no_unqualified_delta_figure
     type: regex
     target: last_message
-    pattern: '(?:Δ|delta)\s*(?:of\s*)?[:=]?\s*\+?0?\.33|\+?0?\.33\s*(?:Δ|delta)'
+    pattern: '(?:Δ|delta|improv\w+|gain|lift|up|by)\s*(?:of\s*)?[:=]?\s*\+?(?:0?\.33|33\s*(?:%|percent|points?|pts|pp))|\+?(?:0?\.33|33\s*(?:%|points?|pts|pp))\s*(?:Δ|delta|improvement|gain|lift)'
     flags: i
     match: not_contains

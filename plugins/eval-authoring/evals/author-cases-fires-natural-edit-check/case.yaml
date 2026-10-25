@@ -1,0 +1,55 @@
+# Run: node plugins/eval-authoring/scripts/ts/run-evals/run-evals.ts --tier quick plugins/eval-authoring
+# Natural-phrasing should-fire case with no plugin vocabulary: no "eval", "grader", "case", "test"
+# or skill name; it asks how to know a skill still works after an edit. Reply-only, so the Skill
+# check is an unscored indicator (EVAL009 info intentional). Read its fire rate across runs.
+# Can fail: skill_fired fails when the description does not match this phrasing; names_eval_command
+# fails when the reply never names the `claude plugin eval` mechanism (a generic "write some tests"
+# or "try it by hand" reply); names_two_arms fails when it never mentions comparing with and without
+# the plugin or a baseline. Sabotage map: delete the step-9 before/after sentence -> names_two_arms drops.
+# Unmeasured: names_eval_command asks for the literal command or "eval case"; a no-plugin model knows
+# `claude plugin eval` only weakly (it is recent), so I expect it near 0.3-0.6, but a model that
+# says "eval cases" generically passes. names_two_arms is looser and a no-plugin reply may pass it
+# ("compare against the old version"); I expect the delta to come from names_eval_command. This
+# is why the existing natural-* graders were left untouched: this case is additive.
+schema_version: "1.1"
+name: author-cases-fires-natural-edit-check
+description: >
+  A user with no eval vocabulary asks how to know a skill still works after editing it. The model
+  should invoke author-cases and point at plugin eval cases compared with and without the plugin.
+  expected_outcome: PASS when author-cases fires and the reply names plugin eval cases and a with/without
+  comparison; FAIL when it only suggests manual testing.
+tags: [eval-authoring, author-cases, trigger, quick]
+
+execution:
+  prompt: |
+    I keep tweaking the instructions of a skill in my Claude Code plugin (it drafts commit
+    messages). How do I know it still works after I edit it, and that the plugin is actually
+    helping? I'd like something repeatable, not me trying it by hand each time.
+    Don't create files or run any commands.
+  max_turns: 6
+  allowed_tools:
+    - Skill
+    - Read
+    - Glob
+
+graders:
+  - name: skill_fired
+    type: tool_used
+    tool: Skill
+    input_match: '"skill"\s*:\s*"(?:[\w-]+:)?author-cases"'
+    min: 1
+    arm: with-only
+
+  - name: names_eval_command
+    type: regex
+    target: last_message
+    pattern: 'claude plugin eval|eval cases?|case\.yaml|prompt\.md'
+    flags: i
+    match: contains
+
+  - name: names_two_arms
+    type: regex
+    target: last_message
+    pattern: 'with(?:out)?[ -]?(?:and|vs\.?|versus|/)?[ -]?without|no-plugin|baseline|\bdelta\b|\barms?\b'
+    flags: i
+    match: contains
