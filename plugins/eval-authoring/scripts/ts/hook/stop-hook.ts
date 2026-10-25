@@ -7,16 +7,18 @@
  * Contract (https://code.claude.com/docs/en/hooks, Stop): stdin JSON carries
  * `cwd` and `stop_hook_active`; stdout `{ decision: "block", reason }` makes
  * Claude continue with `reason`. `stop_hook_active` is true on the retry, so
- * the hook blocks at most once per stop and never loops. Failures no-op.
+ * the hook blocks at most once per stop and never loops. `session_id` keys a
+ * temp-dir marker so it also nags at most once per session. Failures no-op.
  */
 import { execFileSync } from "node:child_process";
-import { existsSync, readdirSync } from "node:fs";
+import { existsSync, readdirSync, writeFileSync } from "node:fs";
+import { tmpdir } from "node:os";
 import { join, relative, resolve, sep } from "node:path";
 import { resolveEvalDir } from "../parser/index.ts";
 import { findPluginRoot } from "./lint-hook.ts";
 
-/** A hung git must not hold the Stop hook open; a timeout throws and the hook no-ops. 3 calls x 8s stays under the 30s hook timeout. */
-const GIT_TIMEOUT_MS = 8_000;
+/** A hung git must not hold the Stop hook open; a timeout throws and the hook no-ops. Worst case 6 calls (rev-parse, 3 merge-base candidates, diff, ls-files) x 4s = 24s, under the 30s hook timeout. */
+const GIT_TIMEOUT_MS = 4_000;
 
 const git = (cwd: string, args: readonly string[]): string =>
   execFileSync("git", [...args], {
@@ -28,15 +30,32 @@ const git = (cwd: string, args: readonly string[]): string =>
 
 const lines = (s: string): string[] => s.split("\n").filter((l) => l !== "");
 
+/** Files changed vs the merge-base with main (committed or not) plus untracked files, repo-relative. */
+export const changedFiles = (cwd: string): readonly string[] => {
+  const base = ["origin/main", "main", "@{upstream}"]
+    .map((ref) => {
+      try {
+        return git(cwd, ["merge-base", "HEAD", ref]).trim();
+      } catch {
+        return "";
+      }
+    })
+    .find((b) => b !== "");
+  return [
+    ...lines(git(cwd, ["diff", "--name-only", base ?? "HEAD"])),
+    ...lines(git(cwd, ["ls-files", "--others", "--exclude-standard"])),
+  ];
+};
+
 /**
- * Uncommitted (staged or not) plus untracked files, repo-relative. Committed
- * branch history is deliberately ignored: it is not this session's work, so a
- * read-only turn on a branch with older skill commits is never blocked.
+ * Once-per-session marker under the temp dir, so a branch that already carries
+ * skill commits is nagged on the first stop only. Undefined for a session_id
+ * that is not path-safe (then there is no marker and the hook behaves as before).
  */
-export const changedFiles = (cwd: string): readonly string[] => [
-  ...lines(git(cwd, ["diff", "--name-only", "HEAD"])),
-  ...lines(git(cwd, ["ls-files", "--others", "--exclude-standard"])),
-];
+export const markerPath = (sessionId: unknown): string | undefined =>
+  typeof sessionId === "string" && /^[A-Za-z0-9_-]+$/.test(sessionId)
+    ? join(tmpdir(), `eval-authoring-stop-${sessionId}`)
+    : undefined;
 
 const latestResults = (evalDir: string): string | undefined => {
   const dir = join(evalDir, "results");
@@ -118,9 +137,16 @@ export const runStopHook = (raw: string): string => {
       "--show-toplevel",
     ]).trim();
     const gaps = findGaps(top, changedFiles(top));
-    return gaps.length === 0
-      ? ""
-      : `${JSON.stringify({ decision: "block", reason: reasonFor(gaps) })}\n`;
+    if (gaps.length === 0) return "";
+    const marker = markerPath(
+      "session_id" in event ? event.session_id : undefined,
+    );
+    if (marker !== undefined) {
+      if (existsSync(marker)) return "";
+      // Fail open: if the marker cannot be written we cannot promise "once", so do not block.
+      writeFileSync(marker, "");
+    }
+    return `${JSON.stringify({ decision: "block", reason: reasonFor(gaps) })}\n`;
   } catch {
     return "";
   }
