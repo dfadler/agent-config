@@ -124,6 +124,7 @@ describe("judgeRun output signals", () => {
   it("treats early access as an unmet requirement and stops", () => {
     const j = judge({
       status: 1,
+      findings: undefined,
       signals: scanOutput("plugin eval is currently in early access"),
     });
     expect(j).toMatchObject({ code: EXIT_DEPENDENCY, stop: true });
@@ -132,10 +133,25 @@ describe("judgeRun output signals", () => {
   it("skips (exit 0) when asked, without also reporting a threshold failure", () => {
     const j = judge({
       status: 1,
+      findings: undefined,
       signals: scanOutput("Plugin eval is currently unavailable"),
       skipUnavailable: true,
     });
     expect(j).toMatchObject({ code: EXIT_OK, stop: true });
+  });
+  it("ignores early-access or unavailable text when a result was read (a graded reply can say it)", () => {
+    const signals = scanOutput("reply: plugin eval is currently in early access; currently unavailable");
+    for (const skipUnavailable of [false, true]) {
+      expect(judge({ status: 1, signals, skipUnavailable })).toMatchObject({
+        code: EXIT_FAILURE,
+        stop: false,
+      });
+    }
+  });
+  it("maps a CLI killed without a status to partial, not below-threshold", () => {
+    const j = judge({ status: null, signal: "SIGKILL" });
+    expect(j.code).toBe(EXIT_PARTIAL);
+    expect(j.reasons.join()).toContain("SIGKILL");
   });
   it("ignores unavailable text on a passing run", () => {
     expect(judge({ signals: scanOutput("currently unavailable") }).code).toBe(EXIT_OK);
@@ -182,6 +198,26 @@ describe("inspectResult", () => {
       { caseName: "x", arm: "without", run: 1, error: "boom" },
     ]);
     expect(f.skippedPaidGraders).toEqual(["x"]);
+  });
+  it("counts an empty-string error and a silent zero, as diagnose does", () => {
+    const f = read(
+      resultJson({
+        cases: [
+          {
+            name: "x",
+            aggregates: {},
+            arms: {
+              with: [{ score: 0, error: "" }, { score: 0 }, { score: 0, graders: [{ name: "g", passed: false }] }],
+              without: [],
+            },
+          },
+        ],
+      }),
+    );
+    expect(f.runErrors.map((e) => [e.run, e.error])).toEqual([
+      [1, "(empty error)"],
+      [2, "scored 0 with no grader detail (usage limit?)"],
+    ]);
   });
   it("is clean for a clean result", () => {
     expect(read(resultJson())).toEqual(clean);

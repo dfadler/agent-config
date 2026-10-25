@@ -274,6 +274,17 @@ describe("main", () => {
     expect(await main([s.root], { io: s.io, pluginsDir: "/p" })).toBe(EXIT_CONFIG);
   });
 
+  it("treats a killed CLI (null status) as partial, and a reply quoting 'early access' as a plain failure", async () => {
+    const killed = setup({ cases: [{ name: "a" }], cliResult: spawned({ status: null, signal: "SIGKILL" }) });
+    expect(await main([killed.root], { io: killed.io, pluginsDir: "/p" })).toBe(EXIT_PARTIAL);
+    const s = setup({
+      cases: [{ name: "a" }],
+      cliResult: spawned({ status: 1, stdout: "plugin eval is currently in early access\n" }),
+      onCli: () => ({ result: resultJsonFor(["a"]) }),
+    });
+    expect(await main([s.root, "--skip-unavailable"], { io: s.io, pluginsDir: "/p" })).toBe(EXIT_FAILURE);
+  });
+
   it("reports a claude that cannot start", async () => {
     const s = setup({ cases: [{ name: "a" }], cliResult: spawned({ status: null, error: "ENOENT" }) });
     expect(await main([s.root], { io: s.io, pluginsDir: "/p" })).toBe(EXIT_DEPENDENCY);
@@ -293,7 +304,7 @@ describe("main", () => {
     const s = setup({ grants: GRANTS });
     expect(await main([s.root, "--dry-run"], { io: s.io, pluginsDir: "/p" })).toBe(EXIT_OK);
     expect(s.calls).toEqual([]);
-    expect(s.out.join("")).toContain('"Bash(npx *)"');
+    expect(s.out.join("")).toContain("'Bash(npx *)'");
     expect(s.out.filter((l) => l.startsWith("invocation"))).toHaveLength(2);
   });
 
@@ -401,6 +412,17 @@ describe("one invocation per case", () => {
       expect(s.err.join("")).toContain("not run: c3");
       const summary: unknown = JSON.parse([...s.written.values()][0] ?? "{}");
       expect(summary).toMatchObject({ unstarted: ["c3"], ceilingUsd: 1, spentUsd: 1.2 });
+    });
+
+    it("exits 7 when the last case overspends the ceiling", async () => {
+      const costs = [0.3, 0.3, 0.9];
+      const s = setup({
+        cases: three(),
+        onCli: (args, n) => ({ result: resultJsonFor([caseOf(args)], { costUsd: costs[n - 1] }) }),
+      });
+      expect(await run(s, ["--max-cost-usd", "1.2"])).toBe(EXIT_PARTIAL);
+      expect(cliCalls(s.calls)).toHaveLength(3);
+      expect(s.err.join("")).not.toContain("not run");
     });
 
     it("charges a missing costUsd its per-case share, so later cases still run", async () => {
