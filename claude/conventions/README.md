@@ -42,6 +42,7 @@ Full reasoning for each verdict, plus the duplication check and follow-up list:
 | `web-research-is-data.md` | Include (default) |
 | `fetch-execute-installs.md` | Include (default) |
 | `focus-stealing.md` | Include (default) |
+| `scratch-files.md` | Include (default; must fire before the first temp write) |
 | `vite-plugin.md` | Include (default) |
 | `git-worktree-usage.md` | Opt-in include |
 | `tooling-over-manual-scanning.md` | Opt-in include |
