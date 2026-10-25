@@ -86,8 +86,7 @@ diagnosis verdicts (tested on fixtures shaped from [#450](https://github.com/dfa
 
 Not confirmed against a logged-in run:
 
-- How several grants reach `--allow-tools` (the wrapper repeats the flag), that
-  `--output-dir X` writes `aggregate-result.json` into `X` rather than a subdirectory
+- That `--output-dir X` writes `aggregate-result.json` into `X` rather than a subdirectory
   (the wrapper reads both), that a result's `costUsd` is present when a run is partial or
   errored, and what `--json` does (it made the CLI exit 1 in
   [#536](https://github.com/dfadler/agent-config/issues/536); the wrapper no longer passes it).
@@ -95,5 +94,3 @@ Not confirmed against a logged-in run:
   (the lint keeps EVAL004 and EVAL005 in full until then).
 - The `aggregate-result.json` shape the diagnosis reads, including split judge votes parsed
   from grader explanations.
-- That the plugin's own cases ([#469](https://github.com/dfadler/agent-config/issues/469))
-  pass; none has reached the model yet.
