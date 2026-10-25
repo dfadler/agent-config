@@ -46,7 +46,7 @@ so pre-allow exactly that command, with Node 22.18 or later first on `PATH`
 ([flags](https://code.claude.com/docs/en/cli-reference)):
 
 ```bash
-PATH="$HOME/.nvm/versions/node/v22.22.1/bin:$PATH" claude -p --agent case-reviewer \
+PATH="<node-22.18+-bin-dir>:$PATH" claude -p --agent case-reviewer \
   --allowedTools "Bash(node *lint/cli.ts*)" "Read" "Grep" "Glob" \
   "Review plugins/<name>/evals"
 ```
