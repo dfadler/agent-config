@@ -168,7 +168,10 @@ const scoredGraderCount = (c: CaseResult): number | undefined => {
  * against a result file, so an explanation without tokens is simply not split.
  */
 export const judgeVotes = (explanation: string): readonly string[] =>
-  explanation.match(/\b(?:PASS|FAIL)\b/g) ?? [];
+  // Only the line after "judge votes:"; a rubric quoted earlier says PASS/FAIL too.
+  /judge votes:?([^\n]*)/i
+    .exec(explanation)?.[1]
+    ?.match(/\b(?:PASS|FAIL)\b/g) ?? [];
 
 const splitVoteFindings = (c: CaseResult): readonly Finding[] => {
   const arms = [
@@ -250,11 +253,13 @@ interface Judged {
 
 /** The verdict from stats alone, once errors and missing signal are ruled out. */
 const judgeDelta = (
-  delta: number,
+  rawDelta: number,
   w: ArmStats,
   wo: ArmStats,
   t: Thresholds,
 ): Judged => {
+  // Float noise: 0.35 - 0.30 is 0.04999999999999999, which must count as 0.05.
+  const delta = round(rawDelta);
   const d = fmt(delta);
   const seW = (w.stdDev ?? 0) ** 2 / Math.max(w.usedRuns, 1);
   const seWo = (wo.stdDev ?? 0) ** 2 / Math.max(wo.usedRuns, 1);
@@ -283,6 +288,13 @@ const judgeDelta = (
         ] as const)
       : [];
   const extra = [...ceiling, ...floor];
+  if (delta <= -t.neutralBand && noiseKnown && -delta <= t.noiseMultiple * se) {
+    return {
+      verdict: "weak-signal",
+      reason: `delta ${d} is negative but within ${String(t.noiseMultiple)} standard errors (${fmt(se)}) of zero, so it may be noise`,
+      findings: extra,
+    };
+  }
   if (delta <= -t.neutralBand) {
     return {
       verdict: "negative-delta",

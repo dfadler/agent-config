@@ -74,6 +74,32 @@ describe("verdict categories", () => {
     );
   });
 
+  it("calls a negative delta within noise a weak signal, not negative-delta", () => {
+    // means 0.6 vs 0.66, sd 0.3 each, n=3: SE ~0.245, so -0.06 is noise.
+    const v = diagnoseCase(
+      caseOf([0.3, 0.6, 0.9], [0.36, 0.66, 0.96], -0.06),
+    );
+    expect(v.verdict).toBe("weak-signal");
+    expect(v.reason).toContain("negative");
+    expect(kinds(v)).not.toContain("negative-delta");
+  });
+
+  it("keeps negative-delta when the drop clears the noise", () => {
+    const v = diagnoseCase(caseOf([0, 0, 0.1], [1, 1, 0.9], -0.9));
+    expect(v.verdict).toBe("negative-delta");
+  });
+
+  it("applies the neutral band to a delta that is exactly 0.05 after float error", () => {
+    // 0.35 - 0.3 is 0.04999999999999999 in floating point.
+    const dropped = (a: number, b: number): CaseResult =>
+      caseOf([], [], 0.5, {
+        withRuns: [run(a), run(0, { error: "rate limit" })],
+        withoutRuns: [run(b)],
+      });
+    expect(diagnoseCase(dropped(0.35, 0.3)).verdict).toBe("discriminates");
+    expect(diagnoseCase(dropped(0.3, 0.35)).verdict).toBe("negative-delta");
+  });
+
   it("trusts a single run per arm but says noise is unknown", () => {
     const v = diagnoseCase(caseOf([1], [0.5], 0.5));
     expect(v.verdict).toBe("discriminates");
@@ -321,6 +347,13 @@ describe("mechanical findings", () => {
       "PASS",
     ]);
     expect(judgeVotes("regex matched")).toEqual([]);
+  });
+
+  it("ignores PASS and FAIL quoted from the rubric outside the votes segment", () => {
+    expect(
+      judgeVotes("PASS if it asks. FAIL if it acts. judge votes: PASS PASS PASS"),
+    ).toEqual(["PASS", "PASS", "PASS"]);
+    expect(judgeVotes("PASS if it asks. FAIL if it acts.")).toEqual([]);
   });
 });
 
