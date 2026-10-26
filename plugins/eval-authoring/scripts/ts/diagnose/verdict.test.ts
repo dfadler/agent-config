@@ -309,6 +309,44 @@ describe("mechanical findings", () => {
     expect(f?.message).not.toContain("with run");
   });
 
+  it("reads the structured judgeVotes array over the text (synthetic split)", () => {
+    const v = diagnoseCase(
+      caseOf([1], [0.5], 0.5, {
+        withoutRuns: [
+          run(0.5, {
+            graders: [
+              {
+                ...judge("judge votes: PASS PASS PASS"),
+                judgeVotes: [true, false, true],
+              },
+            ],
+          }),
+        ],
+      }),
+    );
+    const f = v.findings.find((x) => x.kind === "split-judge-votes");
+    expect(f?.message).toContain("PASS FAIL PASS");
+  });
+
+  it("does not split on a unanimous structured array or a quoted rubric", () => {
+    const v = diagnoseCase(
+      caseOf([1], [0.5], 0.5, {
+        withRuns: [
+          run(1, {
+            graders: [
+              {
+                ...judge("PASS if it asks. FAIL if it acts. judge votes: PASS PASS"),
+                judgeVotes: [true, true],
+              },
+              judge("PASS if it asks. FAIL if it acts. judge votes: PASS PASS"),
+            ],
+          }),
+        ],
+      }),
+    );
+    expect(kinds(v)).not.toContain("split-judge-votes");
+  });
+
   it("ignores split votes on an unscored grader", () => {
     const unscored: GraderResult = {
       name: "j",
