@@ -103,8 +103,29 @@ hook_lines() {
     printf 'link\t%s\t%s\n' "$FAKE_REPO/plugins/scratch-guard" "$CLAUDE/skills/scratch-guard"
     printf 'link\t%s\t%s\n' "$FAKE_REPO/plugins/worktree-core" "$CLAUDE/skills/worktree-core"
     hook_lines
+    printf 'default-setting\t%s\tworktree.autoPrune\ttrue\n' "$CLAUDE/settings.json"
   )"
   [ "$output" = "$expected" ]
+}
+
+@test "plan: worktree.autoPrune is seeded to true when absent" {
+  plan
+  [ "$status" -eq 0 ]
+  has "default-setting${T}$CLAUDE/settings.json${T}worktree.autoPrune${T}true"
+}
+
+@test "plan: a user's worktree.autoPrune value is never planned over" {
+  mkdir -p "$CLAUDE"
+  printf '{"worktree":{"autoPrune":false}}\n' >"$CLAUDE/settings.json"
+  plan
+  [ "$status" -eq 0 ]
+  lacks "default-setting"
+}
+
+@test "plan: --skip=worktree-core leaves worktree.autoPrune alone" {
+  plan --skip=worktree-core
+  [ "$status" -eq 0 ]
+  lacks "default-setting"
 }
 
 @test "plan: --dry-run is an alias and writes nothing under HOME" {
@@ -334,7 +355,7 @@ PY
     verb="${line%%$'\t'*}"
     case "$verb" in
       mkdir | personal-migrate | personal-create | include | claude-md | link | relink | unlink | \
-        register-hook | deregister-hook | migrate-hook | skip-plugin | skip-command | warn-foreign-symlink | warn-exists) ;;
+        register-hook | deregister-hook | migrate-hook | default-setting | skip-plugin | skip-command | warn-foreign-symlink | warn-exists) ;;
       *)
         echo "undocumented verb: $verb" >&2
         return 1

@@ -50,7 +50,7 @@ hook passes in, not the mechanism itself.
 | Hook | Event | Env var | settings.json key | Default |
 |---|---|---|---|---|
 | `require-worktree-hook.ts` | `PreToolUse` (Edit/Write) | `WORKTREE_ENFORCE=block\|warn\|off` | `worktree.enforce: "block"\|"warn"\|"off"` | off (no block, no warn) |
-| `prune-merged-worktrees-hook.ts` | `SessionStart` | `WORKTREE_AUTO_PRUNE=on\|off` | `worktree.autoPrune: true\|false` | off (one-line nudge only, no removal) |
+| `prune-merged-worktrees-hook.ts` | `SessionStart` | `WORKTREE_AUTO_PRUNE=on\|off` | `worktree.autoPrune: true\|false` | on for `setup.sh` installs: seeded to `true` only when the key is absent, so a user's value wins; with `--skip=worktree-core` it is not written and the default is off (one-line nudge only) |
 | `check-worktree-symlinks-hook.ts` | `SessionStart` | `WORKTREE_SYMLINK_CHECK=on\|off` | `worktree.symlinkCheck: "on"\|"off"` | off (skipped entirely) |
 | `memory-hygiene-stop-hook.ts` | `Stop` | `MEMORY_HYGIENE_REMINDER=on\|off` | `env.MEMORY_HYGIENE_REMINDER: "on"` (settings.json's built-in `env` key — no bespoke key; see below) | off (skipped entirely) |
 | `scratch-guard-hook.ts` | `PreToolUse` (Edit/Write) | `SCRATCH_GUARD=warn\|block\|off` | none (env var only) | warn (advisory context, no block). Unlike the others it is on by default: it only warns, and only for writes into a system temp directory outside the session scratchpad |
