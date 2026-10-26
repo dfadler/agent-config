@@ -1,0 +1,59 @@
+# Run: claude plugin eval plugins/fan-out --case fan-out-budget-flag-caps-spawns --runs 3 --trust-plugin --no-publish
+# Shared run/grant facts: docs/contributing.md, "Plugin evals". Grants: see grants.yaml.
+# #807: the --budget flag is parsed by limits.ts and the root holds budget 3 = itself plus 2.
+# Sabotage map: delete the "Divide the budget before spawning" step and the `--budget N` flag
+# text in SKILL.md and the root spawns one agent per package (4): agents_within_cap (max 2) fails.
+# delete the "Exit 2" sentence and this case still passes (covered by fan-out-rejects-invalid-budget).
+# Can fail: agents_within_cap fails at 3+ root spawns or none; states_budget is a floor.
+# good-reply: Budget 3 in total: me plus 2 sub-agents, each covering two packages (auth and billing, search and exports).
+# bad-reply: I spawned four sub-agents, one per package, and merged the results.
+schema_version: "1.1"
+name: fan-out-budget-flag-caps-spawns
+description: >
+  Given --budget 3 and four packages, the root spawns 1 or 2 sub-agents (itself plus 2 is the
+  whole budget). expected_outcome: PASS when Agent calls are between 1 and 2 and the reply
+  states the budget; FAIL when it spawns one agent per package (4) or none.
+tags: [fan-out, budget]
+
+execution:
+  prompt: |
+    Fan this out with --budget 3: for each of the four packages under packages/ (auth,
+    billing, search, exports) a sub-agent should name the first file it would check for uses
+    of the deprecated `legacyFetch` helper. Do not read any files; the sub-agents answer
+    from the package name alone. Merge their answers into one short list and say what
+    budget you worked to.
+  max_turns: 10
+  allowed_tools:
+    - Skill
+    - Agent
+    - Bash
+
+graders:
+  - name: skill_fired
+    type: tool_used
+    tool: Skill
+    input_match: '"skill"\s*:\s*"(?:[\w-]+:)?fan-out"'
+    min: 1
+
+  - name: agents_within_cap
+    type: tool_used
+    tool: Agent
+    min: 1
+    max: 2
+
+  # Floor: the budget of 3 is stated next to budget wording (not a stray digit).
+  - name: states_budget
+    type: regex
+    target: last_message
+    pattern: '(?:budget|cap|at most|max(?:imum)?|in total|total)\W+(?:\w+\W+){0,4}3\b|\b3\s+(?:agents|in total|total)'
+    flags: i
+    match: contains
+    weight: 0.5
+
+  # Indicator: the skill's script resolved the limits instead of the model parsing the flag.
+  - name: limits_script_ran
+    type: tool_used
+    tool: Bash
+    input_match: 'limits\.ts'
+    min: 1
+    arm: with-only
