@@ -9,16 +9,18 @@ description: |
   their own sub-agents under a fixed depth, width and total-agent budget, and merges
   compact results. Not for small tasks or a single question: use
   `subagent-orchestration` to route those.
+argument-hint: "[--budget N] [--depth N] [--width N] <prompt>"
 license: MIT
 metadata:
-  version: "1.0.0"
+  version: "1.1.0"
 ---
 
 # Fan out
 
 ## Contract
 
-- **Input:** a prompt to solve, plus optional overrides for the limits below.
+- **Input:** `$ARGUMENTS`: the prompt to solve, optionally preceded by `--budget N`,
+  `--depth N`, `--width N` to override the limits below.
 - **Output:** one merged answer, a one-line account of how the work was split, and
   which subtasks failed or were skipped.
 - **Does not:** decide whether a task deserves heavy parallelism (that is
@@ -26,13 +28,16 @@ metadata:
 
 ## Limits
 
-Defaults. The user can override any of them in the request.
+Parse `--budget`, `--depth` and `--width` out of `$ARGUMENTS`; the rest is the prompt. A
+limit given in plain words in the request ("at most 8 agents") counts the same. Anything
+not given takes its default. For `budget` that is the harness's current max sub-agent
+count: run `echo "${CLAUDE_CODE_MAX_CONCURRENT_SUBAGENTS:-20}"` and use the number.
 
 | Limit | Default | Meaning |
 |---|---|---|
 | `depth` | 2 | Layers of sub-agents below you. The harness hard-stops at 3. |
-| `width` | 4 | Children one agent may spawn at once. |
-| `budget` | 12 | Total agents in the whole run, all layers. |
+| `width` | 4 | Children one agent may spawn at once. Never above `budget` minus 1. |
+| `budget` | current max sub-agent count (env value, else 20) | Total agents in the whole run, all layers. |
 
 The harness also caps concurrent sub-agents (`CLAUDE_CODE_MAX_CONCURRENT_SUBAGENTS`,
 default 20) and nesting (`CLAUDE_CODE_MAX_SUBAGENT_SPAWN_DEPTH`), per the
