@@ -1,25 +1,36 @@
 # Run: claude plugin eval plugins/fan-out --case fan-out-respects-user-budget --runs 3 --trust-plugin --no-publish
-# Shared run/grant facts: docs/contributing.md, "Plugin evals". No grant; reply-only.
-# Budget half of #729: the user caps the run below the default and below the task's natural
-# width (10 packages). Can fail: within_budget (llm, judged) fails a plan that spawns more than
-# 5 sub-agents or one per package; skill_fired is with-arm only and not scored.
+# Shared run/grant facts: docs/contributing.md, "Plugin evals". Grants: see grants.yaml.
+# Budget half of #729, behavior grader from #807: the user caps the run below the default and
+# below the task's natural width (10 packages). The root really spawns, so the cap is graded on
+# its Agent calls, not on a described plan.
+# Sabotage map: delete the "Divide the budget before spawning" step in SKILL.md and the root
+# spawns one agent per package (10): agents_within_cap (Agent max 5) fails. delete the "Limits"
+# script paragraph and states_cap can still pass; it is a floor, not the signal.
+# The prompt hands over the cap, so a baseline may obey it too: treat as a regression guard;
+# fan-out-budget-flag-caps-spawns is the case that separates the arms.
+# Can fail: agents_within_cap fails above 5 root spawns; skill_fired is with-arm only and not scored.
+# good-reply: Used 5 sub-agents (budget 6 in total including me), two packages each: auth and billing, search and notifications, exports and users, orgs and audit, webhooks and admin.
+# bad-reply: I spawned ten sub-agents, one per package, and merged their results.
 schema_version: "1.1"
 name: fan-out-respects-user-budget
 description: >
-  Asked to fan out a ten-package audit with a cap of 6 agents in total, the plan never
-  exceeds 6 agents. expected_outcome: PASS when the plan groups packages to fit the cap;
-  FAIL when it assigns one agent per package (10) or otherwise exceeds 6.
+  Asked to fan out a ten-package audit with a cap of 6 agents in total, the root agent spawns
+  at most 5 sub-agents. expected_outcome: PASS when the Agent calls stay at 5 or fewer and
+  the reply states the cap; FAIL when it spawns one agent per package (10) or otherwise exceeds 5.
 tags: [fan-out, budget]
 
 execution:
   prompt: |
-    Fan this out across parallel sub-agents, with at most 6 agents in total including you:
-    audit the ten packages under packages/ (auth, billing, search, notifications, exports,
-    users, orgs, audit, webhooks, admin) for uses of the deprecated `legacyFetch` helper.
-    Describe your plan in four sentences, no commands.
-  max_turns: 4
+    Fan this out across parallel sub-agents, with at most 6 agents in total including you.
+    For each of these ten packages under packages/ (auth, billing, search, notifications,
+    exports, users, orgs, audit, webhooks, admin) a sub-agent should name the first file
+    it would check for uses of the deprecated `legacyFetch` helper. Do not read any files
+    or run commands; the sub-agents answer from the package name alone. Merge their
+    answers into one short list and say how many agents you used.
+  max_turns: 10
   allowed_tools:
     - Skill
+    - Agent
 
 graders:
   - name: skill_fired
@@ -28,15 +39,19 @@ graders:
     input_match: '"skill"\s*:\s*"(?:[\w-]+:)?fan-out"'
     min: 1
 
-  - name: within_budget
-    type: llm
-    criteria: |
-      PASS if the plan spawns at most 5 sub-agents (6 total including the root), for
-      example by grouping the ten packages across fewer agents, and does not allow
-      descendants to push the total past 6.
+  # Root-level spawns only: the eval trace holds the root session; sub-agents' own calls are
+  # in separate files and are not graded (verified with --keep-temp, see PR 809).
+  - name: agents_within_cap
+    type: tool_used
+    tool: Agent
+    min: 1
+    max: 5
 
-      FAIL if any of these hold:
-      - It assigns one agent per package (ten agents) or otherwise names more than 5
-        sub-agents.
-      - It lets sub-agents spawn further helpers with no stated total cap.
-      - It declines to use sub-agents at all.
+  # Floor: the stated cap pairs a number with budget wording (not a stray digit).
+  - name: states_cap
+    type: regex
+    target: last_message
+    pattern: '(?:budget|cap|at most|max(?:imum)?|in total|total)\W+(?:\w+\W+){0,4}6\b|\b6\s+(?:agents|in total|total)'
+    flags: i
+    match: contains
+    weight: 0.5

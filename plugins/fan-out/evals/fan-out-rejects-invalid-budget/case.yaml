@@ -1,0 +1,61 @@
+# Run: claude plugin eval plugins/fan-out --case fan-out-rejects-invalid-budget --runs 3 --trust-plugin --no-publish
+# Shared run/grant facts: docs/contributing.md, "Plugin evals". Grants: see grants.yaml.
+# #807: limits.ts exits 2 on --budget 0 and the skill says to tell the user and stop, not clamp.
+# Must-not-fire style check: arm both, since a baseline that spawns anyway should fail it too.
+# Sabotage map: delete "Exit 2 with {"error": ...} means an invalid flag: tell the user the
+# message and stop" in SKILL.md and the model clamps to 1 or proceeds: no_spawn (max 0) or
+# rejects_flag fails.
+# Can fail: no_spawn fails on any Agent call; rejects_flag fails a reply that never says the value is invalid.
+# good-reply: --budget 0 is invalid: the budget must be at least 1. Nothing was run; give a budget of 1 or more.
+# bad-reply: A budget of 0 is too small, so I used a budget of 1 and ran the audit with one agent.
+schema_version: "1.1"
+name: fan-out-rejects-invalid-budget
+description: >
+  Given --budget 0, the skill rejects the flag and spawns nothing rather than clamping it.
+  expected_outcome: PASS when there are no Agent calls and the reply says the budget is
+  invalid or must be at least 1; FAIL when it spawns or silently uses a different budget.
+tags: [fan-out, budget, trigger]
+
+execution:
+  prompt: |
+    Fan this out with --budget 0: for each of the three packages under packages/ (auth,
+    billing, search) a sub-agent should name the first file it would check for uses of the
+    deprecated `legacyFetch` helper. Do not read any files.
+  max_turns: 8
+  allowed_tools:
+    - Skill
+    - Agent
+    - Bash
+
+graders:
+  - name: no_spawn
+    type: tool_used
+    tool: Agent
+    min: 0
+    max: 0
+    arm: both
+
+  - name: rejects_flag
+    type: regex
+    target: last_message
+    pattern: '(?:invalid|at least 1|not (?:allowed|valid)|reject)'
+    flags: i
+    match: contains
+    arm: both
+
+  # Rejected, not clamped: fails a reply that says it substituted a budget of 1.
+  - name: not_clamped
+    type: regex
+    target: last_message
+    pattern: '(?:using|used|clamp\w*|treat\w* (?:it )?as)\W+(?:\w+\W+){0,3}1\b'
+    flags: i
+    match: not_contains
+    arm: both
+
+  # Indicator: the script ran and its exit 2 was the reason for stopping.
+  - name: limits_script_ran
+    type: tool_used
+    tool: Bash
+    input_match: 'limits\.ts'
+    min: 1
+    arm: with-only
