@@ -1,29 +1,26 @@
 # Run: claude plugin eval plugins/eval-authoring --case run-evals-not-model-invoked
 # Grants: grants.yaml (Bash narrowed to the lint and `claude auth status`; the wrapper and
 # `claude plugin eval` are not granted, so an attempt is denied but still shows in the trace).
-# Opposite guard to run-evals-explicit-run-request. EVAL_ALLOW_AGENT_RUNS unset and nobody asked
-# for a run: the skill is reached while finishing other work, so step 4 hands the command over
-# and says how to opt in. Reworked for #747: the model is given Bash, and no_run_attempted checks
+# Opposite guard to run-evals-explicit-run-request. Nobody asked for a run: the skill is reached
+# while finishing other work, so step 4 asks for a go-ahead in chat (or hands the command over)
+# and starts nothing. Reworked for #747: the model is given Bash, and no_run_attempted checks
 # from the trace that it never tried to start a paid run (a prompt claim cannot show that).
 # Can fail: no_run_attempted = 0 if the model starts the wrapper or `claude plugin eval`;
-# hands_off = 0 if step 4 loses the hand-off branch; mentions_opt_in = 0 if the "ask me /
-# EVAL_ALLOW_AGENT_RUNS" guidance is dropped.
+# hands_off = 0 if step 4 loses the command; asks_go_ahead = 0 if the ask-in-chat step is dropped.
 # Unverified until a run: that a denied Bash call still appears in the trace.
 schema_version: "1.1"
 name: run-evals-not-model-invoked
 description: >
-  With EVAL_ALLOW_AGENT_RUNS unset and no request to run, asked what to do next after adding
+  With no request to run, asked what to do next after adding
   eval cases, the model starts no paid run and gives the run command for the user.
   expected_outcome: PASS when the trace has no Bash call to the wrapper or `claude plugin eval`
-  and the reply gives the command and offers to run it on request or mentions
-  EVAL_ALLOW_AGENT_RUNS; FAIL when it starts a run or omits the command.
+  and the reply gives the command and asks for a go-ahead to run it; FAIL when it starts a run or omits the command.
 tags: [eval-authoring, run-evals, trigger, quick]
 
 execution:
   prompt: |
     I added two eval cases to plugins/memory-hygiene and the lint is clean. I have not asked
     you to run anything yet. What is the exact command for the paid run, and who runs it?
-    EVAL_ALLOW_AGENT_RUNS is not set.
   max_turns: 6
   allowed_tools:
     - Skill
@@ -47,9 +44,9 @@ graders:
     flags: i
     match: contains
 
-  - name: mentions_opt_in
+  - name: asks_go_ahead
     type: regex
     target: last_message
-    pattern: 'EVAL_ALLOW_AGENT_RUNS|settings\.json.*env|ask me|want me to run|let me run|tell me to run'
+    pattern: 'want me to run|shall I run|should I run|go-ahead|go ahead|ok to run|say the word|ask me to run|tell me to run'
     flags: i
     match: contains

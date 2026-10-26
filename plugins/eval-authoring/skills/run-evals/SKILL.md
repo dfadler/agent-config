@@ -1,6 +1,6 @@
 ---
 name: run-evals
-description: Run a plugin's `claude plugin eval` cases at a cost tier, and answer questions about running them - tiers, cost ceilings, concurrency (`-j`), speed, setting up evals in CI, exit codes, and writing a PR line from pasted run-evals scores. Paid; needs an explicit request to run (or EVAL_ALLOW_AGENT_RUNS=1). Not for writing cases (author-cases) or explaining a score (diagnose-scores).
+description: Run a plugin's `claude plugin eval` cases at a cost tier, and answer questions about running them - tiers, cost ceilings, concurrency (`-j`), speed, setting up evals in CI, exit codes, and writing a PR line from pasted run-evals scores. Paid; runs only on the user's go-ahead in chat. Not for writing cases (author-cases) or explaining a score (diagnose-scores).
 argument-hint: "<plugin-path> [quick|standard|thorough]"
 allowed-tools: Bash(node ${CLAUDE_SKILL_DIR}/../../scripts/ts/lint/cli.ts *)
 ---
@@ -21,11 +21,11 @@ A run is paid: cases x runs x arms agent runs, plus three judge calls per `llm` 
 `baseline` grader per run. The cost figures `claude plugin eval` reports are
 list-price estimates of those model calls, not a bill.
 
-**Who may start a run.** An agent session may run it when the user asked for a run in
-this conversation ("run the evals now"), or when `EVAL_ALLOW_AGENT_RUNS=1` is set (for
-example in the project's `.claude/settings.json` env block) for unattended use where
-nobody is asking. With neither, step 4 hands the command to the user instead. A session
-that is not logged in (`claude auth status` fails) hands off either way.
+**Who may start a run.** Only the user's go-ahead. A user who asked for a run in this
+conversation ("run the evals now") has given it; do not ask again. Otherwise ask in chat,
+stating the tier and cost ceiling, and wait. If they decline or do not answer, step 4
+hands the command over instead. No environment variable stands in for the go-ahead. A
+session that is not logged in (`claude auth status` fails) hands off either way.
 
 The wrapper is `${CLAUDE_SKILL_DIR}/../../scripts/ts/run-evals/run-evals.ts`, run with
 `node` (22.18 or later). It owns tiers, grants, preflight checks and exit codes; call
@@ -54,13 +54,9 @@ it, do not rebuild any of that.
    grants. The wrapper never passes `--scaffold`, `--json` or `--report`; it reads
    `aggregate-result.json` from a per-case directory under `<eval-dir>/results/`.
 4. **Run or hand off.** Run it from this session if the user asked for a run in this
-   conversation, or `EVAL_ALLOW_AGENT_RUNS` is exactly `1`
-   (`[ "${EVAL_ALLOW_AGENT_RUNS:-}" = "1" ] && echo yes || echo no`; `0`, `true` and
-   empty do not count). The request, not the variable, is the opt-in when someone is
-   asking. If neither holds (you reached this skill while doing something else), give the
-   exact non-dry-run command to run in the user's own shell and stop. Tell them they can
-   ask you to run it, or set `EVAL_ALLOW_AGENT_RUNS=1` (e.g. in `.claude/settings.json`
-   env block) for unattended runs.
+   conversation. If they did not (you reached this skill while doing something else), ask
+   in chat for a go-ahead, naming the tier and cost ceiling, and wait. If they decline or
+   do not answer, give the exact non-dry-run command to run in their own shell and stop.
 
    Before starting, check login with `claude auth status`; child runs fail with
    `Not logged in` otherwise. Hand the command to the user only if that check fails.
