@@ -36,14 +36,11 @@ describe("main", () => {
     const raw = fixture("real-llm-graded-result.json");
     const out = main(["--format", "json", "r.json"], io({ "r.json": raw }));
     expect(out.code).toBe(EXIT_OK);
-    const d = JSON.parse(out.stdout) as {
-      cases: { verdict: string; delta: number; findings: { kind: string }[] }[];
-    };
-    expect(d.cases[0]?.verdict).toBe("discriminates");
-    expect(d.cases[0]?.delta).toBeCloseTo(0.667, 2);
-    expect(d.cases[0]?.findings.map((f) => f.kind)).not.toContain(
-      "split-judge-votes",
-    );
+    const d: unknown = JSON.parse(out.stdout);
+    expect(d).toMatchObject({
+      cases: [{ verdict: "discriminates", delta: 0.667 }],
+    });
+    expect(out.stdout).not.toContain("split-judge-votes");
     expect(raw).toContain('"judgeVotes": [');
   });
 
