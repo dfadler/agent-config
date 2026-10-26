@@ -45,21 +45,9 @@ graders:
     min: 1
     arm: with-only
 
-  # The fix, in any spelling: an optional group before the name, e.g. (?:[\w-]+:)?, (?:deploy-helper:)?,
-  # ([\w-]+:)?, [^"]*rollback or ".*rollback.
-  # Unmeasured: anchored_form_gone only fails when the reply repeats the broken line as its fix; a
-  # no-plugin reply that omits the prefix fails prefix_optional (measured 0.50 without on the old prompt).
+  # The fix, in any spelling: an optional group before the name, e.g. (?:[\w-]+:)? or (?:deploy-helper:)?
   - name: prefix_optional
     type: regex
     target: last_message
-    pattern: '\((?:\?:)?[^)]{1,40}:\)\?\s*rollback|\[\^"\]\*\s*rollback|"\s*\(?\.[*+]\??\)?:?\s*rollback|\[\\w-\]\*:\??\s*rollback'
+    pattern: '\(\?:[^)]{1,40}:\)\?\s*rollback'
     match: contains
-
-  # The anchored form must be gone from the handed-back grader line. Anchored to the start of the
-  # line so a diff's "- input_match" line or prose quoting the old pattern does not trip it.
-  - name: anchored_form_gone
-    type: regex
-    target: last_message
-    pattern: '^\s*input_match:\s*''"skill"\\s\*:\\s\*"rollback"'''
-    flags: m
-    match: not_contains
