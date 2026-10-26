@@ -5,7 +5,7 @@
  * parsed `aggregate-result.json`; no I/O, no model calls. The #436 delta gate
  * can import `diagnose` and read `verdict`.
  */
-import { isSilentZero } from "../parser/result.ts";
+import { isErrored, isSilentZero } from "../parser/result.ts";
 import type {
   AggregateResult,
   CaseResult,
@@ -105,9 +105,6 @@ export const DEFAULT_THRESHOLDS: Thresholds = {
   noiseMultiple: 2,
   highVariance: 0.25,
 };
-
-// Any string `error` counts, `""` included (#735).
-const isErrored = (r: RunResult): boolean => typeof r.error === "string";
 
 const mean = (xs: readonly number[]): number | undefined =>
   xs.length === 0

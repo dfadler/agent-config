@@ -7,7 +7,7 @@ import {
   readAggregateResult,
   type AggregateResult,
 } from "../parser/index.ts";
-import { isSilentZero } from "../parser/result.ts";
+import { isErrored, isSilentZero } from "../parser/result.ts";
 import {
   EXIT_CONFIG,
   EXIT_DEPENDENCY,
@@ -74,7 +74,7 @@ export const inspectResult = (result: AggregateResult): ResultFindings => ({
     (["with", "without"] as const).flatMap((arm) =>
       (arm === "with" ? c.withRuns : c.withoutRuns).flatMap((r, i) =>
         // Same predicate as diagnose/verdict.ts: any string error (`""` too, #735), or a silent zero.
-        typeof r.error === "string"
+        isErrored(r)
           ? [{ caseName: c.name, arm, run: i + 1, error: r.error === "" ? "(empty error)" : r.error }]
           : isSilentZero(r)
             ? [{ caseName: c.name, arm, run: i + 1, error: "scored 0 with no grader detail (usage limit?)" }]

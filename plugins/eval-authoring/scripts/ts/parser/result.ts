@@ -93,6 +93,11 @@ const readCaseResult = (c: Rec): CaseResult => {
   };
 };
 
+/** A run that errored: any string `error` counts, `""` included (#735). */
+export const isErrored = <T extends { readonly error?: unknown }>(
+  r: T,
+): r is T & { readonly error: string } => typeof r.error === "string";
+
 /**
  * A zero score (not a mock-stopped run) with no grader detail: what a usage-limit run looks like, with
  * no `error` set (#735). A genuine zero has failing graders to show for it.
