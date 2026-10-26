@@ -31,7 +31,10 @@ metadata:
 Parse `--budget`, `--depth` and `--width` out of `$ARGUMENTS`; the rest is the prompt. A
 limit given in plain words in the request ("at most 8 agents") counts the same. Anything
 not given takes its default. For `budget` that is the harness's current max sub-agent
-count: run `echo "${CLAUDE_CODE_MAX_CONCURRENT_SUBAGENTS:-20}"` and use the number.
+count: run `echo "${CLAUDE_CODE_MAX_CONCURRENT_SUBAGENTS:-20}"` and use the number. Every
+limit must be a whole number, `budget` at least 1 and `depth` 0 to 3. An env value that
+is not a positive whole number falls back to 20; an invalid `--budget`, `--depth` or
+`--width` is rejected with a one-line message instead of being clamped.
 
 | Limit | Default | Meaning |
 |---|---|---|
