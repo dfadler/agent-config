@@ -92,5 +92,6 @@ Not confirmed against a logged-in run:
   [#536](https://github.com/dfadler/agent-config/issues/536); the wrapper no longer passes it).
 - That the CLI's "cannot pass with the granted tools" warning appears before authentication
   (the lint keeps EVAL004 and EVAL005 in full until then).
-- The `aggregate-result.json` shape the diagnosis reads, including split judge votes parsed
-  from grader explanations.
+- The `aggregate-result.json` shape the diagnosis reads. The `judge votes:` line and the
+  structured `judgeVotes` array were confirmed on a real result, but only with unanimous
+  votes; a real split vote has not been seen.
