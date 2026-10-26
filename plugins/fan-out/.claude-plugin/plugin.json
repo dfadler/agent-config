@@ -1,7 +1,7 @@
 {
   "$schema": "https://json.schemastore.org/claude-code-plugin-manifest.json",
   "name": "fan-out",
-  "version": "1.0.0",
+  "version": "1.1.0",
   "description": "Fan a prompt out to parallel sub-agents that may spawn their own, under a fixed depth, width and total-agent budget.",
   "author": {
     "name": "Dustin Fadler",
