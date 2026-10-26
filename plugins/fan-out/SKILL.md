@@ -10,9 +10,10 @@ description: |
   compact results. Not for small tasks or a single question: use
   `subagent-orchestration` to route those.
 argument-hint: "[--budget N] [--depth N] [--width N] <prompt>"
+allowed-tools: Bash(node ${CLAUDE_SKILL_DIR}/scripts/ts/limits.ts *)
 license: MIT
 metadata:
-  version: "1.1.0"
+  version: "1.2.0"
 ---
 
 # Fan out
@@ -28,13 +29,17 @@ metadata:
 
 ## Limits
 
-Parse `--budget`, `--depth` and `--width` out of `$ARGUMENTS`; the rest is the prompt. A
-limit given in plain words in the request ("at most 8 agents") counts the same. Anything
-not given takes its default. For `budget` that is the harness's current max sub-agent
-count: run `echo "${CLAUDE_CODE_MAX_CONCURRENT_SUBAGENTS:-20}"` and use the number. Every
-limit must be a whole number, `budget` at least 1 and `depth` 0 to 3. An env value that
-is not a positive whole number falls back to 20; an invalid `--budget`, `--depth` or
-`--width` is rejected with a one-line message instead of being clamped.
+Resolve the limits with the script, not by hand:
+
+`node ${CLAUDE_SKILL_DIR}/scripts/ts/limits.ts $ARGUMENTS`
+
+It prints one JSON object: `budget`, `depth`, `width`, the `prompt` (what is left after
+the flags) and `shares`, the budget each first-wave child gets. Use those numbers as
+given. Exit 2 with `{"error": ...}` means an invalid flag: tell the user the message and
+stop. A limit given in plain words ("at most 8 agents") has no flag, so pass it as one
+(`--budget 8`). If Bash is unavailable, apply the table by hand: whole numbers only, `budget` at least 1,
+`depth` 0 to 3, an unset `budget` is the env value (else 20), and bad input is rejected, not
+clamped.
 
 | Limit | Default | Meaning |
 |---|---|---|
@@ -61,8 +66,8 @@ staging, not a failed child.
    files need disjoint file surfaces or their own worktrees; shared generated files
    count as a surface.
 3. **Divide the budget before spawning.** You hold `budget`. Reserve 1 for yourself,
-   give each child a share of the rest (children run in parallel, so shares must sum
-   to at most what you hold). Spawn the first wave of children (up to `width`, or the
+   give each child its entry in `shares` (children run in parallel, so shares sum to at
+   most what you hold; below the first layer, split what you were given the same way). Spawn the first wave of children (up to `width`, or the
    concurrency cap if lower) in one message.
 4. **Brief each child** with: its subtask, its `depth`/`width`/`budget` remaining
    (`depth` minus 1, its own budget share), and the leaf rule below.
