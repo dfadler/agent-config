@@ -12,6 +12,7 @@ describe("envBudget", () => {
     ["-3", 20],
     ["abc", 20],
     ["", 20],
+    ["9".repeat(400), 20],
   ])("%j -> %i", (value, expected) => {
     expect(envBudget(value)).toBe(expected);
   });
@@ -64,6 +65,8 @@ describe("resolveLimits", () => {
     [["--depth", "4", "x"], /0 to 3/],
     [["--width", "0", "x"], /at least 1/],
     [["--bogus", "1", "x"], /unknown flag/],
+    [["--budget", "9".repeat(400), "x"], /whole number/],
+    [["--budget=3=invalid", "x"], /whole number/],
   ])("rejects %j", (args, message) => {
     const r = run(args);
     expect("error" in r ? r.error : "").toMatch(message);

@@ -14,7 +14,7 @@ schema_version: "1.1"
 name: fan-out-states-budget-and-leaf-rule
 description: >
   Asked to fan out a five-part audit across sub-agents that may spawn their own, the reply
-  plans parallel agents and states a concrete cap on depth or total agents.
+  plans parallel agents and states a concrete cap on total agents.
   expected_outcome: PASS when it proposes parallel agents and a numeric limit; FAIL when it
   spawns without any stated bound.
 tags: [fan-out, trigger]
@@ -65,6 +65,6 @@ graders:
     type: regex
     target: last_message
     # Floor (#807): a number must sit next to budget wording; a stray "5 packages" no longer matches.
-    pattern: '(?:budget|cap|limit)\W+(?:\w+\W+){0,3}\d+\b|(?:at most|max(?:imum)?|up to)\W+(?:\w+\W+){0,2}\d+\s+(?:total\s+)?(?:sub-?)?(?:agents|layers|levels|children)|\d+\s+(?:sub-?)?(?:agents|layers|levels|children)\s+(?:in total|total|max)|depth\W+(?:of\W+)?[0-3]\b'
+    pattern: '(?:budget|cap|limit)\W+(?:\w+\W+){0,3}\d+\b|(?:at most|max(?:imum)?|up to)\W+(?:\w+\W+){0,2}\d+\s+(?:total\s+)?(?:sub-?)?(?:agents|layers|levels|children)|\d+\s+(?:sub-?)?(?:agents|layers|levels|children)\s+(?:in total|total|max)'
     flags: i
     match: contains

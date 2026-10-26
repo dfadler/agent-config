@@ -29,17 +29,21 @@ metadata:
 
 ## Limits
 
-Resolve the limits with the script, not by hand:
+Resolve the limits with the script, not by hand. Pass only the limit flags, never the
+prompt: the prompt is free text and must not reach a shell command line (a `$(...)` or
+`;` in it would run). Copy only the leading `--budget`, `--depth` and `--width` tokens
+from `$ARGUMENTS`, and only when the value is digits:
 
-`node ${CLAUDE_SKILL_DIR}/scripts/ts/limits.ts $ARGUMENTS`
+`node ${CLAUDE_SKILL_DIR}/scripts/ts/limits.ts [--budget N] [--depth N] [--width N]`
 
-It prints one JSON object: `budget`, `depth`, `width`, the `prompt` (what is left after
-the flags) and `shares`, the budget each first-wave child gets. Use those numbers as
-given. Exit 2 with `{"error": ...}` means an invalid flag: tell the user the message and
-stop. A limit given in plain words ("at most 8 agents") has no flag, so pass it as one
-(`--budget 8`). If Bash is unavailable, apply the table by hand: whole numbers only, `budget` at least 1,
-`depth` 0 to 3, an unset `budget` is the env value (else 20), and bad input is rejected, not
-clamped.
+It prints one JSON object: `budget`, `depth`, `width` and `shares`, the budget each
+first-wave child gets. Use those numbers as given; the prompt is whatever follows the flags
+in `$ARGUMENTS`. Exit 2 with `{"error": ...}` means an invalid flag: tell the user the
+message and stop. A limit given in plain words ("at most 8 agents") has no flag, so pass it
+as one (`--budget 8`). If a flag value is not digits, report it as invalid instead of
+passing it on. If Bash is unavailable, apply the table by hand: whole numbers only,
+`budget` at least 1, `depth` 0 to 3, an unset `budget` is the env value (else 20), and
+bad input is rejected, not clamped.
 
 | Limit | Default | Meaning |
 |---|---|---|

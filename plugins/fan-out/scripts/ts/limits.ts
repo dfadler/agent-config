@@ -24,10 +24,16 @@ export type Resolved = Limits | { readonly error: string };
 
 const WHOLE = /^\d+$/;
 
+/** A whole number the JSON output can carry: digits only and a safe integer (no Infinity). */
+const wholeNumber = (raw: string | undefined): number | undefined => {
+  const n = raw !== undefined && WHOLE.test(raw) ? Number(raw) : Number.NaN;
+  return Number.isSafeInteger(n) ? n : undefined;
+};
+
 /** The harness's current max sub-agent count, or the fallback when unset or not a positive whole number. */
 export const envBudget = (value: string | undefined): number => {
-  const n = value !== undefined && WHOLE.test(value) ? Number(value) : 0;
-  return n >= 1 ? n : FALLBACK_BUDGET;
+  const n = wholeNumber(value);
+  return n !== undefined && n >= 1 ? n : FALLBACK_BUDGET;
 };
 
 /** Split `total` into `count` near-equal shares (larger ones first). */
@@ -38,12 +44,16 @@ export const resolveLimits = (args: readonly string[], env: Record<string, strin
   const given = new Map<string, number>();
   let i = 0;
   while (i < args.length && args[i]?.startsWith("--")) {
-    const [flag = "", inline] = (args[i] ?? "").split("=", 2);
+    const arg = args[i] ?? "";
+    const eq = arg.indexOf("=");
+    const flag = eq === -1 ? arg : arg.slice(0, eq);
+    const inline = eq === -1 ? undefined : arg.slice(eq + 1);
     const name = flag.slice(2);
     if (name !== "budget" && name !== "depth" && name !== "width") return { error: `unknown flag ${flag}` };
     const raw = inline ?? args[++i];
-    if (raw === undefined || !WHOLE.test(raw)) return { error: `--${name} needs a whole number, got ${raw ?? "nothing"}` };
-    given.set(name, Number(raw));
+    const value = wholeNumber(raw);
+    if (value === undefined) return { error: `--${name} needs a whole number, got ${raw ?? "nothing"}` };
+    given.set(name, value);
     i++;
   }
   const budget = given.get("budget") ?? envBudget(env.CLAUDE_CODE_MAX_CONCURRENT_SUBAGENTS);
