@@ -369,6 +369,9 @@ apply_plan() {
       migrate-hook)
         migrate_hook_to_exec_form "$a" "$b" "$c" "$d" "$HOME/.claude/settings.json"
         ;;
+      default-setting)
+        ensure_setting_default "$a" "$b" "$c"
+        ;;
       *)
         echo "Unknown plan verb: $verb" >&2
         exit 20

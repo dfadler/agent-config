@@ -30,6 +30,20 @@ describe("main", () => {
     );
   });
 
+  // Trimmed copy of a real `claude plugin eval` llm-graded result. Real, but
+  // every judge sample is unanimous (PASS PASS PASS / FAIL FAIL FAIL): no real split.
+  it("reads a real llm-graded result: judgeVotes parsed, no split finding", () => {
+    const raw = fixture("real-llm-graded-result.json");
+    const out = main(["--format", "json", "r.json"], io({ "r.json": raw }));
+    expect(out.code).toBe(EXIT_OK);
+    const d: unknown = JSON.parse(out.stdout);
+    expect(d).toMatchObject({
+      cases: [{ verdict: "discriminates", delta: 0.667 }],
+    });
+    expect(out.stdout).not.toContain("split-judge-votes");
+    expect(raw).toContain('"judgeVotes": [');
+  });
+
   it("prints JSON verdicts for a recorded three-run result", () => {
     const out = main(
       ["--format", "json", "r.json"],

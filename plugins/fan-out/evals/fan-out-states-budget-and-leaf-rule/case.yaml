@@ -6,11 +6,15 @@
 # plugin from no plugin); plans_parallel is a floor that fails only if the reply never mentions
 # agents/children; allocates_to_packages (llm, judged) fails a reply that declines to fan out
 # or never says which agent takes which package. Neither checks real parallel execution.
+# Sabotage map (#807): delete "State the budget and the split up front" in SKILL.md and the
+# reply drops the cap; states_budget (paired with budget wording) fails.
+# good-reply: Budget: 20 agents in total, depth 2. I spawn one agent per package (auth, billing, search, notifications, exports) and they may spawn helpers.
+# bad-reply: I will send one agent to each of the 5 packages (auth, billing, search, notifications, exports) and merge the answers.
 schema_version: "1.1"
 name: fan-out-states-budget-and-leaf-rule
 description: >
   Asked to fan out a five-part audit across sub-agents that may spawn their own, the reply
-  plans parallel agents and states a concrete cap on depth or total agents.
+  plans parallel agents and states a concrete cap on total agents.
   expected_outcome: PASS when it proposes parallel agents and a numeric limit; FAIL when it
   spawns without any stated bound.
 tags: [fan-out, trigger]
@@ -47,6 +51,9 @@ graders:
       (auth, billing, search, notifications, exports). Wording like "parallel" is not
       required.
 
+      Quote the sentence that assigns packages to agents. Do not fail for: a missing word
+      "parallel", a different number of agents, or an extra caveat.
+
       FAIL if any of these hold:
       - The response declines to use sub-agents, or says it will do the audit itself or
         one package at a time.
@@ -57,6 +64,7 @@ graders:
   - name: states_budget
     type: regex
     target: last_message
-    pattern: '(?:budget|cap|limit|at most|max(?:imum)?|up to)\W+(?:\w+\W+){0,6}\d+|\d+\s+(?:agents|layers|levels|children)|depth\W+(?:of\W+)?[0-3]\b'
+    # Floor (#807): a number must sit next to budget wording; a stray "5 packages" no longer matches.
+    pattern: '(?:budget|cap|limit)\W+(?:\w+\W+){0,3}\d+\b|(?:at most|max(?:imum)?|up to)\W+(?:\w+\W+){0,2}\d+\s+(?:total\s+)?(?:sub-?)?(?:agents|layers|levels|children)|\d+\s+(?:sub-?)?(?:agents|layers|levels|children)\s+(?:in total|total|max)'
     flags: i
     match: contains

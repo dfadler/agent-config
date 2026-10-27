@@ -453,6 +453,8 @@ export interface GraderResult {
   readonly weight?: number;
   /** The grader's explanation; for a judge it carries the votes. */
   readonly explanation?: string;
+  /** A judge's structured votes (true = PASS), present on llm graders in a real result. */
+  readonly judgeVotes?: readonly boolean[];
   /** True for an `arm: with-only` grader. */
   readonly withOnly?: boolean;
 }

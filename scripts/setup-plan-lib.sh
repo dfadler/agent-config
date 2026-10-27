@@ -33,6 +33,7 @@
 #   register-hook     <event> <cmd> <args-json> [matcher]   exec form; matcher omitted when empty
 #   deregister-hook   <event> <cmd> [args-json]   args-json omitted for a shell-form <cmd>
 #   migrate-hook      <event> <shell-cmd> <cmd> <args-json>   rewrite shell form to exec form
+#   default-setting   <file> <key> <json>    set a dotted key only if absent
 #   skip-plugin       <name> <reason>        informational: plugin left out
 #   skip-command      <dest> <reason> <name> informational: command left out
 #   warn-foreign-symlink <dest> <target>     informational: not ours, left alone
@@ -317,6 +318,16 @@ plan_hooks() {
   done
 }
 
+# settings.json values setup seeds. Written only when absent, so a value the
+# user chose (including false) survives re-runs. Gated on the owning plugin so
+# --skip=worktree-core leaves its setting alone too.
+plan_settings() {
+  local settings="$HOME/.claude/settings.json"
+  if ! is_skipped worktree-core && ! setting_is_set "$settings" worktree.autoPrune; then
+    printf 'default-setting\t%s\t%s\t%s\n' "$settings" worktree.autoPrune true
+  fi
+}
+
 # The whole install plan, in the order it must be applied.
 plan_install() {
   plan_skipped_plugins
@@ -329,4 +340,5 @@ plan_install() {
   plan_mkdir "$HOME/.claude/skills"
   plan_plugin_links
   plan_hooks
+  plan_settings
 }

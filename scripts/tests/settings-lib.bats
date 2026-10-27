@@ -355,3 +355,37 @@ assert hooks == [{'type': 'command', 'command': 'node', 'args': ['/p/x.ts']}], h
   [ -z "$output" ]
   [ "$(cat "$SETTINGS")" = "$before" ]
 }
+
+# ---------------------------------------------------------------------------
+# ensure_setting_default
+# ---------------------------------------------------------------------------
+
+@test "setting default: creates settings.json with the key when absent" {
+  ensure_setting_default "$SETTINGS" "worktree.autoPrune" "true"
+  run python3 -c "import json,sys; sys.exit(0 if json.load(open('$SETTINGS'))['worktree']['autoPrune'] is True else 1)"
+  [ "$status" -eq 0 ]
+}
+
+@test "setting default: keeps an explicit false the user chose" {
+  printf '{"worktree":{"autoPrune":false}}' >"$SETTINGS"
+  ensure_setting_default "$SETTINGS" "worktree.autoPrune" "true"
+  run python3 -c "import json,sys; sys.exit(0 if json.load(open('$SETTINGS'))['worktree']['autoPrune'] is False else 1)"
+  [ "$status" -eq 0 ]
+}
+
+@test "setting default: second run is silent and leaves other keys alone" {
+  printf '{"model":"x"}' >"$SETTINGS"
+  ensure_setting_default "$SETTINGS" "worktree.autoPrune" "true"
+  run ensure_setting_default "$SETTINGS" "worktree.autoPrune" "true"
+  [ -z "$output" ]
+  run python3 -c "import json,sys; d=json.load(open('$SETTINGS')); sys.exit(0 if d['model']=='x' and d['worktree']['autoPrune'] is True else 1)"
+  [ "$status" -eq 0 ]
+}
+
+@test "setting default: a non-object parent is left unchanged with a warning" {
+  printf '{"worktree":null}' >"$SETTINGS"
+  run --separate-stderr ensure_setting_default "$SETTINGS" "worktree.autoPrune" "true"
+  [ "$status" -eq 0 ]
+  [[ "$stderr" == *"not an object"* ]]
+  [ "$(cat "$SETTINGS")" = '{"worktree":null}' ]
+}

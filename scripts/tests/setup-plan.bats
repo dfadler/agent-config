@@ -30,7 +30,7 @@ setup() {
   echo "## Convention one" >"$FAKE_REPO/claude/conventions/one.md"
   printf '# comment\n\none.md\n' >"$FAKE_REPO/claude/conventions/DEFAULT_ENABLED"
   local p
-  for p in memory-hygiene scratch-guard worktree-core; do
+  for p in collab-retro memory-hygiene scratch-guard worktree-core; do
     mkdir -p "$FAKE_REPO/plugins/$p/.claude-plugin"
     printf '{"name":"%s"}\n' "$p" >"$FAKE_REPO/plugins/$p/.claude-plugin/plugin.json"
   done
@@ -83,6 +83,7 @@ hook_lines() {
   printf 'register-hook\tSessionStart\tnode\t["%s"]\n' "$WT_HOOKS/prune-merged-worktrees-hook.ts"
   printf 'register-hook\tStop\t%s\n' "$MH_HOOK"
   printf 'register-hook\tPreToolUse\tnode\t["%s"]\tEdit|Write\n' "$CLAUDE/skills/scratch-guard/scripts/ts/scratch-guard-hook.ts"
+  printf 'register-hook\tSessionStart\tnode\t["%s"]\n' "$CLAUDE/skills/collab-retro/scripts/ts/offer-incident-retro-hook.ts"
 }
 
 @test "plan: clean HOME yields the full install plan, in apply order" {
@@ -99,12 +100,34 @@ hook_lines() {
     printf 'link\t%s\t%s\n' "$FAKE_REPO/claude/commands/demo.md" "$CLAUDE/commands/demo.md"
     printf 'link\t%s\t%s\n' "$FAKE_REPO/claude/commands/other.md" "$CLAUDE/commands/other.md"
     printf 'mkdir\t%s\n' "$CLAUDE/skills"
+    printf 'link\t%s\t%s\n' "$FAKE_REPO/plugins/collab-retro" "$CLAUDE/skills/collab-retro"
     printf 'link\t%s\t%s\n' "$FAKE_REPO/plugins/memory-hygiene" "$CLAUDE/skills/memory-hygiene"
     printf 'link\t%s\t%s\n' "$FAKE_REPO/plugins/scratch-guard" "$CLAUDE/skills/scratch-guard"
     printf 'link\t%s\t%s\n' "$FAKE_REPO/plugins/worktree-core" "$CLAUDE/skills/worktree-core"
     hook_lines
+    printf 'default-setting\t%s\tworktree.autoPrune\ttrue\n' "$CLAUDE/settings.json"
   )"
   [ "$output" = "$expected" ]
+}
+
+@test "plan: worktree.autoPrune is seeded to true when absent" {
+  plan
+  [ "$status" -eq 0 ]
+  has "default-setting${T}$CLAUDE/settings.json${T}worktree.autoPrune${T}true"
+}
+
+@test "plan: a user's worktree.autoPrune value is never planned over" {
+  mkdir -p "$CLAUDE"
+  printf '{"worktree":{"autoPrune":false}}\n' >"$CLAUDE/settings.json"
+  plan
+  [ "$status" -eq 0 ]
+  lacks "default-setting"
+}
+
+@test "plan: --skip=worktree-core leaves worktree.autoPrune alone" {
+  plan --skip=worktree-core
+  [ "$status" -eq 0 ]
+  lacks "default-setting"
 }
 
 @test "plan: --dry-run is an alias and writes nothing under HOME" {
@@ -170,7 +193,7 @@ hook_lines() {
 }
 
 @test "plan: --include and --skip selections are the complement of each other" {
-  plan --skip=demo,worktree-core
+  plan --skip=demo,worktree-core,collab-retro
   skip_plan="$output"
   plan --include=other,memory-hygiene,scratch-guard
   # Same actions; only the wording of the informational reason differs.
@@ -334,7 +357,7 @@ PY
     verb="${line%%$'\t'*}"
     case "$verb" in
       mkdir | personal-migrate | personal-create | include | claude-md | link | relink | unlink | \
-        register-hook | deregister-hook | migrate-hook | skip-plugin | skip-command | warn-foreign-symlink | warn-exists) ;;
+        register-hook | deregister-hook | migrate-hook | default-setting | skip-plugin | skip-command | warn-foreign-symlink | warn-exists) ;;
       *)
         echo "undocumented verb: $verb" >&2
         return 1

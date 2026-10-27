@@ -40,7 +40,7 @@ graders:
   - name: hands_off
     type: regex
     target: last_message
-    pattern: 'node\s+\S*run-evals|claude\s+plugin\s+eval\s+\S|/run-evals\b'
+    pattern: 'node\s+\S*run-evals\.ts|/run-evals\b'
     flags: i
     match: contains
 

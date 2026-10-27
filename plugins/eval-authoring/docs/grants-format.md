@@ -60,9 +60,8 @@ The shared parser rejects, with the offending key or entry in the message:
   entry in the five tools with no matching grant, and EVAL005 flags a `tool_used` grader
   whose tool is not granted.
 - Argument order when the wrapper calls the CLI: the target (plugin path) first, then
-  `--case`, then `--allow-tools`. How several entries are passed (repeated flag or one
-  value) is the wrapper's to confirm against `--help` (#460); entries are never joined
-  with commas by this format, because a specifier may contain one.
+  `--case`, then `--allow-tools`. The wrapper repeats `--allow-tools` once per entry;
+  entries are never joined with commas, because a specifier may contain one.
 
 ## Worked example: `fetch-execute-guide`
 

@@ -1,0 +1,40 @@
+# Run: claude plugin eval plugins/collab-retro --case collab-retro-session-mode-near-miss-code-review --runs 3 --trust-plugin --no-publish
+# Shared run/grant facts: docs/contributing.md, "Plugin evals". No grant: Skill only.
+# Should-not-fire near-miss for "Session mode": a request about speeding up the code's own
+# runtime shares "slow" and "what made it slow" vocabulary with a session retro but concerns the
+# product, not the agent's environment. Regression guard, Delta about 0 by design.
+# Can fail: skill_not_fired fails if collab-retro fires on a performance question about code;
+# answers_question fails if the reply never mentions the per-file container.
+schema_version: "1.1"
+name: collab-retro-session-mode-near-miss-code-review
+description: >
+  A question about why a test suite runs slowly must not invoke collab-retro.
+  expected_outcome: regression guard, Delta about 0 by design. PASS when the skill does not
+  fire; FAIL when it fires.
+tags: [collab-retro, trigger, quick]
+
+execution:
+  prompt: |
+    Our CI test run went from 4 minutes to 11 minutes this week. The only change was that
+    tests/integration now creates a fresh Postgres container per test file instead of one per
+    run. What made it so slow, and what is the cheapest fix? Two sentences, no commands.
+  max_turns: 4
+  allowed_tools:
+    - Skill
+
+graders:
+  - name: skill_not_fired
+    type: tool_used
+    tool: Skill
+    input_match: '"skill"\s*:\s*"(?:[\w-]+:)?collab-retro"'
+    min: 0
+    max: 0
+    arm: both
+
+  - name: answers_question
+    type: regex
+    target: last_message
+    pattern: 'container'
+    flags: i
+    match: contains
+    arm: both

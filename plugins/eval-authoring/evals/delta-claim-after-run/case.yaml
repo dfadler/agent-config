@@ -3,7 +3,18 @@
 # scores". The user quotes quick-tier output and asks for a delta; the rule is in author-cases
 # step 9 and run-evals. Reply-only; skill_fired is an unscored indicator (EVAL009 info intended).
 # Can fail: says_delta_unmeasured fails if the reply never declines; no_numeric_delta fails if it
-# writes the +0.33 the user hands over. Not yet sabotage-checked or run (#724).
+# writes the +0.33 the user hands over. Not yet run at the thorough tier since the grader fix (#724).
+# Sabotage-checked offline (#784): no_numeric_delta fails the bad reply, says_delta_unmeasured fails a
+# reply that never declines. no_numeric_delta used to flag a refusal that quotes "+0.33" or "improves
+# by 33 points" after "don't": the negation window stopped at the "." in "0.33". It now steps over a
+# "." followed by a digit and still ends at a sentence boundary. "without" is no longer a negation
+# word (it is the arm name: "0.60 without, a +0.33" was exempt once the window crossed decimals) and
+# "n.t" is now n't. Replayed against 16 kept replies (2026-10-23): the refusal passes, 8 delta-writing
+# replies are flagged.
+# good-reply: I can't claim a delta from these numbers. A quick run only covers the plugin arm, and a
+#  0.20 swing at 3 runs is noise. Delta not measured; a delta claim needs a thorough run. Paste the
+#  scores as is, but don't add a "+0.33" or "improves by 33 points" to the line.
+# bad-reply: Paste this: with-plugin 0.93 vs without-plugin 0.60, a +0.33 improvement from the plugin.
 schema_version: "1.1"
 name: delta-claim-after-run
 description: >
@@ -42,6 +53,6 @@ graders:
   - name: no_numeric_delta
     type: regex
     target: last_message
-    pattern: '(?<!(?:\bnot|n.t|\bnever|\bno|\bcannot|\bwithout)\b[^.\n]{0,40})(?:\b(?:improved|improves|up|delta|Δ)\b|\+)\s*(?:of\s*)?(?:the score\s*)?(?:by\s*)?\+?(?:\d+(?:\.\d+)?|\.\d+)'
+    pattern: '(?<!(?:\bnot|n[''’]t|\bnever|\bno|\bcannot)\b(?:[^.\n]|\.(?=\d)){0,40})(?:\b(?:improved|improves|up|delta|Δ)\b|\+)\s*(?:of\s*)?(?:the score\s*)?(?:by\s*)?\+?(?:\d+(?:\.\d+)?|\.\d+)'
     flags: i
     match: not_contains

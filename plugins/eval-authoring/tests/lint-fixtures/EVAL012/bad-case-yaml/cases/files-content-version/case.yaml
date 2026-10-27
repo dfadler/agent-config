@@ -1,0 +1,8 @@
+schema_version: "1.1"
+name: files-content-version
+execution:
+  prompt: Do the thing.
+graders:
+  - type: "regex"
+    pattern: "version = 1.0"
+    target: "files"

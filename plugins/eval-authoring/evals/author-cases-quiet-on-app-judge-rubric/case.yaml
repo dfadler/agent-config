@@ -1,0 +1,44 @@
+# Run: node plugins/eval-authoring/scripts/ts/run-evals/run-evals.ts --tier quick plugins/eval-authoring
+# (quick tier: one run, plugin arm only, `--ablation none`; no grant needed.)
+# Should-not-fire near-miss, distinct from the unit-test, CI, hooks, playwright and skill-wording
+# quiet cases: it shares "eval", "grader", "rubric", "PASS/FAIL" and "judge" with author-cases but
+# wants a rubric for an application's own LLM outputs, not a `claude plugin eval` case. Chosen
+# because grader vocabulary is the likeliest over-trigger the existing quiet cases do not probe.
+# "Explain what a Delta means" was skipped: that belongs to diagnose-scores.
+# Can fail: author_cases_not_invoked fails if the description over-triggers on judge/rubric talk;
+# writes_rubric fails if the reply has no rubric at all.
+# Unmeasured: a regression guard; a no-plugin arm passes it by default, so no delta by design.
+schema_version: "1.1"
+name: author-cases-quiet-on-app-judge-rubric
+description: >
+  A request for a scoring rubric for a chatbot's answers in an offline harness must not invoke
+  author-cases, which is for `claude plugin eval` cases. expected_outcome: PASS when the model
+  does not call author-cases and replies with a rubric; FAIL when it invokes author-cases or
+  gives no rubric. Regression guard: no delta by design.
+tags: [eval-authoring, author-cases, trigger, quick]
+
+execution:
+  prompt: |
+    I'm building a support chatbot for my web app and have a Python script that replays 200
+    saved questions through it. I want a second model to grade each answer. Write the grading
+    rubric I should give that judge model, with clear PASS and FAIL conditions for
+    "answers from the provided help-center text only". Put the rubric in your reply.
+  max_turns: 6
+  allowed_tools:
+    - Skill
+
+graders:
+  - name: author_cases_not_invoked
+    type: tool_used
+    tool: Skill
+    input_match: '"skill"\s*:\s*"(?:[\w-]+:)?author-cases"'
+    min: 0
+    max: 0
+    arm: both
+
+  - name: writes_rubric
+    type: regex
+    target: last_message
+    pattern: 'PASS[\s\S]{0,400}FAIL|FAIL[\s\S]{0,400}PASS'
+    match: contains
+    arm: both
