@@ -1,0 +1,57 @@
+# Run: claude plugin eval plugins/collab-retro --case collab-retro-session-mode-environment-findings --runs 5 --trust-plugin --no-publish
+# Shared run/grant facts: docs/contributing.md, "Plugin evals". No grant: Skill only. The
+# session notes are pasted; nothing is read or written.
+# Should-fire case for "Session mode": a slow session with no correction or frustration, where
+# the question is what about the environment cost time. The prompt does not name the skill, the
+# mode or the categories.
+# Can fail: skill_fired fails if the description stops matching an environment-focused retro of
+# one session; names_findings fails if the reply gives neither a navigation nor a guardrail
+# finding (the two facts pasted); asks_before_shipping fails if the reply proposes edits without
+# asking.
+# Reference-good reply: "Navigation: add a pointer to src/billing/ in CLAUDE.md (14 turns spent
+# finding it). Guardrail: no lint check for the date-format bug; add one. Want me to make these
+# changes?" Known-bad reply: a two-sentence recap of the session with no proposals.
+# Skill phrases checked: "Navigation", "No guardrail", "Ask before shipping".
+schema_version: "1.1"
+name: collab-retro-session-mode-environment-findings
+description: >
+  After a slow session with no correction, the model invokes collab-retro and proposes
+  environment changes (navigation pointer, missing check) and asks before shipping them.
+  expected_outcome: PASS when the skill fires, the reply names a navigation and a guardrail
+  finding and asks before editing; FAIL otherwise.
+tags: [collab-retro, session, quick]
+
+execution:
+  prompt: |
+    That refactor session took three hours and nothing went wrong, but it felt slow. Do a
+    retro: what about the setup around the agent made it slower than it should have been?
+    Notes from the session: it took 14 turns to find where invoice totals are computed
+    (src/billing/totals.ts), the agent read the whole 4,000-line generated schema.sql three
+    times, and a bug where dates were formatted as MM/DD instead of ISO shipped to staging
+    because no lint rule or test covers date formatting. Reply with your findings only. Do
+    not run commands.
+  max_turns: 6
+  allowed_tools:
+    - Skill
+
+graders:
+  - name: skill_fired
+    type: tool_used
+    tool: Skill
+    input_match: '"skill"\s*:\s*"(?:[\w-]+:)?collab-retro"'
+    min: 1
+    arm: with-only
+
+  - name: names_findings
+    type: regex
+    target: last_message
+    pattern: '(?=[\s\S]*(?:navigation|pointer|totals\.ts))(?=[\s\S]*(?:lint|check|test|hook))'
+    flags: i
+    match: contains
+
+  - name: asks_before_shipping
+    type: regex
+    target: last_message
+    pattern: '(?:want me to|should I|shall I|would you like|let me know (?:if|which)|your (?:call|go-ahead|approval)|before (?:I )?(?:make|edit|apply))'
+    flags: i
+    match: contains
