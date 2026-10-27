@@ -7,7 +7,7 @@ const isQuietCheck = (g: Grader): boolean =>
 
 /** Literal text of a top-level alternation, or undefined if any alternative uses regex syntax. */
 const literals = (pattern: string): readonly string[] | undefined => {
-  const alts = pattern.split("|");
+  const alts = pattern.split(/(?<!\\)\|/);
   const isLiteral = (a: string): boolean => a !== "" && !/[\\()[\]{}*+?^$.]/.test(a.replace(/\\[^\w\s]/g, ""));
   return alts.every(isLiteral) ? alts.map((a) => a.replace(/\\([^\w\s])/g, "$1")) : undefined;
 };

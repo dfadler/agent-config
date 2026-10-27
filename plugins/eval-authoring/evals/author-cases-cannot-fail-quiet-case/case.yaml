@@ -57,3 +57,10 @@ graders:
     pattern: 'by construction|cannot (?:ever )?fail|can.?t (?:ever )?fail|never fail|passes (?:in|on) both|(?:no|without the) plugin[^.]{0,40}(?:passes|pass it)|echo(?:es|ed)? the prompt|(?:cued|given away|supplied) by the prompt|prompt (?:already )?(?:contains|gives away|cues|supplies)'
     flags: i
     match: contains
+
+  - name: does_not_approve_as_is
+    type: regex
+    target: last_message
+    pattern: 'keep (?:it|this|the case) (?:as[- ]is|unchanged)|(?:run|use|ship) (?:it|this) as[- ]is|no changes (?:are )?needed'
+    flags: i
+    match: not_contains
