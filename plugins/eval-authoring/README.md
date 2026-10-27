@@ -21,7 +21,7 @@ checks what a script can; the rest needs a paid run.
 | [`hooks/`](hooks/hooks.json) | PostToolUse hook on `Write\|Edit`: lints after Claude edits a file under a plugin's eval directory and reports findings back as context. Report only, always exits 0, no-ops elsewhere and under `tests/`. |
 | [`hooks/` Stop](hooks/scripts/eval-gap-on-stop.sh) | Blocks a stop once when a plugin's `skills/` or `agents/` changed (committed on the branch since its merge-base with `main`, or uncommitted) with no change under its eval directory. The reason asks for updated cases and a before/after score comparison (baseline = newest `evals/results/` directory), or a one-line why-not. It nags at most once per session, keyed on the session id, so it never loops. |
 | [`skills/author-cases`](skills/author-cases/SKILL.md) | Writing cases: graders (free first), mocks, fixtures, should-fire and should-not-fire prompts. |
-| [`skills/run-evals`](skills/run-evals/SKILL.md) | Paid. Lints, shows the planned commands, then runs the wrapper. Runs when you ask for it in chat (or `EVAL_ALLOW_AGENT_RUNS=1` is set); otherwise hands you the command. |
+| [`skills/run-evals`](skills/run-evals/SKILL.md) | Paid. Lints, shows the planned commands, then runs the wrapper. Runs when you ask for it in chat; otherwise asks for a go-ahead (tier and cost ceiling) and, if you decline, hands you the command. |
 | [`scripts/ts/run-evals/`](scripts/ts/run-evals/run-evals.ts) | The wrapper: cost tiers `quick` / `standard` / `thorough`, one CLI invocation per case (each under its own grants), a cumulative cost ceiling, preflight checks, never `--scaffold`. |
 | [`skills/diagnose-scores`](skills/diagnose-scores/SKILL.md) | Finds the result file, runs the script and interprets each verdict (cause, evidence, next step). |
 | [`scripts/ts/diagnose/`](scripts/ts/diagnose/diagnose.ts) | Free per-case verdict from an `aggregate-result.json` (delta, variance, run errors, split judge votes). |
@@ -70,8 +70,8 @@ tier-specific cost ceiling (`quick` scales with the number of cases); see [run-e
 ## What it cannot do
 
 - `claude plugin eval` needs a logged-in shell (`claude auth status`). A logged-in agent
-  session runs evals when you ask it to; with no request it hands you the command. Set
-  `EVAL_ALLOW_AGENT_RUNS=1` (e.g. in `.claude/settings.json` env block) for unattended runs.
+  session runs evals when you ask it to; with no request it asks you in chat for a go-ahead
+  and waits, so an unattended session stalls on that question.
 - Neither the lint nor `case-reviewer` can prove a case is useful: whether it can fail and
   shows a delta needs a paid run.
 - A plugin cannot ship rules, so guidance lives in the lint's messages and the skills.
