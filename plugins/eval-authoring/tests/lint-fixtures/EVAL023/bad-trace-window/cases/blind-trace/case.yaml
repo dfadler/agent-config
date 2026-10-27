@@ -1,0 +1,11 @@
+schema_version: "1.1"
+name: blind-trace
+execution:
+  prompt: Do the thing.
+  max_turns: 13
+graders:
+  - type: "regex"
+    pattern: "done"
+  - type: "llm"
+    criteria: "PASS if the run reads the file before editing it. FAIL if it edits first."
+    focus: "trace"

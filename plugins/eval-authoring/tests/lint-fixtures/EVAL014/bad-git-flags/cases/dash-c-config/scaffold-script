@@ -1,0 +1,3 @@
+#!/usr/bin/env bash
+set -euo pipefail
+git -c user.name=x -c user.email=x@example.com commit -q -m "the fix"

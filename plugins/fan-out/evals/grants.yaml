@@ -1,0 +1,8 @@
+# Per-case --allow-tools grants (format: plugins/eval-authoring/docs/grants-format.md).
+# Bash is limited to the skill's own limits.ts script (#807), so the flag cases can resolve limits.
+schema_version: "1"
+grants:
+  fan-out-budget-flag-caps-spawns:
+    - "Bash(node *limits.ts*)"
+  fan-out-rejects-invalid-budget:
+    - "Bash(node *limits.ts*)"

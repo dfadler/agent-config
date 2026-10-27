@@ -32,7 +32,7 @@ the authority; the severity is the default.
 | EVAL011 | warn | A judge reading the reply cannot see what was passed to a tool. | Use `focus: mock_calls` when the criteria are about tool inputs. |
 | EVAL012 | error | Inline regex flags, a pattern matched against a file path instead of its content, or an unescaped quote inside a traced value make a regex match nothing, or everything. | Use the `flags` key, `target: { source: file, path }`, and `\\"` for a quote in a trace. |
 | EVAL013 | warn | A mock for a server the plugin does not declare is never used; an invalid `expect`, `type` or a `type: agent` mock with no `.replay` recordings fails at run time. | Rename the mock directory to the server, fix the field, or commit the recordings. |
-| EVAL014 | warn | A `scaffold_script` that is missing fails the run; a `fixtures/` or `bin/` directory is speculative; an answer in the scaffold's git history or an `add_dirs` directory leaks to the model. | Create the script or correct the path; remove the answer from history and `add_dirs`. |
+| EVAL014 | warn (info for git history and a bare `.git` in `add_dirs`) | A `scaffold_script` that is missing fails the run; a `fixtures/` or `bin/` directory is speculative; an answer in the scaffold's git history or an `add_dirs` directory leaks to the model. | Create the script or correct the path; remove the answer from history and `add_dirs`. |
 | EVAL015 | warn | Result directories that git does not ignore get committed by accident. | Add the results directory to `.gitignore`. |
 | EVAL016 | warn | A case graded only by a judge is the most expensive and noisiest kind. | Add a free grader (`regex`, `tool_used`, `file_exists`). |
 | EVAL017 | error | `quick` runs must be free; an `llm` or `baseline` grader is a paid call. | Remove the `quick` tag or the paid grader. |
@@ -41,8 +41,10 @@ the authority; the severity is the default.
 | EVAL020 | info | A suite that checks the skill fires but never that it stays quiet cannot catch an over-broad description. | Add a near-miss prompt that must not fire the skill. |
 | EVAL021 | warn | A grant the case never lists in `allowed_tools` widens permissions for nothing. | Remove the grant, or add the tool to `allowed_tools`. |
 | EVAL022 | warn | Installed plugins are called as `plugin:name`; an `input_match` without an optional prefix misses them. | Allow an optional `plugin:` prefix in the pattern. |
-| EVAL023 | warn | A judge on `last_message` can be talked into a pass by the reply, and an `llm` judge on `trace` sees only the first and last 12 messages. | Add a `regex` backstop, or lower `max_turns` to 12 or less. |
+| EVAL023 | warn (info for the `last_message` problem) | A judge on `last_message` can be talked into a pass by the reply, and an `llm` judge on `trace` sees only the first and last 12 messages. | Add a `regex` backstop, or lower `max_turns` to 12 or less. |
 | EVAL024 | warn | A case whose graders are all "must not fire" Skill checks (the no-plugin arm passes them by construction) or regexes whose literal text is in the prompt has only the with-arm fire rate to fail on. | Grade a trace action in a fixture workspace, or tag the case `smoke` to label it a cheap trigger guard, or drop it. |
+
+The Sev column is the rule's default. EVAL007, EVAL012, EVAL014 and EVAL023 override it for some problems (a finding's own severity wins); run `--list-rules` or read the finding for the one you got.
 
 ## The three steps
 

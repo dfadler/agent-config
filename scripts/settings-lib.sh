@@ -236,3 +236,81 @@ with open(settings_path, "w") as f:
 print("Migrated {} hook to exec form in {}".format(event, settings_path))
 PYEOF
 }
+
+# setting_is_set SETTINGS_FILE KEY
+#   Read-only probe: returns 0 if the dotted KEY (e.g. "worktree.autoPrune")
+#   exists in SETTINGS_FILE with any value, 1 if not — including when the file
+#   is missing, is not valid JSON, or python3 is unavailable. Prints nothing.
+setting_is_set() {
+  local settings="$1" key="$2"
+
+  [[ -f "$settings" ]] || return 1
+
+  SETTINGS_FILE="$settings" SETTING_KEY="$key" python3 2>/dev/null <<'PYEOF'
+import json, os, sys
+
+try:
+    with open(os.environ["SETTINGS_FILE"]) as f:
+        node = json.load(f)
+except ValueError:
+    sys.exit(1)
+
+for part in os.environ["SETTING_KEY"].split("."):
+    if not isinstance(node, dict) or part not in node:
+        sys.exit(1)
+    node = node[part]
+sys.exit(0)
+PYEOF
+}
+
+# ensure_setting_default SETTINGS_FILE KEY JSON_VALUE
+#   Sets the dotted KEY to JSON_VALUE (parsed as JSON) only when KEY is absent,
+#   so a value the user chose — including false — is never overwritten on a
+#   re-run. Creates SETTINGS_FILE as {} if it does not exist. Prints one status
+#   line on write; nothing if already set. Prints a warning to stderr and
+#   returns 0 if python3 is unavailable.
+ensure_setting_default() {
+  local settings="$1" key="$2" value="$3"
+
+  if ! command -v python3 >/dev/null 2>&1; then
+    printf 'Warning: python3 not found — cannot set %s in %s\n' "$key" "$settings" >&2
+    return 0
+  fi
+
+  if setting_is_set "$settings" "$key"; then
+    return 0
+  fi
+
+  if [[ ! -f "$settings" ]]; then
+    printf '{}\n' >"$settings"
+  fi
+
+  SETTINGS_FILE="$settings" SETTING_KEY="$key" SETTING_VALUE="$value" python3 <<'PYEOF'
+import json, os, sys
+
+settings_path = os.environ["SETTINGS_FILE"]
+key           = os.environ["SETTING_KEY"]
+value         = json.loads(os.environ["SETTING_VALUE"])
+
+with open(settings_path) as f:
+    data = json.load(f)
+
+*parents, leaf = key.split(".")
+node = data
+for part in parents:
+    if not isinstance(node, dict):
+        break
+    node = node.setdefault(part, {})
+if not isinstance(node, dict):
+    # An existing non-object parent (e.g. {"worktree": null}) is the user's; leave it.
+    sys.stderr.write("Warning: cannot set {} in {}: a parent is not an object\n".format(key, settings_path))
+    sys.exit(0)
+node[leaf] = value
+
+with open(settings_path, "w") as f:
+    json.dump(data, f, indent=4)
+    f.write("\n")
+
+print("Set {} in {}".format(key, settings_path))
+PYEOF
+}
