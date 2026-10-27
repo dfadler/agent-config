@@ -9,16 +9,19 @@ description: |
   their own sub-agents under a fixed depth, width and total-agent budget, and merges
   compact results. Not for small tasks or a single question: use
   `subagent-orchestration` to route those.
+argument-hint: "[--budget N] [--depth N] [--width N] <prompt>"
+allowed-tools: Bash(node ${CLAUDE_SKILL_DIR}/scripts/ts/limits.ts *)
 license: MIT
 metadata:
-  version: "1.0.0"
+  version: "1.2.0"
 ---
 
 # Fan out
 
 ## Contract
 
-- **Input:** a prompt to solve, plus optional overrides for the limits below.
+- **Input:** `$ARGUMENTS`: the prompt to solve, optionally preceded by `--budget N`,
+  `--depth N`, `--width N` to override the limits below.
 - **Output:** one merged answer, a one-line account of how the work was split, and
   which subtasks failed or were skipped.
 - **Does not:** decide whether a task deserves heavy parallelism (that is
@@ -26,13 +29,27 @@ metadata:
 
 ## Limits
 
-Defaults. The user can override any of them in the request.
+Resolve the limits with the script, not by hand. Pass only the limit flags, never the
+prompt: the prompt is free text and must not reach a shell command line (a `$(...)` or
+`;` in it would run). Copy only the leading `--budget`, `--depth` and `--width` tokens
+from `$ARGUMENTS`, and only when the value is digits:
+
+`node ${CLAUDE_SKILL_DIR}/scripts/ts/limits.ts [--budget N] [--depth N] [--width N]`
+
+It prints one JSON object: `budget`, `depth`, `width` and `shares`, the budget each
+first-wave child gets. Use those numbers as given; the prompt is whatever follows the flags
+in `$ARGUMENTS`. Exit 2 with `{"error": ...}` means an invalid flag: tell the user the
+message and stop. A limit given in plain words ("at most 8 agents") has no flag, so pass it
+as one (`--budget 8`). If a flag value is not digits, report it as invalid instead of
+passing it on. If Bash is unavailable, apply the table by hand: whole numbers only,
+`budget` at least 1, `depth` 0 to 3, an unset `budget` is the env value (else 20), and
+bad input is rejected, not clamped.
 
 | Limit | Default | Meaning |
 |---|---|---|
 | `depth` | 2 | Layers of sub-agents below you. The harness hard-stops at 3. |
-| `width` | 4 | Children one agent may spawn at once. |
-| `budget` | 12 | Total agents in the whole run, all layers. |
+| `width` | 4 | Children one agent may spawn at once. Never above `budget` minus 1. |
+| `budget` | current max sub-agent count (env value, else 20) | Total agents in the whole run, all layers. |
 
 The harness also caps concurrent sub-agents (`CLAUDE_CODE_MAX_CONCURRENT_SUBAGENTS`,
 default 20) and nesting (`CLAUDE_CODE_MAX_SUBAGENT_SPAWN_DEPTH`), per the
@@ -53,8 +70,8 @@ staging, not a failed child.
    files need disjoint file surfaces or their own worktrees; shared generated files
    count as a surface.
 3. **Divide the budget before spawning.** You hold `budget`. Reserve 1 for yourself,
-   give each child a share of the rest (children run in parallel, so shares must sum
-   to at most what you hold). Spawn the first wave of children (up to `width`, or the
+   give each child its entry in `shares` (children run in parallel, so shares sum to at
+   most what you hold; below the first layer, split what you were given the same way). Spawn the first wave of children (up to `width`, or the
    concurrency cap if lower) in one message.
 4. **Brief each child** with: its subtask, its `depth`/`width`/`budget` remaining
    (`depth` minus 1, its own budget share), and the leaf rule below.

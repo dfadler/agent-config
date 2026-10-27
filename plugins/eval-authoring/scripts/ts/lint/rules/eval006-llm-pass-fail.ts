@@ -2,8 +2,8 @@ import { graderLabel } from "../helpers.ts";
 import { fromDocs } from "../sources.ts";
 import type { Rule } from "../types.ts";
 
-const PASS = /\bpass(?:es|ed)?\b/i;
-const FAIL = /\bfail(?:s|ed)?\b/i;
+const PASS = /\bpass(?:es|ed|ing)?\b/i;
+const FAIL = /\bfail(?:s|ed|ing|ure)?\b/i;
 
 /**
  * EVAL006: an `llm` grader's criteria should state PASS and FAIL conditions.

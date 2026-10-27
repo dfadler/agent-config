@@ -25,6 +25,7 @@ interface Fake {
   settings?: string; // raw settings.json text; undefined = absent
   env?: Env;
   bashOut?: { stdout: string; stderr: string };
+  userSettings?: string; // $HOME/.claude/settings.json (HOME=/home/u); undefined = absent
 }
 
 const makeCtx = (f: Fake) => {
@@ -43,6 +44,8 @@ const makeCtx = (f: Fake) => {
     readFile: (p) => {
       if (p === "/top/.claude/settings.json" && f.settings !== undefined)
         return f.settings;
+      if (p === "/home/u/.claude/settings.json" && f.userSettings !== undefined)
+        return f.userSettings;
       throw new Error("ENOENT");
     },
     out: (t) => out.push(t),
@@ -249,6 +252,22 @@ describe("pruneMerged", () => {
     const c = makeCtx(f);
     pruneMerged(c.ctx, script);
     expect(c.bashCalls).toEqual([[script, flag]]);
+  });
+
+  it("reads autoPrune from user-level settings when the project has none", () => {
+    const c = makeCtx({ env: { HOME: "/home/u" }, userSettings: prune(true) });
+    pruneMerged(c.ctx, script);
+    expect(c.bashCalls).toEqual([[script, "--auto"]]);
+  });
+
+  it("a project autoPrune value beats the user-level one", () => {
+    const c = makeCtx({
+      env: { HOME: "/home/u" },
+      settings: prune(false),
+      userSettings: prune(true),
+    });
+    pruneMerged(c.ctx, script);
+    expect(c.bashCalls).toEqual([[script, "--hook"]]);
   });
 
   it("forwards the script's stdout and skips a missing script", () => {

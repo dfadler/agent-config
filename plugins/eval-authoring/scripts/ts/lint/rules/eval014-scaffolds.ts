@@ -31,8 +31,9 @@ const binProblem = (dir: string, where: string): readonly Problem[] =>
       ]
     : [];
 
-/** Git commands that put a fix or an earlier trial into history the agent can read (#744). */
-const GIT_HISTORY = /\bgit\s+(?:commit|branch|tag|checkout\s+-b|switch\s+-c)\b/;
+/** Git commands that put a fix or an earlier trial into history the agent can read (#744); `-C dir` and `-c k=v` may sit between `git` and the verb. */
+const GIT_HISTORY =
+  /\bgit(?:\s+-[Cc]\s+\S+)*\s+(?:commit|branch|tag|checkout\s+(?:-\S+\s+)*-b|switch\s+(?:-\S+\s+)*-c)\b/;
 /** File names that look like an answer key. */
 const ANSWER_NAME = /(?:^|[-_.])(?:answers?|solutions?|expected|golden)(?:[-_.]|$)/i;
 
@@ -69,6 +70,8 @@ const leakProblems = (
             fix: "Keep the answer out of the workspace and out of git history: commit only the broken starting state, or drop the git setup.",
             loc: c.scaffoldScript.loc,
             source,
+            // Info: committing the broken starting state, which the fix text recommends, trips this too; it cannot see what is in the commit.
+            severity: "info",
           },
         ]
       : [];
@@ -82,6 +85,8 @@ const leakProblems = (
             fix: "Move the answer or the .git directory out of the directory listed in add_dirs.",
             loc: c.addDirs.loc,
             source,
+            // A bare .git can be a deliberate fixture repo (a git-log skill needs one); an answer-named file cannot.
+            ...(hits.every((h) => h.endsWith(".git")) ? { severity: "info" as const } : {}),
           },
         ];
   });
