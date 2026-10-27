@@ -1,8 +1,25 @@
 import { graderLabel } from "../helpers.ts";
 import type { Rule } from "../types.ts";
 
-/** `"skill": "name` where the name starts right after the quote: no room for a `plugin:` prefix. */
-const BARE_SKILL_NAME = /"skill"(?:\\s\*)?:(?:\\s\*)?"[\w-]/;
+/**
+ * True when `pattern` matches a bare `"skill":"name"` call, for a word taken
+ * from the pattern, but not the same call with a `plugin:` prefix. Testing
+ * sample inputs instead of the pattern's text catches `"skill": "name`,
+ * `"skill":"(a|b)"` and `\s?`, and leaves a pattern that already allows a prefix alone.
+ */
+const missesPrefixedCall = (pattern: string): boolean => {
+  let re: RegExp;
+  try {
+    re = new RegExp(pattern);
+  } catch {
+    return false; // an invalid regex is EVAL012's business
+  }
+  return (pattern.match(/[A-Za-z][\w-]*/g) ?? []).some((w) =>
+    ['"skill":"', '"skill": "'].some(
+      (k) => re.test(`${k}${w}"`) && !re.test(`${k}zz-plugin:${w}"`),
+    ),
+  );
+};
 
 /** EVAL022: a Skill `input_match` must allow an optional `plugin:` prefix, or namespaced calls are never counted. */
 export const rule: Rule = {
@@ -14,10 +31,10 @@ export const rule: Rule = {
     c.graders.flatMap((g) => {
       if (g.type !== "tool_used" || g.tool.value !== "Skill") return [];
       const m = g.inputMatch.value;
-      if (m === undefined || !BARE_SKILL_NAME.test(m)) return [];
+      if (m === undefined || !missesPrefixedCall(m)) return [];
       return [
         {
-          message: `${graderLabel(g)} input_match '${m}' puts the skill name right after the opening quote, so an installed plugin's 'plugin:name' call never matches and firing is undercounted (from #713).`,
+          message: `${graderLabel(g)} input_match '${m}' matches a bare skill name but not a 'plugin:name' call, so an installed plugin's call never matches and firing is undercounted (from #713).`,
           fix: 'Allow the prefix: `"skill"\\s*:\\s*"(?:[\\w-]+:)?name"`.',
           loc: g.inputMatch.loc,
         },
