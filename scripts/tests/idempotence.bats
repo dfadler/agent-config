@@ -137,8 +137,8 @@ assert d['theme'] == 'dark', 'unrelated key lost'
 cmds = [' '.join([h['command']] + h.get('args', [])) for ev in d['hooks'].values() for e in ev for h in e['hooks']]
 assert cmds.count('/usr/bin/true') == 1, 'user hook duplicated or lost'
 managed = [c for c in cmds if c != '/usr/bin/true']
-assert len(managed) == 8, 'expected 8 managed hooks, got {}'.format(len(managed))
-assert len(set(managed)) == 7, 'duplicate managed hook (the nudge script is registered under two events)'
+assert len(managed) == 9, 'expected 9 managed hooks, got {}'.format(len(managed))
+assert len(set(managed)) == 8, 'duplicate managed hook (the nudge script is registered under two events)'
 "
   [ "$status" -eq 0 ]
 }

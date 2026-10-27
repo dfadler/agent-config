@@ -56,6 +56,8 @@ hook passes in, not the mechanism itself.
 | `incident-nudge-hook.ts` | `UserPromptSubmit` + `Stop` | `COLLAB_RETRO_NUDGE=on\|off` | `env.COLLAB_RETRO_NUDGE: "on"` | off (skipped entirely). Log-only: a frustration phrase appends one line to a per-session pending file; `Stop` offers a retro at most once per session |
 | `scratch-guard-hook.ts` | `PreToolUse` (Edit/Write) | `SCRATCH_GUARD=warn\|block\|off` | none (env var only) | warn (advisory context, no block). Unlike the others it is on by default: it only warns, and only for writes into a system temp directory outside the session scratchpad |
 
+`protected-remote-hook.ts` (`gh-publish-guide`, `PreToolUse` Bash) is registered by `setup.sh` too. It asks, never denies, before `gh pr create`/`gh issue create`/`gh issue comment`/`git push` aimed at an owner other than `origin`'s; env vars `GH_PROTECTED_REMOTE_OVERRIDE=1` (skip) and `GH_PROTECTED_REMOTE_ALLOW=owner,...` (extra owners). Input fields (`tool_input.command`, `cwd`) per the [hooks docs](https://code.claude.com/docs/en/hooks).
+
 `memory-hygiene-stop-hook.ts` belongs to a different plugin (`memory-hygiene`,
 not `worktree-core`) and does not use the worktree hook lib — it hand-rolls its
 own on/off check. `Stop` fires once per turn, not once per session

@@ -21,3 +21,4 @@ PreToolUse	Edit|Write	scratch-guard	scratch-guard/scripts/ts/scratch-guard-hook.
 SessionStart	-	collab-retro	collab-retro/scripts/ts/offer-incident-retro-hook.ts	collab-retro/hooks/scripts/offer-incident-retro-hook.sh
 UserPromptSubmit	-	collab-retro	collab-retro/scripts/ts/incident-nudge-hook.ts	-
 Stop	-	collab-retro	collab-retro/scripts/ts/incident-nudge-hook.ts	-
+PreToolUse	Bash	gh-publish-guide	gh-publish-guide/scripts/ts/protected-remote-hook.ts	-
