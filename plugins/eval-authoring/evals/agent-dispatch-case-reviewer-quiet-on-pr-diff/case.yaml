@@ -42,7 +42,7 @@ graders:
   - name: names_the_bug
     type: regex
     target: last_message
-    pattern: 'off[- ]by[- ]one|one (too many|extra)|extra (item|element)|size ?\+ ?1|- ?1'
+    pattern: 'off[- ]by[- ]one|one (too many|extra|more)|extra (item|element)|size ?\+ ?1|\bbugs?\b|do(n.t| not) merge|not safe|unsafe|incorrect|wrong'
     flags: i
     match: contains
     arm: both

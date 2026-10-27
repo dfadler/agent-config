@@ -32,7 +32,7 @@ graders:
   - name: addresses_request
     type: regex
     target: last_message
-    pattern: 'turn|convert|changelog'
+    pattern: 'convert|transform|generat|draft|summariz|concise|shorter|redundan|filler|verbose|produc|writ|rewrit|trim|tighter|streamlin|revised|version|here.s'
     flags: i
     match: contains
     arm: both

@@ -48,7 +48,7 @@ graders:
   - name: names_both_cases
     type: regex
     target: last_message
-    pattern: 'release-notes-tone[\s\S]*changelog-style|changelog-style[\s\S]*release-notes-tone'
+    pattern: '^(?=[\s\S]*(?:rubric|wording|criteria))(?=[\s\S]*(?:skill|transcripts?|explanation))'
     flags: i
     match: contains
 

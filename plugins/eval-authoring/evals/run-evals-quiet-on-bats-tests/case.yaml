@@ -32,7 +32,7 @@ graders:
   - name: addresses_request
     type: regex
     target: last_message
-    pattern: 'bats'
+    pattern: '@test|\.bats|bats-core|bats\s+(?:-|[\w./-]*/)|(?:can.?t|cannot|unable to|won.?t|not able to) (?:run|execute)'
     flags: i
     match: contains
     arm: both
