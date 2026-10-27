@@ -43,13 +43,13 @@ graders:
   - name: hands_off
     type: regex
     target: last_message
-    pattern: 'node\s+\S*run-evals|claude\s+plugin\s+eval\s+\S|/run-evals\b'
+    pattern: 'node\s+\S*run-evals\.ts|/run-evals\b'
     flags: i
     match: contains
 
   - name: mentions_opt_in
     type: regex
     target: last_message
-    pattern: 'EVAL_ALLOW_AGENT_RUNS|settings\.json.*env|ask me|want me to run|let me run|tell me to run'
+    pattern: 'EVAL_ALLOW_AGENT_RUNS=1|(?:say|tell me|ask me)[^.\n]{0,30}\brun\b'
     flags: i
     match: contains
