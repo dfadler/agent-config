@@ -84,6 +84,8 @@ hook_lines() {
   printf 'register-hook\tStop\t%s\n' "$MH_HOOK"
   printf 'register-hook\tPreToolUse\tnode\t["%s"]\tEdit|Write\n' "$CLAUDE/skills/scratch-guard/scripts/ts/scratch-guard-hook.ts"
   printf 'register-hook\tSessionStart\tnode\t["%s"]\n' "$CLAUDE/skills/collab-retro/scripts/ts/offer-incident-retro-hook.ts"
+  printf 'register-hook\tUserPromptSubmit\tnode\t["%s"]\n' "$CLAUDE/skills/collab-retro/scripts/ts/incident-nudge-hook.ts"
+  printf 'register-hook\tStop\tnode\t["%s"]\n' "$CLAUDE/skills/collab-retro/scripts/ts/incident-nudge-hook.ts"
 }
 
 @test "plan: clean HOME yields the full install plan, in apply order" {
@@ -242,7 +244,7 @@ PY
   plan
   [ "$status" -eq 0 ]
   has "migrate-hook${T}Stop${T}$MH_SHELL${T}$MH_HOOK"
-  lacks "register-hook${T}Stop"
+  lacks "register-hook${T}Stop${T}$MH_HOOK"
 }
 
 @test "plan: opting a plugin out deregisters its shell-form entry as well as its exec form" {
