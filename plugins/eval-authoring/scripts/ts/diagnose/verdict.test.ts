@@ -66,8 +66,9 @@ describe("verdict categories", () => {
 
   it("treats a delta at the neutral band edge as signal, not zero", () => {
     const edge = DEFAULT_THRESHOLDS.neutralBand;
+    // One run per arm: noise unknown, so a positive delta is capped at weak-signal.
     expect(diagnoseCase(caseOf([1], [1 - edge], edge)).verdict).toBe(
-      "discriminates",
+      "weak-signal",
     );
     expect(diagnoseCase(caseOf([1], [1 + edge], -edge)).verdict).toBe(
       "negative-delta",
@@ -96,14 +97,35 @@ describe("verdict categories", () => {
         withRuns: [run(a), run(0, { error: "rate limit" })],
         withoutRuns: [run(b)],
       });
-    expect(diagnoseCase(dropped(0.35, 0.3)).verdict).toBe("discriminates");
+    expect(diagnoseCase(dropped(0.35, 0.3)).verdict).toBe("weak-signal");
     expect(diagnoseCase(dropped(0.3, 0.35)).verdict).toBe("negative-delta");
   });
 
-  it("trusts a single run per arm but says noise is unknown", () => {
+  it("caps a single run per arm at weak-signal and says noise is unknown", () => {
     const v = diagnoseCase(caseOf([1], [0.5], 0.5));
-    expect(v.verdict).toBe("discriminates");
+    expect(v.verdict).toBe("weak-signal");
     expect(kinds(v)).toContain("single-run");
+  });
+});
+
+describe("calibration", () => {
+  it("uses the t quantile, not 2 SE, at 3 runs", () => {
+    // means 0.6 vs 0.3, sd 0.1 each, n=3: SE 0.0816, 2 SE = 0.163 < 0.3 < t(2) 4.303 * SE = 0.351.
+    const v = diagnoseCase(caseOf([0.5, 0.6, 0.7], [0.2, 0.3, 0.4], 0.3));
+    expect(v.verdict).toBe("weak-signal");
+  });
+
+  it("floors SE so two SD-0 arms with a small delta are not discriminates", () => {
+    const v = diagnoseCase(caseOf([0.6, 0.6, 0.6], [0.5, 0.5, 0.5], 0.1));
+    expect(v.verdict).toBe("weak-signal");
+    expect(diagnoseCase(caseOf([1, 1, 1], [0, 0, 0], 1)).verdict).toBe(
+      "discriminates",
+    );
+  });
+
+  it("flags a near-ceiling pair, not only exact 1", () => {
+    const v = diagnoseCase(caseOf([1, 0.9, 1], [1, 1, 0.9], 0));
+    expect(kinds(v)).toContain("both-arms-pass-all");
   });
 });
 
@@ -140,7 +162,6 @@ describe("missing signal", () => {
         withoutRuns: [run(0.5)],
       }),
     );
-    expect(v.verdict).toBe("discriminates");
     expect(v.scoredGraders).toBeUndefined();
   });
 
@@ -180,13 +201,13 @@ describe("errors and skipped judges", () => {
     // The file's delta (-0.333) counts the 0-scored errored run as a regression.
     const v = diagnoseCase(
       caseOf([], [], -0.333, {
-        withRuns: [run(1), run(1), run(0, { error: limited })],
+        withRuns: [run(1), run(1), run(1), run(0, { error: limited })],
         withoutRuns: [run(0.5), run(0.5), run(0.5)],
       }),
     );
     expect(v.verdict).toBe("discriminates");
     expect(v.delta).toBe(0.5);
-    expect(v.with.usedRuns).toBe(2);
+    expect(v.with.usedRuns).toBe(3);
     expect(kinds(v)).toEqual(
       expect.arrayContaining(["run-error", "delta-recomputed"]),
     );
@@ -398,7 +419,7 @@ describe("mechanical findings", () => {
 describe("thresholds", () => {
   it("honors a custom neutral band", () => {
     const c = caseOf([1], [0.8], 0.2);
-    expect(diagnoseCase(c).verdict).toBe("discriminates");
+    expect(diagnoseCase(c).verdict).toBe("weak-signal");
     expect(
       diagnoseCase(c, false, { ...DEFAULT_THRESHOLDS, neutralBand: 0.3 })
         .verdict,
