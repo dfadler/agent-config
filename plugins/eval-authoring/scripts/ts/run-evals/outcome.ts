@@ -7,6 +7,7 @@ import {
   readAggregateResult,
   type AggregateResult,
 } from "../parser/index.ts";
+import { isErrored, isSilentZero } from "../parser/result.ts";
 import {
   EXIT_CONFIG,
   EXIT_DEPENDENCY,
@@ -72,9 +73,12 @@ export const inspectResult = (result: AggregateResult): ResultFindings => ({
   runErrors: result.cases.flatMap((c) =>
     (["with", "without"] as const).flatMap((arm) =>
       (arm === "with" ? c.withRuns : c.withoutRuns).flatMap((r, i) =>
-        typeof r.error === "string" && r.error !== ""
-          ? [{ caseName: c.name, arm, run: i + 1, error: r.error }]
-          : [],
+        // Same predicate as diagnose/verdict.ts: any string error (`""` too, #735), or a silent zero.
+        isErrored(r)
+          ? [{ caseName: c.name, arm, run: i + 1, error: r.error === "" ? "(empty error)" : r.error }]
+          : isSilentZero(r)
+            ? [{ caseName: c.name, arm, run: i + 1, error: "scored 0 with no grader detail (usage limit?)" }]
+            : [],
       ),
     ),
   ),
@@ -188,8 +192,12 @@ const note = (
 export const judgeRun = (input: JudgeInput): Judgement => {
   const { signals, findings } = input;
   const meaning = interpretCliExit(input.status, input.signal);
+  // Only trust the phrases when there is no readable result: with one, they can
+  // come from a graded reply or the report, and a real failure must stay a failure.
   const unavailable =
-    meaning !== "pass" && (signals.earlyAccess || signals.unavailable);
+    meaning !== "pass" &&
+    findings === undefined &&
+    (signals.earlyAccess || signals.unavailable);
   const notes: readonly Judgement[] = [
     ...(meaning === "interrupted"
       ? [note(EXIT_INTERRUPTED, ["the CLI was interrupted"], true)]
@@ -218,7 +226,11 @@ export const judgeRun = (input: JudgeInput): Judgement => {
     ...(meaning === "failed" && !unavailable
       ? [note(EXIT_FAILURE, ["below threshold, or the CLI rejected the run (no cases, untrusted directory, invalid option)"], false)]
       : []),
-    ...(meaning === "unknown" && !unavailable
+    // No status at all (SIGKILL, OOM): the run died, which says nothing about the score.
+    ...(meaning === "unknown" && !unavailable && input.status === null
+      ? [note(EXIT_PARTIAL, [`the CLI died without an exit status (signal ${input.signal ?? "none"}): not a below-threshold result`], false)]
+      : []),
+    ...(meaning === "unknown" && !unavailable && input.status !== null
       ? [note(EXIT_FAILURE, [`unexpected CLI exit status ${String(input.status)}`], false)]
       : []),
     ...(findings === undefined
