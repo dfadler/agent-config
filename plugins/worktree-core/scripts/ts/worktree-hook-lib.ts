@@ -87,18 +87,26 @@ export const runHook = (
 export const isRemote = (env: Env): boolean =>
   env["CLAUDE_CODE_REMOTE"] === "true";
 
-/** Parsed `<toplevel>/.claude/settings.json`, or undefined when unavailable. */
-export const readSettings = (ctx: HookCtx): unknown => {
-  const top = ctx.git(["rev-parse", "--show-toplevel"]);
-  if (top.status !== 0) return undefined;
+const parseSettings = (ctx: HookCtx, path: string): unknown => {
   try {
-    return JSON.parse(
-      ctx.readFile(`${top.stdout.trim()}/.claude/settings.json`),
-    );
+    return JSON.parse(ctx.readFile(path));
   } catch {
     // Absent or malformed settings mean "not configured".
     return undefined;
   }
+};
+
+/** Parsed `<toplevel>/.claude/settings.json`, or undefined when unavailable. */
+export const readSettings = (ctx: HookCtx): unknown => {
+  const top = ctx.git(["rev-parse", "--show-toplevel"]);
+  if (top.status !== 0) return undefined;
+  return parseSettings(ctx, `${top.stdout.trim()}/.claude/settings.json`);
+};
+
+/** Parsed `$HOME/.claude/settings.json`, or undefined when unavailable. */
+export const readUserSettings = (ctx: HookCtx): unknown => {
+  const home = ctx.env["HOME"];
+  return home ? parseSettings(ctx, `${home}/.claude/settings.json`) : undefined;
 };
 
 const asRecord = (v: unknown): Record<string, unknown> | undefined =>
@@ -119,8 +127,8 @@ const normalize = (v: string): string => {
 
 /**
  * Resolve an enable-mode: env var (with boolean synonyms) first, then the
- * project settings value (matched literally; `fromSettings` does any
- * translation), then `fallback`. Only members of `valid` are accepted from
+ * project settings value, then the user-level (`~/.claude`) settings value
+ * (matched literally; `fromSettings` does any translation), then `fallback`. Only members of `valid` are accepted from
  * either source. See docs/hook-composition.md.
  */
 export const resolveEnableMode = (
@@ -134,8 +142,11 @@ export const resolveEnableMode = (
 ): string => {
   const fromEnv = normalize(ctx.env[opts.envVar] ?? "");
   if (fromEnv !== "" && opts.valid.includes(fromEnv)) return fromEnv;
-  const fromFile = opts.fromSettings(readSettings(ctx));
-  return opts.valid.includes(fromFile) ? fromFile : opts.fallback;
+  for (const settings of [readSettings(ctx), readUserSettings(ctx)]) {
+    const fromFile = opts.fromSettings(settings);
+    if (opts.valid.includes(fromFile)) return fromFile;
+  }
+  return opts.fallback;
 };
 
 /** Settings reader for a plain string key, "" when absent or not a string. */
