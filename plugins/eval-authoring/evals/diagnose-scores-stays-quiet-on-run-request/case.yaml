@@ -12,7 +12,7 @@ name: diagnose-scores-stays-quiet-on-run-request
 description: >
   Command-inquiry boundary: a request to run evals and say which command to use must not invoke
   diagnose-scores. expected_outcome: PASS when the skill is not invoked; FAIL otherwise.
-tags: [eval-authoring, diagnose-scores, trigger, quick]
+tags: [eval-authoring, diagnose-scores, trigger, quick, smoke]
 
 execution:
   prompt: |
