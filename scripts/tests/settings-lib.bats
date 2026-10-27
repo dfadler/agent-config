@@ -381,3 +381,11 @@ assert hooks == [{'type': 'command', 'command': 'node', 'args': ['/p/x.ts']}], h
   run python3 -c "import json,sys; d=json.load(open('$SETTINGS')); sys.exit(0 if d['model']=='x' and d['worktree']['autoPrune'] is True else 1)"
   [ "$status" -eq 0 ]
 }
+
+@test "setting default: a non-object parent is left unchanged with a warning" {
+  printf '{"worktree":null}' >"$SETTINGS"
+  run --separate-stderr ensure_setting_default "$SETTINGS" "worktree.autoPrune" "true"
+  [ "$status" -eq 0 ]
+  [[ "$stderr" == *"not an object"* ]]
+  [ "$(cat "$SETTINGS")" = '{"worktree":null}' ]
+}

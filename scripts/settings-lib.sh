@@ -286,7 +286,7 @@ ensure_setting_default() {
   fi
 
   SETTINGS_FILE="$settings" SETTING_KEY="$key" SETTING_VALUE="$value" python3 <<'PYEOF'
-import json, os
+import json, os, sys
 
 settings_path = os.environ["SETTINGS_FILE"]
 key           = os.environ["SETTING_KEY"]
@@ -298,7 +298,13 @@ with open(settings_path) as f:
 *parents, leaf = key.split(".")
 node = data
 for part in parents:
+    if not isinstance(node, dict):
+        break
     node = node.setdefault(part, {})
+if not isinstance(node, dict):
+    # An existing non-object parent (e.g. {"worktree": null}) is the user's; leave it.
+    sys.stderr.write("Warning: cannot set {} in {}: a parent is not an object\n".format(key, settings_path))
+    sys.exit(0)
 node[leaf] = value
 
 with open(settings_path, "w") as f:
