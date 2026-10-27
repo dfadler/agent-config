@@ -41,6 +41,9 @@ const readGrader = (g: Rec): GraderResult => {
   const weight = optNum(g["weight"]);
   const explanation = optStr(g["explanation"]);
   const withOnly = optBool(g["withOnly"]);
+  const votes = Array.isArray(g["judgeVotes"])
+    ? arr(g["judgeVotes"]).filter((v): v is boolean => typeof v === "boolean")
+    : undefined;
   return {
     ...(name === undefined ? {} : { name }),
     ...(type === undefined ? {} : { type }),
@@ -49,6 +52,7 @@ const readGrader = (g: Rec): GraderResult => {
     ...(scored === undefined ? {} : { scored }),
     ...(weight === undefined ? {} : { weight }),
     ...(explanation === undefined ? {} : { explanation }),
+    ...(votes === undefined ? {} : { judgeVotes: votes }),
     ...(withOnly === undefined ? {} : { withOnly }),
   };
 };

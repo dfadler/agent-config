@@ -160,12 +160,23 @@ const scoredGraderCount = (c: CaseResult): number | undefined => {
 };
 
 /**
- * Votes in a judge's `explanation`. Assumes it carries PASS or FAIL tokens
- * ("judge votes: PASS PASS PASS" is what the console prints); unconfirmed
- * against a result file, so an explanation without tokens is simply not split.
+ * Votes in a judge's `explanation`: PASS or FAIL tokens after "judge votes:".
+ * Confirmed against a real llm-graded `claude plugin eval` result (fixture
+ * real-llm-graded-result.json), but only unanimous samples were seen, never a
+ * real split. Graders also carry a structured `judgeVotes` boolean array,
+ * which `graderVotes` prefers; this text parse is the fallback.
  */
 export const judgeVotes = (explanation: string): readonly string[] =>
-  explanation.match(/\b(?:PASS|FAIL)\b/g) ?? [];
+  // Only the line after "judge votes:"; a rubric quoted earlier says PASS/FAIL too.
+  /judge votes:?([^\n]*)/i
+    .exec(explanation)?.[1]
+    ?.match(/\b(?:PASS|FAIL)\b/g) ?? [];
+
+/** A grader's votes: the structured array when present, else the explanation text. */
+const graderVotes = (g: GraderResult): readonly string[] =>
+  g.judgeVotes !== undefined
+    ? g.judgeVotes.map((v) => (v ? "PASS" : "FAIL"))
+    : judgeVotes(g.explanation ?? "");
 
 const splitVoteFindings = (c: CaseResult): readonly Finding[] => {
   const arms = [
@@ -175,8 +186,8 @@ const splitVoteFindings = (c: CaseResult): readonly Finding[] => {
   const splits = arms.flatMap(([arm, runs]) =>
     runs.flatMap((r, i) =>
       (r.graders ?? []).flatMap((g) => {
-        if (g.scored === false || g.explanation === undefined) return [];
-        const votes = judgeVotes(g.explanation);
+        if (g.scored === false) return [];
+        const votes = graderVotes(g);
         return votes.includes("PASS") && votes.includes("FAIL")
           ? [
               `${g.name ?? "(unnamed grader)"} (${arm} run ${String(i + 1)}: ${votes.join(" ")})`,
@@ -247,11 +258,13 @@ interface Judged {
 
 /** The verdict from stats alone, once errors and missing signal are ruled out. */
 const judgeDelta = (
-  delta: number,
+  rawDelta: number,
   w: ArmStats,
   wo: ArmStats,
   t: Thresholds,
 ): Judged => {
+  // Float noise: 0.35 - 0.30 is 0.04999999999999999, which must count as 0.05.
+  const delta = round(rawDelta);
   const d = fmt(delta);
   const seW = (w.stdDev ?? 0) ** 2 / Math.max(w.usedRuns, 1);
   const seWo = (wo.stdDev ?? 0) ** 2 / Math.max(wo.usedRuns, 1);
@@ -280,6 +293,13 @@ const judgeDelta = (
         ] as const)
       : [];
   const extra = [...ceiling, ...floor];
+  if (delta <= -t.neutralBand && noiseKnown && -delta <= t.noiseMultiple * se) {
+    return {
+      verdict: "weak-signal",
+      reason: `delta ${d} is negative but within ${String(t.noiseMultiple)} standard errors (${fmt(se)}) of zero, so it may be noise`,
+      findings: extra,
+    };
+  }
   if (delta <= -t.neutralBand) {
     return {
       verdict: "negative-delta",

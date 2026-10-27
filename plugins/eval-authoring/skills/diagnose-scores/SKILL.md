@@ -66,7 +66,7 @@ interprets the verdict.
   `--ablation` back to two arms).
 - **`judge-skipped`:** the cost ceiling skipped paid graders; not a signal. Recommend a higher
   ceiling or a free grader.
-- **`weak-signal`:** positive Δ inside noise. Recommend more runs before changing anything.
+- **`weak-signal`:** Δ inside noise, positive or negative (a drop smaller than 2 standard errors lands here, not under `negative-delta`). Recommend more runs before changing anything.
 - **`both-arms-pass-all` / `both-arms-fail-all`:** a case that cannot fail, or never passes
   (check graders and grants).
 - **`discriminates`:** one line; do not invent a problem.
@@ -81,10 +81,12 @@ without-arm mean over usable runs.
 
 | Verdict | Rule |
 |---|---|
-| `negative-delta` | Δ ≤ -0.05 |
+| `negative-delta` | Δ ≤ -0.05 and beyond 2 standard errors; with unknown noise, any Δ ≤ -0.05 |
 | `no-discrimination` | -0.05 < Δ < 0.05 |
-| `weak-signal` | Δ ≥ 0.05 and Δ ≤ 2 standard errors (only when both arms' standard deviations are known) |
+| `weak-signal` | \|Δ\| ≥ 0.05 and within 2 standard errors (only when both arms' standard deviations are known) |
 | `discriminates` | Δ ≥ 0.05 and Δ > 2 standard errors; with unknown noise, any Δ ≥ 0.05 |
+
+Δ is rounded to three decimals before these comparisons, so an exact ±0.05 lands the same way every time.
 | `high-variance` finding | an arm's run-score standard deviation is above 0.25 |
 
 The 0.05 band, the 2 standard errors and the 0.25 SD are rules of thumb the script chose,
