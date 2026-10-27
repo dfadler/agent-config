@@ -99,6 +99,18 @@ const deltaBreaches = (
     ([n, d]) => `${n}: delta ${String(d)} < floor ${String(floor)}`,
   );
 
+/** Cases with no delta (plugin-arm-only): the delta gate cannot see them (#738). */
+const ungatedNotes = (doc: Record<string, unknown>): string =>
+  list(doc["cases"])
+    .flatMap((c) =>
+      isRecord(c) &&
+      (!isRecord(c["aggregates"]) ||
+        typeof c["aggregates"]["delta"] !== "number")
+        ? [`- ungated by delta (no-plugin arm absent): ${String(c["name"])}\n`]
+        : [],
+    )
+    .join("");
+
 const inconclusive = (why: string): Result<CliError, never> =>
   err(cliError(EXIT_PARTIAL, `inconclusive: ${why}`));
 
@@ -130,7 +142,7 @@ const decide = (
     ...invalidReasons(doc),
   ];
   if (bad.length > 0) return inconclusive(bad.join("; "));
-  const warns = deltaWarnings(doc).join("");
+  const warns = deltaWarnings(doc).join("") + ungatedNotes(doc);
   const breaches = floor === undefined ? [] : deltaBreaches(doc, floor);
   if (breaches.length > 0) {
     return err(
