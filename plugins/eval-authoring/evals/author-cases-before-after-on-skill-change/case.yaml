@@ -3,6 +3,10 @@
 # updating the cases and comparing before and after scores, in the PR's Eval results section.
 # Can fail: a no-plugin reply says "add tests" generically and never names run-evals or Eval results.
 # Likely delta: positive; the skill fires only if its description matches an edit-then-PR request.
+# Unmeasured: compares_before_after now needs a score/result word beside before and after; a no-plugin
+# reply says "rerun your tests and compare" and likely still passes it (expect ~0.5-0.8 without). The
+# order grader needs "update the cases" then "before ... score"; a plain reply may pass it too, so
+# only the run-evals/Eval results grader is expected to carry the delta. Needs a standard before/after run.
 # Near-miss boundary: author-cases-stays-quiet-on-unit-tests. EVAL009 info is intentional (reply-only skill case).
 schema_version: "1.1"
 name: author-cases-before-after-on-skill-change
@@ -37,7 +41,16 @@ graders:
   - name: compares_before_after
     type: regex
     target: last_message
-    pattern: '(before|baseline|previous)[\s\S]*(after|new score|re-?run)|(after|re-?run)[\s\S]*(before|baseline|previous)'
+    pattern: '\b(?:before|baseline|previous|latest|old)\b[^.\n]{0,60}\b(?:scores?|results?|run)\b[\s\S]{0,400}\b(?:after|new|re-?run)\b[^.\n]{0,60}\b(?:scores?|results?|run)\b'
+    flags: i
+    match: contains
+
+  # Order: update the cases first, then compare before and after (the order is the skill's addition).
+  # PASS if "update/add/edit ... cases" is stated before the before/after score comparison.
+  - name: updates_cases_then_compares
+    type: regex
+    target: last_message
+    pattern: '\b(?:updat|add|edit|revis|chang|adjust|write|extend)\w*[^.\n]{0,60}\b(?:cases?|evals?)\b[\s\S]{0,600}\b(?:before|baseline|previous|latest|old)\b[^.\n]{0,60}\bscores?\b'
     flags: i
     match: contains
 
