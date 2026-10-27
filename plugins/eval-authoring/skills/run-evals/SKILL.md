@@ -76,7 +76,7 @@ it, do not rebuild any of that.
 5. **Relay the result.** The run ends with a Markdown summary (per-case with, without and
    delta, tier, models, cost, the command, and the redacted, truncated reply of each
    failed grader; plus a "Delta not significant below 20 cases" footer when the suite is
-   smaller than that, which you keep next to any delta you quote); paste it under an
+   smaller than that; give arm scores and "delta not measured" for such a suite rather than a delta figure, see below); paste it under an
    "Eval results" heading. Report the wrapper's output and exit code without
    reinterpreting; relay its preflight errors verbatim. Exit codes:
    - `0`: passed, results trustworthy.
@@ -91,10 +91,13 @@ it, do not rebuild any of that.
      as a pass.
    - `20`: internal error. `130` and `143`: interrupted or terminated.
 
-**A PR line from pasted scores.** When the user quotes `quick` or 3-run (`standard`)
-scores and wants a delta in the PR, give the arm scores and write "delta not measured":
-no delta number, even marked preliminary. A delta needs a with-and-without comparison at
-`thorough`. The wrapper's summary says the same under its table.
+**A PR line from pasted scores.** When the user quotes scores and wants a delta in the PR,
+and the scores are `quick` or 3-run (`standard`) or the suite has fewer than about 20 cases,
+give the arm scores and write "delta not measured": no delta number, even marked
+preliminary or with a caveat beside it. More runs per arm do not fix this, because runs
+shrink within-case noise but only more cases shrink the standard error of a delta. A delta
+needs a with-and-without comparison at `thorough` on a suite of about 20 cases or more. The
+wrapper's summary says the same under its table.
 
 ## What the tier values mean
 

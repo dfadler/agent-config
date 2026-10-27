@@ -4,7 +4,10 @@
 # Rewritten for #746: the prompt now presents a failing grader and its symptom instead of asking
 # for the answer; it never mentions a prefix. The reply is graded on the grader it hands back
 # (the fixed input_match must accept both call forms), not on a doc phrase.
-# Measured 2026-10-14 on the old prompt: 1.00 with the plugin, 0.50 without; unmeasured since.
+# Regression guard, no expected delta: in traces the skill does not fire here (0 of 6 runs) and the
+# no-plugin model already answers with an optional prefix group, so the arms tie. No skill_fired
+# grader for that reason. The grader once required a non-capturing `(?:` group and failed correct
+# replies that wrote `(deploy-helper:)?`; it now accepts both. Prompt no longer says "installed".
 schema_version: "1.1"
 name: author-cases-skill-input-match-plugin-prefix
 description: >
@@ -17,7 +20,7 @@ tags: [eval-authoring, author-cases, quick]
 
 execution:
   prompt: |
-    My claude plugin eval case for the `rollback` skill in my installed deploy-helper plugin
+    My claude plugin eval case for the `rollback` skill in my deploy-helper plugin
     fails every run: skill_fired is 0, yet the transcript clearly shows the skill being
     called. This is the grader:
 
@@ -38,16 +41,10 @@ execution:
     - Grep
 
 graders:
-  - name: skill_fired
-    type: tool_used
-    tool: Skill
-    input_match: '"skill"\s*:\s*"(?:[\w-]+:)?author-cases"'
-    min: 1
-    arm: with-only
-
-  # The fix, in any spelling: an optional group before the name, e.g. (?:[\w-]+:)? or (?:deploy-helper:)?
+  # The fix, in any spelling: an optional group (capturing or not) before the name, e.g.
+  # (?:[\w-]+:)?, (?:deploy-helper:)? or (deploy-helper:)? (real replies used the capturing form)
   - name: prefix_optional
     type: regex
     target: last_message
-    pattern: '\(\?:[^)]{1,40}:\)\?\s*rollback'
+    pattern: '\((?:\?:)?[^)]{1,40}:\)\?\s*rollback'
     match: contains
