@@ -1,0 +1,53 @@
+# Run: claude plugin eval plugins/worktree-core --case worktree-core-stays-quiet-on-solo-stash --runs 3 --trust-plugin --no-publish
+# Shared run/grant facts: docs/contributing.md, "Plugin evals". No grant; reply-only.
+# Should-not-fire near-miss on the stash rule: a single clone, no worktrees, no other session,
+# so `git stash` is fine. The prompt asks for stash on purpose, so the with-plugin arm shows
+# whether the skill makes the model refuse or lecture where the hazard does not apply.
+# Delta 0 by design. All free, quick.
+# Can fail: no_worktree_skill_fired fails if the skill fires on a plain stash request;
+# uses_stash fails if the reply avoids stash (the over-application the case guards);
+# restores_changes (half weight) fails if the reply never gets the changes back.
+# The prompt cues stash, so uses_stash is cheap for a baseline; the Skill check carries the signal.
+schema_version: "1.1"
+name: worktree-core-stays-quiet-on-solo-stash
+description: >
+  A solo user in a single clone who asks to stash changes to hop to a hotfix branch and come
+  back is outside the stash-collision hazard, so git-worktree-usage must not fire and the reply
+  uses git stash and pop or apply. expected_outcome: PASS when the skill is not invoked and the
+  reply stashes and restores; FAIL when the skill is invoked or the reply avoids stash.
+  Regression guard: Delta 0 by design.
+tags: [worktree-core, trigger, quick]
+
+execution:
+  prompt: |
+    I'm working alone in a single clone: no worktrees and no other sessions. I need to hop to
+    branch hotfix for a minute and then come back to my uncommitted changes, and I'd like to
+    use git stash for that. Give the git commands in order. Don't run anything; answer in one
+    bash code block, no comments and no other text.
+  max_turns: 6
+  allowed_tools:
+    - Skill
+
+graders:
+  - name: no_worktree_skill_fired
+    type: tool_used
+    tool: Skill
+    input_match: '"skill"\s*:\s*"(?:[\w-]+:)?git-worktree-usage"'
+    min: 0
+    max: 0
+    arm: both
+
+  - name: uses_stash
+    type: regex
+    target: last_message
+    pattern: 'git\s+stash(?!\s+(?:pop|apply|drop|list|show|branch|clear)\b)'
+    match: contains
+    arm: both
+
+  - name: restores_changes
+    type: regex
+    target: last_message
+    pattern: 'git\s+stash(?!\s+(?:pop|apply|drop|list|show|branch|clear)\b)[\s\S]*git\s+(?:switch|checkout)\s+hotfix\b[\s\S]*git\s+(?:switch|checkout)\b[\s\S]*git\s+stash\s+(?:pop|apply)\b'
+    match: contains
+    arm: both
+    weight: 0.5
