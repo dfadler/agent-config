@@ -205,6 +205,13 @@ describe("runHook: failure containment", () => {
     expect(out).toBe("");
   });
 
+  it("gives up after the deadline instead of hanging", async () => {
+    const root = makePlugin();
+    const hang: LintFn = () => new Promise(() => undefined);
+    const out = await runHook(event(join(root, "evals/bad/case.yaml")), hang, 20);
+    expect(out).toBe("");
+  });
+
   it("returns nothing when the lint refuses the plugin", async () => {
     const root = makePlugin();
     const refuse: LintFn = () =>
