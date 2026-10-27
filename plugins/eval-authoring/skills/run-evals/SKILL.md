@@ -112,21 +112,12 @@ So at threshold 1 every grader of a case must pass in every run. `quick` makes o
 so a single miss fails the case, **including a miss on a half-weight wording regex**:
 `weight` changes the score, and any score under 1 fails the case at this threshold.
 
-`--max-cost-usd` is a ceiling on the list-price cost estimate, with no default ceiling
-in the CLI. It is checked before each run starts; once spent, nothing further starts,
-runs already started finish, and if any run is left unstarted the CLI exits 2 (the
-wrapper reports 7, partial). The wrapper sets one ceiling for the whole run: `quick`
-gets the larger of $1 and $0.25 per selected case (8 cases: $2; 12: $3), `standard` a
-flat $5, `thorough` a flat $15, and `--max-cost-usd` replaces any of these as a total,
-never per case. `--dry-run` prints the ceiling and how it was derived. The wrapper makes
-one invocation per case, gives each the budget left, adds up each result's `costUsd`,
-and stops launching when nothing is left, listing the cases it did not run (exit 7). A
-result with no readable `costUsd` is charged the ceiling divided by the number of cases
-(capped at what is left), so one cost-less result does not use up the budget. The $0.25
-rate comes from logged-in runs ($0.04 to $0.12 a run, judge calls included; derivation in
-`tiers.ts`) with about 2x headroom; it is an estimate until a quick run reports real
-costs. If a run reports exit 7 with the ceiling hit, its scores are partial: trim the
-cases rather than reading them as failures.
+`--max-cost-usd` is a ceiling on the list-price cost estimate (the CLI has no default). The
+wrapper sets one total ceiling per run: `quick` the larger of $1 and $0.25 per selected case,
+`standard` $5, `thorough` $15; `--max-cost-usd` replaces it as a total. `--dry-run` prints
+the ceiling and how it was derived. Once spent, nothing further starts and the wrapper lists
+the cases it did not run (exit 7): trim the cases rather than reading partial scores as
+failures.
 
 ## Run in your repo (CI)
 
@@ -157,7 +148,7 @@ Levers, biggest first. Times and costs are rough figures from one 9-case plugin
 |---|---|---|
 | Iterate on one case | `run-evals.ts --tier quick <plugin> --case <name>` (raw: `<case-dir> --runs 3 --ablation none -j 5`) | ~1 min, ~$0.70 |
 | Full suite, pushed | raw: `<plugin> --runs 5 -j 6` | ~8 min |
-| Pre-merge | `run-evals.ts --tier thorough <plugin>` (raw: `--runs 5 -j 6`) | ~8 min |
+| Pre-merge | `run-evals.ts --tier standard <plugin>` (`thorough` for a noisy verdict or a release) | tier-dependent |
 
 Only `-j 3` (16 min) and `-j 6` (8 min) were timed; the `-j 5` in the first row is a guess
 (a one-case run has too few runs to use it), and `-j 9` is untested. The wrapper sets no `-j`.

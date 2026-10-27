@@ -5,7 +5,7 @@ fixtures and mocks" and "Mock files".
 
 Each run starts in an empty workspace, so put what the task needs in the prompt, or seed it.
 With nothing to read the model tends to hunt the workspace for files, so inline inputs
-beat leaving it empty (89-skills post; see the Eval Research doc, Tools).
+beat leaving it empty.
 
 ## Faking a CLI or fixture files
 
