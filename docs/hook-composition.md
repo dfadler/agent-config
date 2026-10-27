@@ -53,6 +53,7 @@ hook passes in, not the mechanism itself.
 | `prune-merged-worktrees-hook.ts` | `SessionStart` | `WORKTREE_AUTO_PRUNE=on\|off` | `worktree.autoPrune: true\|false` | on for `setup.sh` installs: seeded to `true` only when the key is absent, so a user's value wins; with `--skip=worktree-core` it is not written and the hook itself is not installed (`plan_hooks` deregisters it). The hook reads the project `.claude/settings.json`, then `~/.claude/settings.json` |
 | `check-worktree-symlinks-hook.ts` | `SessionStart` | `WORKTREE_SYMLINK_CHECK=on\|off` | `worktree.symlinkCheck: "on"\|"off"` | off (skipped entirely) |
 | `memory-hygiene-stop-hook.ts` | `Stop` | `MEMORY_HYGIENE_REMINDER=on\|off` | `env.MEMORY_HYGIENE_REMINDER: "on"` (settings.json's built-in `env` key — no bespoke key; see below) | off (skipped entirely) |
+| `incident-nudge-hook.ts` | `UserPromptSubmit` + `Stop` | `COLLAB_RETRO_NUDGE=on\|off` | `env.COLLAB_RETRO_NUDGE: "on"` | off (skipped entirely). Log-only: a frustration phrase appends one line to a per-session pending file; `Stop` offers a retro at most once per session |
 | `scratch-guard-hook.ts` | `PreToolUse` (Edit/Write) | `SCRATCH_GUARD=warn\|block\|off` | none (env var only) | warn (advisory context, no block). Unlike the others it is on by default: it only warns, and only for writes into a system temp directory outside the session scratchpad |
 
 `memory-hygiene-stop-hook.ts` belongs to a different plugin (`memory-hygiene`,

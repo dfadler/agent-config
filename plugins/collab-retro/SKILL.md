@@ -174,6 +174,11 @@ note about a PR you closed unmerged or a revert in the last two days. Treat it
 as a prompt to ask, not to act: offer the retro, and on a yes pre-fill
 `trigger: PR closed` or `trigger: revert`.
 
+An opt-in hook (`COLLAB_RETRO_NUDGE=on`, `scripts/ts/incident-nudge-hook.ts`)
+logs frustration phrases ("I told you", "not what I asked") to a per-session
+pending file and, at most once per session at Stop, asks you to offer a retro.
+Same rule: offer in one sentence, run only on a yes.
+
 1. **Check recurrence.** Pick a short `class` slug for the failure (name the
    failure, not the repo, e.g. `trusted-spec-over-user-evidence`), then run
    `node plugins/collab-retro/scripts/ts/scan-feedback-memories.ts --incidents <class>`.
