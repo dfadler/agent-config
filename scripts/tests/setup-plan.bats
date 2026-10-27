@@ -30,7 +30,7 @@ setup() {
   echo "## Convention one" >"$FAKE_REPO/claude/conventions/one.md"
   printf '# comment\n\none.md\n' >"$FAKE_REPO/claude/conventions/DEFAULT_ENABLED"
   local p
-  for p in memory-hygiene scratch-guard worktree-core; do
+  for p in collab-retro memory-hygiene scratch-guard worktree-core; do
     mkdir -p "$FAKE_REPO/plugins/$p/.claude-plugin"
     printf '{"name":"%s"}\n' "$p" >"$FAKE_REPO/plugins/$p/.claude-plugin/plugin.json"
   done
@@ -83,6 +83,7 @@ hook_lines() {
   printf 'register-hook\tSessionStart\tnode\t["%s"]\n' "$WT_HOOKS/prune-merged-worktrees-hook.ts"
   printf 'register-hook\tStop\t%s\n' "$MH_HOOK"
   printf 'register-hook\tPreToolUse\tnode\t["%s"]\tEdit|Write\n' "$CLAUDE/skills/scratch-guard/scripts/ts/scratch-guard-hook.ts"
+  printf 'register-hook\tSessionStart\tnode\t["%s"]\n' "$CLAUDE/skills/collab-retro/scripts/ts/offer-incident-retro-hook.ts"
 }
 
 @test "plan: clean HOME yields the full install plan, in apply order" {
@@ -99,6 +100,7 @@ hook_lines() {
     printf 'link\t%s\t%s\n' "$FAKE_REPO/claude/commands/demo.md" "$CLAUDE/commands/demo.md"
     printf 'link\t%s\t%s\n' "$FAKE_REPO/claude/commands/other.md" "$CLAUDE/commands/other.md"
     printf 'mkdir\t%s\n' "$CLAUDE/skills"
+    printf 'link\t%s\t%s\n' "$FAKE_REPO/plugins/collab-retro" "$CLAUDE/skills/collab-retro"
     printf 'link\t%s\t%s\n' "$FAKE_REPO/plugins/memory-hygiene" "$CLAUDE/skills/memory-hygiene"
     printf 'link\t%s\t%s\n' "$FAKE_REPO/plugins/scratch-guard" "$CLAUDE/skills/scratch-guard"
     printf 'link\t%s\t%s\n' "$FAKE_REPO/plugins/worktree-core" "$CLAUDE/skills/worktree-core"
@@ -191,7 +193,7 @@ hook_lines() {
 }
 
 @test "plan: --include and --skip selections are the complement of each other" {
-  plan --skip=demo,worktree-core
+  plan --skip=demo,worktree-core,collab-retro
   skip_plan="$output"
   plan --include=other,memory-hygiene,scratch-guard
   # Same actions; only the wording of the informational reason differs.
