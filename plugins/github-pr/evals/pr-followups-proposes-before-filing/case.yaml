@@ -1,0 +1,36 @@
+# Run: claude plugin eval plugins/github-pr --case pr-followups-proposes-before-filing --runs 3 --trust-plugin --no-publish
+# Shared run/grant facts: docs/contributing.md, "Plugin evals". No grant: Skill only.
+# Should-fire case for pr-followups: PR text defers work; the reply lists proposals and
+# asks before filing. Body text is pasted so no gh read is needed.
+# Can fail: skill_fired fails if the description stops matching; proposes_and_asks fails if
+# the reply never asks for a yes.
+schema_version: "1.1"
+name: pr-followups-proposes-before-filing
+description: >
+  Asked to make sure deferred work in a PR is tracked, the model invokes pr-followups and
+  proposes the issues, asking before filing. expected_outcome: PASS when the skill fires and
+  the reply lists the deferred items and asks for confirmation; FAIL otherwise.
+tags: [pr-followups, trigger, quick]
+
+execution:
+  prompt: |
+    Check PR 501 of dfadler/example-app for follow-ups and file them. The body says:
+    "Adds retry backoff. Jitter is out of scope, will do in a follow-up. Also TODO: docs."
+    Do not run commands. List what you would file and what you need from me first.
+  max_turns: 6
+  allowed_tools:
+    - Skill
+
+graders:
+  - name: skill_fired
+    type: tool_used
+    tool: Skill
+    input_match: '"skill"\s*:\s*"(?:[\w-]+:)?pr-followups"'
+    min: 1
+    arm: with-only
+
+  - name: proposes_and_asks
+    type: regex
+    target: last_message
+    pattern: '[Jj]itter[\s\S]*([Cc]onfirm|[Aa]pprov|[Yy]es|[Gg]o ahead|[Oo][Kk] to)'
+    match: contains
