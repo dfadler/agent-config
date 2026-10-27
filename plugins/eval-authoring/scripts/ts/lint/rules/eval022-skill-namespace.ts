@@ -14,9 +14,11 @@ const missesPrefixedCall = (pattern: string): boolean => {
   } catch {
     return false; // an invalid regex is EVAL012's business
   }
+  // A prefix written into the pattern (`(?:screen-capture:)?`) is the installed plugin's own.
+  const prefixes = ["zz-plugin", ...(pattern.match(/[A-Za-z][\w-]*(?=:)/g) ?? [])];
   return (pattern.match(/[A-Za-z][\w-]*/g) ?? []).some((w) =>
     ['"skill":"', '"skill": "'].some(
-      (k) => re.test(`${k}${w}"`) && !re.test(`${k}zz-plugin:${w}"`),
+      (k) => re.test(`${k}${w}"`) && !prefixes.some((p) => re.test(`${k}${p}:${w}"`)),
     ),
   );
 };
