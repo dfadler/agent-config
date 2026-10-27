@@ -2,21 +2,21 @@
 # No grant; reply-only. Default two arms. Unrun: paid, hand-off only.
 # Covers the "Can this case fail?" check in author-cases (PR 789 evidence). Sabotage map: delete that
 # block from SKILL.md -> names_construction_pass should drop. skill_fired is with-arm only (indicator).
-# The prompt does not say the case is vacuous; the pass-by-construction and prompt-cued facts must
-# come from reading the YAML. A plain model may already notice the Skill check: delta unverified.
+# The prompt asks keep/rewrite/drop without saying the case is vacuous; the pass-by-construction and
+# prompt-cued facts must come from reading the YAML. A plain model may already notice the Skill check: delta unverified.
 schema_version: "1.1"
 name: author-cases-cannot-fail-quiet-case
 description: >
   Shown a should-not-fire case whose only graders are an arm-both "skill not fired" check and a
   regex on text the prompt itself contains, the reply says the case cannot tell plugin from no
-  plugin and offers a fix. expected_outcome: PASS when the reply says the no-plugin arm passes
-  by construction or the regex is cued by the prompt; FAIL when it approves the case as is.
+  plugin. expected_outcome: PASS when the reply says the no-plugin arm passes by construction or
+  the regex is cued by the prompt; FAIL when it approves the case as is.
 tags: [eval-authoring, author-cases, can-fail, quick]
 
 execution:
   prompt: |
-    Review this eval case for my `deploy-helper` skill before I spend money running it.
-    It is a near-miss that should leave the skill alone.
+    I'm authoring `claude plugin eval` cases for my `deploy-helper` skill. Should I keep, rewrite
+    or drop this case before I spend money running it?
 
     ```yaml
     name: deploy-helper-stays-quiet-on-unit-tests
@@ -54,6 +54,6 @@ graders:
   - name: names_construction_pass
     type: regex
     target: last_message
-    pattern: 'by construction|cannot (?:ever )?fail|can.?t (?:ever )?fail|never fail|cued|echo(?:es|ed)? the prompt|without the plugin|no-plugin|passes (?:in|on) both|smoke'
+    pattern: 'by construction|cannot (?:ever )?fail|can.?t (?:ever )?fail|never fail|passes (?:in|on) both|(?:no|without the) plugin[^.]{0,40}(?:passes|pass it)|echo(?:es|ed)? the prompt|(?:cued|given away|supplied) by the prompt|prompt (?:already )?(?:contains|gives away|cues|supplies)'
     flags: i
     match: contains
