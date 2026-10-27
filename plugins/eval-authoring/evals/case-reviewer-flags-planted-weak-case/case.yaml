@@ -75,7 +75,7 @@ graders:
   - name: reviewer_dispatched
     type: tool_used
     tool: Agent
-    input_match: "case-reviewer"
+    input_match: '"subagent_type"\s*:\s*"(?:[\w-]+:)?case-reviewer"'
     min: 1
 
   # Precondition, not a skill property: the model followed the prompt and wrote the files the
@@ -119,7 +119,7 @@ graders:
   - name: notes_tautological_grader
     type: regex
     target: last_message
-    pattern: "(\\.\\*|has_text)[\\s\\S]{0,300}(always|any reply|every|matches everything|tautolog|vacuous|cannot fail|never fail)|(always|matches everything|tautolog|vacuous|cannot fail|never fail)[\\s\\S]{0,300}(\\.\\*|has_text)"
+    pattern: "(\\.\\*|has_text)[\\s\\S]{0,80}(any reply|every reply|matches (any|every)|tautolog|vacuous|cannot fail|can.t fail|never fail)|(any reply|every reply|matches (any|every)|tautolog|vacuous|cannot fail|can.t fail|never fail)[\\s\\S]{0,80}(\\.\\*|has_text)"
     flags: i
     match: contains
     weight: 0.5

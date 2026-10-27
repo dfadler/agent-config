@@ -11,6 +11,9 @@
 # rubric_requires_quote fails if the rubric has no quoted-evidence rule; has_no_fire_list fails
 # if there is no "do not fail for" list; names_known_bad_reply fails if no known-bad reply is
 # drafted; skill_fired (with-arm only) fails if the description stops matching.
+# Unmeasured: both patterns were widened for paraphrases ("ignore style nits", "bad reply"). A no-plugin
+# model writes an llm rubric with some nit exclusion fairly often, so has_no_fire_list may now pass
+# without the plugin (expect 0.3-0.6, was lower); names_known_bad_reply stays skill-specific (~0.1).
 schema_version: "1.1"
 name: author-cases-rubric-and-sequence-graders
 description: >
@@ -67,13 +70,13 @@ graders:
   - name: has_no_fire_list
     type: regex
     target: last_message
-    pattern: 'do(?:es)? not fail (?:for|on|because)|don.?t fail (?:for|on)|not fail for (?:style|length|formatting)'
+    pattern: 'do(?:es)? not (?:fail|penali[sz]e|flag|mark down)|don.?t (?:fail|penali[sz]e|flag|mark down)|(?:ignore|skip|disregard)[^.\n]{0,40}(?:style|length|format|wording|nit)|no[- ]fire|not fail for'
     flags: i
     match: contains
 
   - name: names_known_bad_reply
     type: regex
     target: last_message
-    pattern: 'known[- ]bad'
+    pattern: 'known[- ]bad|bad[- ]reply|(?:wrong|failing|negative|deliberately (?:bad|wrong))[- ](?:example )?(?:reply|transcript)|counter-?example'
     flags: i
     match: contains

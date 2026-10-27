@@ -51,8 +51,8 @@ execution:
       - name: names_breaking_change
         type: regex
         target: last_message
-        pattern: 'download'
-        flags: i
+        pattern: '^#{1,4}\s*.*breaking'
+        flags: im
         match: contains
     ```
 
@@ -62,7 +62,7 @@ execution:
     schema_version: "1.1"
     name: release-notes-quiet
     description: >
-      A request to review a diff, which shares the word changelog, must not invoke the skill.
+      A request to audit a CHANGELOG against merged pull requests, which shares the word changelog, must not invoke the skill.
       expected_outcome: PASS when release-notes is not invoked; FAIL when it is.
     tags: [release-notes, trigger, quick]
     execution:
@@ -91,7 +91,7 @@ graders:
   - name: reviewer_dispatched
     type: tool_used
     tool: Agent
-    input_match: "case-reviewer"
+    input_match: '"subagent_type"\s*:\s*"(?:[\w-]+:)?case-reviewer"'
     min: 1
 
   - name: files_created
@@ -103,7 +103,7 @@ graders:
   - name: says_clean
     type: regex
     target: last_message
-    pattern: "\\bclean\\b|no (?:blocking |significant |real )?(?:findings|issues|problems|defects)|nothing to (?:flag|fix)"
+    pattern: "\\bclean\\b|no (?:blocking |significant |real )?(?:findings|issues|problems|defects)|nothing to (?:flag|fix)|looks (?:good|fine|sound)|no (?:further|other|remaining) (?:findings|issues|problems)"
     flags: i
     match: contains
 

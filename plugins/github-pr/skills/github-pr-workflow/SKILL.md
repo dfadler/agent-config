@@ -75,7 +75,8 @@ diagnose one, since a syntax error never reaches a runner.
 If a PR body says "follow-up", "later" or "out of scope", file each item as an
 issue first and cite its number in the body (`Follow-up: #N`). A PR that merges
 with an unfiled follow-up loses it. Before opening or merging, grep the body for
-those words and confirm each has a number. For issues filed by someone else,
+those words and confirm each has a number (`github-pr:pr-followups` does the
+full detect, dedupe and file pass). For issues filed by someone else,
 also read issue-reporter-etiquette before closing them or merging `Closes #N`.
 
 ## Responding to review comments

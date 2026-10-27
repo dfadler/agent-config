@@ -42,7 +42,8 @@ the authority; the severity is the default.
 | EVAL021 | warn | A grant the case never lists in `allowed_tools` widens permissions for nothing. | Remove the grant, or add the tool to `allowed_tools`. |
 | EVAL022 | warn | Installed plugins are called as `plugin:name`; an `input_match` without an optional prefix misses them. | Allow an optional `plugin:` prefix in the pattern. |
 | EVAL023 | warn (info for the `last_message` problem) | A judge on `last_message` can be talked into a pass by the reply, and an `llm` judge on `trace` sees only the first and last 12 messages. | Add a `regex` backstop, or lower `max_turns` to 12 or less. |
-| EVAL024 | warn | A case whose graders are all "must not fire" Skill checks (the no-plugin arm passes them by construction) or regexes whose literal text is in the prompt has only the with-arm fire rate to fail on. | Grade a trace action in a fixture workspace, or tag the case `smoke` to label it a cheap trigger guard, or drop it. |
+| EVAL024 | warn | A `last_message` regex that already matches the case prompt passes (or trips) on a reply that echoes the prompt. | Match wording only the skill or a correct answer would add, or grade behavior with `tool_used`. |
+| EVAL025 | warn | A case whose graders are all "must not fire" Skill checks (the no-plugin arm passes them by construction) or regexes whose literal text is in the prompt has only the with-arm fire rate to fail on. | Grade a trace action in a fixture workspace, or tag the case `smoke` to label it a cheap trigger guard, or drop it. |
 
 The Sev column is the rule's default. EVAL007, EVAL012, EVAL014 and EVAL023 override it for some problems (a finding's own severity wins); run `--list-rules` or read the finding for the one you got.
 

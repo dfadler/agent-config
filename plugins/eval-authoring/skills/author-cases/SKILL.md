@@ -1,6 +1,6 @@
 ---
 name: author-cases
-description: Write or fix `claude plugin eval` cases - graders, mocks, fixtures, thresholds, should-trigger and should-not-trigger prompts. Use when adding evals to a new plugin or skill ("add evals to my plugin"), adding graders to existing cases, or writing the PR description for a change to a skill or agent that has eval cases. ALWAYS invoke it first when a plugin's skill or agent was just changed and the question is what to do about its evals, because it sets the order - update the cases, then compare before and after scores. Not for running evals (run-evals), explaining a score (diagnose-scores) or unit tests of plugin code.
+description: Write or fix `claude plugin eval` cases - graders, mocks, fixtures, thresholds, should-trigger and should-not-trigger prompts. Use when adding evals to a new plugin or skill ("add evals to my plugin"), adding graders to existing cases, or writing the PR description for a change to a skill or agent that has eval cases. ALWAYS invoke it first when a plugin's skill or agent was just changed and no scores exist yet (once there are scores, use diagnose-scores), because it sets the order - update the cases, then compare before and after scores. Not for running evals (run-evals), explaining a score (diagnose-scores) or unit tests of plugin code.
 argument-hint: "<plugin-path> [skill-or-agent]"
 ---
 
@@ -36,9 +36,6 @@ draft them there: tell the user to commit the skill and start a fresh session, t
 - Check domain facts in graders against primary docs or source, not the skill text.
 - Same-session cases that all pass first try, or take under a minute each, probably do
   not test the boundary. A few independent cases beat many co-authored ones.
-- A baseline of 0.90 or more signals the case may be solvable without the plugin; check
-  whether the prompt leaks the answer before rewriting or dropping it (step 7). The 0.90
-  is a rule of thumb (little headroom left for the plugin to add), not a measured cutoff.
 - A must-not-fire case that fires in over 20% of runs after two skill revisions is a
   scope bug: fix the trigger description, not the case. Both numbers are rules of thumb.
 
@@ -65,7 +62,7 @@ draft them there: tell the user to commit the skill and start a fresh session, t
    in [graders](references/graders.md). Pair a grader on the result with one on the steps.
    A reply-only skill case has no scored steps grader: `tool_used: Skill` is an unscored
    indicator in a two-arm run, and there is no other step to check. Keep the Skill check,
-   grade the reply with free `regex` graders, and accept the EVAL009 info finding. Do not
+   grade the reply with free `regex` graders, and accept the EVAL009 finding. Do not
    set `arm: both` on a should-fire Skill check to clear it: the no-plugin arm can never
    pass it, so it manufactures a delta that says nothing about the skill
    ([docs](https://code.claude.com/docs/en/plugin-evals#compare-against-a-no-plugin-baseline)).
@@ -89,7 +86,7 @@ draft them there: tell the user to commit the skill and start a fresh session, t
      that cues the behavior scores 1.00 for both (PR 789: 0.17 vs 0.00, and 1.00 vs 1.00).
    Instead, grade a trace action (`tool_used` on `Bash`, a `file_exists`) in a fixture
    workspace whose state makes the behavior necessary without naming it; or keep the case but
-   tag it `smoke` and say it is a cheap trigger-boundary guard with no expected delta (EVAL024
+   tag it `smoke` and say it is a cheap trigger-boundary guard with no expected delta (EVAL025
    skips tagged cases); or drop it.
 5. **Write PASS and FAIL conditions** for any `llm` grader: `PASS if <observable thing>.`
    `FAIL if <observable thing>.` Concrete enough that two judges agree. Also put a
@@ -101,21 +98,20 @@ draft them there: tell the user to commit the skill and start a fresh session, t
    Replies say nothing about `tool_used`, `tool_order` or `file_exists`: check those
    against a representative trace or artifact. See
    [rubrics](references/graders.md#rubrics-for-llm-graders).
-6. **Record grants.** If `allowed_tools` names `Bash`, `Write`, `Edit`, `WebFetch` or
-   `WebSearch`, add the exact `--allow-tools` entry for that case to
+6. **Record grants.** `allowed_tools` cannot grant `Bash`, `Write`, `Edit`, `WebFetch` or
+   `WebSearch`; a case that needs one gets an `--allow-tools` entry in
    `<eval dir>/grants.yaml` ([format](../../docs/grants-format.md)). Keep each entry as
    narrow as the case needs; a grant applies to every case in a run, which is why they are
    recorded per case. Faking a CLI or MCP server: [fixtures and
    mocks](references/fixtures-and-mocks.md). Testing a plugin's agents:
    [agents](references/agents.md).
 7. **Check the baseline.** Before trusting a new case, run it once without the plugin. A
-   baseline score of 0.9 or more means the case may be solvable without the plugin:
-   inspect the prompt for a leaked answer, and the workspace too: a `scaffold_script`
-   that commits a fix or `add_dirs` holding an answer file are readable by the agent
-   (EVAL014). Then rewrite it or drop the case. When
-   answering a user about such a case, open with that check (does the prompt give the
-   answer away?) and do not open with a keep, rewrite or drop verdict. A case that cannot separate the arms is a regression guard, not
-   evidence the skill helps.
+   baseline score of 0.9 or more (a rule of thumb: little headroom left for the plugin to
+   add, not a measured cutoff) means the case may be solvable without the plugin: inspect
+   the prompt and the workspace for a leaked answer (EVAL014 covers the mechanical
+   cases), then rewrite or drop it. When answering a user about such a case, lead with
+   that leak check: a keep, rewrite or drop verdict is only sound once it is known. A case
+   that cannot separate the arms is a regression guard, not evidence the skill helps.
 8. **Lint.** `node ${CLAUDE_SKILL_DIR}/../../scripts/ts/lint/cli.ts <plugin-path>` (Node 22
    or later). Fix every error. Fix each warning or write down why it is intended.
 9. **Review and hand off.** Ask the [case-reviewer agent](../../agents/case-reviewer.md)
@@ -135,16 +131,17 @@ draft them there: tell the user to commit the skill and start a fresh session, t
 
 ## Gotchas
 
-- The plugin's Stop hook blocks once when a plugin's skills or agents changed with no eval change. Treat it as a task: add or update the cases, then get the before (latest `evals/results/`) and after scores, or say why evals do not apply.
-
+- The plugin's Stop hook blocks once when skills or agents changed with no eval change:
+  treat it as the task in step 9.
 - Declared plugin `dependencies` are not resolved in an eval run (observed in #450, not in
-  the docs: the plugin is silently dropped). EVAL018 checks this.
+  the docs; EVAL018 checks it).
 - In a worktree-isolated session in this repo, a hook may block shell commands containing
   the word `eval`. It may also refuse compound commands (`$VAR`, globs, `for` loops,
   multi-file heredocs, some pipes). Use single plain commands and the Write tool; never
   write a workaround script, and ask the user to run what the hook blocks.
-- Each new sentence in a `SKILL.md` needs a case that fails when that sentence is deleted
-  (a sabotage map in the case header names it). A reply-only regex case on common-sense
+- A new `SKILL.md` sentence that changes behavior should be named in the PR body as either
+  covered by a case or not covered (step 9); a few independent cases beat one per sentence.
+  A reply-only regex case on common-sense
   routing sits at a 1.00 baseline and cannot register a skill change (#690: two such
   cases, delta 0.00 at 10 runs per arm). Prefer a case whose prompt does not name the
   answer, or one that grades the `Agent` calls the skill is meant to change.
@@ -157,13 +154,8 @@ draft them there: tell the user to commit the skill and start a fresh session, t
 - Grade behavior that helps a user, not a verbatim phrase the skill happens to contain.
   Use an `llm` grader last, with concrete PASS and FAIL wording (the noisiest graders in
   #713 were model-judged).
-- A Skill `input_match` must allow an optional `plugin:` prefix (EVAL022); installed
-  plugins are called as `plugin:name`.
 - Whether a case is useful is only known after a two-arm run (Δ above zero, graders
   discriminating). The lint cannot show that; say so rather than claiming it.
 - Action-based grading (grade the commands Claude runs, not its prose) needs a `Bash` grant
-  and changes behavior: the model may explain instead of run. In the #474 pilot (3 runs per
-  arm) it added variance rather than determinism (with 0.53 vs without 0.20, against 1.00
-  for the prose case), Bash never ran in any without-arm run, and `tool_order` gave a false
-  failure when two steps shared one command. Prefer prose graders; keep an action case only
-  if its with-arm variance is no worse and Δ is at least as large as the prose version's.
+  and may make the model explain instead of run; it added variance in the #474 pilot. Prefer
+  prose graders; numbers and the keep rule: [graders](references/graders.md#action-based-grading-pilot-result-474).

@@ -1,0 +1,48 @@
+# Run: node plugins/eval-authoring/scripts/ts/run-evals/run-evals.ts --tier quick plugins/eval-authoring
+# No grant (Agent, Read only). Near-miss for eval-authoring:case-reviewer: a code review of a
+# diff that shares the word "review" but contains no eval case. Pairs with
+# case-reviewer-fires-natural-review.
+# Can fail: reviewer_not_dispatched = 0 if the agent over-triggers on "review";
+# names_the_bug = 0 if the reply misses the extra element in the diff.
+# Unmeasured: regression guard, so a no-plugin model should pass both graders (it cannot dispatch
+# a plugin agent and any model spots the size + 1 slice bug); Delta zero by design.
+schema_version: "1.1"
+name: agent-dispatch-case-reviewer-quiet-on-pr-diff
+description: >
+  Reviewing a code diff must not dispatch eval-authoring:case-reviewer. expected_outcome: PASS
+  when the agent is not dispatched and the reply names the off-by-one; FAIL otherwise.
+tags: [eval-authoring, case-reviewer, agent, trigger, quick]
+
+execution:
+  prompt: |
+    Review this PR diff and tell me in two sentences if it is safe to merge. No files, no commands.
+
+    ```diff
+    --- a/src/pager.js
+    +++ b/src/pager.js
+    @@ -3,4 +3,4 @@ export function lastPage(items, size) {
+    -  return items.slice(-size);
+    +  return items.slice(items.length - size - 1);
+     }
+    ```
+  max_turns: 4
+  allowed_tools:
+    - Agent
+    - Read
+
+graders:
+  - name: reviewer_not_dispatched
+    type: tool_used
+    tool: Agent
+    input_match: '"subagent_type"\s*:\s*"(?:[\w-]+:)?case-reviewer"'
+    min: 0
+    max: 0
+    arm: both
+
+  - name: names_the_bug
+    type: regex
+    target: last_message
+    pattern: 'off[- ]by[- ]one|one (too many|extra)|extra (item|element)|size ?\+ ?1|- ?1'
+    flags: i
+    match: contains
+    arm: both

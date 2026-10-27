@@ -1,6 +1,6 @@
 ---
 name: diagnose-scores
-description: ALWAYS invoke this skill first when asked where to start on an eval case with a negative Delta or a low score on replies that look correct, even when nothing is to hand to run, because it sets the order of suspects (judge first). Explain why an eval case scored low - "my eval fails", "score 0.4", negative or zero Δ, 0.00 on output that looks correct, exit 1 or 2 with fine-looking results. Free, read-only. Not for running evals (run-evals) or writing cases (author-cases).
+description: ALWAYS invoke this skill first when scores already exist and you are asked where to start on an eval case with a negative Delta or a low score on replies that look correct, even when nothing is to hand to run, because it sets the order of suspects (judge first). Explain why an eval case scored low - "my eval fails", "score 0.4", negative or zero Δ, 0.00 on output that looks correct, exit 1 or 2 with fine-looking results. Free, read-only. Not for running evals (run-evals) or writing cases (author-cases).
 allowed-tools: Bash(node ${CLAUDE_SKILL_DIR}/../../scripts/ts/diagnose/diagnose.ts *)
 argument-hint: "[results-dir | aggregate-result.json | plugin-path]"
 ---
@@ -66,7 +66,7 @@ interprets the verdict.
   `--ablation` back to two arms).
 - **`judge-skipped`:** the cost ceiling skipped paid graders; not a signal. Recommend a higher
   ceiling or a free grader.
-- **`weak-signal`:** positive Δ inside noise. Recommend more runs before changing anything.
+- **`weak-signal`:** Δ inside noise, positive or negative (a drop smaller than 2 standard errors lands here, not under `negative-delta`). Recommend more runs before changing anything.
 - **`both-arms-pass-all` / `both-arms-fail-all`:** a case that cannot fail, or never passes
   (check graders and grants).
 - **`discriminates`:** one line; do not invent a problem.
@@ -81,10 +81,12 @@ without-arm mean over usable runs.
 
 | Verdict | Rule |
 |---|---|
-| `negative-delta` | Δ ≤ -0.05 |
+| `negative-delta` | Δ ≤ -0.05 and beyond 2 standard errors; with unknown noise, any Δ ≤ -0.05 |
 | `no-discrimination` | -0.05 < Δ < 0.05 |
-| `weak-signal` | Δ ≥ 0.05 and Δ ≤ 2 standard errors (only when both arms' standard deviations are known) |
+| `weak-signal` | \|Δ\| ≥ 0.05 and within 2 standard errors (only when both arms' standard deviations are known) |
 | `discriminates` | Δ ≥ 0.05 and Δ > 2 standard errors; with unknown noise, any Δ ≥ 0.05 |
+
+Δ is rounded to three decimals before these comparisons, so an exact ±0.05 lands the same way every time.
 | `high-variance` finding | an arm's run-score standard deviation is above 0.25 |
 
 The 0.05 band, the 2 standard errors and the 0.25 SD are rules of thumb the script chose,

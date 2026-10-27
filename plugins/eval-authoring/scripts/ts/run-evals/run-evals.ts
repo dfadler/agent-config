@@ -505,7 +505,7 @@ export const main = async (
       );
       io.out(
         `invocation ${String(i + 1)}/${String(total)}: claude ${buildCliArgs(spec)
-          .map((a) => (/[\s*()]/.test(a) ? JSON.stringify(a) : a))
+          .map(shellWord)
           .join(" ")}\n`,
       );
     });
@@ -566,9 +566,10 @@ export const main = async (
       `run-evals: cost ceiling $${String(ceilingUsd)} spent ($${String(progress.spentUsd)}); not run: ${unstarted.join(", ")}\n`,
     );
   }
+  // The last case can overspend without any later case to notice, so check the total too.
   const exit = progress.done.reduce<ExitCode>(
     (c, g) => worstExit(c, g.exit),
-    progress.outOfBudget ? EXIT_PARTIAL : EXIT_OK,
+    progress.outOfBudget || progress.spentUsd > ceilingUsd ? EXIT_PARTIAL : EXIT_OK,
   );
   const summary: RunSummary = {
     tier: options.tier.name,

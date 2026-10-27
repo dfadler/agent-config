@@ -1,0 +1,12 @@
+schema_version: "1.1"
+name: x
+execution:
+  prompt: Use the skill.
+  allowed_tools:
+    - Skill
+graders:
+  - type: tool_used
+    tool: Skill
+    max: 0
+    min: 0
+    input_match: '"skill"\s*:\s*"(?:screen-capture:)?(?:capture|compare)"'

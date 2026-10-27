@@ -1,0 +1,29 @@
+# Run: node plugins/eval-authoring/scripts/ts/run-evals/run-evals.ts --tier quick plugins/eval-authoring
+# No grant: Skill only. Near-miss: "why is my ... failing" shape, but a vitest test, not a plugin
+# eval case.
+# Can fail: diagnose_not_fired = 0 when the description matches any "why is X failing" prompt.
+# Unmeasured: regression guard; a no-plugin model passes (the skill does not exist there), so
+# Delta is zero by design. The with-arm result is the only signal.
+schema_version: "1.1"
+name: diagnose-scores-quiet-on-vitest-failure
+description: >
+  A failing vitest test is not an eval score and must not invoke diagnose-scores.
+  expected_outcome: PASS when diagnose-scores is not invoked; FAIL otherwise.
+tags: [eval-authoring, diagnose-scores, trigger, quick]
+
+execution:
+  prompt: |
+    Why is my vitest test failing? It says "expected 3 to be 4" in src/sum.test.ts. Answer in your
+    reply; do not run anything.
+  max_turns: 4
+  allowed_tools:
+    - Skill
+
+graders:
+  - name: diagnose_not_fired
+    type: tool_used
+    tool: Skill
+    input_match: '"skill"\s*:\s*"(?:[\w-]+:)?diagnose-scores"'
+    min: 0
+    max: 0
+    arm: both

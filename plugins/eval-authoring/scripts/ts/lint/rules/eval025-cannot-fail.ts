@@ -23,12 +23,12 @@ const isCued = (g: Grader, prompt: string): boolean => {
 };
 
 /**
- * EVAL024: every grader passes without the plugin by construction (a quiet
+ * EVAL025: every grader passes without the plugin by construction (a quiet
  * Skill check) or is cued by the prompt text, so the only live signal is the
  * with-arm fire rate. Opt out with the `smoke` tag (a labelled cheap guard).
  */
 export const rule: Rule = {
-  id: "EVAL024",
+  id: "EVAL025",
   severity: "warn",
   title: "Every grader passes without the plugin or is cued by the prompt (tag smoke to accept)",
   source: "from PR 789: a should-not-fire case scored 1.00 with and without; see author-cases, 'Can this case fail?'",

@@ -1,6 +1,6 @@
 ---
 name: run-evals
-description: Run a plugin's `claude plugin eval` cases at a cost tier, and answer questions about running them - tiers, cost ceilings, concurrency (`-j`), speed, setting up evals in CI, exit codes, and writing a PR line from pasted run-evals scores. Paid; needs an explicit request to run (or EVAL_ALLOW_AGENT_RUNS=1). Not for writing cases (author-cases) or explaining a score (diagnose-scores).
+description: Run a plugin's `claude plugin eval` cases at a cost tier, and answer questions about running them - tiers, cost ceilings, concurrency (`-j`), speed, setting up evals in CI, exit codes, and writing a PR line from pasted run-evals scores. Paid; runs only on the user's go-ahead in chat. Not for writing cases (author-cases) or explaining a score (diagnose-scores).
 argument-hint: "<plugin-path> [quick|standard|thorough]"
 allowed-tools: Bash(node ${CLAUDE_SKILL_DIR}/../../scripts/ts/lint/cli.ts *)
 ---
@@ -21,11 +21,11 @@ A run is paid: cases x runs x arms agent runs, plus three judge calls per `llm` 
 `baseline` grader per run. The cost figures `claude plugin eval` reports are
 list-price estimates of those model calls, not a bill.
 
-**Who may start a run.** An agent session may run it when the user asked for a run in
-this conversation ("run the evals now"), or when `EVAL_ALLOW_AGENT_RUNS=1` is set (for
-example in the project's `.claude/settings.json` env block) for unattended use where
-nobody is asking. With neither, step 4 hands the command to the user instead. A session
-that is not logged in (`claude auth status` fails) hands off either way.
+**Who may start a run.** Only the user's go-ahead. A user who asked for a run in this
+conversation ("run the evals now") has given it; do not ask again. Otherwise ask in chat,
+stating the tier and cost ceiling, and wait. If they decline or do not answer, step 4
+hands the command over instead. No environment variable stands in for the go-ahead. A
+session that is not logged in (`claude auth status` fails) hands off either way.
 
 The wrapper is `${CLAUDE_SKILL_DIR}/../../scripts/ts/run-evals/run-evals.ts`, run with
 `node` (22.18 or later). It owns tiers, grants, preflight checks and exit codes; call
@@ -54,13 +54,9 @@ it, do not rebuild any of that.
    grants. The wrapper never passes `--scaffold`, `--json` or `--report`; it reads
    `aggregate-result.json` from a per-case directory under `<eval-dir>/results/`.
 4. **Run or hand off.** Run it from this session if the user asked for a run in this
-   conversation, or `EVAL_ALLOW_AGENT_RUNS` is exactly `1`
-   (`[ "${EVAL_ALLOW_AGENT_RUNS:-}" = "1" ] && echo yes || echo no`; `0`, `true` and
-   empty do not count). The request, not the variable, is the opt-in when someone is
-   asking. If neither holds (you reached this skill while doing something else), give the
-   exact non-dry-run command to run in the user's own shell and stop. Tell them they can
-   ask you to run it, or set `EVAL_ALLOW_AGENT_RUNS=1` (e.g. in `.claude/settings.json`
-   env block) for unattended runs.
+   conversation. If they did not (you reached this skill while doing something else), ask
+   in chat for a go-ahead, naming the tier and cost ceiling, and wait. If they decline or
+   do not answer, give the exact non-dry-run command to run in their own shell and stop.
 
    Before starting, check login with `claude auth status`; child runs fail with
    `Not logged in` otherwise. Hand the command to the user only if that check fails.
@@ -112,21 +108,12 @@ So at threshold 1 every grader of a case must pass in every run. `quick` makes o
 so a single miss fails the case, **including a miss on a half-weight wording regex**:
 `weight` changes the score, and any score under 1 fails the case at this threshold.
 
-`--max-cost-usd` is a ceiling on the list-price cost estimate, with no default ceiling
-in the CLI. It is checked before each run starts; once spent, nothing further starts,
-runs already started finish, and if any run is left unstarted the CLI exits 2 (the
-wrapper reports 7, partial). The wrapper sets one ceiling for the whole run: `quick`
-gets the larger of $1 and $0.25 per selected case (8 cases: $2; 12: $3), `standard` a
-flat $5, `thorough` a flat $15, and `--max-cost-usd` replaces any of these as a total,
-never per case. `--dry-run` prints the ceiling and how it was derived. The wrapper makes
-one invocation per case, gives each the budget left, adds up each result's `costUsd`,
-and stops launching when nothing is left, listing the cases it did not run (exit 7). A
-result with no readable `costUsd` is charged the ceiling divided by the number of cases
-(capped at what is left), so one cost-less result does not use up the budget. The $0.25
-rate comes from logged-in runs ($0.04 to $0.12 a run, judge calls included; derivation in
-`tiers.ts`) with about 2x headroom; it is an estimate until a quick run reports real
-costs. If a run reports exit 7 with the ceiling hit, its scores are partial: trim the
-cases rather than reading them as failures.
+`--max-cost-usd` is a ceiling on the list-price cost estimate (the CLI has no default). The
+wrapper sets one total ceiling per run: `quick` the larger of $1 and $0.25 per selected case,
+`standard` $5, `thorough` $15; `--max-cost-usd` replaces it as a total. `--dry-run` prints
+the ceiling and how it was derived. Once spent, nothing further starts and the wrapper lists
+the cases it did not run (exit 7): trim the cases rather than reading partial scores as
+failures.
 
 ## Run in your repo (CI)
 
@@ -157,7 +144,7 @@ Levers, biggest first. Times and costs are rough figures from one 9-case plugin
 |---|---|---|
 | Iterate on one case | `run-evals.ts --tier quick <plugin> --case <name>` (raw: `<case-dir> --runs 3 --ablation none -j 5`) | ~1 min, ~$0.70 |
 | Full suite, pushed | raw: `<plugin> --runs 5 -j 6` | ~8 min |
-| Pre-merge | `run-evals.ts --tier thorough <plugin>` (raw: `--runs 5 -j 6`) | ~8 min |
+| Pre-merge | `run-evals.ts --tier standard <plugin>` (`thorough` for a noisy verdict or a release) | tier-dependent |
 
 Only `-j 3` (16 min) and `-j 6` (8 min) were timed; the `-j 5` in the first row is a guess
 (a one-case run has too few runs to use it), and `-j 9` is untested. The wrapper sets no `-j`.

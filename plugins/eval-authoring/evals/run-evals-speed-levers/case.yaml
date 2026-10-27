@@ -40,7 +40,7 @@ graders:
   - name: targets_one_case
     type: regex
     target: last_message
-    pattern: '--case\b|single case|one case|case director'
+    pattern: '--case\b|\bone case\b|case director'
     flags: i
     match: contains
 

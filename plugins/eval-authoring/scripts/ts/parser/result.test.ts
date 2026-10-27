@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { readAggregateResult } from "./result.ts";
+import { isErrored, readAggregateResult } from "./result.ts";
 
 const doc = (extra: Record<string, unknown> = {}): string =>
   JSON.stringify({
@@ -142,5 +142,17 @@ describe("readAggregateResult", () => {
     const out = readAggregateResult(text);
     expect(out.ok).toBe(false);
     expect(!out.ok && out.reason).toContain(reason);
+  });
+});
+
+describe("isErrored", () => {
+  it("counts any string error, including the empty string (#735)", () => {
+    expect(isErrored({ error: "boom" })).toBe(true);
+    expect(isErrored({ error: "" })).toBe(true);
+  });
+  it("does not count null, undefined or non-strings", () => {
+    expect(isErrored({ error: null })).toBe(false);
+    expect(isErrored({})).toBe(false);
+    expect(isErrored({ error: 1 })).toBe(false);
   });
 });

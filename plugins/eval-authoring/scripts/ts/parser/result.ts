@@ -41,6 +41,9 @@ const readGrader = (g: Rec): GraderResult => {
   const weight = optNum(g["weight"]);
   const explanation = optStr(g["explanation"]);
   const withOnly = optBool(g["withOnly"]);
+  const votes = Array.isArray(g["judgeVotes"])
+    ? arr(g["judgeVotes"]).filter((v): v is boolean => typeof v === "boolean")
+    : undefined;
   return {
     ...(name === undefined ? {} : { name }),
     ...(type === undefined ? {} : { type }),
@@ -49,6 +52,7 @@ const readGrader = (g: Rec): GraderResult => {
     ...(scored === undefined ? {} : { scored }),
     ...(weight === undefined ? {} : { weight }),
     ...(explanation === undefined ? {} : { explanation }),
+    ...(votes === undefined ? {} : { judgeVotes: votes }),
     ...(withOnly === undefined ? {} : { withOnly }),
   };
 };
@@ -92,6 +96,11 @@ const readCaseResult = (c: Rec): CaseResult => {
     withoutRuns: arr(arms["without"]).filter(isRec).map(readRun),
   };
 };
+
+/** A run that errored: any string `error` counts, `""` included (#735). */
+export const isErrored = <T extends { readonly error?: unknown }>(
+  r: T,
+): r is T & { readonly error: string } => typeof r.error === "string";
 
 /**
  * A zero score (not a mock-stopped run) with no grader detail: what a usage-limit run looks like, with

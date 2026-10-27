@@ -27,8 +27,9 @@ short calls per grader per run) and add variance. There are no custom-code grade
 3. **Guard the judge:** a reply can talk an `llm` judge into a pass, and an `llm` on
    `trace` reads only the first and last 12 messages (EVAL023). Put the rubric in the
    criteria, back it with a `regex` on `last_message` plus a negative regex for
-   rubric-echo phrases, keep `max_turns` at 12 or less when judging `trace`, and add one
-   adversarial case whose reply claims a perfect score and must score 0.
+   rubric-echo phrases, keep `max_turns` at 12 or less when judging `trace`, and for a high-stakes
+   judge, consider one adversarial case whose reply claims a perfect score and must score 0
+   (it costs a paid grader run, so skip it for low-stakes ones).
 4. **Keep paid graders narrow:** short output only, at most one per case unless the
    dimensions are independent, and paired with free graders.
 5. **Say why** with a one-line comment beside any paid grader. Comments are not parsed;

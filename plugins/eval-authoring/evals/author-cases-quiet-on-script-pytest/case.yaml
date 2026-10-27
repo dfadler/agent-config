@@ -1,9 +1,10 @@
 # Run: node plugins/eval-authoring/scripts/ts/run-evals/run-evals.ts --tier quick plugins/eval-authoring
-# Near-miss for author-cases (#745): shares "plugin" but is a docs question. Regression guard: a no-plugin arm passes it
-# by design (no delta), hence --ablation none via the quick tier.
+# Near-miss for author-cases (#745): tests a plugin's script, not a skill or agent, so it shares plugin vocabulary but needs no eval case.
+# Regression guard: a no-plugin arm passes it by design (no delta), hence --ablation none via the
+# quick tier.
 # Can fail: skill_not_fired fails if the description over-triggers on this vocabulary.
 schema_version: "1.1"
-name: author-cases-quiet-on-hooks-explainer
+name: author-cases-quiet-on-script-pytest
 description: >
   A request that shares vocabulary with author-cases but is not about `claude plugin eval` cases must
   not invoke it. expected_outcome: PASS when author-cases is not invoked and the reply addresses the
@@ -12,7 +13,8 @@ tags: [eval-authoring, author-cases, trigger, quick]
 
 execution:
   prompt: |
-    What does the hooks.json file in a Claude Code plugin do?
+    Write a pytest for the `render_notes.py` script in my plugin; it takes a changelog
+    file and prints markdown. Show the test in your reply.
     Don't create files or run any commands.
   max_turns: 6
   allowed_tools:
@@ -32,7 +34,7 @@ graders:
   - name: addresses_request
     type: regex
     target: last_message
-    pattern: 'hook|event|PreToolUse|command'
+    pattern: 'def test_|pytest|assert'
     flags: i
     match: contains
     arm: both
