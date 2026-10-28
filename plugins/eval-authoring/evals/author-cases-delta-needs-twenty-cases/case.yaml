@@ -1,9 +1,12 @@
 # Run: node plugins/eval-authoring/scripts/ts/run-evals/run-evals.ts --tier standard --case author-cases-delta-needs-twenty-cases plugins/eval-authoring
-# No grant; reply-only. Covers author-cases step 9 (#739): a delta is claimed only for a plugin
+# No grant; reply-only. Covers the 20-case rule (#739), taught in author-cases step 9 and in
+# run-evals "A PR line from pasted scores"; a PR-line prompt routes to run-evals (observed in
+# traces), so skill_fired accepts either skill. No arm-score grader: any reply restating the
+# prompt's scores would match it (EVAL024). A delta is claimed only for a plugin
 # with about 20 or more cases, because runs shrink within-case noise but only cases shrink the
 # standard error of a delta. A 3-case suite reports arm scores and "delta not measured".
 # Can fail: states_delta_not_measured fails if the reply writes a delta figure as a result
-# instead of declining it; states_case_count_reason fails if the reply gives the old
+# (or "delta +0.33" with a "not significant" footer) instead of declining it; states_case_count_reason fails if the reply gives the old
 # "more runs" fix instead of the case count; skill_fired (with-arm only) fails if the
 # description stops matching.
 # Unmeasured: no_unqualified_delta_figure now also blocks 33%, 33 points and "improvement of 0.33";
@@ -14,8 +17,9 @@ name: author-cases-delta-needs-twenty-cases
 description: >
   Given a 3-case suite with 10 runs per arm and a user who wants a delta in the PR body, the
   reply declines to cite a delta and says a delta needs about 20 cases. expected_outcome:
-  PASS when it gives arm scores, writes delta not measured and names the case count; FAIL when
-  it presents a delta as the result or says more runs would fix it.
+  PASS when it writes delta not measured and names the case count; FAIL when it presents a
+  delta as the result or says more runs would fix it. Whether the reply restates the arm scores
+  is not graded (a grader for it would match the prompt itself, EVAL024).
 tags: [eval-authoring, author-cases, quick]
 
 execution:
@@ -35,7 +39,7 @@ graders:
   - name: skill_fired
     type: tool_used
     tool: Skill
-    input_match: '"skill"\s*:\s*"(?:[\w-]+:)?author-cases"'
+    input_match: '"skill"\s*:\s*"(?:[\w-]+:)?(?:author-cases|run-evals)"'
     min: 1
     arm: with-only
 
@@ -53,14 +57,6 @@ graders:
     target: last_message
     pattern: '\b(?:20|twenty)\b[^.\n]{0,40}\bcases?\b|\bcases?\b[^.\n]{0,40}\b(?:20|twenty)\b'
     flags: i
-    match: contains
-
-  # Both supplied arm scores appear, so "delta not measured" alone does not pass.
-  - name: states_both_arm_scores
-    type: regex
-    target: last_message
-    pattern: '0?\.93.*0?\.60|0?\.60.*0?\.93'
-    flags: s
     match: contains
 
   - name: no_unqualified_delta_figure
