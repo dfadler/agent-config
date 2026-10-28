@@ -83,4 +83,19 @@ describe("runHook", () => {
     });
     expect(runHook("not json", run, {})).toBe("");
   });
+
+  it("runs its lookups in the event's cwd", () => {
+    const cwds = new Set<string | undefined>();
+    const spy: Run = (cmd, args, cwd) => {
+      cwds.add(cwd);
+      return run(cmd, args, cwd);
+    };
+    const raw = JSON.stringify({
+      tool_name: "Bash",
+      cwd: "/some/repo",
+      tool_input: { command: "git push upstream" },
+    });
+    runHook(raw, spy, {});
+    expect([...cwds]).toEqual(["/some/repo"]);
+  });
 });

@@ -109,10 +109,14 @@ export const DEFAULT_THRESHOLDS: Thresholds = {
   highVariance: 0.25,
 };
 
-/** Two-sided 95% t quantiles for 1 to 10 degrees of freedom. */
-const T95 = [12.706, 4.303, 3.182, 2.776, 2.571, 2.447, 2.365, 2.306, 2.262, 2.228];
+/** Two-sided 95% t quantiles for 1 to 30 degrees of freedom. */
+const T95 = [
+  12.706, 4.303, 3.182, 2.776, 2.571, 2.447, 2.365, 2.306, 2.262, 2.228, 2.201, 2.179,
+  2.16, 2.145, 2.131, 2.12, 2.11, 2.101, 2.093, 2.086, 2.08, 2.074, 2.069, 2.064, 2.06,
+  2.056, 2.052, 2.048, 2.045, 2.042,
+];
 
-/** t quantile at the smaller arm's df (conservative); 2 from 11 df up. */
+/** t quantile at the smaller arm's df (conservative); 2 from 31 df up. */
 const tQuantile = (w: ArmStats, wo: ArmStats): number =>
   T95[Math.min(w.usedRuns, wo.usedRuns) - 2] ?? 2;
 
@@ -289,7 +293,7 @@ const judgeDelta = (
             kind: "both-arms-pass-all",
             severity: "warn",
             message:
-              "both arms score 1: nothing in the case fails without the plugin, so it cannot discriminate (fine as a regression guard, say so in expected_outcome)",
+              "both arms score at the ceiling (mean >= 0.95): almost nothing fails without the plugin, so the case has little headroom to discriminate (fine as a regression guard, say so in expected_outcome)",
           },
         ] as const)
       : [];

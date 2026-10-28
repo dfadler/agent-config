@@ -66,8 +66,8 @@ interprets the verdict.
   `--ablation` back to two arms).
 - **`judge-skipped`:** the cost ceiling skipped paid graders; not a signal. Recommend a higher
   ceiling or a free grader.
-- **`weak-signal`:** Δ inside noise, positive or negative (a drop within the t cutoff below lands here, not under `negative-delta`). Recommend more runs before changing anything.
-- **`both-arms-pass-all` / `both-arms-fail-all`:** a case that cannot fail, or never passes
+- **`weak-signal`:** Δ inside noise, positive or negative (a drop within the t cutoff below lands here, not under `negative-delta`). Recommend more runs before changing anything, unless both arms have SD 0 (the 0.05 floor sets the bar, so more identical runs cannot change the verdict): then a larger effect or a sharper grader is the lever.
+- **`both-arms-pass-all` / `both-arms-fail-all`:** a case that cannot fail (or has almost no headroom, both means at least 0.95), or never passes
   (check graders and grants).
 - **`discriminates`:** one line; do not invent a problem.
 
@@ -86,7 +86,7 @@ without-arm mean over usable runs.
 | `weak-signal` | \|Δ\| ≥ 0.05 and within the t cutoff; also any Δ ≥ 0.05 when an arm has under two usable runs (noise unknown) |
 | `discriminates` | Δ ≥ 0.05 and Δ > the t cutoff, with both arms' standard deviations known |
 
-The t cutoff is the two-sided 95% t quantile at the smaller arm's run count minus one (4.30 at 3 runs, 2.78 at 5, 2 from 12) times the standard error of Δ, floored at 0.05 so two arms with SD 0 do not count as noise-free. The `both-arms-pass-all` finding fires when both arm means are at least 0.95.
+The t cutoff is the two-sided 95% t quantile at the smaller arm's run count minus one (4.30 at 3 runs, 2.78 at 5, 2 from 31) times the standard error of Δ, floored at 0.05 so two arms with SD 0 do not count as noise-free. The `both-arms-pass-all` finding fires when both arm means are at least 0.95.
 
 Δ is rounded to three decimals before these comparisons, so an exact ±0.05 lands the same way every time.
 | `high-variance` finding | an arm's run-score standard deviation is above 0.25 |

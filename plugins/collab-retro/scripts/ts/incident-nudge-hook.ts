@@ -19,7 +19,7 @@
 // ponytail: a small fixed phrase list on short prompts stands in for
 // frustration detection; it misses tone without these words. Upgrade path:
 // grow the list from real incidents.
-import { appendFileSync, closeSync, existsSync, mkdirSync, openSync, readFileSync } from "node:fs";
+import { appendFileSync, closeSync, existsSync, mkdirSync, openSync, readFileSync, rmSync } from "node:fs";
 import { join } from "node:path";
 
 export interface Deps {
@@ -74,8 +74,8 @@ export const run = (d: Deps): number => {
     const hit = PHRASES.map((re) => re.exec(prompt)?.[0]).find((m) => m !== undefined);
     if (hit === undefined) return 0;
     try {
-      mkdirSync(dir, { recursive: true });
-      appendFileSync(pending, `${d.now.toISOString()} ${hit.toLowerCase()}\n`);
+      mkdirSync(dir, { recursive: true, mode: 0o700 });
+      appendFileSync(pending, `${d.now.toISOString()} ${hit.toLowerCase()}\n`, { mode: 0o600 });
     } catch {
       // Log-only and best effort.
     }
@@ -86,9 +86,14 @@ export const run = (d: Deps): number => {
     if (input?.["stop_hook_active"] === true) return 0;
     if (existsSync(nudged) || !existsSync(pending)) return 0;
     try {
-      closeSync(openSync(nudged, "w"));
+      closeSync(openSync(nudged, "wx", 0o600)); // "wx": only one concurrent Stop claims the nudge
     } catch {
       return 0; // cannot throttle, so do not nudge
+    }
+    try {
+      rmSync(pending); // keep the .nudged marker so the nudge stays once per session
+    } catch {
+      // best effort
     }
     d.out(`${JSON.stringify(NUDGE)}\n`);
   }

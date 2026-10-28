@@ -9,6 +9,7 @@ import { spawnSync } from "node:child_process";
 export type Run = (
   cmd: string,
   args: readonly string[],
+  cwd?: string,
 ) => { readonly status: number; readonly stdout: string };
 export type Env = Readonly<Record<string, string | undefined>>;
 
@@ -114,8 +115,8 @@ export const checkCommand = (
   return undefined;
 };
 
-const realRun: Run = (cmd, args) => {
-  const r = spawnSync(cmd, [...args], { encoding: "utf8", timeout: 10_000 });
+const realRun: Run = (cmd, args, cwd) => {
+  const r = spawnSync(cmd, [...args], { encoding: "utf8", timeout: 10_000, cwd });
   return { status: r.status ?? 1, stdout: r.stdout };
 };
 
@@ -130,7 +131,9 @@ export const runHook = (raw: string, run: Run, env: Env): string => {
     const input = e["tool_input"];
     const command = isRecord(input) ? input["command"] : undefined;
     if (typeof command !== "string") return "";
-    const reason = checkCommand(command, run, env);
+    // Resolve remotes in the event's repository, not the hook process's cwd.
+    const cwd = typeof e["cwd"] === "string" ? e["cwd"] : undefined;
+    const reason = checkCommand(command, (c, a) => run(c, a, cwd), env);
     return reason === undefined
       ? ""
       : `${JSON.stringify({

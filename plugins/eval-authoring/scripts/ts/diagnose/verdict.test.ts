@@ -123,6 +123,12 @@ describe("calibration", () => {
     );
   });
 
+  it("keeps the t cutoff at 12 runs (t(11) 2.201 x SE floor 0.05 = 0.110)", () => {
+    const rep = (x: number) => Array.from({ length: 12 }, () => x);
+    expect(diagnoseCase(caseOf(rep(0.605), rep(0.5), 0.105)).verdict).toBe("weak-signal");
+    expect(diagnoseCase(caseOf(rep(0.62), rep(0.5), 0.12)).verdict).toBe("discriminates");
+  });
+
   it("flags a near-ceiling pair, not only exact 1", () => {
     const v = diagnoseCase(caseOf([1, 0.9, 1], [1, 1, 0.9], 0));
     expect(kinds(v)).toContain("both-arms-pass-all");
