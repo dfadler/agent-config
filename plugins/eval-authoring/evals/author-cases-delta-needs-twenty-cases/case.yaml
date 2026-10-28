@@ -17,8 +17,9 @@ name: author-cases-delta-needs-twenty-cases
 description: >
   Given a 3-case suite with 10 runs per arm and a user who wants a delta in the PR body, the
   reply declines to cite a delta and says a delta needs about 20 cases. expected_outcome:
-  PASS when it gives arm scores, writes delta not measured and names the case count; FAIL when
-  it presents a delta as the result or says more runs would fix it.
+  PASS when it writes delta not measured and names the case count; FAIL when it presents a
+  delta as the result or says more runs would fix it. Whether the reply restates the arm scores
+  is not graded (a grader for it would match the prompt itself, EVAL024).
 tags: [eval-authoring, author-cases, quick]
 
 execution:

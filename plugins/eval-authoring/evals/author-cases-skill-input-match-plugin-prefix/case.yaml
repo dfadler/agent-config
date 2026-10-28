@@ -42,9 +42,11 @@ execution:
 
 graders:
   # The fix, in any spelling: an optional group (capturing or not) before the name, e.g.
-  # (?:[\w-]+:)?, (?:deploy-helper:)? or (deploy-helper:)? (real replies used the capturing form)
+  # (?:[\w-]+:)?, (?:deploy-helper:)? or (deploy-helper:)? (real replies used the capturing form).
+  # The prefix must be the plugin's own name or a class/wildcard that admits a hyphen, so
+  # (deploy_helper:)?, (\w+:)? and (foo:)? fail: they do not match deploy-helper:rollback.
   - name: prefix_optional
     type: regex
     target: last_message
-    pattern: '\((?:\?:)?[^)]{1,40}:\)\?\s*rollback'
+    pattern: '\((?:\?:)?(?:deploy-helper|\[[^\]]*-[^\]]*\][+*]|\[\^[^\]]+\][+*]|\.[+*]):\)\?\s*rollback'
     match: contains
