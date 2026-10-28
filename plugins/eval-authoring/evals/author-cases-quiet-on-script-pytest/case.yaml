@@ -34,7 +34,7 @@ graders:
   - name: addresses_request
     type: regex
     target: last_message
-    pattern: 'def test_|pytest|assert'
+    pattern: 'def test_|\bassert\b|tmp_path|subprocess|capsys'
     flags: i
     match: contains
     arm: both

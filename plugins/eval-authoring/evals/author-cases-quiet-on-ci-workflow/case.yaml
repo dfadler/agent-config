@@ -32,7 +32,7 @@ graders:
   - name: addresses_request
     type: regex
     target: last_message
-    pattern: 'on:|runs-on|vitest'
+    pattern: 'runs-on|actions/checkout|pull_request|steps:|uses:'
     flags: i
     match: contains
     arm: both

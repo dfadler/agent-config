@@ -37,7 +37,7 @@ graders:
   - name: explains_max_turns
     type: regex
     target: last_message
-    pattern: '(limit|cap|bound|maximum|max)[\s\S]{0,80}turns?|turns?[\s\S]{0,80}(limit|cap|bound|maximum)'
+    pattern: '(limit|cap|bound|maximum)[\s\S]{0,80}turns?|turns?[\s\S]{0,80}(limit|cap|bound|maximum)'
     flags: i
     match: contains
     arm: both

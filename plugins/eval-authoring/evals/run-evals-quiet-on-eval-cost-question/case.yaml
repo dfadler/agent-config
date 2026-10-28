@@ -32,7 +32,7 @@ graders:
   - name: addresses_request
     type: regex
     target: last_message
-    pattern: 'cost|\$|token|plan'
+    pattern: '\$\s?\d|per (?:month|developer|user|seat)|/month|subscription|pay-as-you-go|rate limits?|depends|varies|average'
     flags: i
     match: contains
     arm: both

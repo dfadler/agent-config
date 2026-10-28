@@ -32,7 +32,7 @@ graders:
   - name: addresses_request
     type: regex
     target: last_message
-    pattern: 'openai|evals|oaieval'
+    pattern: 'oaieval|pip install|git clone|completion[ _-]?fn|registry|yaml|api[_ ]?base|ollama|vllm|endpoint'
     flags: i
     match: contains
     arm: both

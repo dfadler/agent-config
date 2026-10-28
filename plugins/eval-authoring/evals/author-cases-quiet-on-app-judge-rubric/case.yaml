@@ -39,6 +39,7 @@ graders:
   - name: writes_rubric
     type: regex
     target: last_message
-    pattern: 'PASS[\s\S]{0,400}FAIL|FAIL[\s\S]{0,400}PASS'
+    pattern: '(?:PASS|FAIL)(?:\W{0,6}(?:if|when|only|means|the|an?|every|all|each|answer|response|reply|it)\b|\W{0,3}:)[\s\S]{0,800}(?:PASS|FAIL)(?:\W{0,6}(?:if|when|only|means|the|an?|every|all|each|answer|response|reply|it)\b|\W{0,3}:)'
+    flags: i
     match: contains
     arm: both
