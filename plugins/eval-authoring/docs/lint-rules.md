@@ -22,7 +22,7 @@ the authority; the severity is the default.
 | EVAL002 | error | The CLI ignores or rejects keys it does not know, so a typo silently drops a check. | Use only documented keys, put run fields (`max_turns`, `allowed_tools`...) under `execution:`, and start `case.yaml` with `schema_version` and `name`. |
 | EVAL003 | error | A value outside the schema (bad `runs`, `weight`, `arm`, grader `type`, an `env` key not starting `EVAL_`) fails to load or changes scoring. | Set the field to a value the message's range allows. |
 | EVAL004 | error | A case cannot grant itself `Bash`, `Write`, `Edit`, `WebFetch` or `WebSearch`; without a recorded grant the tool is denied and the case cannot pass. | Add the exact entry to `grants.yaml`, or drop the tool from `allowed_tools`. |
-| EVAL005 | error | A `tool_used` grader on a tool the case never gets: `max: 0` can never fail, `min: 1` can never pass. | Grant the tool, or grade something observable. |
+| EVAL005 | error | A `max: 0` `tool_used` grader on a tool the case never gets can never fail. (The CLI's preflight already warns when `min: 1` can never pass.) | Grant the tool, or grade something observable. |
 | EVAL006 | warn | A judge given no explicit pass and fail conditions guesses, and split votes make the score noise. | Write `PASS if ...` and `FAIL if ...` with observable conditions. |
 | EVAL007 | error | `tool_used: Skill` needs `Skill` in `allowed_tools`, or the check can never see a call; a `max: 0` Skill check on one arm only tests the arm that cannot fire it. | Add `Skill`; give a "must not fire" check `arm: both`. |
 | EVAL008 | warn | If every grader is excluded from scoring, both arms score alike and there is no delta. | Add a grader that counts (see EVAL010). |
@@ -57,7 +57,7 @@ Hits from running the lint over every plugin with evals (30 plugins, 269 cases),
 - 022: 0. Keep; the false positive was fixed in #812.
 - 014: 0. The `fixtures/bin` check was removed (a probe in #450 refuted it); the rest stays.
 - 001: deleted; the CLI rejects an empty or missing `graders:` with a clear message.
-- 005: 0. Open: the CLI warns for `min: 1`, not for `max: 0`.
+- 005: narrowed to `max: 0`; the CLI's preflight already warns when `min: 1` cannot pass.
 - 003, 004, 008, 010, 021: 0. Open merge candidates (003 into 002, 004 with 021, 008 with 010).
 - All other rules: 0. Keep.
 

@@ -58,15 +58,15 @@ describe("fetch-execute-guide under the real lint rules", () => {
     expect(summarize(findingsOf(REAL_PLUGIN, rules))).toEqual([]);
   });
 
-  it("fails EVAL004 and EVAL005 on both cases when the grants file is removed", async () => {
+  it("fails EVAL004 on both cases and EVAL005 on the max: 0 case when the grants file is removed", async () => {
     const rules = await loadRules();
     rmSync(join(copy, "evals", "grants.yaml"));
+    // RUNS needs Bash at least once: that is the CLI's own preflight warning, not EVAL005 (#811).
     expect(summarize(findingsOf(copy, rules)).toSorted()).toEqual(
       [
         `error EVAL004 ${ASKS}`,
         `error EVAL004 ${RUNS}`,
         `error EVAL005 ${ASKS}`,
-        `error EVAL005 ${RUNS}`,
       ],
     );
   });
