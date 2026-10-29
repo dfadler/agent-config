@@ -225,9 +225,12 @@ const splitVoteFindings = (c: CaseResult): readonly Finding[] => {
 };
 
 /**
- * Names of the case's guard graders: ones expected to pass in both arms and on
- * an empty reply, so they say nothing about a cut-off or discrimination. A
- * `not_contains` regex, a `tool_used` with `max` 0 or 1, a `file_exists` with
+ * Names of the case's guard graders: ones expected to pass in both arms, so
+ * they say nothing about discrimination, and (for `last_message` ones) pass on
+ * an empty reply, so they say nothing about a cut-off. A `not_contains` regex,
+ * a `tool_used` with `max` 0 or 1 (`min` is not read: a `min 1 max 1` check is
+ * treated as a guard too, which fits the repo's "exactly one write" uses but
+ * would hide a positive "exactly once" read), a `file_exists` with
  * `exists: false`.
  */
 const guardNames = (c: CaseResult): ReadonlySet<string> =>
