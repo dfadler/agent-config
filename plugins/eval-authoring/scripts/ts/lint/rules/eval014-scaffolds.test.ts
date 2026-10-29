@@ -21,19 +21,10 @@ describe("EVAL014", () => {
     expect(found[0]).toMatch(/warn EVAL014 .*scaffold_script to 'scaffold-script'/);
   });
 
-  it.each(["bad-bin-case-yaml", "bad-bin-prompt-md", "bad-bin-suite"])(
-    "reports fixtures/bin as speculative in %s",
-    (fixture) => {
-      const found = messages(fixture);
-      expect(found).toHaveLength(1);
-      expect(found[0]).toMatch(/fixtures\/bin directory\. This check is speculative/);
-      expect(found[0]).toMatch(/#450/);
-    },
-  );
-
-  it("does not report an existing script or an ordinary fixtures directory", () => {
+  it("does not report an existing script or a fixtures/bin directory", () => {
     expect(messages("good-case-yaml")).toEqual([]);
     expect(messages("good-prompt-md")).toEqual([]);
+    expect(messages("good-bin-ignored")).toEqual([]);
   });
 });
 
