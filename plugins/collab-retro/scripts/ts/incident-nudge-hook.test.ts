@@ -1,3 +1,4 @@
+import { spawnSync } from "node:child_process";
 import { existsSync, mkdtempSync, readFileSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
@@ -62,5 +63,28 @@ describe("collab-retro incident nudge hook", () => {
   it("fails open on bad input", () => {
     expect(call("not json").code).toBe(0);
     expect(call({ hook_event_name: "Stop" }).out).toBe("");
+  });
+});
+
+describe("entrypoint (spawned)", () => {
+  const entry = join(import.meta.dirname, "incident-nudge-hook.ts");
+  const hook = (input: string) =>
+    spawnSync(process.execPath, [entry], {
+      input,
+      encoding: "utf8",
+      env: { PATH: "", TMPDIR: tmp, COLLAB_RETRO_NUDGE: "on" },
+    });
+
+  it("logs a frustration phrase, then Stop nudges once", () => {
+    expect(hook(JSON.stringify(prompt("how many times do I have to say it")))).toMatchObject({ status: 0, stdout: "" });
+    expect(existsSync(pendingFile())).toBe(true);
+    const first = hook(JSON.stringify(stop()));
+    expect(first.status).toBe(0);
+    expect(JSON.parse(first.stdout)).toEqual(NUDGE);
+    expect(hook(JSON.stringify(stop())).stdout).toBe("");
+  });
+
+  it("fails open on garbage stdin", () => {
+    expect(hook("not json")).toMatchObject({ status: 0, stdout: "" });
   });
 });
