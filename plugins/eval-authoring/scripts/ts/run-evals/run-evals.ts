@@ -55,6 +55,7 @@ export const USAGE = `Usage: run-evals.ts [options] <plugin-path>
 Run a plugin's eval cases at a cost tier. The CLI's --case takes one glob, so
 the wrapper makes one CLI invocation per case, each under exactly that case's
 grants (<eval-dir>/grants.yaml). Never passes --scaffold, --json or --report.
+On macOS each invocation runs under caffeinate -i so the machine stays awake.
 
 Options:
   --tier <name>        quick | standard | thorough (default: ${DEFAULT_TIER})
@@ -386,7 +387,13 @@ const runInvocation = async (
     command: ["claude", ...args],
     allottedUsd: budgetUsd,
   };
-  const ran = await io.spawn("claude", args, {
+  // macOS: keep the machine awake for the invocation; caffeinate passes the
+  // child's exit status through (a signal death comes back as 128 + signal).
+  const [cmd, argv]: readonly [string, readonly string[]] =
+    io.platform === "darwin" && io.findOnPath("caffeinate").length > 0
+      ? ["caffeinate", ["-i", "--", "claude", ...args]]
+      : ["claude", args];
+  const ran = await io.spawn(cmd, argv, {
     onStdout: io.out,
     onStderr: io.err,
   });

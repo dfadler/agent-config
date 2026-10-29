@@ -233,6 +233,25 @@ describe("main", () => {
     expect(cliCalls(s.calls)).toHaveLength(1);
   });
 
+  it("runs the CLI under caffeinate -i on macOS when it is on PATH, and bare elsewhere", async () => {
+    const withCaffeinate = {
+      claude: ["/bin/claude"],
+      git: ["/bin/git"],
+      caffeinate: ["/usr/bin/caffeinate"],
+    };
+    const mac = setup({ cases: [{ name: "a" }], onPath: withCaffeinate, onCli: okCli() });
+    await main([mac.root], { io: mac.io, pluginsDir: "/p" });
+    const wrapped = mac.calls.filter((c) => c.command === "caffeinate");
+    expect(wrapped).toHaveLength(1);
+    expect(wrapped[0]?.args.slice(0, 4)).toEqual(["-i", "--", "claude", "plugin"]);
+    expect(cliCalls(mac.calls)).toHaveLength(0);
+
+    const linux = setup({ cases: [{ name: "a" }], onPath: withCaffeinate, onCli: okCli(), platform: "linux" });
+    await main([linux.root], { io: linux.io, pluginsDir: "/p" });
+    expect(linux.calls.some((c) => c.command === "caffeinate")).toBe(false);
+    expect(cliCalls(linux.calls)).toHaveLength(1);
+  });
+
   it("does not pass --trust-plugin for a plugin outside the repo's plugins directory", async () => {
     const s = setup({ cases: [{ name: "a" }] });
     await main([s.root], { io: s.io, pluginsDir: "/somewhere/else" });
