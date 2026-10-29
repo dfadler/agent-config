@@ -218,11 +218,17 @@ describe("runHook: failure containment", () => {
     const root = makePlugin();
     const blocker = join(root, "blocker.mjs");
     writeFileSync(blocker, "for (;;) {}\n");
-    const lint: LintFn = (r, s) => workerLint(r, s, pathToFileURL(blocker));
+    let workerRun: ReturnType<typeof workerLint> | undefined;
+    const lint: LintFn = (r, s) => {
+      workerRun = workerLint(r, s, pathToFileURL(blocker));
+      return workerRun;
+    };
     const t0 = Date.now();
     const out = await runHook(event(join(root, "evals/bad/case.yaml")), lint, 200);
     expect(out).toBe("");
     expect(Date.now() - t0).toBeLessThan(3000);
+    // The deadline abort must terminate the worker, not just stop waiting for it.
+    await expect(workerRun).rejects.toThrow("exited without a result");
   });
 
   it("terminates a blocked worker when the signal aborts", async () => {
