@@ -1,6 +1,7 @@
 import { spawnSync } from "node:child_process";
 import {
   chmodSync,
+  existsSync,
   mkdirSync,
   mkdtempSync,
   rmSync,
@@ -12,6 +13,7 @@ import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { checkSymlinks } from "./check-worktree-symlinks-hook.ts";
 import { pruneMerged } from "./prune-merged-worktrees-hook.ts";
 import { requireWorktree } from "./require-worktree-hook.ts";
+import { makeSandbox } from "./test-helpers.ts";
 import {
   EXIT_BLOCK,
   hookExitCode,
@@ -363,5 +365,24 @@ describe("entrypoints (spawned)", () => {
     const r = hook(main, {}, "prune-merged-worktrees-hook");
     expect(r.status).toBe(0);
     expect(r.stdout).toBe("");
+  });
+
+  it("prune hook prints the hint for a merged worktree when unconfigured", () => {
+    const sb = makeSandbox();
+    try {
+      const p = sb.addWorktree("a");
+      sb.markMerged("worktree-a", sb.head(p));
+      const r = spawnSync(process.execPath, [entry("prune-merged-worktrees-hook")], {
+        cwd: sb.repo,
+        input: JSON.stringify({ hook_event_name: "SessionStart", cwd: sb.repo }),
+        encoding: "utf8",
+        env: sb.env,
+      });
+      expect(r.status).toBe(0);
+      expect(r.stdout).toMatch(/1 merged worktree\(s\) could be pruned; set worktree\.autoPrune/);
+      expect(existsSync(p)).toBe(true);
+    } finally {
+      sb.cleanup();
+    }
   });
 });
