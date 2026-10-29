@@ -71,6 +71,54 @@ describe("parseArgs", () => {
     const p = parseArgs(["p"]);
     expect(p.kind === "options" && p.options.tier.name).toBe("standard");
   });
+  it("takes --changed bare or with =<ref>, never beside --case", () => {
+    const changed = (a: string[]) => {
+      const p = parseArgs(["p", ...a]);
+      return p.kind === "options" ? p.options.changed : p.kind;
+    };
+    expect(changed([])).toBeUndefined();
+    expect(changed(["--changed"])).toBe("");
+    expect(changed(["--changed=v1.2"])).toBe("v1.2");
+    expect(changed(["--changed", "--case", "a"])).toBe("error");
+  });
+});
+
+describe("--changed", () => {
+  const gitOf =
+    (diff: string, mergeBase = 0) =>
+    (args: readonly string[]) =>
+      args.includes("merge-base")
+        ? spawned({ status: mergeBase, stdout: "abc\n", stderr: "fatal: no ref\n" })
+        : args.includes("diff")
+          ? spawned({ stdout: diff })
+          : spawned();
+
+  it("exits 0 and runs nothing when nothing changed", async () => {
+    const s = setup({ onGit: gitOf("") });
+    expect(await main([s.root, "--changed=base"], { io: s.io, pluginsDir: "/p" })).toBe(EXIT_OK);
+    expect(cliCalls(s.calls)).toHaveLength(0);
+    expect(s.out.join("")).toContain("nothing changed since base");
+  });
+
+  it("exits 0 when the changed cases are outside the tier's tag", async () => {
+    const s = setup({ onGit: gitOf("evals/b/case.yaml\n") });
+    expect(await main([s.root, "--tier", "quick", "--changed=base"], { io: s.io, pluginsDir: "/p" })).toBe(EXIT_OK);
+    expect(cliCalls(s.calls)).toHaveLength(0);
+    expect(s.out.join("")).toContain("tagged 'quick'");
+  });
+
+  it("plans only the changed case", async () => {
+    const s = setup({ onGit: gitOf("evals/b/case.yaml\n") });
+    expect(await main([s.root, "--changed=base", "--dry-run"], { io: s.io, pluginsDir: "/p" })).toBe(EXIT_OK);
+    expect(s.out.join("")).toContain("invocation 1/1");
+    expect(s.out.join("")).toContain("--case b");
+  });
+
+  it("is a usage error when the ref has no merge base", async () => {
+    const s = setup({ onGit: gitOf("", 128) });
+    expect(await main([s.root, "--changed=nope"], { io: s.io, pluginsDir: "/p" })).toBe(EXIT_USAGE);
+    expect(s.err.join("")).toContain("nope");
+  });
 });
 
 describe("--max-cost-usd", () => {

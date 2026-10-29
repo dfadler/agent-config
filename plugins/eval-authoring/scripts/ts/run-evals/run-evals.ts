@@ -33,6 +33,7 @@ import {
   needsBash,
   planGroups,
   planInvocations,
+  selectChanged,
   type Invocation,
 } from "./plan.ts";
 import { runPreflight } from "./preflight.ts";
@@ -78,6 +79,15 @@ ${Object.values(TIERS).map((t) => `                         ${t.name}: ${t.descr
                        are wildcards); the other cases are not planned, so the
                        ceiling, preflight and exit codes cover the subset.
                        One pattern, and no match is an error (exit 3)
+  --changed[=<ref>]    run only the cases touched since the merge base with
+                       <ref> (default: origin's HEAD, else origin/main),
+                       counting committed, staged, unstaged and untracked
+                       files under the plugin: a file under a case directory
+                       selects that case; skills/<name>/ or agents/<name>.md
+                       selects every case tagged <name> or whose tool_used
+                       grader matches it; grants.yaml, the manifest or a hook
+                       selects every case. Nothing changed is exit 0 with a
+                       message. Not combined with --case
   --output-dir <dir>   base results directory (default: <eval-dir>/results).
                        Each wrapper run writes <dir>/run-<time>/<NN>-<case>
   --publish-report     publish the report (default: --no-publish)
@@ -126,6 +136,8 @@ interface Options {
   readonly skipUnavailable: boolean;
   readonly dryRun: boolean;
   readonly only: string | undefined;
+  /** `--changed`: the ref, "" for the default; undefined when off. */
+  readonly changed: string | undefined;
   readonly pr: string | undefined;
   readonly yes: boolean;
 }
@@ -169,7 +181,9 @@ export const parseArgs = (argv: readonly string[]): Parsed => {
   const bad = ((): string | undefined => {
     for (let i = 0; i < argv.length; i += 1) {
       const a = argv[i] ?? "";
-      if (VALUE_FLAGS.includes(a)) {
+      if (a === "--changed" || a.startsWith("--changed=")) {
+        values.set("--changed", a.slice("--changed=".length));
+      } else if (VALUE_FLAGS.includes(a)) {
         const v = argv[i + 1];
         if (v === undefined || v.startsWith("--")) return `${a} needs a value`;
         values.set(a, v);
@@ -210,6 +224,9 @@ export const parseArgs = (argv: readonly string[]): Parsed => {
   if (pr === undefined && bools.has("--yes")) {
     return { kind: "error", message: "--yes only applies with --pr" };
   }
+  if (values.has("--changed") && values.has("--case")) {
+    return { kind: "error", message: "--changed and --case are two selectors; pass one" };
+  }
   const [plugin, ...extra] = positionals;
   if (plugin === undefined) {
     return { kind: "error", message: "missing <plugin-path>" };
@@ -237,6 +254,7 @@ export const parseArgs = (argv: readonly string[]): Parsed => {
       skipUnavailable: bools.has("--skip-unavailable"),
       dryRun: bools.has("--dry-run"),
       only: values.get("--case"),
+      changed: values.get("--changed"),
       pr,
       yes: bools.has("--yes"),
     },
@@ -473,12 +491,30 @@ export const main = async (
     options.evalDir === undefined ? {} : { flag: options.evalDir },
   );
   const grants = readGrantsFile(join(suite.evalDir, "grants.yaml"));
-  const plan = planGroups(
-    suite,
-    grants,
-    options.tier.tag,
-    options.only,
-  );
+  const changed =
+    options.changed === undefined
+      ? undefined
+      : await selectChanged(io, target, suite, options.changed);
+  if (changed !== undefined && !changed.ok) return fail(io, EXIT_USAGE, changed.reason);
+  const tag = options.tier.tag;
+  const picked =
+    changed === undefined
+      ? undefined
+      : changed.names.filter(
+          (n) =>
+            tag === undefined ||
+            suite.cases.some((c) => c.name.value === n && c.tags.value.includes(tag)),
+        );
+  if (changed !== undefined && picked !== undefined && picked.length === 0) {
+    io.out(
+      `run-evals: nothing changed since ${changed.ref} under ${target}${tag === undefined ? "" : ` among cases tagged '${tag}'`}; no case to run\n`,
+    );
+    return EXIT_OK;
+  }
+  if (changed !== undefined && picked !== undefined) {
+    io.err(`run-evals: --changed since ${changed.ref}: ${picked.join(", ")}\n`);
+  }
+  const plan = planGroups(suite, grants, tag, options.only, picked);
   if (!plan.ok) return fail(io, EXIT_CONFIG, plan.reason);
 
   const trust = isRepoPlugin(target, deps.pluginsDir, io.realpath);

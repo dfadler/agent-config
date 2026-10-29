@@ -70,7 +70,9 @@ it, do not rebuild any of that.
    plugin under test while a run is in flight: the plugin arm loads its files live. Run
    silently (foreground, summary only) only if the user asks for a silent run.
    To re-run a subset, add `--case <name-or-glob>` (the wrapper filters its own plan, so
-   no temp `--eval-dir`). To put the results in a PR, add `--pr <n>`: it prints the exact
+   no temp `--eval-dir`), or `--changed[=<ref>]` to run only the cases touched since
+   `<ref>` (default origin's HEAD; mapping rules in `--help`; nothing changed is exit 0).
+   To put the results in a PR, add `--pr <n>`: it prints the exact
    marked block, asks, then replaces the `run-evals` block in the PR body with `gh pr
    edit`. It is off by default, refuses `--dry-run`, and `--yes` skips only the question.
 5. **Relay the result.** The run ends with a Markdown summary (per-case with, without and
