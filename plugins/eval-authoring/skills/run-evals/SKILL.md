@@ -71,10 +71,13 @@ it, do not rebuild any of that.
    silently (foreground, summary only) only if the user asks for a silent run.
    To re-run a subset, add `--case <name-or-glob>` (the wrapper filters its own plan, so
    no temp `--eval-dir`), or `--changed[=<ref>]` to run only the cases touched since
-   `<ref>` (default origin's HEAD; mapping rules in `--help`: a skill description change
-   reruns every `trigger` case, `scripts/**` reruns the Bash-granted cases, docs rerun
-   nothing). An empty diff is exit 0; changed files that map to no case exit 1 unless
-   `--changed-allow-empty`, so a CI wiring gap cannot pass silently.
+   `<ref>` (default origin's HEAD; mapping rules in `--help`: a skill or agent description
+   change reruns every `trigger` case, `scripts/**` reruns the Bash-granted cases, docs
+   rerun nothing). An empty diff is exit 0. All or nothing: any changed file that maps to
+   no case exits 1 before anything runs, even beside files that did map, unless
+   `--changed-allow-empty`, so a CI wiring gap cannot pass silently. The summary's
+   `subset:` line names the tier and the finished count; with `--pr` it warns when the
+   block it replaces held a full run.
    To put the results in a PR, add `--pr <n>`: it prints the exact
    marked block, asks, then replaces the `run-evals` block in the PR body with `gh pr
    edit`. It is off by default, refuses `--dry-run`, and `--yes` skips only the question.

@@ -30,6 +30,7 @@ import {
   type Judgement,
 } from "./outcome.ts";
 import { scanOutput } from "./output.ts";
+import { BLOCK_END, BLOCK_START } from "./summary.ts";
 import {
   needsBash,
   planGroups,
@@ -86,19 +87,24 @@ ${Object.values(TIERS).map((t) => `                         ${t.name}: ${t.descr
                        files under the plugin: a file under a case directory
                        selects that case; skills/<name>/ or agents/<name>.md
                        selects every case tagged <name> or whose tool_used
-                       input_match accepts a call to it; a change to a
-                       skill's frontmatter (its description) also selects
-                       every case tagged 'trigger', a body-only change does
-                       not; scripts/** selects every case granted Bash, or
-                       every case when a hook references the script;
-                       grants.yaml, the manifest or a hook selects every
-                       case; docs and README select nothing. An empty diff
-                       is exit 0 with a message; changed files that map to
-                       no case are listed and exit 1. With --pr, the block
-                       says it is a subset. Not combined with --case
+                       input_match accepts a call to it (bare or as
+                       <plugin>:<name>); a change to a skill's or agent's
+                       frontmatter (its description) also selects every
+                       case tagged 'trigger', a body-only change does not;
+                       scripts/** selects every case granted Bash (grants
+                       or allowed_tools), or every case when a hook
+                       references the script; grants.yaml, the manifest or
+                       a hook selects every case; docs and README select
+                       nothing. A renamed file counts under both paths. An
+                       empty diff is exit 0 with a message. All or nothing:
+                       any changed file that maps to no case is listed and
+                       exits 1 before anything runs, even when other files
+                       did map. With --pr, the block says it is a subset.
+                       Not combined with --case
   --changed-allow-empty
-                       with --changed: exit 0 instead of 1 when the changed
-                       files map to no case
+                       with --changed: run the mapped cases (exit 0 when
+                       there are none) instead of exiting 1 over the
+                       changed files that map to no case
   --output-dir <dir>   base results directory (default: <eval-dir>/results).
                        Each wrapper run writes <dir>/run-<time>/<NN>-<case>
   --publish-report     publish the report (default: --no-publish)
@@ -539,6 +545,13 @@ export const main = async (
       );
       return options.changedAllowEmpty ? EXIT_OK : EXIT_FAILURE;
     }
+    if (changed.unmapped.length > 0 && !options.changedAllowEmpty) {
+      // All or nothing: a mapped case beside an unmapped file would run green over the gap.
+      io.err(
+        `run-evals: ${String(changed.unmapped.length)} of ${String(changed.paths.length)} changed files map to no case (since ${changed.ref} under ${target}); pass --changed-allow-empty to run the mapped cases anyway\n`,
+      );
+      return EXIT_FAILURE;
+    }
     if (picked.length === 0) {
       io.out(
         `run-evals: the cases changed since ${changed.ref} (${changed.names.join(", ")}) are not tagged '${tag ?? ""}'; no case to run\n`,
@@ -640,10 +653,10 @@ export const main = async (
     (c, g) => worstExit(c, g.exit),
     progress.outOfBudget || progress.spentUsd > ceilingUsd ? EXIT_PARTIAL : EXIT_OK,
   );
-  // The denominator is what the same command would plan without --changed: the tier's cases.
+  // N is what finished, M what the same command would plan without --changed: the tier's cases.
   const subset =
     changed?.ok === true
-      ? `subset: ${String(total)} of ${String(suite.cases.filter((c) => inTier(c.name.value)).length)} cases, --changed since ${changed.ref}`
+      ? `subset: ${String(progress.done.length)} of ${String(suite.cases.filter((c) => inTier(c.name.value)).length)} ${options.tier.name} cases, --changed since ${changed.ref}`
       : null;
   const summary: RunSummary = {
     tier: options.tier.name,
@@ -691,12 +704,19 @@ export const main = async (
   }
   const block = renderBlock(markdown);
   io.out(`\n${block}\n`);
-  const published = await publishToPr(io, options.pr, block, options.yes);
+  const published = await publishToPr(io, options.pr, block, options.yes, subset !== null);
   return published === undefined ? exit : worstExit(exit, published);
 };
 
 const shellWord = (a: string): string =>
   /^[\w@%+=:,./-]+$/.test(a) ? a : `'${a.replace(/'/g, "'\\''")}'`;
+
+/** The text between the run-evals markers of a PR body; undefined when there is no block. */
+const priorBlock = (body: string): string | undefined => {
+  const start = body.indexOf(BLOCK_START);
+  const end = body.indexOf(BLOCK_END, start);
+  return start >= 0 && end >= 0 ? body.slice(start, end) : undefined;
+};
 
 /**
  * The publish step of --pr: show the block, get a yes (or --yes), then edit
@@ -707,8 +727,15 @@ const publishToPr = async (
   pr: string,
   block: string,
   yes: boolean,
+  subset: boolean,
 ): Promise<ExitCode | undefined> => {
   const view = await io.spawn("gh", ["pr", "view", pr, "--json", "body", "-q", ".body"]);
+  const prior = view.status === 0 ? priorBlock(view.stdout) : undefined;
+  if (subset && prior !== undefined && !prior.includes("\nsubset: ")) {
+    io.err(
+      `run-evals: warning: PR #${pr}'s run-evals block holds a full run; this --changed subset replaces it\n`,
+    );
+  }
   if (view.error !== undefined || view.status !== 0) {
     io.err(`run-evals: could not read PR #${pr} (gh pr view failed); body not edited\n`);
     return EXIT_DEPENDENCY;

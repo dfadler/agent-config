@@ -3,8 +3,8 @@
  * grants, each running under exactly its own grants, never a union
  * (docs/grants-format.md).
  */
-import { existsSync, readdirSync, readFileSync, statSync } from "node:fs";
-import { isAbsolute, join, relative } from "node:path";
+import { existsSync, lstatSync, readdirSync, readFileSync, statSync } from "node:fs";
+import { basename, isAbsolute, join, relative } from "node:path";
 import {
   checkGrantCaseNames,
   grantSet,
@@ -148,39 +148,69 @@ const nulSplit = (text: string): readonly string[] =>
 const hasBash = (grants: readonly string[]): boolean =>
   grants.some((e) => /^Bash(\(|$)/.test(e));
 
-/** True when a tool_used grader's input_match would accept a Skill or Agent call naming `name`. */
-const matchesCall = (pattern: string | undefined, name: string): boolean => {
+/**
+ * True when a tool_used grader's input_match would accept a Skill or Agent
+ * call naming `name`, bare or plugin-prefixed (`<plugin>:<name>`, the form
+ * agents are addressed by).
+ */
+const matchesCall = (pattern: string | undefined, name: string, plugin: string): boolean => {
   if (pattern === undefined) return false;
   try {
     const re = new RegExp(pattern);
-    return [{ skill: name }, { subagent_type: name }].some((p) => re.test(JSON.stringify(p)));
+    return [name, `${plugin}:${name}`]
+      .flatMap((n) => [{ skill: n }, { subagent_type: n }])
+      .some((p) => re.test(JSON.stringify(p)));
   } catch {
     return false;
   }
 };
 
 /** True when the case exercises skill or agent `name`: tagged with it, or a tool_used grader matches a call to it. */
-const exercises = (c: EvalCase, name: string): boolean =>
+const exercises = (c: EvalCase, name: string, plugin: string): boolean =>
   c.tags.value.includes(name) ||
-  c.graders.some((g) => g.type === "tool_used" && matchesCall(g.inputMatch.value, name));
+  c.graders.some((g) => g.type === "tool_used" && matchesCall(g.inputMatch.value, name, plugin));
 
-/** The text of every file under `hooks/` and `hooks.json`, joined; "" when there are none. */
-const hooksText = (pluginRoot: string): string => {
-  const walk = (p: string): readonly string[] => {
-    if (!existsSync(p)) return [];
-    if (statSync(p).isDirectory()) return readdirSync(p).flatMap((e) => walk(join(p, e)));
-    return [readFileSync(p, "utf8")];
-  };
-  return [...walk(join(pluginRoot, "hooks")), ...walk(join(pluginRoot, "hooks.json"))].join("\n");
+/** The manifest's name (else the plugin dir's basename) and its inline `hooks` field as text. */
+const manifestOf = (pluginRoot: string): { readonly name: string; readonly hooks: string } => {
+  try {
+    const m: unknown = JSON.parse(readFileSync(join(pluginRoot, ".claude-plugin", "plugin.json"), "utf8"));
+    const obj = typeof m === "object" && m !== null ? m : {};
+    return {
+      name:
+        "name" in obj && typeof obj.name === "string" && obj.name !== "" ? obj.name : basename(pluginRoot),
+      hooks: "hooks" in obj ? JSON.stringify(obj.hooks) : "",
+    };
+  } catch {
+    return { name: basename(pluginRoot), hooks: "" };
+  }
 };
 
-/** The YAML frontmatter of a Markdown file ("" when there is none). */
+/** The text of every file under `hooks/`, `hooks.json` and the manifest's inline hooks, joined; "" when there are none. */
+const hooksText = (pluginRoot: string, inline: string): string => {
+  const walk = (p: string): readonly string[] => {
+    if (!existsSync(p)) return [];
+    // A symlinked directory is skipped: it can point back up the tree and loop forever.
+    const link = lstatSync(p).isSymbolicLink();
+    if (statSync(p).isDirectory()) {
+      return link ? [] : readdirSync(p).flatMap((e) => walk(join(p, e)));
+    }
+    return [readFileSync(p, "utf8")];
+  };
+  return [...walk(join(pluginRoot, "hooks")), ...walk(join(pluginRoot, "hooks.json")), inline].join("\n");
+};
+
+/** The YAML frontmatter of a Markdown file ("" when there is none); a BOM or leading blank lines do not hide it. */
 const frontmatter = (text: string | undefined): string =>
-  /^---\r?\n[\s\S]*?\r?\n---(?:\r?\n|$)/.exec(text ?? "")?.[0] ?? "";
+  /^---\r?\n[\s\S]*?\r?\n---(?:\r?\n|$)/.exec(
+    (text ?? "").replace(/^﻿?(?:[ \t]*\r?\n)*/, ""),
+  )?.[0] ?? "";
+
+/** What decides routing: the frontmatter, or the whole text when there is none to compare. */
+const routingKey = (text: string): string => frontmatter(text) || text;
 
 export interface ChangedContext {
   readonly grants: GrantsFile;
-  /** Skills (`skills/<name>/`) whose frontmatter changed: their routing is in question. */
+  /** Plugin-relative `skills/<name>/SKILL.md` and `agents/<name>.md` paths whose frontmatter changed: their routing is in question. */
   readonly routingChanged: readonly string[];
 }
 
@@ -189,10 +219,10 @@ export interface ChangedContext {
  * plus the paths that selected nothing:
  * - a file under a case directory selects that case;
  * - `skills/<name>/` or `agents/<name>.md` selects every case exercising
- *   `<name>`; a skill whose frontmatter (description) changed also selects
- *   every `trigger`-tagged case, since routing itself changed;
- * - `scripts/**` selects every case granted Bash, or every case when a hook
- *   references the changed script;
+ *   `<name>`; a skill or agent whose frontmatter (description) changed also
+ *   selects every `trigger`-tagged case, since routing itself changed;
+ * - `scripts/**` selects every case granted Bash (grants.yaml or
+ *   allowed_tools), or every case when a hook references the changed script;
  * - grants.yaml, the manifest or a hook selects every case;
  * - docs, README and anything else select nothing.
  */
@@ -204,23 +234,24 @@ export const changedCases = (
 ): { readonly names: readonly string[]; readonly unmapped: readonly string[] } => {
   const all = suite.cases.map((c) => c.name.value);
   const grantsFile = relative(pluginRoot, join(suite.evalDir, "grants.yaml"));
-  const hooks = paths.some((p) => p.startsWith("scripts/")) ? hooksText(pluginRoot) : "";
+  const manifest = manifestOf(pluginRoot);
+  const hooks = paths.some((p) => p.startsWith("scripts/")) ? hooksText(pluginRoot, manifest.hooks) : "";
+  const bashCase = (c: EvalCase): boolean =>
+    hasBash(grantSet(ctx.grants, c.name.value)) || c.allowedTools.value.some((t) => t.tool === "Bash");
   // ponytail: a hook "references" a script when its path appears verbatim; transitive imports are not followed
   const mapPath = (p: string): readonly string[] => {
     if (p === grantsFile || /^(?:\.claude-plugin\/|hooks\/|hooks\.json$)/.test(p)) return all;
     if (p.startsWith("scripts/")) {
-      return hooks.includes(p)
-        ? all
-        : all.filter((n) => hasBash(grantSet(ctx.grants, n)));
+      return hooks.includes(p) ? all : suite.cases.filter(bashCase).map((c) => c.name.value);
     }
     const m = /^(?:skills\/([^/]+)\/|agents\/([^/]+)\.md$)/.exec(p);
     const target = m?.[1] ?? m?.[2];
-    const routing = m?.[1] !== undefined && ctx.routingChanged.includes(m[1]);
+    const routing = ctx.routingChanged.includes(p);
     return suite.cases
       .filter(
         (c) =>
           p.startsWith(`${relative(pluginRoot, c.dir)}/`) ||
-          (target !== undefined && exercises(c, target)) ||
+          (target !== undefined && exercises(c, target, manifest.name)) ||
           (routing && c.tags.value.includes(TRIGGER_TAG)),
       )
       .map((c) => c.name.value);
@@ -273,7 +304,8 @@ export const selectChanged = async (
     };
   }
   const baseSha = base.stdout.trim();
-  const diff = await git("diff", "--name-only", "-z", "--relative", baseSha, "--", ".");
+  // --no-renames: a moved skill or script keeps its old path, so the cases wired to it still run.
+  const diff = await git("diff", "--name-only", "--no-renames", "-z", "--relative", baseSha, "--", ".");
   const untracked = await git("ls-files", "--others", "--exclude-standard", "-z");
   const failed = [diff, untracked].find((r) => r.status !== 0);
   if (failed !== undefined) {
@@ -283,19 +315,16 @@ export const selectChanged = async (
     };
   }
   const paths = [...new Set([...nulSplit(diff.stdout), ...nulSplit(untracked.stdout)])];
-  const skills = paths.flatMap((p) => {
-    const m = /^skills\/([^/]+)\/SKILL\.md$/.exec(p);
-    return m?.[1] === undefined ? [] : [{ name: m[1], path: p }];
-  });
+  const routed = paths.filter((p) => /^(?:skills\/[^/]+\/SKILL\.md|agents\/[^/]+\.md)$/.test(p));
   const routingChanged = (
     await Promise.all(
-      skills.map(async ({ name, path }) => {
+      routed.map(async (path) => {
         const before = await git("show", `${baseSha}:./${path}`);
         const file = join(pluginRoot, path);
         const after = existsSync(file) ? readFileSync(file, "utf8") : undefined;
         const changed =
-          before.status !== 0 || after === undefined || frontmatter(before.stdout) !== frontmatter(after);
-        return changed ? [name] : [];
+          before.status !== 0 || after === undefined || routingKey(before.stdout) !== routingKey(after);
+        return changed ? [path] : [];
       }),
     )
   ).flat();

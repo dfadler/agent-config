@@ -5,11 +5,12 @@ import {
   readFileSync,
   realpathSync,
   renameSync,
+  rmSync,
   symlinkSync,
   writeFileSync,
 } from "node:fs";
 import { tmpdir } from "node:os";
-import { dirname, join } from "node:path";
+import { basename, dirname, join } from "node:path";
 import { describe, expect, it } from "vitest";
 import { readGrantsFile, readSuite } from "../parser/index.ts";
 import { spawnProcess, type Io } from "./io.ts";
@@ -157,15 +158,49 @@ describe("changedCases", () => {
     expect(names(root, ["scripts/ts/x.ts"], { grants })).toEqual(["a"]);
   });
 
-  it("selects every trigger-tagged case when a skill's routing changed, else only its own", () => {
+  it("counts a case whose allowed_tools grants Bash, with no grants entry, as a Bash case", () => {
+    const root = makePlugin([{ name: "a" }, { name: "b" }]);
+    writeFileSync(
+      join(root, "evals", "a", "case.yaml"),
+      readFileSync(join(root, "evals", "a", "case.yaml"), "utf8").replace(
+        "execution:\n",
+        "execution:\n  allowed_tools: [Read, Bash(node *)]\n",
+      ),
+    );
+    expect(names(root, ["scripts/ts/x.ts"])).toEqual(["a"]);
+  });
+
+  it("reads hooks declared inline in the manifest and skips a symlinked hooks directory", () => {
+    const root = makePlugin([{ name: "a" }, { name: "b" }]);
+    mkdirSync(join(root, ".claude-plugin"));
+    writeFileSync(
+      join(root, ".claude-plugin", "plugin.json"),
+      JSON.stringify({
+        name: "p",
+        hooks: { PreToolUse: [{ hooks: [{ command: "node ${CLAUDE_PLUGIN_ROOT}/scripts/ts/hook/h.ts" }] }] },
+      }),
+    );
+    // A symlinked directory under hooks/ is not followed, even one that names the script.
+    mkdirSync(join(root, "hooks"));
+    mkdirSync(join(root, "elsewhere"));
+    writeFileSync(join(root, "elsewhere", "h.sh"), "node scripts/ts/x.ts\n");
+    symlinkSync(join(root, "elsewhere"), join(root, "hooks", "link"));
+    symlinkSync(root, join(root, "hooks", "loop"));
+    expect(names(root, ["scripts/ts/hook/h.ts"])).toEqual(["a", "b"]);
+    expect(names(root, ["scripts/ts/x.ts"])).toEqual([]);
+  });
+
+  it("selects every trigger-tagged case when a skill's or agent's routing changed, else only its own", () => {
     const root = makePlugin([
       { name: "a", tags: ["x"] },
       { name: "b", tags: ["y", TRIGGER_TAG] },
       { name: "c", tags: [TRIGGER_TAG] },
     ]);
     expect(names(root, ["skills/x/SKILL.md"])).toEqual(["a"]);
-    expect(names(root, ["skills/x/SKILL.md"], { routingChanged: ["x"] })).toEqual(["a", "b", "c"]);
-    expect(names(root, ["skills/x/reference.md"], { routingChanged: ["y"] })).toEqual(["a"]);
+    expect(names(root, ["skills/x/SKILL.md"], { routingChanged: ["skills/x/SKILL.md"] })).toEqual(["a", "b", "c"]);
+    expect(names(root, ["skills/x/reference.md"], { routingChanged: ["skills/y/SKILL.md"] })).toEqual(["a"]);
+    expect(names(root, ["agents/x.md"])).toEqual(["a"]);
+    expect(names(root, ["agents/x.md"], { routingChanged: ["agents/x.md"] })).toEqual(["a", "b", "c"]);
   });
 
   const withGrader = (root: string, name: string, tool: string, inputMatch: string): void => {
@@ -194,6 +229,21 @@ describe("changedCases", () => {
     expect(names(root, ["skills/x/SKILL.md"])).toEqual(["a"]);
     expect(names(root, ["agents/x-reviewer.md"])).toEqual(["b"]);
     expect(names(root, ["skills/y/SKILL.md"])).toEqual([]);
+  });
+
+  it("accepts the plugin-prefixed agent form from the manifest name, else the plugin dir name", () => {
+    const root = makePlugin([{ name: "a" }, { name: "b" }]);
+    // The documented form (references/agents.md): a required `<plugin>:` prefix, no bare alternative.
+    withGrader(root, "a", "Agent", '"subagent_type"\\s*:\\s*"my-plugin:x-reviewer"');
+    withGrader(root, "b", "Skill", '"skill"\\s*:\\s*"my-plugin:x"');
+    expect(names(root, ["agents/x-reviewer.md", "skills/x/SKILL.md"])).toEqual([]);
+    mkdirSync(join(root, ".claude-plugin"));
+    writeFileSync(join(root, ".claude-plugin", "plugin.json"), '{"name": "my-plugin"}');
+    expect(names(root, ["agents/x-reviewer.md"])).toEqual(["a"]);
+    expect(names(root, ["skills/x/SKILL.md"])).toEqual(["b"]);
+    const bare = makePlugin([{ name: "a" }]);
+    withGrader(bare, "a", "Agent", `"subagent_type"\\s*:\\s*"${basename(bare)}:x-reviewer"`);
+    expect(names(bare, ["agents/x-reviewer.md"])).toEqual(["a"]);
   });
 
   it("does not select on a substring: the pattern must accept the call payload", () => {
@@ -245,7 +295,7 @@ describe("selectChanged", () => {
     mkdirSync(join(root, "skills", "x"), { recursive: true });
     mkdirSync(join(root, "skills", "y"), { recursive: true });
     writeFileSync(join(root, "skills", "x", "SKILL.md"), SKILL_X);
-    writeFileSync(join(root, "skills", "y", "SKILL.md"), "y\n");
+    writeFileSync(join(root, "skills", "y", "SKILL.md"), SKILL_X.replaceAll("x", "y"));
     for (const args of [["init", "-q"], ["add", "."], ["commit", "-q", "-m", "init"], ["branch", "base"]]) {
       const r = await git(top, ...args);
       expect(r.status, r.stderr).toBe(0);
@@ -327,6 +377,46 @@ describe("selectChanged", () => {
     mkdirSync(join(fresh.root, "skills", "z"));
     writeFileSync(join(fresh.root, "skills", "z", "SKILL.md"), "---\nname: z\n---\n");
     expect(await select(fresh.root)).toMatchObject({ names: ["t"] });
+  });
+
+  it("applies the frontmatter rule to agents/*.md too", async () => {
+    const { root } = await repo();
+    const agent = join(root, "agents", "x.md");
+    mkdirSync(dirname(agent));
+    writeFileSync(agent, SKILL_X);
+    expect(await select(root)).toMatchObject({ names: ["a", "t"], unmapped: [] });
+    expect((await git(root, "add", ".")).status).toBe(0);
+    expect((await git(root, "commit", "-q", "-m", "agent")).status).toBe(0);
+    expect((await git(root, "branch", "-f", "base")).status).toBe(0);
+    writeFileSync(agent, SKILL_X.replace("body", "new body"));
+    expect(await select(root)).toMatchObject({ names: ["a"] });
+    writeFileSync(agent, SKILL_X.replace("does x", "does more"));
+    expect(await select(root)).toMatchObject({ names: ["a", "t"] });
+  });
+
+  it("sees frontmatter behind a BOM or leading blank lines, and compares whole texts when neither side has any", async () => {
+    const bom = await repo();
+    writeFileSync(join(bom.root, "skills", "x", "SKILL.md"), `﻿\n\n${SKILL_X}`);
+    expect(await select(bom.root)).toMatchObject({ names: ["a"] });
+    const plain = await repo();
+    const y = join(plain.root, "skills", "y", "SKILL.md");
+    writeFileSync(y, "y, no frontmatter\n");
+    expect((await git(plain.root, "commit", "-q", "-am", "plain")).status).toBe(0);
+    expect((await git(plain.root, "branch", "-f", "base")).status).toBe(0);
+    writeFileSync(y, "y, reworded\n");
+    expect(await select(plain.root)).toMatchObject({ names: ["b", "t"] });
+  });
+
+  it("keeps the old path of a renamed skill, and selects on a deleted one", async () => {
+    const moved = await repo();
+    mkdirSync(join(moved.root, "skills", "z"));
+    expect((await git(moved.root, "mv", "skills/x/SKILL.md", "skills/z/SKILL.md")).status).toBe(0);
+    const r = await select(moved.root);
+    expect(r.ok && r.paths).toEqual(["skills/x/SKILL.md", "skills/z/SKILL.md"]);
+    expect(r).toMatchObject({ names: ["a", "t"], unmapped: [] });
+    const gone = await repo();
+    rmSync(join(gone.root, "skills", "x", "SKILL.md"));
+    expect(await select(gone.root)).toMatchObject({ paths: ["skills/x/SKILL.md"], names: ["a", "t"] });
   });
 
   it("fails on a ref with no merge base", async () => {

@@ -126,23 +126,45 @@ describe("--changed", () => {
     expect(parseArgs(["p", "--changed-allow-empty"]).kind).toBe("error");
   });
 
-  it("plans only the changed case, still listing the unmapped files", async () => {
+  it("is all or nothing: a mapped case beside an unmapped file exits 1 and runs nothing", async () => {
+    const s = setup({ onGit: gitOf(["evals/b/case.yaml", "README.md"]), onCli: okCli() });
+    expect(await run(s, ["--changed=base"])).toBe(EXIT_FAILURE);
+    expect(cliCalls(s.calls)).toHaveLength(0);
+    expect(s.err.join("")).toContain("files that map to no case:\n  README.md");
+    expect(s.err.join("")).toContain("1 of 2 changed files map to no case");
+    expect(s.err.join("")).toContain("--changed-allow-empty");
+    const d = setup({ onGit: gitOf(["evals/b/case.yaml", "README.md"]) });
+    expect(await run(d, ["--changed=base", "--dry-run"])).toBe(EXIT_FAILURE);
+    expect(d.out.join("")).not.toContain("invocation");
+  });
+
+  it("with --changed-allow-empty, plans only the changed case, still listing the unmapped files", async () => {
     const s = setup({ onGit: gitOf(["evals/b/case.yaml", "README.md"]) });
-    expect(await run(s, ["--changed=base", "--dry-run"])).toBe(EXIT_OK);
+    expect(await run(s, ["--changed=base", "--changed-allow-empty", "--dry-run"])).toBe(EXIT_OK);
     expect(s.out.join("")).toContain("invocation 1/1");
     expect(s.out.join("")).toContain("--case b");
     expect(s.err.join("")).toContain("files that map to no case:\n  README.md");
   });
 
-  it("records the resolved ref and the subset in the summary file", async () => {
+  it("records the resolved ref and the subset (finished of the tier's cases) in the summary file", async () => {
     const s = setup({ onGit: gitOf(["evals/b/case.yaml"]), onCli: okCli() });
     expect(await run(s, ["--changed=base"])).toBe(EXIT_OK);
     const written = [...s.written.values()][0] ?? "{}";
     expect(JSON.parse(written)).toMatchObject({
       changedSince: "base",
-      subset: "subset: 1 of 2 cases, --changed since base",
+      subset: "subset: 1 of 2 standard cases, --changed since base",
     });
-    expect(s.out.join("")).toContain("## Eval results\n\nsubset: 1 of 2 cases, --changed since base\n\n");
+    expect(s.out.join("")).toContain("## Eval results\n\nsubset: 1 of 2 standard cases, --changed since base\n\n");
+    // Out of budget after the first case: N counts what finished, not what was planned.
+    const cut = setup({
+      cases: [{ name: "a" }, { name: "b" }, { name: "c" }],
+      onGit: gitOf(["evals/a/case.yaml", "evals/b/case.yaml"]),
+      onCli: okCli(9),
+    });
+    expect(await run(cut, ["--changed=base", "--max-cost-usd", "9"])).toBe(EXIT_PARTIAL);
+    expect(JSON.parse([...cut.written.values()][0] ?? "{}")).toMatchObject({
+      subset: "subset: 1 of 3 standard cases, --changed since base",
+    });
     const whole = setup({ onCli: okCli() });
     await run(whole, []);
     expect(JSON.parse([...whole.written.values()][0] ?? "{}")).toMatchObject({ changedSince: null, subset: null });
