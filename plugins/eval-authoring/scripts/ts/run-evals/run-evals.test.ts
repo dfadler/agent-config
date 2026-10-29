@@ -48,6 +48,12 @@ const okCli =
 
 const STAMP = "run-2026-01-02T03-04-05-000Z";
 
+const withCaffeinate = {
+  claude: ["/bin/claude"],
+  git: ["/bin/git"],
+  caffeinate: ["/usr/bin/caffeinate"],
+};
+
 const cliCalls = (calls: readonly { command: string; args: readonly string[] }[]) =>
   calls.filter((c) => c.command === "claude" && c.args[0] === "plugin");
 
@@ -231,6 +237,38 @@ describe("main", () => {
     await main([s.root], { io: s.io, pluginsDir: "/p" });
     expect(s.err.join()).toContain("preflight warning");
     expect(cliCalls(s.calls)).toHaveLength(1);
+  });
+
+  it("runs the CLI under caffeinate -i on macOS when it is on PATH, and bare elsewhere", async () => {
+    const mac = setup({ cases: [{ name: "a" }], onPath: withCaffeinate, onCli: okCli() });
+    await main([mac.root], { io: mac.io, pluginsDir: "/p" });
+    const wrapped = mac.calls.filter((c) => c.command === "caffeinate");
+    expect(wrapped).toHaveLength(1);
+    expect(wrapped[0]?.args.slice(0, 4)).toEqual(["-i", "--", "claude", "plugin"]);
+    expect(cliCalls(mac.calls)).toHaveLength(0);
+
+    const linux = setup({ cases: [{ name: "a" }], onPath: withCaffeinate, onCli: okCli(), platform: "linux" });
+    await main([linux.root], { io: linux.io, pluginsDir: "/p" });
+    expect(linux.calls.some((c) => c.command === "caffeinate")).toBe(false);
+    expect(cliCalls(linux.calls)).toHaveLength(1);
+  });
+
+  it("maps caffeinate's own exec failure (127/126) to could-not-start and passes other statuses through", async () => {
+    const run = async (status: number, stderr = "") => {
+      const s = setup({ cases: [{ name: "a" }], onPath: withCaffeinate, cliResult: spawned({ status, stderr }) });
+      const code = await main([s.root], { io: s.io, pluginsDir: "/p" });
+      return { code, err: s.err.join(""), summary: [...s.written.values()].join("") };
+    };
+    const missing = await run(127, "claude: No such file or directory\n");
+    expect(missing.code).toBe(EXIT_DEPENDENCY);
+    expect(missing.summary).toContain("could not start claude: caffeinate exit 127: claude: No such file or directory");
+    const nonexec = await run(126, "claude: Permission denied\n");
+    expect(nonexec.code).toBe(EXIT_DEPENDENCY);
+    expect(nonexec.summary).toContain("could not start claude: caffeinate exit 126: claude: Permission denied");
+    // caffeinate execs claude in place, so claude's own status is not an artifact.
+    const plain = await run(3);
+    expect(plain.code).toBe(EXIT_FAILURE);
+    expect(plain.err).toContain("unexpected CLI exit status 3");
   });
 
   it("does not pass --trust-plugin for a plugin outside the repo's plugins directory", async () => {
