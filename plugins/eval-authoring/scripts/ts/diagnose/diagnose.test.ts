@@ -24,7 +24,7 @@ describe("main", () => {
   it("prints text verdicts for a recorded one-run result", () => {
     const out = main(["r.json"], io({ "r.json": fixture("two-cases-one-run.json") }));
     expect(out.code).toBe(EXIT_OK);
-    expect(out.stdout).toContain("example-asks-first: discriminates");
+    expect(out.stdout).toContain("example-asks-first: weak-signal");
     expect(out.stdout).toContain(
       "example-runs-with-permission: no-discrimination",
     );
@@ -56,7 +56,7 @@ describe("main", () => {
       cases: [
         {
           name: "example-asks-first",
-          verdict: "discriminates",
+          verdict: "weak-signal",
           delta: 0.25,
           findings: [{ kind: "split-judge-votes" }],
         },

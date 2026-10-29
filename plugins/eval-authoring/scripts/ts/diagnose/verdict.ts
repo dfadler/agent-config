@@ -88,21 +88,25 @@ export interface Diagnosis {
 export interface Thresholds {
   /** A delta within this distance of zero is "no discrimination" (a delta below the negative of it is "negative-delta"). */
   readonly neutralBand: number;
-  /** With two or more runs per arm, a positive delta must exceed this many standard errors of the difference to count as `discriminates`. */
-  readonly noiseMultiple: number;
+  /** Smallest standard error of the difference used when judging; keeps two zero-spread arms from scoring as infinitely certain. */
+  readonly seFloor: number;
+  /** Both arms with a mean at or above this count as a ceiling (the floor check stays exact 0). */
+  readonly nearCeiling: number;
   /** An arm whose run scores have a standard deviation above this is flagged as unstable. */
   readonly highVariance: number;
 }
 
 /**
  * Defaults. Scores run 0 to 1 and a three-run arm moves in steps of about
- * 0.08, so 0.05 treats a one-step wobble as zero; 2 standard errors is the
- * usual rough bar for "not noise"; a 0.25 standard deviation means the runs
+ * 0.08, so 0.05 treats a one-step wobble as zero; "not noise" means beyond
+ * the two-sided 95% Welch t quantile for the run count (2.8-4.3 at 3 runs, not
+ * the normal 2); a 0.25 standard deviation means the runs
  * disagree by about a quarter of the score range.
  */
 export const DEFAULT_THRESHOLDS: Thresholds = {
   neutralBand: 0.05,
-  noiseMultiple: 2,
+  seFloor: 0.05,
+  nearCeiling: 0.95,
   highVariance: 0.25,
 };
 
@@ -117,6 +121,15 @@ const stdDev = (xs: readonly number[]): number | undefined => {
   const ss = xs.reduce((a, x) => a + (x - m) ** 2, 0);
   return Math.sqrt(ss / (xs.length - 1));
 };
+
+// Two-sided 95% t quantiles for df 1..30; beyond that the normal 1.96.
+const T95 = [12.706, 4.303, 3.182, 2.776, 2.571, 2.447, 2.365, 2.306, 2.262,
+  2.228, 2.201, 2.179, 2.16, 2.145, 2.131, 2.12, 2.11, 2.101, 2.093, 2.086,
+  2.08, 2.074, 2.069, 2.064, 2.06, 2.056, 2.052, 2.048, 2.045, 2.042];
+
+/** The t quantile for Welch degrees of freedom (rounded down, floor 1). */
+export const tQuantile = (df: number): number =>
+  df >= 30 ? 1.96 : (T95[Math.max(1, Math.floor(df)) - 1] ?? 12.706);
 
 const round = (n: number): number => Math.round(n * 1000) / 1000;
 const fmt = (n: number): string => String(round(n));
@@ -270,8 +283,17 @@ const judgeDelta = (
   const seWo = (wo.stdDev ?? 0) ** 2 / Math.max(wo.usedRuns, 1);
   const se = Math.sqrt(seW + seWo);
   const noiseKnown = w.stdDev !== undefined && wo.stdDev !== undefined;
+  const seEff = Math.max(se, t.seFloor);
+  // Welch-Satterthwaite df; with zero spread fall back to the pooled df.
+  const df =
+    se > 0
+      ? se ** 4 /
+        (seW ** 2 / Math.max(w.usedRuns - 1, 1) +
+          seWo ** 2 / Math.max(wo.usedRuns - 1, 1))
+      : Math.max(w.usedRuns + wo.usedRuns - 2, 1);
+  const cut = tQuantile(df) * seEff;
   const ceiling =
-    w.mean === 1 && wo.mean === 1
+    (w.mean ?? 0) >= t.nearCeiling && (wo.mean ?? 0) >= t.nearCeiling
       ? ([
           {
             kind: "both-arms-pass-all",
@@ -293,10 +315,10 @@ const judgeDelta = (
         ] as const)
       : [];
   const extra = [...ceiling, ...floor];
-  if (delta <= -t.neutralBand && noiseKnown && -delta <= t.noiseMultiple * se) {
+  if (delta <= -t.neutralBand && noiseKnown && -delta <= cut) {
     return {
       verdict: "weak-signal",
-      reason: `delta ${d} is negative but within ${String(t.noiseMultiple)} standard errors (${fmt(se)}) of zero, so it may be noise`,
+      reason: `delta ${d} is negative but within ${fmt(cut)} (t quantile ${fmt(tQuantile(df))} x standard error ${fmt(seEff)}) of zero, so it may be noise`,
       findings: extra,
     };
   }
@@ -321,31 +343,32 @@ const judgeDelta = (
       findings: extra,
     };
   }
-  if (noiseKnown && delta <= t.noiseMultiple * se) {
+  if (!noiseKnown) {
     return {
       verdict: "weak-signal",
-      reason: `delta ${d} is within ${String(t.noiseMultiple)} standard errors (${fmt(se)}) of zero, so it may be noise`,
+      reason: `delta ${d} is above zero, but an arm has under two usable runs, so noise is unknown`,
+      findings: [
+        {
+          kind: "single-run",
+          severity: "info",
+          message:
+            "an arm has under two usable runs, so run-to-run noise is unknown; the verdict is capped at weak-signal, rerun with more runs to confirm",
+        },
+        ...extra,
+      ],
+    };
+  }
+  if (delta <= cut) {
+    return {
+      verdict: "weak-signal",
+      reason: `delta ${d} is within ${fmt(cut)} (t quantile ${fmt(tQuantile(df))} x standard error ${fmt(seEff)}) of zero, so it may be noise`,
       findings: extra,
     };
   }
   return {
     verdict: "discriminates",
-    reason: noiseKnown
-      ? `delta ${d} is above ${String(t.noiseMultiple)} standard errors (${fmt(se)})`
-      : `delta ${d} is above zero`,
-    findings: [
-      ...(noiseKnown
-        ? []
-        : [
-            {
-              kind: "single-run" as const,
-              severity: "info" as const,
-              message:
-                "an arm has under two usable runs, so run-to-run noise is unknown; rerun with more runs to confirm",
-            },
-          ]),
-      ...extra,
-    ],
+    reason: `delta ${d} is above ${fmt(cut)} (t quantile ${fmt(tQuantile(df))} x standard error ${fmt(seEff)})`,
+    findings: extra,
   };
 };
 

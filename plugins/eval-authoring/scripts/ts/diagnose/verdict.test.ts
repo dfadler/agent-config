@@ -66,8 +66,9 @@ describe("verdict categories", () => {
 
   it("treats a delta at the neutral band edge as signal, not zero", () => {
     const edge = DEFAULT_THRESHOLDS.neutralBand;
+    // Positive edge with unknown noise is signal (capped), not no-discrimination.
     expect(diagnoseCase(caseOf([1], [1 - edge], edge)).verdict).toBe(
-      "discriminates",
+      "weak-signal",
     );
     expect(diagnoseCase(caseOf([1], [1 + edge], -edge)).verdict).toBe(
       "negative-delta",
@@ -96,14 +97,36 @@ describe("verdict categories", () => {
         withRuns: [run(a), run(0, { error: "rate limit" })],
         withoutRuns: [run(b)],
       });
-    expect(diagnoseCase(dropped(0.35, 0.3)).verdict).toBe("discriminates");
+    expect(diagnoseCase(dropped(0.35, 0.3)).verdict).toBe("weak-signal");
     expect(diagnoseCase(dropped(0.3, 0.35)).verdict).toBe("negative-delta");
   });
 
-  it("trusts a single run per arm but says noise is unknown", () => {
+  it("caps a single run per arm at weak-signal and says noise is unknown", () => {
     const v = diagnoseCase(caseOf([1], [0.5], 0.5));
-    expect(v.verdict).toBe("discriminates");
+    expect(v.verdict).toBe("weak-signal");
     expect(kinds(v)).toContain("single-run");
+  });
+
+  it("caps at weak-signal when only one arm has two usable runs", () => {
+    expect(diagnoseCase(caseOf([1, 1], [0], 1)).verdict).toBe("weak-signal");
+  });
+
+  it("uses the t quantile, not 2 SE, at 3 runs", () => {
+    // means 0.6 vs 0.0, sd 0.2 / 0.0: SE 0.115, df 2 -> cut 4.3 x 0.115 = 0.50
+    // would be 0.23 at 2 SE. A 0.3 delta is beyond 2 SE but not the t cut.
+    const v = diagnoseCase(caseOf([0.4, 0.6, 0.8], [0.3, 0.3, 0.3], 0.3));
+    expect(v.verdict).toBe("weak-signal");
+  });
+
+  it("floors the SE so zero-spread arms need a real gap", () => {
+    // SD 0 both arms, 3 runs: cut = 4.303 x 0.05 = 0.215.
+    expect(diagnoseCase(caseOf([0.6, 0.6, 0.6], [0.5, 0.5, 0.5], 0.1)).verdict).toBe("weak-signal");
+    expect(diagnoseCase(caseOf([0.8, 0.8, 0.8], [0.5, 0.5, 0.5], 0.3)).verdict).toBe("discriminates");
+  });
+
+  it("treats near-ceiling arms as a ceiling, not only exact 1", () => {
+    const v = diagnoseCase(caseOf([0.96, 0.96], [0.97, 0.97], -0.01));
+    expect(kinds(v)).toContain("both-arms-pass-all");
   });
 });
 
@@ -140,7 +163,7 @@ describe("missing signal", () => {
         withoutRuns: [run(0.5)],
       }),
     );
-    expect(v.verdict).toBe("discriminates");
+    expect(v.verdict).toBe("weak-signal");
     expect(v.scoredGraders).toBeUndefined();
   });
 
@@ -398,7 +421,7 @@ describe("mechanical findings", () => {
 describe("thresholds", () => {
   it("honors a custom neutral band", () => {
     const c = caseOf([1], [0.8], 0.2);
-    expect(diagnoseCase(c).verdict).toBe("discriminates");
+    expect(diagnoseCase(c).verdict).toBe("weak-signal");
     expect(
       diagnoseCase(c, false, { ...DEFAULT_THRESHOLDS, neutralBand: 0.3 })
         .verdict,

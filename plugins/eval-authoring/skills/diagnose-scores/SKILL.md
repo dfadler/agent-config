@@ -66,7 +66,7 @@ interprets the verdict.
   `--ablation` back to two arms).
 - **`judge-skipped`:** the cost ceiling skipped paid graders; not a signal. Recommend a higher
   ceiling or a free grader.
-- **`weak-signal`:** Δ inside noise, positive or negative (a drop smaller than 2 standard errors lands here, not under `negative-delta`). Recommend more runs before changing anything.
+- **`weak-signal`:** Δ inside noise, positive or negative (a drop smaller than the t-quantile cutoff lands here, not under `negative-delta`). Recommend more runs before changing anything.
 - **`both-arms-pass-all` / `both-arms-fail-all`:** a case that cannot fail, or never passes
   (check graders and grants).
 - **`discriminates`:** one line; do not invent a problem.
@@ -81,15 +81,17 @@ without-arm mean over usable runs.
 
 | Verdict | Rule |
 |---|---|
-| `negative-delta` | Δ ≤ -0.05 and beyond 2 standard errors; with unknown noise, any Δ ≤ -0.05 |
+| `negative-delta` | Δ ≤ -0.05 and beyond the t cutoff; with unknown noise, any Δ ≤ -0.05 |
 | `no-discrimination` | -0.05 < Δ < 0.05 |
-| `weak-signal` | \|Δ\| ≥ 0.05 and within 2 standard errors (only when both arms' standard deviations are known) |
-| `discriminates` | Δ ≥ 0.05 and Δ > 2 standard errors; with unknown noise, any Δ ≥ 0.05 |
+| `weak-signal` | \|Δ\| ≥ 0.05 and within the t cutoff, or noise unknown (an arm has under two usable runs: capped here) |
+| `discriminates` | Δ ≥ 0.05 and Δ > t cutoff, with noise known |
+
+The t cutoff is the two-sided 95% Welch t quantile for the run count (4.3 at 2+2 runs, 3.2 at 3+3) times the standard error of the difference, floored at 0.05 so zero-spread arms need a gap of about 0.22 at 3 runs. `both-arms-pass-all` fires when both means are at least 0.95.
 
 Δ is rounded to three decimals before these comparisons, so an exact ±0.05 lands the same way every time.
 | `high-variance` finding | an arm's run-score standard deviation is above 0.25 |
 
-The 0.05 band, the 2 standard errors and the 0.25 SD are rules of thumb the script chose,
+The 0.05 band, the 0.05 SE floor, the 0.95 ceiling and the 0.25 SD are rules of thumb the script chose,
 not measured limits. They may change; `verdict.ts` is the authority.
 
 ## Reading `mock-recordings/`
