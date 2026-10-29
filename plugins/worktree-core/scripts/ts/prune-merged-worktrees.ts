@@ -219,8 +219,13 @@ export const ignoredContentReason = (
   path: string,
   disposable: readonly RegExp[] = [],
 ): string | undefined => {
-  const held = git(["status", "--porcelain", "--ignored"], path)
-    .stdout.split("\n")
+  // -z and =all: list each ignored file unquoted, not a collapsed parent dir
+  // that would hide a disposable path from the prefix match.
+  const held = git(
+    ["status", "--porcelain", "-z", "--ignored", "--untracked-files=all"],
+    path,
+  )
+    .stdout.split("\0")
     .filter(
       (l) =>
         l.startsWith("!! ") &&

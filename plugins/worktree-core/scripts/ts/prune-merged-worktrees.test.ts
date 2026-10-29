@@ -136,6 +136,24 @@ describe("classification (dry run)", () => {
     expect(existsSync(p)).toBe(false);
   });
 
+  it("matches disposable content even when git collapses it under an all-ignored parent", () => {
+    const p = sb.addWorktree("a");
+    put(join(p, ".gitignore"), "evals/\n");
+    sb.git(p, "add", ".gitignore");
+    sb.git(p, "commit", "-q", "-m", "ignore");
+    sb.git(p, "push", "-q", "origin", "HEAD");
+    sb.markMerged("worktree-a", sb.head(p));
+    put(
+      join(sb.repo, ".claude", "settings.json"),
+      JSON.stringify({
+        worktree: { autoPruneDisposableIgnored: ["evals/results/"] },
+      }),
+    );
+    put(join(p, "evals", "results", "r.json"), "{}");
+    go(["--yes"]);
+    expect(existsSync(p)).toBe(false);
+  });
+
   it("keeps a merged worktree with keep in its name", () => {
     const p = mergedWorktree("a-keep");
     expect(go(["--yes"]).out).toMatch(/name contains 'keep'/);
