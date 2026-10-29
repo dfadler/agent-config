@@ -293,7 +293,7 @@ const judgeDelta = (
             kind: "both-arms-pass-all",
             severity: "warn",
             message:
-              "both arms score at the ceiling (mean >= 0.95): almost nothing fails without the plugin, so the case has little headroom to discriminate (fine as a regression guard, say so in expected_outcome)",
+              "both arms score at the ceiling (mean >= 0.95): almost nothing fails without the plugin, so the case cannot discriminate: check for a leaked answer, then fix or drop it (a should-not-fire case is the exception: delta 0 is by design, say so in expected_outcome)",
           },
         ] as const)
       : [];

@@ -110,8 +110,10 @@ draft them there: tell the user to commit the skill and start a fresh session, t
    add, not a measured cutoff) means the case may be solvable without the plugin: inspect
    the prompt and the workspace for a leaked answer (EVAL014 covers the mechanical
    cases), then rewrite or drop it. When answering a user about such a case, lead with
-   that leak check: a keep, rewrite or drop verdict is only sound once it is known. A case
-   that cannot separate the arms is a regression guard, not evidence the skill helps.
+   that leak check: a keep, rewrite or drop verdict is only sound once it is known. An
+   outcome case the baseline also passes cannot discriminate: check for a leaked answer,
+   then fix or drop it. Call a case a "regression guard" only if it should not fire the
+   skill (delta 0 by design) and its `expected_outcome` says so.
 8. **Lint.** `node ${CLAUDE_SKILL_DIR}/../../scripts/ts/lint/cli.ts <plugin-path>` (Node 22
    or later). Fix every error. Fix each warning or write down why it is intended.
 9. **Review and hand off.** Ask the [case-reviewer agent](../../agents/case-reviewer.md)
@@ -123,11 +125,11 @@ draft them there: tell the user to commit the skill and start a fresh session, t
    "Eval results" section (the run-evals summary, with the before score from the newest
    `evals/results/` run next to the after score, and a delta claimed only for a plugin with
    about 20 or more cases: runs shrink within-case noise, only cases shrink the standard
-   error of a delta; a smaller suite is a regression guard, so give the arm scores and
-   write "delta not measured", never a Δ number, even marked preliminary), or says why it has none. The PR body states what was measured (with, without,
-   delta) and names each changed behavior no case covers. It never says a change
-   "improves" or "fixes" a behavior without a case whose delta shows it; with a delta of
-   zero, call the cases regression guards and say the benefit is unverified.
+   error of a delta; for a smaller suite give the arm scores and write "delta not
+   measured", never a Δ number, even marked preliminary), or says why it has none. The PR
+   body states what was measured (with, without, delta) and names each changed behavior no
+   case covers. It never says a change "improves" or "fixes" a behavior without a case
+   whose delta shows it; with a delta of zero, say the benefit is unverified.
 
 ## Gotchas
 
