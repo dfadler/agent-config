@@ -112,7 +112,11 @@ draft them there: tell the user to commit the skill and start a fresh session, t
    cases), then rewrite or drop it. When answering a user about such a case, lead with
    that leak check: a keep, rewrite or drop verdict is only sound once it is known. An
    outcome case the baseline also passes cannot discriminate: check for a leaked answer,
-   then fix or drop it. Call a case a "regression guard" only if it should not fire the
+   then fix or drop it. If the prompt leaks nothing and the baseline still passes, the
+   graders are checking default model behavior: rewrite the prompt so the skill's rule and
+   its exception both apply in one reply and grade the part only the skill adds, or drop
+   the case; a sabotage result that still passes (kept in the case header) means drop.
+   Call a case a "regression guard" only if it should not fire the
    skill (delta 0 by design) and its `expected_outcome` says so.
 8. **Lint.** `node ${CLAUDE_SKILL_DIR}/../../scripts/ts/lint/cli.ts <plugin-path>` (Node 22
    or later). Fix every error. Fix each warning or write down why it is intended.

@@ -88,8 +88,8 @@ Run after the lint, on each case. Skip anything the lint already reported.
    covers the mechanical part; see author-cases, "Can this case fail?").
 5. **Tells the plugin from no plugin.** Is the property tested something the skill
    adds, or something the model does by default? A default behavior gives a Delta
-   of zero in a two-arm run. If the case deliberately tests a default (a safety
-   regression guard), it should say so in `expected_outcome`.
+   of zero in a two-arm run. If the case deliberately tests a default (only a
+   should-not-fire guard), it should say so in `expected_outcome`.
 6. **Proportionate.** Free graders (`regex`, `tool_used`, `tool_order`,
    `file_exists`) first; `llm` or `baseline` only for a semantic property. Flag an
    `llm` grader whose property a regex or tool check could decide, high `runs` on a
