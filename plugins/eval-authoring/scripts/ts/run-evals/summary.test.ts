@@ -85,11 +85,11 @@ describe("redact and quoteSafe", () => {
     expect(redact("a plain sentence")).toBe("a plain sentence");
   });
   it("masks the home directory only on a path boundary", () => {
+    // Masked only before `/` or at the end: `/Users/x"` stays, as in the caffeinate exit path.
     expect(maskHome('{"cwd":"/Users/x","f":"/Users/x/r/a.ts"} /Users/xavier/b /Users/x', "/Users/x/")).toBe(
-      '{"cwd":"~","f":"~/r/a.ts"} /Users/xavier/b ~',
+      '{"cwd":"/Users/x","f":"~/r/a.ts"} /Users/xavier/b ~',
     );
     expect(maskHome("/Users/x/r", "")).toBe("/Users/x/r");
-    expect(maskHome("C:\\Users\\x\\r", "C:\\Users\\x")).toBe("~\\r");
   });
   it("tells a trace cut mid-line from a whole one", () => {
     expect(truncatedTrace(`${TRACE}\n`)).toBe(false);
@@ -270,9 +270,10 @@ describe("replies files", () => {
   const STAMP = "run-2026-01-02T03-04-05-000Z";
   const summaryOf = (s: ReturnType<typeof setup>): unknown =>
     JSON.parse(s.written.get(join(s.root, "evals", "results", STAMP, "run-evals-summary.json")) ?? "null");
-  it("has the CLI keep the sandboxes, writes each run's redacted reply and tool calls beside the results, then removes the sandboxes", async () => {
+  const PRINTED_REPLY = "- reply: `here it is: token=[REDACTED]";
+  it("with --keep-temp passes it through and writes each run's redacted reply and tool calls beside the results; the summary still quotes the failing reply", async () => {
     const s = setup();
-    expect(await main([s.root, "--case", "alpha"], deps(s))).toBe(EXIT_OK);
+    expect(await main([s.root, "--case", "alpha", "--keep-temp"], deps(s))).toBe(EXIT_OK);
     const cli = s.calls.find((c) => c.args[0] === "plugin");
     expect(cli?.args).toContain("--keep-temp");
     const dir = join(s.root, "evals", "results", STAMP, "replies", "01-alpha");
@@ -284,27 +285,28 @@ describe("replies files", () => {
     expect(s.written.has(join(dir, "alpha", "without-1.md"))).toBe(false);
     expect(summaryOf(s)).toMatchObject({ invocations: [{ caseName: "alpha", repliesDir: dir }] });
     expect(s.err.join("")).toContain(`1 run replies in ${dir}`);
-    expect(s.removed).toEqual([SANDBOX]);
+    expect(s.out.join("")).toContain(PRINTED_REPLY);
   });
-  it("keeps the sandboxes with --keep-temp", async () => {
+  it("without --keep-temp writes no replies, passes no --keep-temp and prints nothing extra", async () => {
     const s = setup();
-    expect(await main([s.root, "--case", "alpha", "--keep-temp"], deps(s))).toBe(EXIT_OK);
-    expect(s.removed).toEqual([]);
-    expect(s.written.has(join(s.root, "evals", "results", STAMP, "replies", "01-alpha", "alpha", "with-1.md"))).toBe(true);
-  });
-  it("leaves repliesDir unset and says so when no trace is readable; a sandbox that cannot be removed is one warning", async () => {
-    const s = setup({ files: {}, onRemove: () => { throw new Error("EACCES"); } });
     expect(await main([s.root, "--case", "alpha"], deps(s))).toBe(EXIT_OK);
+    expect(s.calls.find((c) => c.args[0] === "plugin")?.args).not.toContain("--keep-temp");
+    expect([...s.written.keys()].some((k) => k.includes("/replies/"))).toBe(false);
+    expect(JSON.stringify(summaryOf(s))).not.toContain("repliesDir");
+    expect(s.err.join("")).not.toMatch(/replies|trace/);
+    expect(s.out.join("")).toContain(PRINTED_REPLY);
+  });
+  it("leaves repliesDir unset and says so when no trace is readable", async () => {
+    const s = setup({ files: {} });
+    expect(await main([s.root, "--case", "alpha", "--keep-temp"], deps(s))).toBe(EXIT_OK);
     expect([...s.written.keys()].some((k) => k.includes("/replies/"))).toBe(false);
     expect(summaryOf(s)).toMatchObject({ invocations: [{ caseName: "alpha" }] });
     expect(JSON.stringify(summaryOf(s))).not.toContain("repliesDir");
-    const err = s.err.join("");
-    expect(err).toContain("invocation 1/1 (alpha): no readable trace for any of its 2 run(s); no replies written");
-    expect(err).toContain(`could not remove sandbox ${SANDBOX} (EACCES)`);
+    expect(s.err.join("")).toContain("invocation 1/1 (alpha): no readable trace for any of its 2 run(s); no replies written");
   });
   it("warns once, drops repliesDir and goes on with the run and the summary when a replies file cannot be written", async () => {
     const s = setup({ onWrite: (p) => { if (p.includes("/replies/")) throw new Error("ENOSPC"); } });
-    expect(await main([s.root, "--case", "al*"], deps(s))).toBe(EXIT_OK);
+    expect(await main([s.root, "--case", "al*", "--keep-temp"], deps(s))).toBe(EXIT_OK);
     expect(s.calls.filter((c) => c.args[0] === "plugin")).toHaveLength(2);
     expect([...s.written.keys()].some((k) => k.includes("/replies/"))).toBe(false);
     expect(summaryOf(s)).toMatchObject({ invocations: [{ caseName: "alpha", exit: EXIT_OK }, { caseName: "alpine", exit: EXIT_OK }] });
@@ -314,6 +316,7 @@ describe("replies files", () => {
     expect(warnings[0]).toContain("invocation 1/2 (alpha): could not write the replies files (");
     expect(warnings[0]).toContain("/replies/01-alpha/alpha/with-1.md: ENOSPC); continuing");
     expect(s.out.join("")).toContain("| alpha |");
+    expect(s.out.join("")).toContain(PRINTED_REPLY);
   });
 });
 

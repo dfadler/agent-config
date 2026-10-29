@@ -34,16 +34,16 @@ export const redact = (text: string): string =>
   );
 
 /**
- * `home` replaced with `~` on a path boundary only (the next character is not a
- * path-segment character): `/Users/x` masks `/Users/x/repo` and `/Users/x"` in
- * JSON but leaves `/Users/xavier` alone. Applied before `redact`, whose long-run
- * catch-all would otherwise eat the whole path prefix.
+ * `home` replaced with `~` on a path boundary only (followed by `/` or the end of
+ * the text, the same rule as the caffeinate exit path): `/Users/x` masks
+ * `/Users/x/repo` but leaves `/Users/xavier` alone. Applied before `redact`,
+ * whose long-run catch-all would otherwise eat the whole path prefix.
  */
 export const maskHome = (text: string, home: string): string => {
   const bare = home.replace(/\/+$/, "");
   return bare === ""
     ? text
-    : text.replace(new RegExp(`${bare.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}(?![\\w.-])`, "g"), "~");
+    : text.replace(new RegExp(`${bare.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}(?=/|$)`, "g"), "~");
 };
 
 /** One line, redacted, truncated, and unable to close the code span or fake a block marker. */

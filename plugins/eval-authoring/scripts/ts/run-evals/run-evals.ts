@@ -49,7 +49,7 @@ import {
   type AblationMode,
   type Tier,
 } from "./tiers.ts";
-import { replyFiles, runCount, safeName, sandboxDirs } from "./traces.ts";
+import { replyFiles, runCount, safeName } from "./traces.ts";
 
 export const USAGE = `Usage: run-evals.ts [options] <plugin-path>
 
@@ -82,9 +82,8 @@ ${Object.values(TIERS).map((t) => `                         ${t.name}: ${t.descr
   --output-dir <dir>   base results directory (default: <eval-dir>/results).
                        Each wrapper run writes <dir>/run-<time>/<NN>-<case>
   --publish-report     publish the report (default: --no-publish)
-  --keep-temp          keep each run's sandbox (its trace.jsonl) under /tmp.
-                       By default it is removed once the run's final reply
-                       and tool calls are written, redacted, to
+  --keep-temp          keep run traces and write replies/ next to the result:
+                       each run's final reply and tool calls, redacted, at
                        <dir>/run-<time>/replies/<NN>-<case>/<case>/<arm>-<run>.md
   --skip-unavailable   exit 0 when plugin eval is in early access or down
   --dry-run            print the commands and exit; runs nothing
@@ -332,9 +331,7 @@ const invocationSpec = (
   maxCostUsd: budgetUsd,
   evalDir: options.evalDir,
   trustPlugin: trust,
-  // The CLI always keeps the sandboxes: the replies files are read from their traces (27-49KB
-  // each) after it exits. The wrapper removes them itself unless the user passed --keep-temp.
-  reporting: { ...options.reporting, outputDir, keepTemp: true },
+  reporting: { ...options.reporting, outputDir },
 });
 
 /** Where invocation `n` of `total` writes: `<runDir>/<NN>-<case>`. */
@@ -452,14 +449,13 @@ const runInvocation = async (
 const errorText = (e: unknown): string => (e instanceof Error ? e.message : String(e));
 
 /**
- * After an invocation: write its replies files under `repliesDir`, then remove
- * the run sandboxes unless `--keep-temp`. Nothing here aborts the run: a failed
- * write or removal is one stderr line. Returns `repliesDir` when every replies
- * file was written and there was at least one; undefined otherwise.
+ * Write an invocation's replies files under `repliesDir` (only with
+ * `--keep-temp`: otherwise the CLI has already deleted the traces). Nothing here
+ * aborts the run: a failed write is one stderr line. Returns `repliesDir` when
+ * every replies file was written and there was at least one; undefined otherwise.
  */
 const persistReplies = (
   io: Io,
-  options: Options,
   label: string,
   repliesDir: string,
   resultText: string | undefined,
@@ -484,15 +480,6 @@ const persistReplies = (
     io.err(`run-evals: ${label}: could not write the replies files (${written.error}); continuing\n`);
   } else if (written.n > 0) {
     io.err(`run-evals: ${label}: ${String(written.n)} run replies in ${repliesDir}\n`);
-  }
-  if (!options.reporting.keepTemp) {
-    sandboxDirs(resultText, io.tempRoots).forEach((dir) => {
-      try {
-        io.removeDir(dir);
-      } catch (e: unknown) {
-        io.err(`run-evals: ${label}: could not remove sandbox ${dir} (${errorText(e)}); pass --keep-temp to keep them on purpose\n`);
-      }
-    });
   }
   return written.error === undefined && written.n > 0 ? repliesDir : undefined;
 };
@@ -602,15 +589,8 @@ export const main = async (
         remaining,
         shareUsd,
       );
-      const repliesDir = persistReplies(
-        io,
-        options,
-        `invocation ${String(i + 1)}/${String(total)} (${inv.caseName})`,
-        join(runDir, "replies", basename(outDir)),
-        r.resultText,
-      );
       return {
-        done: [...acc.done, { ...r.summary, ...(repliesDir === undefined ? {} : { repliesDir }) }],
+        done: [...acc.done, r.summary],
         texts: [...acc.texts, r.resultText],
         spentUsd: round4(acc.spentUsd + r.summary.chargedUsd),
         stopped: r.stop,
@@ -619,6 +599,18 @@ export const main = async (
     },
     Promise.resolve({ done: [], texts: [], spentUsd: 0, stopped: false, outOfBudget: false }),
   );
+  // After the whole loop, so the summary below still reads each trace for its failing reply.
+  const done = !options.reporting.keepTemp
+    ? progress.done
+    : progress.done.map((d, i) => {
+        const repliesDir = persistReplies(
+          io,
+          `invocation ${String(i + 1)}/${String(total)} (${d.caseName})`,
+          join(runDir, "replies", basename(invocationDir(runDir, i + 1, total, d))),
+          progress.texts[i],
+        );
+        return repliesDir === undefined ? d : { ...d, repliesDir };
+      });
   const unstarted = invocations
     .slice(progress.done.length)
     .map((inv) => inv.caseName);
@@ -640,7 +632,7 @@ export const main = async (
     ceilingUsd,
     ceilingBasis: ceiling.basis,
     spentUsd: progress.spentUsd,
-    invocations: progress.done,
+    invocations: done,
     unstarted,
     exit,
   };
@@ -661,7 +653,7 @@ export const main = async (
     exit,
     command: `node plugins/eval-authoring/scripts/ts/run-evals/run-evals.ts ${argv.map(shellWord).join(" ")}`,
     unstarted,
-    cases: progress.done.map((d, i) => ({
+    cases: done.map((d, i) => ({
       caseName: d.caseName,
       exit: d.exit,
       row: caseRow(d.caseName, progress.texts[i], io.readFile),

@@ -1,4 +1,4 @@
-import { chmodSync, existsSync, mkdirSync, mkdtempSync, realpathSync, symlinkSync, writeFileSync } from "node:fs";
+import { chmodSync, mkdirSync, mkdtempSync, symlinkSync, writeFileSync } from "node:fs";
 import { homedir, tmpdir } from "node:os";
 import { join } from "node:path";
 import { describe, expect, it } from "vitest";
@@ -69,24 +69,5 @@ describe("nodeIo", () => {
     expect(io.realpath(join(dir, "nope"))).toBe(join(dir, "nope"));
     expect(io.findOnPath("anything")).toEqual([]);
     expect(io.home).toBe(homedir());
-    expect(io.tempRoots).toContain(tmpdir());
-    expect(io.tempRoots).toContain("/tmp");
-  });
-  it("removes a sandbox under the temp dir even with a mode-000 sealed/ inside, and refuses anything else", () => {
-    const dir = mkdtempSync(join(tmpdir(), "run-evals-io-"));
-    const sandbox = join(dir, "e-X");
-    mkdirSync(join(sandbox, "sealed", "inner"), { recursive: true });
-    writeFileSync(join(sandbox, "sealed", "inner", "f"), "x");
-    writeFileSync(join(sandbox, "trace.jsonl"), "{}");
-    chmodSync(join(sandbox, "sealed", "inner", "f"), 0o000);
-    chmodSync(join(sandbox, "sealed"), 0o000);
-    const io = nodeIo({ PATH: "" });
-    io.removeDir(sandbox);
-    expect(existsSync(sandbox)).toBe(false);
-    expect(existsSync(dir)).toBe(true);
-    expect(() => { io.removeDir(sandbox); }).not.toThrow(); // already gone (the CLI removed it): a no-op
-    expect(io.tempRoots).toContain(realpathSync(tmpdir()));
-    // Refused before anything is touched: a missing path would otherwise be a silent no-op (rmSync force).
-    expect(() => { io.removeDir(join(process.cwd(), "no-such-sandbox")); }).toThrow(/refusing to remove/);
   });
 });

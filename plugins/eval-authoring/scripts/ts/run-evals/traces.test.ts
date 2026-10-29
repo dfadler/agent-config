@@ -1,7 +1,7 @@
 import { readFileSync } from "node:fs";
 import { describe, expect, it } from "vitest";
 import { toolCalls } from "./summary.ts";
-import { replyFiles, runCount, sandboxDirs } from "./traces.ts";
+import { replyFiles, runCount } from "./traces.ts";
 
 const fx = (n: string): string => readFileSync(new URL(`./fixtures/${n}`, import.meta.url), "utf8");
 
@@ -104,26 +104,5 @@ describe("replyFiles", () => {
     const cut = `${line([{ type: "text", text: "done" }])}\n{"type":"assistant","message":{"content":[{"type":"te`;
     expect(replyFiles("/d", text, () => whole, HOME)[0]?.text).toContain("## Final reply\n\ndone");
     expect(replyFiles("/d", text, () => cut, HOME)[0]?.text).toContain("## Last complete assistant message\n\ndone");
-  });
-});
-
-describe("sandboxDirs", () => {
-  const result = (...paths: readonly unknown[]): string =>
-    JSON.stringify({ cases: [{ name: "c", arms: { with: paths.map((tracePath) => ({ score: 1, tracePath })), without: [] } }] });
-
-  it("is each run's sandbox (two levels above the trace) once, only when strictly under a temp root", () => {
-    const text = result(
-      "/tmp/e-A/run0/trace.jsonl",
-      "/tmp/e-A/run1/trace.jsonl",
-      "/var/folders/x/T/e-B/run0/trace.jsonl",
-      "/tmp/trace.jsonl",
-      "/home/u/e-C/run0/trace.jsonl",
-      "e-D/run0/trace.jsonl",
-      "/tmpfs/e-E/run0/trace.jsonl",
-      42,
-    );
-    expect(sandboxDirs(text, ["/tmp", "/var/folders/x/T/"])).toEqual(["/tmp/e-A", "/var/folders/x/T/e-B"]);
-    expect(sandboxDirs(text, [])).toEqual([]);
-    expect(sandboxDirs(undefined, ["/tmp"])).toEqual([]);
   });
 });

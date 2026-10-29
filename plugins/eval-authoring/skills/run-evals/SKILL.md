@@ -41,7 +41,7 @@ it, do not rebuild any of that.
      merging a change to cases or to the plugin.
    - `thorough`: every case, 5 runs. Use before a release, or to back a delta claim. A
      noisy `standard` verdict is better answered with more cases than more runs; read the
-     replies before paying for `thorough`.
+     replies (`--keep-temp`) before paying for `thorough`.
 
    If the user named no tier, use `standard`, and say so.
 2. **Lint first** (free, no model calls):
@@ -52,11 +52,10 @@ it, do not rebuild any of that.
    come from `<eval-dir>/grants.yaml` ([format](../../docs/grants-format.md)); each
    case runs in its own CLI invocation (`--case` takes one glob) under exactly its own
    grants. The wrapper never passes `--scaffold`, `--json` or `--report`; it reads
-   `aggregate-result.json` from a per-case directory under `<eval-dir>/results/`. Each
-   run's final reply and tool calls are written, redacted, to
-   `<eval-dir>/results/run-<time>/replies/<NN>-<case>/<case>/<arm>-<run>.md`, and the
-   run's sandbox under `/tmp` is then removed; pass `--keep-temp` to keep the sandboxes
-   (the raw `trace.jsonl`) as well.
+   `aggregate-result.json` from a per-case directory under `<eval-dir>/results/`.
+   `--keep-temp` keeps run traces and writes `replies/` next to the result: each run's
+   final reply and tool calls, redacted, at
+   `<eval-dir>/results/run-<time>/replies/<NN>-<case>/<case>/<arm>-<run>.md`.
 4. **Run or hand off.** Run it from this session if the user asked for a run in this
    conversation. If they did not (you reached this skill while doing something else), ask
    in chat for a go-ahead, naming the tier and cost ceiling, and wait. If they decline or

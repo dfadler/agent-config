@@ -1,11 +1,11 @@
 /**
  * One Markdown file per run with its final reply and tool calls, read from the
- * `trace.jsonl` in the run's sandbox. The wrapper always passes `--keep-temp` to
- * the CLI (without it the sandbox, and so the trace, is deleted before the
- * wrapper can read it; #713 1f) and removes the sandbox itself afterwards
- * unless the user asked to keep it. Pure: the caller reads and writes.
+ * `trace.jsonl` in the run's sandbox. Only `--keep-temp` leaves that sandbox
+ * behind (without it the CLI deletes it before the wrapper can read the trace;
+ * #713 1f), so the wrapper writes these only then. Pure: the caller reads and
+ * writes; the wrapper never deletes anything.
  */
-import { dirname, isAbsolute, join } from "node:path";
+import { join } from "node:path";
 import {
   finalReply,
   isRec,
@@ -102,22 +102,3 @@ export const replyFiles = (
       ? []
       : [{ path: join(dir, safeName(caseName), `${arm}-${String(n)}.md`), text: render(caseName, arm, n, run, trace, home) }];
   });
-
-/**
- * The sandbox of each run in `resultText`: `dirname(dirname(tracePath))`
- * (`<sandbox>/runN/trace.jsonl`), de-duplicated, and only when it lies
- * strictly under one of `tempRoots`; anything else is left alone.
- */
-export const sandboxDirs = (
-  resultText: string | undefined,
-  tempRoots: readonly string[],
-): readonly string[] => {
-  const roots = tempRoots.map((r) => r.replace(/\/+$/, "")).filter((r) => r !== "");
-  const dirs = runsOf(resultText).flatMap(({ run }) => {
-    const p = run["tracePath"];
-    if (typeof p !== "string" || !isAbsolute(p)) return [];
-    const sandbox = dirname(dirname(p));
-    return roots.some((r) => sandbox.startsWith(`${r}/`)) ? [sandbox] : [];
-  });
-  return [...new Set(dirs)];
-};
