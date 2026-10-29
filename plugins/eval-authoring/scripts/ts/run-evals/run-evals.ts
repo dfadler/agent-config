@@ -100,7 +100,10 @@ ${Object.values(TIERS).map((t) => `                         ${t.name}: ${t.descr
                        any changed file that maps to no case is listed and
                        exits 1 before anything runs, even when other files
                        did map. With --pr, the block says it is a subset.
-                       Not combined with --case
+                       The file-to-case mapping is a heuristic and can miss
+                       cases (hooks named by path, prose-only graders,
+                       routing stolen from a sibling skill): run the full
+                       tier before a release. Not combined with --case
   --changed-allow-empty
                        with --changed: run the mapped cases (exit 0 when
                        there are none) instead of exiting 1 over the
@@ -548,7 +551,7 @@ export const main = async (
     if (changed.unmapped.length > 0 && !options.changedAllowEmpty) {
       // All or nothing: a mapped case beside an unmapped file would run green over the gap.
       io.err(
-        `run-evals: ${String(changed.unmapped.length)} of ${String(changed.paths.length)} changed files map to no case (since ${changed.ref} under ${target}); pass --changed-allow-empty to run the mapped cases anyway\n`,
+        `run-evals: ${String(changed.unmapped.length)} of ${String(changed.paths.length)} changed files map to no case (since ${changed.ref} under ${target}); the mapped cases were ${changed.names.join(", ") || "none"}; pass --changed-allow-empty to run them anyway\n`,
       );
       return EXIT_FAILURE;
     }

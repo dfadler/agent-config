@@ -77,7 +77,8 @@ it, do not rebuild any of that.
    no case exits 1 before anything runs, even beside files that did map, unless
    `--changed-allow-empty`, so a CI wiring gap cannot pass silently. The summary's
    `subset:` line names the tier and the finished count; with `--pr` it warns when the
-   block it replaces held a full run.
+   block it replaces held a full run. The mapping is a heuristic and can miss cases, so
+   run the full tier before a release.
    To put the results in a PR, add `--pr <n>`: it prints the exact
    marked block, asks, then replaces the `run-evals` block in the PR body with `gh pr
    edit`. It is off by default, refuses `--dry-run`, and `--yes` skips only the question.
