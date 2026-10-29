@@ -327,7 +327,7 @@ const runFindings = (c: CaseResult): readonly Finding[] => {
             {
               kind: "turn-limit" as const,
               severity: "warn" as const,
-              message: `${String(starved)} of ${String(runs.length)} ${arm} runs hit the turn limit (max_turns ${String(c.maxTurns)}) with every last_message grader failing, consistent with a cut-off: a cut-off run has no final reply, so those graders fail for the wrong reason (the score is still counted); raise max_turns or trim the work before judging the case`,
+              message: `${String(starved)} of ${String(runs.length)} ${arm} runs hit the turn limit (max_turns ${String(c.maxTurns)}) with every non-guard last_message grader failing, consistent with a cut-off: a cut-off run has no final reply, so those graders fail for the wrong reason (the score is still counted); raise max_turns or trim the work before judging the case`,
             },
           ]),
       ...(maybeStarved === 0

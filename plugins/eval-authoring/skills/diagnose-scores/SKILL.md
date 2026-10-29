@@ -74,9 +74,9 @@ interprets the verdict.
   wrong reason; its score still counts). Recommend a higher `max_turns` or less work in the
   prompt before reading anything else into the case. At `info` the result could not tell a
   cut-off from a reply on the last turn: no grader definitions, no `last_message` grader, every
-  `last_message` grader is a guard (`not_contains`, `tool_used` max 0 or 1, `file_exists`
-  exists false), or a grader has no pass/fail value. In the guard-only case the case cannot
-  detect a cut-off at all; it needs one positive `last_message` grader.
+  `last_message` grader is a `not_contains` guard (see `vacuous-graders` below for the guard
+  shapes), or a grader has no pass/fail value. In the guard-only case the case cannot detect a
+  cut-off at all; it needs one positive `last_message` grader.
 - **`vacuous-graders`:** the named graders pass in every run of both arms, so they cannot
   discriminate: a check the baseline satisfies trivially ("did not read X" with no X), or a
   negative pattern the prompt itself contains. A guard (`match: not_contains`, `tool_used` with `max` 0 or 1, `file_exists` with `exists: false`) is
