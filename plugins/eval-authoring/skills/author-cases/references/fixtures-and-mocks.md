@@ -25,7 +25,7 @@ non-zero exit scores the run 0.
   that commits a fix or branch, or an `add_dirs` folder with an answer file or `.git`,
   leaks it (EVAL014; Anthropic's agent-evals post reports an agent using earlier trials'
   git history).
-- A `fixtures/bin` directory put on `PATH` is **not** supported: do not use it (EVAL014).
+- A `fixtures/bin` directory put on `PATH` is **not** supported (a probe in #450 found it is not on `PATH`): do not use it.
 - `context.add_dirs` lists case-directory folders Claude may read (read-only).
   `context.history_file` resumes a `.jsonl` transcript; such a case runs one arm by default
   when the target is a path.

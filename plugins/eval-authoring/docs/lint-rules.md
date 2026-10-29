@@ -32,7 +32,7 @@ the authority; the severity is the default.
 | EVAL011 | warn | A judge reading the reply cannot see what was passed to a tool. | Use `focus: mock_calls` when the criteria are about tool inputs. |
 | EVAL012 | error | Inline regex flags, a pattern matched against a file path instead of its content, or an unescaped quote inside a traced value make a regex match nothing, or everything. | Use the `flags` key, `target: { source: file, path }`, and `\\"` for a quote in a trace. |
 | EVAL013 | warn | A mock for a server the plugin does not declare is never used; an invalid `expect`, `type` or a `type: agent` mock with no `.replay` recordings fails at run time. | Rename the mock directory to the server, fix the field, or commit the recordings. |
-| EVAL014 | warn (info for git history and a bare `.git` in `add_dirs`) | A `scaffold_script` that is missing fails the run; a `fixtures/` or `bin/` directory is speculative; an answer in the scaffold's git history or an `add_dirs` directory leaks to the model. | Create the script or correct the path; remove the answer from history and `add_dirs`. |
+| EVAL014 | warn (info for git history and a bare `.git` in `add_dirs`) | A `scaffold_script` that is missing fails the run; an answer in the scaffold's git history or an `add_dirs` directory leaks to the model. | Create the script or correct the path; remove the answer from history and `add_dirs`. |
 | EVAL015 | warn | Result directories that git does not ignore get committed by accident. | Add the results directory to `.gitignore`. |
 | EVAL016 | warn | A case graded only by a judge is the most expensive and noisiest kind. | Add a free grader (`regex`, `tool_used`, `file_exists`). |
 | EVAL017 | error | `quick` runs must be free; an `llm` or `baseline` grader is a paid call. | Remove the `quick` tag or the paid grader. |
@@ -46,6 +46,22 @@ the authority; the severity is the default.
 | EVAL025 | warn | A case whose graders are all "must not fire" Skill checks (the no-plugin arm passes them by construction) or regexes whose literal text is in the prompt has only the with-arm fire rate to fail on. | Grade a trace action in a fixture workspace, or tag the case `smoke` to label it a cheap trigger guard, or drop it. |
 
 The Sev column is the rule's default. EVAL007, EVAL012, EVAL014 and EVAL023 override it for some problems (a finding's own severity wins); run `--list-rules` or read the finding for the one you got.
+
+## Audit (#811)
+
+Hits from running the lint over every plugin with evals (30 plugins, 269 cases), 2026-10-28. Details and rule origins: [#811](https://github.com/dfadler/agent-config/issues/811). CLI overlap was not checked against the live CLI.
+
+- 009: 143 info. Open: fires on over half of cases; delete or make opt-in?
+- 024: 56 warn. Keep: real prompt-echo findings; the fixes are case edits.
+- 023: 12 info. Keep; the `last_message` half is unproven.
+- 025: 6 warn. Keep.
+- 022: 0. Keep; the false positive was fixed in #812.
+- 014: 0. The `fixtures/bin` check was removed (a probe in #450 refuted it); the rest stays.
+- 001, 005: 0. Open: the CLI may already reject these.
+- 003, 004, 008, 010, 021: 0. Open merge candidates (003 into 002, 004 with 021, 008 with 010).
+- All other rules: 0. Keep.
+
+Zero hits means the suites are clean now, not that a rule never caught anything.
 
 ## The three steps
 
