@@ -90,8 +90,9 @@ Not confirmed against a logged-in run:
   (the wrapper reads both), that a result's `costUsd` is present when a run is partial or
   errored, and what `--json` does (it made the CLI exit 1 in
   [#536](https://github.com/dfadler/agent-config/issues/536); the wrapper no longer passes it).
-- That the CLI's "cannot pass with the granted tools" warning appears before authentication.
-  A `--max-cost-usd 0` probe saw it for a `min: 1` grader (#811), so EVAL005 now covers only
+- Whether the CLI's "cannot pass with the granted tools" warning changes anything at run
+  time. `--max-cost-usd 0` probes on 2.1.300 saw it at preflight, before any run, for every
+  `min >= 1` `tool_used` grader on an ungranted tool (#811), so EVAL005 now covers only
   `max: 0`; the lint keeps EVAL004 in full.
 - The `aggregate-result.json` shape the diagnosis reads. The `judge votes:` line and the
   structured `judgeVotes` array were confirmed on a real result, but only with unanimous

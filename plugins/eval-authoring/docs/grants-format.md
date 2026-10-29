@@ -58,7 +58,10 @@ The shared parser rejects, with the offending key or entry in the message:
   run; the wrapper does not do this.)
 - The lint checks each case against its own grant set: EVAL004 flags an `allowed_tools`
   entry in the five tools with no matching grant, and EVAL005 flags a `max: 0` `tool_used`
-  grader whose tool is not granted (the CLI itself warns when a `min: 1` one cannot pass).
+  grader whose tool is not granted. A `min >= 1` one, explicit or the default, is the CLI's own
+  preflight warning, "cannot pass with the granted tools": probed on CLI 2.1.300 for both
+  layouts, with and without the tool in `allowed_tools` (#811). It is a warning, not a
+  rejection; `--allow-tools` for the tool silences it.
 - Argument order when the wrapper calls the CLI: the target (plugin path) first, then
   `--case`, then `--allow-tools`. The wrapper repeats `--allow-tools` once per entry;
   entries are never joined with commas, because a specifier may contain one.
