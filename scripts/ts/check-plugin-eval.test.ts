@@ -80,7 +80,7 @@ describe("check-plugin-eval", () => {
   });
 
   it("warns on non-positive delta without failing; missing delta is silent", () => {
-    const warn = check("0", result({ delta: 0 }));
+    const warn = check("0", result({ delta: 0, withoutArm: {} }));
     expect(warn.tag === "ok" && warn.value).toContain("warning: c1");
     const none = check("0", result());
     expect(none.tag === "ok" && none.value).not.toContain("warning");
@@ -153,25 +153,68 @@ describe("check-plugin-eval", () => {
     expect(codeOf(check("0", result(), ["--delta-floor", ""]))).toBe(2);
   });
 
-  it("--delta-floor gates a low delta; default stays warn-only", () => {
-    const low = result({ delta: 0.05 });
-    expect(codeOf(check("0", low))).toBe(0);
-    expect(codeOf(check("0", low, ["--delta-floor", "0.1"]))).toBe(1);
-    const at = result({ delta: 0.1 });
-    expect(codeOf(check("0", at, ["--delta-floor", "0.1"]))).toBe(0);
-    expect(codeOf(check("0", result(), ["--delta-floor", "0.1"]))).toBe(0);
+  // n cases, each with-arm 3 runs at `w` and without-arm 3 runs at `wo`.
+  const manyCases = (n: number, w: number, wo: number) =>
+    Array.from({ length: n }, (_, i) => ({
+      name: `c${String(i)}`,
+      aggregates: { delta: w - wo },
+      arms: {
+        with: [1, 2, 3].map(() => arm({ score: w })),
+        without: [1, 2, 3].map(() => arm({ score: wo })),
+      },
+    }));
+  const many = (n: number, w: number, wo: number) =>
+    JSON.stringify({
+      schemaVersion: 1,
+      partial: false,
+      cases: manyCases(n, w, wo),
+    });
+  const f = ["--delta-floor", "0.14"];
+
+  it("--delta-floor gates a low mean delta once there are 16 cases (#736)", () => {
+    expect(codeOf(check("0", many(16, 0.5, 0.4), f))).toBe(1);
+    expect(codeOf(check("0", many(16, 0.6, 0.4), f))).toBe(0);
   });
 
-  it("--delta-floor 0 (the CI setting, #585): -0.01 fails, 0 passes, no delta passes", () => {
-    const f = ["--delta-floor", "0"];
-    expect(codeOf(check("0", result({ delta: -0.01 }), f))).toBe(1);
-    expect(codeOf(check("0", result({ delta: 0 }), f))).toBe(0);
+  it("is advisory under 16 cases: warns, exit 0 (#736)", () => {
+    const r = check("0", many(15, 0.5, 0.4), f);
+    expect(codeOf(r)).toBe(0);
+    expect(r.tag === "ok" ? r.value : "").toContain("advisory");
+  });
+
+  it("does not fail a single negative case when the mean delta clears the floor", () => {
+    const bad = {
+      name: "neg",
+      aggregates: { delta: -0.3 },
+      arms: { with: [arm({ score: 0.2 })], without: [arm({ score: 0.5 })] },
+    };
+    const doc = {
+      schemaVersion: 1,
+      partial: false,
+      cases: [bad, ...manyCases(15, 0.9, 0.4)],
+    };
+    expect(codeOf(check("0", JSON.stringify(doc), f))).toBe(0);
+  });
+
+  it("reports pass^k next to the mean (#736)", () => {
+    const r = check("0", many(2, 1, 0.4));
+    expect(r.tag === "ok" ? r.value : "").toContain("pass^k 1.00");
+    const m = check("0", many(2, 0.5, 0.4));
+    expect(m.tag === "ok" ? m.value : "").toContain("pass^k 0.00");
+  });
+
+  it("warns on a diagnose verdict, not a raw delta (#736)", () => {
+    const r = check("0", many(1, 0.4, 0.4));
+    expect(r.tag === "ok" ? r.value : "").toContain("no-discrimination");
+  });
+
+  it("no delta passes under the floor", () => {
     expect(codeOf(check("0", result(), f))).toBe(0);
   });
 
   it("an invalid run stays inconclusive under --delta-floor", () => {
     const bad = result({ partial: true, delta: -1 });
-    expect(codeOf(check("0", bad, ["--delta-floor", "0.1"]))).toBe(7);
+    expect(codeOf(check("0", bad, f))).toBe(7);
   });
 
   it("rejects a non-numeric --delta-floor", () => {
