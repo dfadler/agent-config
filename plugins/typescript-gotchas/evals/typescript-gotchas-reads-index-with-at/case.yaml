@@ -1,7 +1,7 @@
 # Run: node plugins/eval-authoring/scripts/ts/run-evals/run-evals.ts --tier quick plugins/typescript-gotchas
 # Should-fire half of the trigger boundary: new non-test TypeScript that reads an array by a
 # variable index. The should-not-fire halves are typescript-gotchas-stays-quiet-on-test-file
-# and typescript-gotchas-keeps-dom-brackets. Every grader is free, so the case is tagged `quick`.
+# and typescript-gotchas-stays-quiet-on-python. Every grader is free, so the case is tagged `quick`.
 # Why this prompt: a first version asked for the last element. The model writes `.at(-1)` for
 # that on its own once any skill fires, so the case passed with the skill body emptied
 # (sabotage check, PR #531). A plain variable index is where the default is `urls[i]` and
