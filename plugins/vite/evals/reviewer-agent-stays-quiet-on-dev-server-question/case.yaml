@@ -1,0 +1,44 @@
+# Run: node plugins/eval-authoring/scripts/ts/run-evals/run-evals.ts --tier standard plugins/vite
+# (use `--ablation none`: the no-plugin arm cannot dispatch a plugin agent.)
+# Quiet half of the vite-plugin-reviewer boundary: shares "Vite" and "config" with the agent's
+# description but is a dev-server routing question with no plugin file or diff to review.
+# Smoke guard (no expected delta): the no-plugin arm passes the not-dispatched check by
+# construction because the agent does not exist there.
+# Can fail: reviewer_not_dispatched = 0 if the model hands a plain Vite question to the reviewer;
+# names_proxy = 0 if the reply misses server.proxy (the prompt never says "proxy").
+schema_version: "1.1"
+name: reviewer-agent-stays-quiet-on-dev-server-question
+description: >
+  A question about /api requests returning index.html under a custom Vite base must not dispatch
+  vite-plugin-reviewer, since no plugin code is involved. expected_outcome: PASS when the agent
+  is not dispatched and the reply points to server.proxy; FAIL when the agent is dispatched or
+  the reply misses the proxy fix. Tests a default behavior; guards against over-dispatch only.
+tags: [vite, reviewer, agent, trigger, smoke]
+
+execution:
+  prompt: |
+    My Vite app sets base: '/app/' in vite.config.ts. In dev, fetch('/api/users') returns my
+    index.html instead of JSON. Which config option fixes it? Two sentences, no files, no
+    commands.
+  max_turns: 4
+  allowed_tools:
+    - Agent
+
+graders:
+  # Steps. min 0 is explicit (tool_used defaults min to 1); arm both so it scores in two-arm runs.
+  - name: reviewer_not_dispatched
+    type: tool_used
+    tool: Agent
+    input_match: '"subagent_type"\s*:\s*"(?:[\w-]+:)?vite-plugin-reviewer"'
+    min: 0
+    max: 0
+    arm: both
+
+  # Result: completion check, not an agent property.
+  - name: names_proxy
+    type: regex
+    target: last_message
+    pattern: 'server\.proxy'
+    flags: i
+    match: contains
+    arm: both
