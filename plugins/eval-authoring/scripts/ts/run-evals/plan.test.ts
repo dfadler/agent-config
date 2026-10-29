@@ -1,10 +1,28 @@
-import { appendFileSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
-import { join } from "node:path";
+import {
+  appendFileSync,
+  mkdirSync,
+  mkdtempSync,
+  readFileSync,
+  realpathSync,
+  renameSync,
+  symlinkSync,
+  writeFileSync,
+} from "node:fs";
+import { tmpdir } from "node:os";
+import { dirname, join } from "node:path";
 import { describe, expect, it } from "vitest";
 import { readGrantsFile, readSuite } from "../parser/index.ts";
 import { spawnProcess, type Io } from "./io.ts";
-import { changedCases, needsBash, planGroups, selectChanged } from "./plan.ts";
-import { fakeIo, makePlugin } from "./test-support.ts";
+import {
+  changedCases,
+  DEFAULT_CHANGED_REF,
+  needsBash,
+  planGroups,
+  selectChanged,
+  TRIGGER_TAG,
+  type ChangedContext,
+} from "./plan.ts";
+import { fakeIo, makePlugin, spawned } from "./test-support.ts";
 
 const plan = (
   cases: Parameters<typeof makePlugin>[0],
@@ -93,6 +111,13 @@ describe("planGroups", () => {
 
 describe("changedCases", () => {
   const suiteOf = (root: string) => readSuite(root);
+  const noGrants = readGrantsFile("/nonexistent/grants.yaml");
+  const names = (
+    root: string,
+    paths: readonly string[],
+    ctx: Partial<ChangedContext> = {},
+  ): readonly string[] =>
+    changedCases(suiteOf(root), root, paths, { grants: noGrants, routingChanged: [], ...ctx }).names;
 
   it("maps a case file, a skill, an agent and a manifest to cases", () => {
     const root = makePlugin([
@@ -100,35 +125,84 @@ describe("changedCases", () => {
       { name: "b", tags: ["y"] },
       { name: "c" },
     ]);
-    const suite = suiteOf(root);
-    expect(changedCases(suite, root, ["evals/a/case.yaml"])).toEqual(["a"]);
-    expect(changedCases(suite, root, ["skills/y/SKILL.md"])).toEqual(["b"]);
-    expect(changedCases(suite, root, ["agents/x.md"])).toEqual(["a"]);
-    expect(changedCases(suite, root, ["README.md", "scripts/ts/x.ts"])).toEqual([]);
-    expect(changedCases(suite, root, ["evals/grants.yaml"])).toEqual(["a", "b", "c"]);
-    expect(changedCases(suite, root, [".claude-plugin/plugin.json"])).toEqual(["a", "b", "c"]);
+    expect(names(root, ["evals/a/case.yaml"])).toEqual(["a"]);
+    expect(names(root, ["skills/y/SKILL.md"])).toEqual(["b"]);
+    expect(names(root, ["agents/x.md"])).toEqual(["a"]);
+    expect(names(root, ["README.md", "docs/x.md", "scripts/ts/x.ts"])).toEqual([]);
+    expect(names(root, ["evals/grants.yaml"])).toEqual(["a", "b", "c"]);
+    expect(names(root, [".claude-plugin/plugin.json"])).toEqual(["a", "b", "c"]);
   });
 
-  it("selects a case whose tool_used grader names the skill, without a tag", () => {
-    const root = makePlugin([{ name: "a" }]);
+  it("lists the paths that select nothing", () => {
+    const root = makePlugin([{ name: "a", tags: ["x"] }]);
+    const r = changedCases(
+      suiteOf(root),
+      root,
+      ["README.md", "skills/x/SKILL.md", "docs/guide.md"],
+      { grants: noGrants, routingChanged: [] },
+    );
+    expect(r).toEqual({ names: ["a"], unmapped: ["README.md", "docs/guide.md"] });
+  });
+
+  it("maps scripts/** to the cases granted Bash, and to every case when a hook references the script", () => {
+    const root = makePlugin(
+      [{ name: "a" }, { name: "b" }, { name: "c" }],
+      grantsYaml("  a:\n    - \"Bash(node *)\"\n  b:\n    - \"Write\"\n"),
+    );
+    const grants = readGrantsFile(join(root, "evals", "grants.yaml"));
+    expect(names(root, ["scripts/ts/x.ts"], { grants })).toEqual(["a"]);
+    mkdirSync(join(root, "hooks", "scripts"), { recursive: true });
+    writeFileSync(join(root, "hooks", "scripts", "h.sh"), 'node "$here/../../scripts/ts/hook/h.ts"\n');
+    expect(names(root, ["scripts/ts/hook/h.ts"], { grants })).toEqual(["a", "b", "c"]);
+    expect(names(root, ["scripts/ts/x.ts"], { grants })).toEqual(["a"]);
+  });
+
+  it("selects every trigger-tagged case when a skill's routing changed, else only its own", () => {
+    const root = makePlugin([
+      { name: "a", tags: ["x"] },
+      { name: "b", tags: ["y", TRIGGER_TAG] },
+      { name: "c", tags: [TRIGGER_TAG] },
+    ]);
+    expect(names(root, ["skills/x/SKILL.md"])).toEqual(["a"]);
+    expect(names(root, ["skills/x/SKILL.md"], { routingChanged: ["x"] })).toEqual(["a", "b", "c"]);
+    expect(names(root, ["skills/x/reference.md"], { routingChanged: ["y"] })).toEqual(["a"]);
+  });
+
+  const withGrader = (root: string, name: string, tool: string, inputMatch: string): void => {
     writeFileSync(
-      join(root, "evals", "a", "case.yaml"),
+      join(root, "evals", name, "case.yaml"),
       [
         'schema_version: "1.1"',
-        "name: a",
+        `name: ${name}`,
         "tags: []",
         "execution:",
         "  prompt: hello",
         "graders:",
         "  - name: fired",
         "    type: tool_used",
-        "    tool: Skill",
-        "    input_match: '\"skill\"\\s*:\\s*\"(?:[\\w-]+:)?x\"'",
+        `    tool: ${tool}`,
+        `    input_match: '${inputMatch}'`,
         "",
       ].join("\n"),
     );
-    expect(changedCases(suiteOf(root), root, ["skills/x/SKILL.md"])).toEqual(["a"]);
-    expect(changedCases(suiteOf(root), root, ["skills/y/SKILL.md"])).toEqual([]);
+  };
+
+  it("selects a case whose tool_used grader accepts a call to the skill or agent, without a tag", () => {
+    const root = makePlugin([{ name: "a" }, { name: "b" }]);
+    withGrader(root, "a", "Skill", '"skill"\\s*:\\s*"(?:[\\w-]+:)?x"');
+    withGrader(root, "b", "Agent", '"subagent_type"\\s*:\\s*"(?:[\\w-]+:)?x-reviewer"');
+    expect(names(root, ["skills/x/SKILL.md"])).toEqual(["a"]);
+    expect(names(root, ["agents/x-reviewer.md"])).toEqual(["b"]);
+    expect(names(root, ["skills/y/SKILL.md"])).toEqual([]);
+  });
+
+  it("does not select on a substring: the pattern must accept the call payload", () => {
+    const root = makePlugin([{ name: "a" }, { name: "b" }]);
+    // Names "x-extended", so a call to "x" is not accepted though "x" is a substring of the pattern.
+    withGrader(root, "a", "Skill", '"skill"\\s*:\\s*"x-extended"');
+    withGrader(root, "b", "Skill", "[unclosed");
+    expect(names(root, ["skills/x/SKILL.md"])).toEqual([]);
+    expect(names(root, ["skills/x-extended/SKILL.md"])).toEqual(["a"]);
   });
 });
 
@@ -147,43 +221,58 @@ describe("selectChanged", () => {
       "core.hooksPath=/dev/null",
       ...args,
     ]);
-  const io = (): Io => ({ ...fakeIo().io, spawn: spawnProcess });
+  const io = (): Io => ({ ...fakeIo().io, spawn: spawnProcess, realpath: realpathSync });
+  const noGrants = readGrantsFile("/nonexistent/grants.yaml");
+  const select = (root: string, ref = "base") =>
+    selectChanged(io(), root, readSuite(root), noGrants, ref);
 
-  /** A committed plugin repo with cases a (skill x), b (skill y) and a `base` branch at the commit. */
-  const repo = async (): Promise<string> => {
-    const root = makePlugin([
+  const SKILL_X = "---\nname: x\ndescription: does x\n---\n\n# x\n\nbody\n";
+
+  /** A committed repo whose plugin is `under` (default: the repo root), with cases a (skill x), b (skill y), t (trigger) and a `base` branch at the commit. */
+  const repo = async (under = ""): Promise<{ repo: string; root: string }> => {
+    const plugin = makePlugin([
       { name: "a", tags: ["x"] },
       { name: "b", tags: ["y"] },
+      { name: "t", tags: [TRIGGER_TAG] },
     ]);
+    const top = under === "" ? plugin : mkdtempSync(join(tmpdir(), "run-evals-repo-"));
+    const root = under === "" ? plugin : join(top, under);
+    if (under !== "") {
+      mkdirSync(dirname(root), { recursive: true });
+      renameSync(plugin, root);
+      writeFileSync(join(top, "other.txt"), "sibling\n");
+    }
     mkdirSync(join(root, "skills", "x"), { recursive: true });
     mkdirSync(join(root, "skills", "y"), { recursive: true });
-    writeFileSync(join(root, "skills", "x", "SKILL.md"), "x\n");
+    writeFileSync(join(root, "skills", "x", "SKILL.md"), SKILL_X);
     writeFileSync(join(root, "skills", "y", "SKILL.md"), "y\n");
     for (const args of [["init", "-q"], ["add", "."], ["commit", "-q", "-m", "init"], ["branch", "base"]]) {
-      const r = await git(root, ...args);
+      const r = await git(top, ...args);
       expect(r.status, r.stderr).toBe(0);
     }
-    return root;
+    return { repo: top, root };
   };
 
   it("selects nothing when nothing changed", async () => {
-    const root = await repo();
-    await expect(selectChanged(io(), root, readSuite(root), "base")).resolves.toEqual({
+    const { root } = await repo();
+    await expect(select(root)).resolves.toEqual({
       ok: true,
       ref: "base",
+      paths: [],
       names: [],
+      unmapped: [],
     });
   });
 
   it("selects an uncommitted case edit", async () => {
-    const root = await repo();
+    const { root } = await repo();
     appendFileSync(join(root, "evals", "a", "case.yaml"), "# edited\n");
-    const r = await selectChanged(io(), root, readSuite(root), "base");
-    expect(r).toEqual({ ok: true, ref: "base", names: ["a"] });
+    const r = await select(root);
+    expect(r).toEqual({ ok: true, ref: "base", paths: ["evals/a/case.yaml"], names: ["a"], unmapped: [] });
   });
 
   it("selects the cases of a committed skill change plus an untracked new case", async () => {
-    const root = await repo();
+    const { root } = await repo();
     appendFileSync(join(root, "skills", "y", "SKILL.md"), "more\n");
     expect((await git(root, "commit", "-q", "-am", "skill")).status).toBe(0);
     mkdirSync(join(root, "evals", "d"));
@@ -191,15 +280,95 @@ describe("selectChanged", () => {
       join(root, "evals", "d", "case.yaml"),
       readFileSync(join(root, "evals", "b", "case.yaml"), "utf8").replace("name: b", "name: d"),
     );
-    const r = await selectChanged(io(), root, readSuite(root), "base");
-    expect(r).toEqual({ ok: true, ref: "base", names: ["b", "d"] });
+    const r = await select(root);
+    expect(r.ok && r.names).toEqual(["b", "d"]);
+  });
+
+  it("reports changed files that select nothing", async () => {
+    const { root } = await repo();
+    writeFileSync(join(root, "README.md"), "docs\n");
+    const r = await select(root);
+    expect(r).toEqual({ ok: true, ref: "base", paths: ["README.md"], names: [], unmapped: ["README.md"] });
+  });
+
+  it("reads paths with spaces and non-ASCII names intact", async () => {
+    const { root } = await repo();
+    writeFileSync(join(root, "evals", "a", "fixture é.txt"), "x\n");
+    const r = await select(root);
+    expect(r.ok && r.paths).toEqual(["evals/a/fixture é.txt"]);
+    expect(r.ok && r.names).toEqual(["a"]);
+  });
+
+  it("scopes the diff to a plugin that is a subdirectory of its repo", async () => {
+    const { repo: top, root } = await repo("plugins/p");
+    appendFileSync(join(top, "other.txt"), "changed outside the plugin\n");
+    writeFileSync(join(top, "untracked-outside.txt"), "x\n");
+    appendFileSync(join(root, "evals", "a", "case.yaml"), "# edited\n");
+    // A body-only skill edit: the base-version frontmatter read must resolve the nested path too.
+    appendFileSync(join(root, "skills", "x", "SKILL.md"), "more body\n");
+    const r = await select(root);
+    expect(r).toEqual({
+      ok: true,
+      ref: "base",
+      paths: ["evals/a/case.yaml", "skills/x/SKILL.md"],
+      names: ["a"],
+      unmapped: [],
+    });
+  });
+
+  it("selects every trigger case on a skill frontmatter change, only the skill's cases on a body change", async () => {
+    const body = await repo();
+    writeFileSync(join(body.root, "skills", "x", "SKILL.md"), SKILL_X.replace("body", "new body"));
+    expect(await select(body.root)).toMatchObject({ names: ["a"] });
+    const fm = await repo();
+    writeFileSync(join(fm.root, "skills", "x", "SKILL.md"), SKILL_X.replace("does x", "does x and more"));
+    expect(await select(fm.root)).toMatchObject({ names: ["a", "t"] });
+    const fresh = await repo();
+    mkdirSync(join(fresh.root, "skills", "z"));
+    writeFileSync(join(fresh.root, "skills", "z", "SKILL.md"), "---\nname: z\n---\n");
+    expect(await select(fresh.root)).toMatchObject({ names: ["t"] });
   });
 
   it("fails on a ref with no merge base", async () => {
-    const root = await repo();
-    const r = await selectChanged(io(), root, readSuite(root), "no-such-ref");
+    const { root } = await repo();
+    const r = await select(root, "no-such-ref");
     expect(r.ok).toBe(false);
     if (!r.ok) expect(r.reason).toContain("no-such-ref");
+  });
+
+  it("refuses an eval dir that resolves outside the plugin", async () => {
+    const { root } = await repo();
+    const outside = mkdtempSync(join(tmpdir(), "run-evals-outside-"));
+    renameSync(join(root, "evals"), join(outside, "evals"));
+    symlinkSync(join(outside, "evals"), join(root, "evals"));
+    const r = await select(root);
+    expect(r.ok).toBe(false);
+    if (!r.ok) expect(r.reason).toContain("outside the plugin");
+  });
+
+  it("resolves the bare form from origin's HEAD, else origin/main", async () => {
+    const root = makePlugin([{ name: "a" }]);
+    const calls: string[][] = [];
+    const fake = (head: string | undefined) => ({
+      ...fakeIo({
+        onGit: (args) => {
+          calls.push([...args]);
+          return args.includes("symbolic-ref")
+            ? spawned(head === undefined ? { status: 1 } : { stdout: `${head}\n` })
+            : spawned({ stdout: args.includes("merge-base") ? "abc\n" : "" });
+        },
+      }).io,
+      realpath: realpathSync,
+    });
+    const withHead = await selectChanged(fake("origin/develop"), root, readSuite(root), noGrants, "");
+    expect(withHead).toMatchObject({ ok: true, ref: "origin/develop" });
+    expect(calls.find((c) => c.includes("merge-base"))).toContain("origin/develop");
+    calls.length = 0;
+    const fallback = await selectChanged(fake(undefined), root, readSuite(root), noGrants, "");
+    expect(fallback).toMatchObject({ ok: true, ref: DEFAULT_CHANGED_REF });
+    expect(calls.find((c) => c.includes("merge-base"))).toContain(DEFAULT_CHANGED_REF);
+    const empty = await selectChanged(fake(""), root, readSuite(root), noGrants, "");
+    expect(empty).toMatchObject({ ok: true, ref: DEFAULT_CHANGED_REF });
   });
 });
 

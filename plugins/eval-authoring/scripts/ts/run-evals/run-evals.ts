@@ -11,6 +11,7 @@ import { buildCliArgs, type Reporting, type RunSpec } from "./command.ts";
 import {
   EXIT_CONFIG,
   EXIT_DEPENDENCY,
+  EXIT_FAILURE,
   EXIT_INTERNAL,
   EXIT_OK,
   EXIT_PARTIAL,
@@ -85,9 +86,19 @@ ${Object.values(TIERS).map((t) => `                         ${t.name}: ${t.descr
                        files under the plugin: a file under a case directory
                        selects that case; skills/<name>/ or agents/<name>.md
                        selects every case tagged <name> or whose tool_used
-                       grader matches it; grants.yaml, the manifest or a hook
-                       selects every case. Nothing changed is exit 0 with a
-                       message. Not combined with --case
+                       input_match accepts a call to it; a change to a
+                       skill's frontmatter (its description) also selects
+                       every case tagged 'trigger', a body-only change does
+                       not; scripts/** selects every case granted Bash, or
+                       every case when a hook references the script;
+                       grants.yaml, the manifest or a hook selects every
+                       case; docs and README select nothing. An empty diff
+                       is exit 0 with a message; changed files that map to
+                       no case are listed and exit 1. With --pr, the block
+                       says it is a subset. Not combined with --case
+  --changed-allow-empty
+                       with --changed: exit 0 instead of 1 when the changed
+                       files map to no case
   --output-dir <dir>   base results directory (default: <eval-dir>/results).
                        Each wrapper run writes <dir>/run-<time>/<NN>-<case>
   --publish-report     publish the report (default: --no-publish)
@@ -138,6 +149,7 @@ interface Options {
   readonly only: string | undefined;
   /** `--changed`: the ref, "" for the default; undefined when off. */
   readonly changed: string | undefined;
+  readonly changedAllowEmpty: boolean;
   readonly pr: string | undefined;
   readonly yes: boolean;
 }
@@ -163,6 +175,7 @@ const BOOL_FLAGS: readonly string[] = [
   "--skip-unavailable",
   "--dry-run",
   "--yes",
+  "--changed-allow-empty",
 ];
 
 /** A plain decimal greater than zero ("0.5", "2", ".5"); anything else (empty, "abc", "-1", "NaN", "1e3", "0x10", "0") is undefined. */
@@ -227,6 +240,9 @@ export const parseArgs = (argv: readonly string[]): Parsed => {
   if (values.has("--changed") && values.has("--case")) {
     return { kind: "error", message: "--changed and --case are two selectors; pass one" };
   }
+  if (!values.has("--changed") && bools.has("--changed-allow-empty")) {
+    return { kind: "error", message: "--changed-allow-empty only applies with --changed" };
+  }
   const [plugin, ...extra] = positionals;
   if (plugin === undefined) {
     return { kind: "error", message: "missing <plugin-path>" };
@@ -255,6 +271,7 @@ export const parseArgs = (argv: readonly string[]): Parsed => {
       dryRun: bools.has("--dry-run"),
       only: values.get("--case"),
       changed: values.get("--changed"),
+      changedAllowEmpty: bools.has("--changed-allow-empty"),
       pr,
       yes: bools.has("--yes"),
     },
@@ -287,6 +304,10 @@ export interface RunSummary {
   /** Cases never launched (budget spent, or an earlier invocation stopped the run). */
   readonly unstarted: readonly string[];
   readonly exit: ExitCode;
+  /** The resolved `--changed` ref; null when the whole suite was planned. */
+  readonly changedSince: string | null;
+  /** "subset: N of M cases, --changed since <ref>" when `--changed` narrowed the run; null otherwise. */
+  readonly subset: string | null;
 }
 
 export interface InvocationSummary {
@@ -494,24 +515,36 @@ export const main = async (
   const changed =
     options.changed === undefined
       ? undefined
-      : await selectChanged(io, target, suite, options.changed);
+      : await selectChanged(io, target, suite, grants, options.changed);
   if (changed !== undefined && !changed.ok) return fail(io, EXIT_USAGE, changed.reason);
   const tag = options.tier.tag;
-  const picked =
-    changed === undefined
-      ? undefined
-      : changed.names.filter(
-          (n) =>
-            tag === undefined ||
-            suite.cases.some((c) => c.name.value === n && c.tags.value.includes(tag)),
-        );
-  if (changed !== undefined && picked !== undefined && picked.length === 0) {
-    io.out(
-      `run-evals: nothing changed since ${changed.ref} under ${target}${tag === undefined ? "" : ` among cases tagged '${tag}'`}; no case to run\n`,
-    );
-    return EXIT_OK;
-  }
+  const inTier = (n: string): boolean =>
+    tag === undefined ||
+    suite.cases.some((c) => c.name.value === n && c.tags.value.includes(tag));
+  const picked = changed === undefined ? undefined : changed.names.filter(inTier);
   if (changed !== undefined && picked !== undefined) {
+    if (changed.paths.length === 0) {
+      io.out(`run-evals: nothing changed since ${changed.ref} under ${target}; no case to run\n`);
+      return EXIT_OK;
+    }
+    if (changed.unmapped.length > 0) {
+      io.err(
+        `run-evals: --changed: files that map to no case:\n${changed.unmapped.map((p) => `  ${p}`).join("\n")}\n`,
+      );
+    }
+    if (changed.names.length === 0) {
+      // A changed file that selects nothing is a wiring gap until someone says otherwise: never green by default.
+      io.err(
+        `run-evals: ${String(changed.paths.length)} files changed, none map to a case (since ${changed.ref} under ${target})\n`,
+      );
+      return options.changedAllowEmpty ? EXIT_OK : EXIT_FAILURE;
+    }
+    if (picked.length === 0) {
+      io.out(
+        `run-evals: the cases changed since ${changed.ref} (${changed.names.join(", ")}) are not tagged '${tag ?? ""}'; no case to run\n`,
+      );
+      return EXIT_OK;
+    }
     io.err(`run-evals: --changed since ${changed.ref}: ${picked.join(", ")}\n`);
   }
   const plan = planGroups(suite, grants, tag, options.only, picked);
@@ -607,6 +640,11 @@ export const main = async (
     (c, g) => worstExit(c, g.exit),
     progress.outOfBudget || progress.spentUsd > ceilingUsd ? EXIT_PARTIAL : EXIT_OK,
   );
+  // The denominator is what the same command would plan without --changed: the tier's cases.
+  const subset =
+    changed?.ok === true
+      ? `subset: ${String(total)} of ${String(suite.cases.filter((c) => inTier(c.name.value)).length)} cases, --changed since ${changed.ref}`
+      : null;
   const summary: RunSummary = {
     tier: options.tier.name,
     ablation: options.tier.ablation,
@@ -618,6 +656,8 @@ export const main = async (
     invocations: progress.done,
     unstarted,
     exit,
+    changedSince: changed?.ok === true ? changed.ref : null,
+    subset,
   };
   io.writeFile(
     join(runDir, SUMMARY_FILE),
@@ -626,7 +666,7 @@ export const main = async (
   io.err(
     `run-evals: tier ${options.tier.name}, ablation ${options.tier.ablation}: exit ${String(exit)}\n`,
   );
-  const markdown = renderSummary({
+  const rendered = renderSummary({
     plugin: basename(target),
     tier: options.tier.name,
     model: options.model ?? DEFAULT_MODEL,
@@ -642,6 +682,9 @@ export const main = async (
       row: caseRow(d.caseName, progress.texts[i], io.readFile),
     })),
   });
+  // A --changed run is a subset: say so under the heading, in the terminal and in the PR block alike.
+  const markdown =
+    subset === null ? rendered : rendered.replace("\n\n", `\n\n${subset}\n\n`);
   if (options.pr === undefined) {
     io.out(`\n${markdown}\n`);
     return exit;

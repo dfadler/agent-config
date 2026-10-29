@@ -330,6 +330,21 @@ describe("--pr", () => {
     expect(await main(argv(r), deps(r))).toBe(4);
     expect(ghCalls(r.calls).map((c) => c.args[1])).toEqual(["view"]);
   });
+  it("with --changed, says the block is a subset and records the ref", async () => {
+    const s = prSetup({
+      confirm: true,
+      onGit: (a) =>
+        a.includes("merge-base") || a.includes("--version")
+          ? spawned({ stdout: a.includes("merge-base") ? "abc\n" : "git version 2.39.3\n" })
+          : spawned({ stdout: a.includes("diff") ? "evals/beta/case.yaml\0" : "" }),
+    });
+    expect(await main([s.root, "--changed=base", "--pr", "7"], deps(s))).toBe(EXIT_OK);
+    const subset = "subset: 1 of 3 cases, --changed since base";
+    const body = ghCalls(s.calls).find((c) => c.args[1] === "edit")?.args[4] ?? "";
+    expect(body).toContain(`## Eval results\n\n${subset}\n\n`);
+    expect(s.out.join("")).toContain(subset);
+    expect(JSON.parse([...s.written.values()][0] ?? "{}")).toMatchObject({ changedSince: "base", subset });
+  });
   it("keeps the worse run exit code when publishing succeeds", async () => {
     const s = prSetup({ confirm: true, onCli: () => ({ result: "garbage" }) });
     expect(await main(argv(s), deps(s))).toBe(EXIT_PARTIAL);
