@@ -124,6 +124,13 @@ Run after the lint, on each case. Skip anything the lint already reported.
 13. **Helps a user.** Does a grader check behavior that helps a user, or a verbatim
     phrase the skill happens to contain? Quote the phrase and say what a correct reply
     that words it differently would score.
+14. **Independent of the skill (from #773).** (a) Does a `regex` or `llm` criterion echo a
+    distinctive phrase from the targeted `SKILL.md` verbatim? `Grep` the phrase in the
+    skill; a hit means the case tests whether the text was pasted, not whether the
+    behavior happened. Quote the phrase and the skill line. (b) Does `git log` show the
+    skill change and its new cases in one commit, with no before/after scores (author-cases
+    step 9, run-evals before/after rule)? The cases may have been written to pass the new
+    text. Report it as "written alongside the skill, needs a run".
 
 Do not claim what a run would show. Whether a case really discriminates needs a
 paid two-arm run and the diagnosis script; write "needs a run" for those.
