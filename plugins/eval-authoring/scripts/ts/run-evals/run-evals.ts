@@ -49,7 +49,7 @@ import {
   type AblationMode,
   type Tier,
 } from "./tiers.ts";
-import { replyFiles } from "./traces.ts";
+import { replyFiles, runCount, safeName, sandboxDirs } from "./traces.ts";
 
 export const USAGE = `Usage: run-evals.ts [options] <plugin-path>
 
@@ -82,10 +82,10 @@ ${Object.values(TIERS).map((t) => `                         ${t.name}: ${t.descr
   --output-dir <dir>   base results directory (default: <eval-dir>/results).
                        Each wrapper run writes <dir>/run-<time>/<NN>-<case>
   --publish-report     publish the report (default: --no-publish)
-  --keep-temp          accepted for compatibility: run sandboxes are always
-                       kept (the CLI deletes them otherwise), and each run's
-                       final reply and tool calls are written, redacted, to
-                       <dir>/run-<time>/replies/<case>/<arm>-<run>.md
+  --keep-temp          keep each run's sandbox (its trace.jsonl) under /tmp.
+                       By default it is removed once the run's final reply
+                       and tool calls are written, redacted, to
+                       <dir>/run-<time>/replies/<NN>-<case>/<case>/<arm>-<run>.md
   --skip-unavailable   exit 0 when plugin eval is in early access or down
   --dry-run            print the commands and exit; runs nothing
   --pr <n>             after the run, write the results summary into a marked
@@ -313,9 +313,6 @@ const fail = (io: Io, code: ExitCode, message: string): ExitCode => {
 /** Round to the 4 decimals a `--max-cost-usd` is given in; also keeps float drift out of the running total. */
 const round4 = (n: number): number => Math.round(n * 10000) / 10000;
 
-/** A directory-name-safe form of a case name. */
-const safeName = (name: string): string => name.replace(/[^\w.-]/g, "_");
-
 const runStamp = (io: Io): string => io.now().toISOString().replace(/[:.]/g, "-");
 
 const invocationSpec = (
@@ -335,8 +332,8 @@ const invocationSpec = (
   maxCostUsd: budgetUsd,
   evalDir: options.evalDir,
   trustPlugin: trust,
-  // Always keep the sandboxes: the replies files are read from their traces after the CLI exits.
-  // ponytail: leaves each run's ~160K sandbox in TMPDIR for the OS to purge; delete the sandboxes after extraction if that grows.
+  // The CLI always keeps the sandboxes: the replies files are read from their traces (27-49KB
+  // each) after it exits. The wrapper removes them itself unless the user passed --keep-temp.
   reporting: { ...options.reporting, outputDir, keepTemp: true },
 });
 
@@ -452,6 +449,54 @@ const runInvocation = async (
   };
 };
 
+const errorText = (e: unknown): string => (e instanceof Error ? e.message : String(e));
+
+/**
+ * After an invocation: write its replies files under `repliesDir`, then remove
+ * the run sandboxes unless `--keep-temp`. Nothing here aborts the run: a failed
+ * write or removal is one stderr line. Returns `repliesDir` when every replies
+ * file was written and there was at least one; undefined otherwise.
+ */
+const persistReplies = (
+  io: Io,
+  options: Options,
+  label: string,
+  repliesDir: string,
+  resultText: string | undefined,
+): string | undefined => {
+  const replies = replyFiles(repliesDir, resultText, io.readFile, io.home);
+  if (replies.length === 0 && runCount(resultText) > 0) {
+    io.err(`run-evals: ${label}: no readable trace for any of its ${String(runCount(resultText))} run(s); no replies written\n`);
+  }
+  const written = replies.reduce<{ readonly n: number; readonly error: string | undefined }>(
+    (acc, f) => {
+      if (acc.error !== undefined) return acc;
+      try {
+        io.writeFile(f.path, f.text);
+        return { ...acc, n: acc.n + 1 };
+      } catch (e: unknown) {
+        return { ...acc, error: `${f.path}: ${errorText(e)}` };
+      }
+    },
+    { n: 0, error: undefined },
+  );
+  if (written.error !== undefined) {
+    io.err(`run-evals: ${label}: could not write the replies files (${written.error}); continuing\n`);
+  } else if (written.n > 0) {
+    io.err(`run-evals: ${label}: ${String(written.n)} run replies in ${repliesDir}\n`);
+  }
+  if (!options.reporting.keepTemp) {
+    sandboxDirs(resultText, io.tempRoots).forEach((dir) => {
+      try {
+        io.removeDir(dir);
+      } catch (e: unknown) {
+        io.err(`run-evals: ${label}: could not remove sandbox ${dir} (${errorText(e)}); pass --keep-temp to keep them on purpose\n`);
+      }
+    });
+  }
+  return written.error === undefined && written.n > 0 ? repliesDir : undefined;
+};
+
 interface Progress {
   readonly done: readonly InvocationSummary[];
   readonly texts: readonly (string | undefined)[];
@@ -544,6 +589,7 @@ export const main = async (
       if (acc.stopped || acc.outOfBudget) return acc;
       const remaining = round4(ceilingUsd - acc.spentUsd);
       if (remaining <= 0) return { ...acc, outOfBudget: true };
+      const outDir = invocationDir(runDir, i + 1, total, inv);
       const r = await runInvocation(
         io,
         options,
@@ -552,20 +598,19 @@ export const main = async (
         i + 1,
         total,
         inv,
-        invocationDir(runDir, i + 1, total, inv),
+        outDir,
         remaining,
         shareUsd,
       );
-      const repliesDir = join(runDir, "replies", safeName(inv.caseName));
-      const replies = replyFiles(repliesDir, r.resultText, io.readFile);
-      replies.forEach((f) => {
-        io.writeFile(f.path, f.text);
-      });
-      if (replies.length > 0) {
-        io.err(`run-evals: invocation ${String(i + 1)}/${String(total)} (${inv.caseName}): ${String(replies.length)} run replies in ${repliesDir}\n`);
-      }
+      const repliesDir = persistReplies(
+        io,
+        options,
+        `invocation ${String(i + 1)}/${String(total)} (${inv.caseName})`,
+        join(runDir, "replies", basename(outDir)),
+        r.resultText,
+      );
       return {
-        done: [...acc.done, { ...r.summary, ...(replies.length > 0 ? { repliesDir } : {}) }],
+        done: [...acc.done, { ...r.summary, ...(repliesDir === undefined ? {} : { repliesDir }) }],
         texts: [...acc.texts, r.resultText],
         spentUsd: round4(acc.spentUsd + r.summary.chargedUsd),
         stopped: r.stop,

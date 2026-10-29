@@ -79,6 +79,10 @@ export interface FakeIoOptions {
   readonly files?: Readonly<Record<string, string>>;
   /** Directory listings to return, by path. */
   readonly dirs?: Readonly<Record<string, readonly string[]>>;
+  /** Called before each write is recorded; throw to make that write fail. */
+  readonly onWrite?: (path: string) => void;
+  /** Called before each removal is recorded; throw to make it fail. */
+  readonly onRemove?: (path: string) => void;
   /** The answer to a confirm() question; default is no. */
   readonly confirm?: boolean;
   /** Reply for a spawned `gh` call, given its argv. */
@@ -91,6 +95,7 @@ export interface FakeIo {
   readonly out: string[];
   readonly err: string[];
   readonly written: Map<string, string>;
+  readonly removed: string[];
   readonly questions: string[];
 }
 
@@ -99,6 +104,7 @@ export const fakeIo = (o: FakeIoOptions = {}): FakeIo => {
   const out: string[] = [];
   const err: string[] = [];
   const written = new Map<string, string>();
+  const removed: string[] = [];
   const questions: string[] = [];
   const files = new Map<string, string>(Object.entries(o.files ?? {}));
   let cliCount = 0;
@@ -147,14 +153,21 @@ export const fakeIo = (o: FakeIoOptions = {}): FakeIo => {
     ],
     readFile: (p) => files.get(p),
     writeFile: (p, t) => {
+      o.onWrite?.(p);
       written.set(p, t);
+    },
+    home: "/home/u",
+    tempRoots: ["/tmp"],
+    removeDir: (p) => {
+      o.onRemove?.(p);
+      removed.push(p);
     },
     confirm: (q) => {
       questions.push(q);
       return Promise.resolve(o.confirm ?? false);
     },
   };
-  return { io, calls, out, err, written, questions };
+  return { io, calls, out, err, written, removed, questions };
 };
 
 /** Minimal valid `aggregate-result.json` text. */

@@ -2,6 +2,7 @@
  * The paste-ready Markdown summary of a run, and the marked block that carries
  * it in a PR body. Pure: no I/O, so it is tested from recorded result text.
  */
+import { isAbsolute } from "node:path";
 
 export const BLOCK_START = "<!-- run-evals:start -->";
 export const BLOCK_END = "<!-- run-evals:end -->";
@@ -31,6 +32,19 @@ export const redact = (text: string): string =>
       ),
     text,
   );
+
+/**
+ * `home` replaced with `~` on a path boundary only (the next character is not a
+ * path-segment character): `/Users/x` masks `/Users/x/repo` and `/Users/x"` in
+ * JSON but leaves `/Users/xavier` alone. Applied before `redact`, whose long-run
+ * catch-all would otherwise eat the whole path prefix.
+ */
+export const maskHome = (text: string, home: string): string => {
+  const bare = home.replace(/\/+$/, "");
+  return bare === ""
+    ? text
+    : text.replace(new RegExp(`${bare.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}(?![\\w.-])`, "g"), "~");
+};
 
 /** One line, redacted, truncated, and unable to close the code span or fake a block marker. */
 export const quoteSafe = (text: string, max: number = REPLY_MAX): string => {
@@ -66,6 +80,21 @@ const assistantContent = (trace: string | undefined): readonly (readonly unknown
     const e = parse(line);
     return isRec(e) && e["type"] === "assistant" && isRec(e["message"]) ? list(e["message"]["content"]) : [];
   });
+
+/** A run's `trace.jsonl` through `readFile`; undefined unless `tracePath` is absolute (a relative one would resolve against the cwd) and readable. */
+export const traceOf = (
+  run: Rec,
+  readFile: (path: string) => string | undefined,
+): string | undefined => {
+  const p = run["tracePath"];
+  return typeof p === "string" && isAbsolute(p) ? readFile(p) : undefined;
+};
+
+/** True when the trace's last non-empty line is not a JSON record: the file was cut short, so its last message may be missing. */
+export const truncatedTrace = (trace: string): boolean => {
+  const last = trace.split("\n").findLast((l) => l.trim() !== "");
+  return last !== undefined && parse(last) === undefined;
+};
 
 /** The text of the last assistant message in a `trace.jsonl`; undefined when there is none. */
 export const finalReply = (trace: string | undefined): string | undefined => {
@@ -136,8 +165,7 @@ export const caseRow = (
     delta: num(agg["delta"]),
     failed: runs.flatMap((r, i) => {
       if (!isRec(r)) return [];
-      const tracePath = r["tracePath"];
-      const reply = typeof tracePath === "string" ? finalReply(readFile(tracePath)) : undefined;
+      const reply = finalReply(traceOf(r, readFile));
       return list(r["graders"]).flatMap((g) =>
         isRec(g) && g["passed"] === false
           ? [
