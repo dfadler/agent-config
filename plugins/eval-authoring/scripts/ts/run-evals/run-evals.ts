@@ -49,6 +49,7 @@ import {
   type AblationMode,
   type Tier,
 } from "./tiers.ts";
+import { replyFiles } from "./traces.ts";
 
 export const USAGE = `Usage: run-evals.ts [options] <plugin-path>
 
@@ -81,7 +82,10 @@ ${Object.values(TIERS).map((t) => `                         ${t.name}: ${t.descr
   --output-dir <dir>   base results directory (default: <eval-dir>/results).
                        Each wrapper run writes <dir>/run-<time>/<NN>-<case>
   --publish-report     publish the report (default: --no-publish)
-  --keep-temp          keep run traces
+  --keep-temp          accepted for compatibility: run sandboxes are always
+                       kept (the CLI deletes them otherwise), and each run's
+                       final reply and tool calls are written, redacted, to
+                       <dir>/run-<time>/replies/<case>/<arm>-<run>.md
   --skip-unavailable   exit 0 when plugin eval is in early access or down
   --dry-run            print the commands and exit; runs nothing
   --pr <n>             after the run, write the results summary into a marked
@@ -283,6 +287,8 @@ export interface InvocationSummary {
   readonly exit: ExitCode;
   readonly reasons: readonly string[];
   readonly resultDir: string | undefined;
+  /** Where each run's final reply and tool calls went (`<arm>-<run>.md`); unset when no trace was readable. */
+  readonly repliesDir?: string | undefined;
 }
 
 const scoringNote = (a: AblationMode): string =>
@@ -329,7 +335,9 @@ const invocationSpec = (
   maxCostUsd: budgetUsd,
   evalDir: options.evalDir,
   trustPlugin: trust,
-  reporting: { ...options.reporting, outputDir },
+  // Always keep the sandboxes: the replies files are read from their traces after the CLI exits.
+  // ponytail: leaves each run's ~160K sandbox in TMPDIR for the OS to purge; delete the sandboxes after extraction if that grows.
+  reporting: { ...options.reporting, outputDir, keepTemp: true },
 });
 
 /** Where invocation `n` of `total` writes: `<runDir>/<NN>-<case>`. */
@@ -548,8 +556,16 @@ export const main = async (
         remaining,
         shareUsd,
       );
+      const repliesDir = join(runDir, "replies", safeName(inv.caseName));
+      const replies = replyFiles(repliesDir, r.resultText, io.readFile);
+      replies.forEach((f) => {
+        io.writeFile(f.path, f.text);
+      });
+      if (replies.length > 0) {
+        io.err(`run-evals: invocation ${String(i + 1)}/${String(total)} (${inv.caseName}): ${String(replies.length)} run replies in ${repliesDir}\n`);
+      }
       return {
-        done: [...acc.done, r.summary],
+        done: [...acc.done, { ...r.summary, ...(replies.length > 0 ? { repliesDir } : {}) }],
         texts: [...acc.texts, r.resultText],
         spentUsd: round4(acc.spentUsd + r.summary.chargedUsd),
         stopped: r.stop,

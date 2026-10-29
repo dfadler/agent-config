@@ -1,4 +1,5 @@
 import { readFileSync } from "node:fs";
+import { join } from "node:path";
 import { describe, expect, it } from "vitest";
 import { EXIT_OK, EXIT_PARTIAL, EXIT_USAGE } from "./exit-codes.ts";
 import { main, parseArgs } from "./run-evals.ts";
@@ -246,6 +247,34 @@ describe("printed summary", () => {
     const text = s.out.join("");
     expect(text).toContain("(no readable result)");
     expect(text).toMatch(/\| beta \| not run \|/);
+  });
+});
+
+describe("replies files", () => {
+  const STAMP = "run-2026-01-02T03-04-05-000Z";
+  it("always keeps the sandboxes and writes each run's redacted reply and tool calls beside the results", async () => {
+    const s = setup();
+    expect(await main([s.root, "--case", "alpha"], deps(s))).toBe(EXIT_OK);
+    const cli = s.calls.find((c) => c.args[0] === "plugin");
+    expect(cli?.args).toContain("--keep-temp");
+    const dir = join(s.root, "evals", "results", STAMP, "replies", "alpha");
+    const file = s.written.get(join(dir, "with-1.md")) ?? "";
+    expect(file).toContain("# alpha: with arm, run 1");
+    expect(file).toContain("failed graders: g");
+    expect(file).toContain("token=[REDACTED]");
+    expect(file).not.toContain(FAKE_TOKEN);
+    expect(s.written.has(join(dir, "without-1.md"))).toBe(false);
+    const summary: unknown = JSON.parse(s.written.get(join(s.root, "evals", "results", STAMP, "run-evals-summary.json")) ?? "{}");
+    expect(summary).toMatchObject({ invocations: [{ caseName: "alpha", repliesDir: dir }] });
+    expect(s.err.join("")).toContain(`1 run replies in ${dir}`);
+  });
+  it("leaves repliesDir unset when no trace is readable", async () => {
+    const s = setup({ files: {} });
+    await main([s.root, "--case", "alpha"], deps(s));
+    expect([...s.written.keys()].some((k) => k.includes("/replies/"))).toBe(false);
+    const summary: unknown = JSON.parse([...s.written.values()][0] ?? "{}");
+    expect(summary).toMatchObject({ invocations: [{ caseName: "alpha" }] });
+    expect(JSON.stringify(summary)).not.toContain("repliesDir");
   });
 });
 
