@@ -50,6 +50,8 @@ describe("collab-retro incident nudge hook", () => {
     call(prompt("how many times do I have to say it"));
     expect(JSON.parse(call(stop()).out)).toEqual(NUDGE);
     expect(call(stop()).out).toBe("");
+    call(prompt("I told you again")); // a later phrase does not re-arm the nudge
+    expect(call(stop()).out).toBe("");
     expect(call(stop({}, "s2")).out).toBe("");
   });
 
