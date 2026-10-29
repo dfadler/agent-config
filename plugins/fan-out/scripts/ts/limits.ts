@@ -4,6 +4,7 @@
  * object: the effective limits, the prompt, and the first wave's per-child budget
  * shares. Exit 0 on success, 2 with `{"error": ...}` on an invalid flag.
  */
+import { realpathSync } from "node:fs";
 import { pathToFileURL } from "node:url";
 
 export const FALLBACK_BUDGET = 20;
@@ -68,7 +69,9 @@ export const resolveLimits = (args: readonly string[], env: Record<string, strin
   return { budget, depth, width, prompt: args.slice(i).join(" "), shares: split(budget - 1, children) };
 };
 
-if (import.meta.url === pathToFileURL(process.argv[1] ?? "").href) {
+// `import.meta.url` is the real path, so resolve argv[1] too: the skill is linked into ~/.claude/skills.
+const entry = process.argv[1];
+if (entry !== undefined && import.meta.url === pathToFileURL(realpathSync(entry)).href) {
   const out = resolveLimits(process.argv.slice(2), process.env);
   console.log(JSON.stringify(out));
   process.exit("error" in out ? 2 : 0);

@@ -1,3 +1,8 @@
+import { execFileSync } from "node:child_process";
+import { mkdtempSync, rmSync, symlinkSync } from "node:fs";
+import { tmpdir } from "node:os";
+import { dirname, join } from "node:path";
+import { fileURLToPath } from "node:url";
 import { describe, expect, it } from "vitest";
 import { envBudget, resolveLimits, split } from "./limits.ts";
 
@@ -70,5 +75,21 @@ describe("resolveLimits", () => {
   ])("rejects %j", (args, message) => {
     const r = run(args);
     expect("error" in r ? r.error : "").toMatch(message);
+  });
+});
+
+describe("CLI", () => {
+  it("prints the JSON when invoked through a symlinked directory", () => {
+    const dir = mkdtempSync(join(tmpdir(), "limits-"));
+    try {
+      const link = join(dir, "fan-out");
+      symlinkSync(dirname(fileURLToPath(import.meta.url)), link);
+      const out = execFileSync("node", [join(link, "limits.ts"), "--budget", "50", "--depth", "3"], {
+        encoding: "utf8",
+      });
+      expect(JSON.parse(out)).toEqual({ budget: 50, depth: 3, width: 4, prompt: "", shares: [13, 12, 12, 12] });
+    } finally {
+      rmSync(dir, { recursive: true });
+    }
   });
 });
