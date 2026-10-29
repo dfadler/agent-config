@@ -5,6 +5,7 @@
  *
  * Usage: see USAGE below, or run with --help.
  */
+import { homedir } from "node:os";
 import { basename, dirname, join, resolve } from "node:path";
 import { readGrantsFile, readSuite } from "../parser/index.ts";
 import { buildCliArgs, type Reporting, type RunSpec } from "./command.ts";
@@ -358,19 +359,29 @@ const locateResult = (
       return text === undefined ? [] : [{ dir: d, text }];
     })[0];
 
+/** What a shell or caffeinate prints when the exec itself fails. */
+const EXEC_FAILURE = /No such file or directory|Permission denied|command not found/;
+
 /**
  * caffeinate "execs" the utility (man caffeinate, EXAMPLES), and on macOS it
  * does so in place: the utility runs in the pid Node spawned (verified: the
  * child's $$ equals the spawn's pid). So claude's exit status and a signal
  * death ({status: null, signal}) arrive exactly as a bare spawn sees them. The
- * only wrapping artifact is caffeinate's own exec failure, 127 (not found) or
- * 126 (not executable), with "<cmd>: <reason>" on stderr.
+ * wrapping artifact is caffeinate's own exec failure, 127 (not found) or 126
+ * (not executable), with "<cmd>: <reason>" on stderr. claude itself can exit
+ * 126/127 too, so the remap also needs that stderr shape and no result file;
+ * anything else passes through to the usual exit-status judgement.
  */
-export const unwrapExit = (r: SpawnResult): SpawnResult => {
-  if (r.status !== 127 && r.status !== 126) return r;
-  const detail = r.stderr.trim();
-  const reason = `caffeinate exit ${String(r.status)}${detail === "" ? "" : `: ${detail}`}`;
-  return { ...r, status: null, error: reason };
+export const unwrapExit = (
+  r: SpawnResult,
+  hasResult: boolean,
+  home: string,
+): SpawnResult => {
+  const line = r.stderr.split("\n").map((l) => l.trim()).find((l) => l !== "") ?? "";
+  if ((r.status !== 127 && r.status !== 126) || hasResult || !EXEC_FAILURE.test(line)) return r;
+  // The reason lands in run-evals-summary.json and the --pr comment: one line, capped, home masked.
+  const detail = line.replaceAll(home, "~").slice(0, 200);
+  return { ...r, status: null, error: `caffeinate exit ${String(r.status)}: ${detail}` };
 };
 
 const runInvocation = async (
@@ -413,7 +424,8 @@ const runInvocation = async (
     onStdout: io.out,
     onStderr: io.err,
   });
-  const ran = cmd === "caffeinate" ? unwrapExit(raw) : raw;
+  const located = locateResult(io, outputDir);
+  const ran = cmd === "caffeinate" ? unwrapExit(raw, located !== undefined, homedir()) : raw;
   if (ran.error !== undefined) {
     return {
       summary: {
@@ -428,7 +440,6 @@ const runInvocation = async (
       resultText: undefined,
     };
   }
-  const located = locateResult(io, outputDir);
   const read = findingsFromText(located?.text, outputDir);
   const facts = rawResultFacts(located?.text);
   const verdict: Judgement = judgeRun({
