@@ -1,3 +1,8 @@
+import { execFileSync } from "node:child_process";
+import { mkdtempSync, rmSync, symlinkSync } from "node:fs";
+import { tmpdir } from "node:os";
+import { dirname, join } from "node:path";
+import { fileURLToPath } from "node:url";
 import { describe, expect, it } from "vitest";
 import { envBudget, resolveLimits, split } from "./limits.ts";
 
@@ -70,5 +75,38 @@ describe("resolveLimits", () => {
   ])("rejects %j", (args, message) => {
     const r = run(args);
     expect("error" in r ? r.error : "").toMatch(message);
+  });
+});
+
+describe("CLI", () => {
+  const here = dirname(fileURLToPath(import.meta.url));
+  const expected = { budget: 50, depth: 3, width: 4, prompt: "", shares: [13, 12, 12, 12] };
+  const args = ["--budget", "50", "--depth", "3"];
+
+  it.each([
+    ["through a symlinked directory", {}],
+    ["through a symlinked directory with --preserve-symlinks-main", { NODE_OPTIONS: "--preserve-symlinks-main" }],
+  ])("prints the JSON %s", (_name, env) => {
+    const dir = mkdtempSync(join(tmpdir(), "limits-"));
+    try {
+      const link = join(dir, "fan-out");
+      symlinkSync(here, link);
+      const out = execFileSync("node", [join(link, "limits.ts"), ...args], {
+        encoding: "utf8",
+        env: { ...process.env, ...env },
+      });
+      expect(JSON.parse(out)).toEqual(expected);
+    } finally {
+      rmSync(dir, { recursive: true });
+    }
+  });
+
+  it("stays quiet when imported under node -e with a non-file argument", () => {
+    const out = execFileSync(
+      "node",
+      ["-e", `import(${JSON.stringify(join(here, "limits.ts"))}).then(() => console.log("imported"))`, "not-a-file"],
+      { encoding: "utf8" },
+    );
+    expect(out.trim()).toBe("imported");
   });
 });
