@@ -288,6 +288,7 @@ describe("main", () => {
   it("reports a claude that cannot start", async () => {
     const s = setup({ cases: [{ name: "a" }], cliResult: spawned({ status: null, error: "ENOENT" }) });
     expect(await main([s.root], { io: s.io, pluginsDir: "/p" })).toBe(EXIT_DEPENDENCY);
+    expect(s.err.join()).toContain("could not start claude: ENOENT");
   });
 
   it("tees the CLI's output to the terminal", async () => {
