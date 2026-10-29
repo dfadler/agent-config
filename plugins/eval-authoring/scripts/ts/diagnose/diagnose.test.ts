@@ -58,6 +58,12 @@ describe("main", () => {
           name: "example-asks-first",
           verdict: "weak-signal",
           delta: 0.25,
+          // The fixture carries no case-level grader definitions, so a
+          // not_contains guard cannot be told apart: info, not warn.
+          findings: [
+            { kind: "split-judge-votes" },
+            { kind: "vacuous-graders", severity: "info" },
+          ],
         },
         {
           name: "example-runs-with-permission",
@@ -65,8 +71,6 @@ describe("main", () => {
         },
       ],
     });
-    expect(out.stdout).toContain('"kind": "split-judge-votes"');
-    expect(out.stdout).toContain('"kind": "vacuous-graders"');
   });
 
   it("handles a partial document and a one-arm case", () => {

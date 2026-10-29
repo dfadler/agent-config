@@ -12,7 +12,11 @@ const doc = (extra: Record<string, unknown> = {}): string =>
         name: "c1",
         dir: "d",
         maxTurns: 4,
-        graders: [{ name: "g", type: "regex" }],
+        graders: [
+          { name: "g", type: "regex", config: { match: "not_contains" } },
+          { name: "j", type: "llm", config: { focus: "trace" } },
+          { name: "t", type: "tool_used", config: { tool: "Skill" } },
+        ],
         arms: {
           with: [
             {
@@ -72,6 +76,12 @@ describe("readAggregateResult", () => {
     });
     expect(c1?.maxTurns).toBe(4);
     expect(c2?.maxTurns).toBeUndefined();
+    expect(c1?.graders).toEqual([
+      { name: "g", type: "regex", target: "last_message", match: "not_contains" },
+      { name: "j", type: "llm", target: "trace" },
+      { name: "t", type: "tool_used" },
+    ]);
+    expect(c2?.graders).toBeUndefined();
     expect(c1?.withRuns).toEqual([
       {
         score: 1,

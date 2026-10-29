@@ -69,13 +69,17 @@ interprets the verdict.
 - **`weak-signal`:** Δ inside noise, positive or negative (a drop within the t cutoff below lands here, not under `negative-delta`). Recommend more runs before changing anything, unless both arms have SD 0 (the 0.05 floor sets the bar, so more identical runs cannot change the verdict): then a larger effect or a sharper grader is the lever.
 - **`both-arms-pass-all` / `both-arms-fail-all`:** a case that cannot fail (or has almost no headroom, both means at least 0.95: check for a leaked answer, then fix or drop it), or never passes
   (check graders and grants).
-- **`turn-limit`:** a run used every allowed turn, so it had no final reply and its text
-  graders failed for the wrong reason (its score still counts). Recommend a higher
-  `max_turns` or less work in the prompt before reading anything else into the case.
+- **`turn-limit`:** a run used every allowed turn and every `last_message` grader failed, so
+  it was cut off with no final reply and those graders failed for the wrong reason (its score
+  still counts). Recommend a higher `max_turns` or less work in the prompt before reading
+  anything else into the case. At `info` the result could not tell a cut-off from a reply on
+  the last turn (no grader definitions or no `last_message` grader); say so and move on.
 - **`vacuous-graders`:** the named graders pass in every run of both arms, so they cannot
   discriminate: a check the baseline satisfies trivially ("did not read X" with no X), or a
-  negative pattern the prompt itself contains. Reword or drop each one; a should-not-fire
-  case is the exception.
+  negative pattern the prompt itself contains. A negative guard (`match: not_contains`) is
+  expected to pass in both arms and is not named when the result carries the case's grader
+  definitions; at `info` it could not be told apart, so check `case.yaml` first. Otherwise
+  reword each one; a should-not-fire case is the exception.
 - **`discriminates`:** one line; do not invent a problem.
 
 Partial results (the script prints `PARTIAL`) are left out of trends; say so.

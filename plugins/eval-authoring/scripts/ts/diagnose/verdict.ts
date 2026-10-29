@@ -139,15 +139,14 @@ const stdDev = (xs: readonly number[]): number | undefined => {
 const round = (n: number): number => Math.round(n * 1000) / 1000;
 const fmt = (n: number): string => String(round(n));
 
-/** Runs that can be compared: no error, judges not skipped, a numeric score. */
+/** A run that can be compared: no error, no silent 0, judges not skipped. */
+const comparable = (r: RunResult): boolean =>
+  !isErrored(r) && !isSilentZero(r) && r.skippedPaidGraders !== true;
+
+/** Scores of the comparable runs that have one. */
 const usable = (runs: readonly RunResult[]): readonly number[] =>
   runs.flatMap((r) =>
-    isErrored(r) ||
-    isSilentZero(r) ||
-    r.skippedPaidGraders === true ||
-    r.score === undefined
-      ? []
-      : [r.score],
+    comparable(r) && r.score !== undefined ? [r.score] : [],
   );
 
 const armStats = (runs: readonly RunResult[]): ArmStats => {
@@ -225,6 +224,28 @@ const splitVoteFindings = (c: CaseResult): readonly Finding[] => {
       ];
 };
 
+/**
+ * Whether a run at the turn limit was cut off before its reply (#713 1d):
+ * true when every grader that reads `last_message` failed, false when one
+ * passed (the run replied on its last turn), undefined when the data cannot
+ * say (the result carries no grader definitions, or no `last_message` grader
+ * scored the run).
+ */
+const cutOff = (c: CaseResult, r: RunResult): boolean | undefined => {
+  if (c.graders === undefined) return undefined;
+  const lastMessage = new Set(
+    c.graders.flatMap((g) =>
+      g.target === "last_message" && g.name !== undefined ? [g.name] : [],
+    ),
+  );
+  const results = (r.graders ?? []).filter(
+    (g) => g.name !== undefined && lastMessage.has(g.name),
+  );
+  return results.length === 0
+    ? undefined
+    : results.every((g) => g.passed === false);
+};
+
 const runFindings = (c: CaseResult): readonly Finding[] => {
   const arms = [
     ["with", c.withRuns],
@@ -234,11 +255,17 @@ const runFindings = (c: CaseResult): readonly Finding[] => {
     const errors = runs.filter(isErrored);
     const aborted = runs.filter((r) => r.aborted === true).length;
     const skipped = runs.filter((r) => r.skippedPaidGraders === true).length;
-    const starved = runs.filter(
+    // Errored runs are run-error, never turn-limit as well.
+    const atLimit = runs.filter(
       (r) =>
+        !isErrored(r) &&
         c.maxTurns !== undefined &&
         r.turns !== undefined &&
         r.turns >= c.maxTurns,
+    );
+    const starved = atLimit.filter((r) => cutOff(c, r) === true).length;
+    const maybeStarved = atLimit.filter(
+      (r) => cutOff(c, r) === undefined,
     ).length;
     const out: readonly Finding[] = [
       ...(errors.length === 0
@@ -274,7 +301,16 @@ const runFindings = (c: CaseResult): readonly Finding[] => {
             {
               kind: "turn-limit" as const,
               severity: "warn" as const,
-              message: `${String(starved)} of ${String(runs.length)} ${arm} runs hit the turn limit (max_turns ${String(c.maxTurns)}): a cut-off run has no final reply, so every text grader fails for the wrong reason (the score is still counted); raise max_turns or trim the work before judging the case`,
+              message: `${String(starved)} of ${String(runs.length)} ${arm} runs hit the turn limit (max_turns ${String(c.maxTurns)}) with every last_message grader failing: a cut-off run has no final reply, so those graders fail for the wrong reason (the score is still counted); raise max_turns or trim the work before judging the case`,
+            },
+          ]),
+      ...(maybeStarved === 0
+        ? []
+        : [
+            {
+              kind: "turn-limit" as const,
+              severity: "info" as const,
+              message: `${String(maybeStarved)} of ${String(runs.length)} ${arm} runs used every allowed turn (max_turns ${String(c.maxTurns)}), but no last_message grader result can tell a cut-off from a reply: the run may simply have replied on its last turn`,
             },
           ]),
     ];
@@ -287,20 +323,25 @@ const runFindings = (c: CaseResult): readonly Finding[] => {
  * from no plugin (#713 1c): "did not read X" when the baseline has no X, or a
  * phrase the prompt itself contains. Needs grader detail in both arms.
  * With-only graders are absent from the no-plugin score by design and are
- * skipped, as are graders excluded from the score in every run.
+ * skipped, as are graders excluded from the score in every run, and
+ * `not_contains` guards (expected to pass in both arms). Without the case's
+ * grader definitions a guard cannot be told apart, so the finding is info.
  */
 const vacuousGraderFindings = (c: CaseResult): readonly Finding[] => {
   const graded = (
     runs: readonly RunResult[],
   ): readonly (readonly GraderResult[])[] =>
     runs.flatMap((r) =>
-      r.graders === undefined || isErrored(r) || isSilentZero(r)
-        ? []
-        : [r.graders],
+      r.graders === undefined || !comparable(r) ? [] : [r.graders],
     );
   const w = graded(c.withRuns);
   const wo = graded(c.withoutRuns);
   if (w.length === 0 || wo.length === 0) return [];
+  const guards = new Set(
+    (c.graders ?? []).flatMap((g) =>
+      g.match === "not_contains" && g.name !== undefined ? [g.name] : [],
+    ),
+  );
   const all = [...w, ...wo].flat();
   const names = [
     ...new Set(all.flatMap((g) => (g.name === undefined ? [] : [g.name]))),
@@ -310,22 +351,24 @@ const vacuousGraderFindings = (c: CaseResult): readonly Finding[] => {
   const vacuous = names.filter((name) => {
     const entries = all.filter((g) => g.name === name);
     return (
+      !guards.has(name) &&
       has(w, name) > 0 &&
       has(wo, name) > 0 &&
       entries.every((g) => g.withOnly !== true && g.passed === true) &&
       entries.some((g) => g.scored !== false)
     );
   });
+  const known = c.graders !== undefined;
   return vacuous.length === 0
     ? []
     : [
         {
           kind: "vacuous-graders",
-          severity: "warn",
-          message: `graders pass in every run of both arms, so they cannot discriminate (a check the baseline satisfies trivially, or a negative pattern the prompt itself contains; a should-not-fire case is the exception): ${vacuous
+          severity: known ? "warn" : "info",
+          message: `graders pass in every run of both arms, so they cannot discriminate (a check the baseline satisfies trivially, or a negative pattern the prompt itself contains; a negative guard is expected to pass in both arms; otherwise reword; a should-not-fire case is the exception)${known ? "" : "; the result carries no grader definitions, so a not_contains guard cannot be told apart"}: ${vacuous
             .map(
               (name) =>
-                `${name} (with ${String(has(w, name))}/${String(has(w, name))}, without ${String(has(wo, name))}/${String(has(wo, name))})`,
+                `${name} (with ${String(has(w, name))}/${String(w.length)}, without ${String(has(wo, name))}/${String(wo.length)})`,
             )
             .join("; ")}`,
         },
