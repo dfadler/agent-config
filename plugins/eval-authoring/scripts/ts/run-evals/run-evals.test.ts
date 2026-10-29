@@ -307,6 +307,14 @@ describe("main", () => {
       expect(reason.length).toBe("caffeinate exit 127: ".length + 200);
     });
 
+    it("masks the home directory only on a path boundary", async () => {
+      const home = homedir();
+      const r = await run(127, `${home}2/bin/claude: No such file or directory ${home}/x\n`);
+      expect(r.code).toBe(EXIT_DEPENDENCY);
+      expect(r.summary).toContain(`${home}2/bin/claude`);
+      expect(r.summary).toContain(" ~/x");
+    });
+
     it("redacts a token-shaped stderr line before it reaches the summary", async () => {
       const r = await run(127, "claude: No such file or directory Bearer abcdefghij1234567890\n");
       expect(r.code).toBe(EXIT_DEPENDENCY);
