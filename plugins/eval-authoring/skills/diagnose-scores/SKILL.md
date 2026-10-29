@@ -66,7 +66,7 @@ interprets the verdict.
   `--ablation` back to two arms).
 - **`judge-skipped`:** the cost ceiling skipped paid graders; not a signal. Recommend a higher
   ceiling or a free grader.
-- **`weak-signal`:** Δ inside noise, positive or negative (a drop within the t cutoff below lands here, not under `negative-delta`). Do not change anything on this case alone: read its replies, and recommend more cases before more runs, because more cases shrink the suite's delta error while more runs only shrink this case's noise (unless an arm has under two usable runs, so its noise is unknown: then rerun first, as the table below says). More runs are pointless when both arms have SD 0 (the 0.05 floor sets the bar, so more identical runs cannot change the verdict): then a larger effect or a sharper grader is the lever.
+- **`weak-signal`:** Δ inside noise, positive or negative (a drop within the t cutoff below lands here, not under `negative-delta`). Do not change anything on this case alone: read its replies, and recommend more cases before more runs, because more cases shrink the suite's delta error while more runs only shrink this case's noise (unless an arm has under two usable runs, so its noise is unknown: then rerun first, as the `single-run` finding says). More runs are pointless when both arms have SD 0 (the 0.05 floor sets the bar, so more identical runs cannot change the verdict): then a larger effect or a sharper grader is the lever.
 - **`both-arms-pass-all` / `both-arms-fail-all`:** a case that cannot fail (or has almost no headroom, both means at least 0.95: check for a leaked answer, then fix or drop it), or never passes
   (check graders and grants).
 - **`discriminates`:** one line; do not invent a problem.
