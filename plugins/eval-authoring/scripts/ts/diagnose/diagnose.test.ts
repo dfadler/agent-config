@@ -38,6 +38,38 @@ describe("main", () => {
     expect(out.stdout).not.toContain('"verdict": "weak-signal"');
   });
 
+  it("prints the near-ceiling threshold in the ceiling finding", () => {
+    const argv = ["--near-ceiling", "0.5", "r.json"];
+    const out = main(argv, io({ "r.json": fixture("two-cases-one-run.json") }));
+    expect(out.code).toBe(EXIT_OK);
+    expect(out.stdout).toContain("(mean >= 0.5)");
+  });
+
+  it("keeps a zero delta out of negative-delta under a tiny neutral band", () => {
+    const argv = ["--neutral-band", "0.001", "r.json"];
+    const out = main(argv, io({ "r.json": fixture("two-cases-one-run.json") }));
+    expect(out.code).toBe(EXIT_OK);
+    expect(out.stdout).toContain("example-runs-with-permission: no-discrimination");
+    expect(out.stdout).not.toContain("negative-delta");
+  });
+
+  it("rejects an out-of-range threshold, naming the flag and range", () => {
+    for (const [argv, range] of [
+      [["--neutral-band", "0", "a.json"], "--neutral-band needs a number in (0, 1]"],
+      [["--near-ceiling", "95", "a.json"], "--near-ceiling needs a number in (0, 1]"],
+    ] as const) {
+      const out = main(argv, io({ "a.json": "{}" }));
+      expect(out.code).toBe(EXIT_USAGE);
+      expect(out.stderr).toContain(range);
+    }
+  });
+
+  it("names a repeated or unknown option", () => {
+    const out = main(["--se-floor", "0.1", "--se-floor", "0.2", "a.json"], io({}));
+    expect(out.code).toBe(EXIT_USAGE);
+    expect(out.stderr).toContain("unknown or repeated option --se-floor");
+  });
+
   // Trimmed copy of a real `claude plugin eval` llm-graded result. Real, but
   // every judge sample is unanimous (PASS PASS PASS / FAIL FAIL FAIL): no real split.
   it("reads a real llm-graded result: judgeVotes parsed, no split finding", () => {
@@ -105,6 +137,8 @@ describe("main", () => {
     ["a missing format value", ["a.json", "--format"]],
     ["an unknown flag", ["--nope"]],
     ["a non-numeric threshold", ["--neutral-band", "abc", "a.json"]],
+    ["a zero neutral band", ["--neutral-band", "0", "a.json"]],
+    ["a flag=value form", ["--neutral-band=0.1", "a.json"]],
     ["a missing threshold value", ["a.json", "--se-floor"]],
     ["a missing file", ["missing.json"]],
   ])("exits 2 for %s", (_label, argv) => {

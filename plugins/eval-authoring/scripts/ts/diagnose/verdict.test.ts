@@ -423,6 +423,18 @@ describe("mechanical findings", () => {
 });
 
 describe("thresholds", () => {
+  it("never calls a zero delta negative, even with a zero neutral band", () => {
+    const t = { ...DEFAULT_THRESHOLDS, neutralBand: 0 };
+    // One run per arm (noise unknown) and two runs per arm (noise known) take
+    // different branches; neither may read delta 0 as below zero.
+    for (const c of [caseOf([1], [1], 0), caseOf([1, 1], [1, 1], 0)]) {
+      const v = diagnoseCase(c, false, t);
+      expect(v.verdict).not.toBe("negative-delta");
+      expect(kinds(v)).not.toContain("negative-delta");
+      expect(v.reason).not.toMatch(/negative/);
+    }
+  });
+
   it("honors a custom neutral band", () => {
     const c = caseOf([1], [0.8], 0.2);
     expect(diagnoseCase(c).verdict).toBe("weak-signal");
