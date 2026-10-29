@@ -295,13 +295,22 @@ describe("main", () => {
 
     it("keeps the reason to stderr's first line, capped at 200 characters, with the home directory masked", async () => {
       const home = homedir();
-      const first = `${home}/bin/claude: No such file or directory ${"x".repeat(300)}`;
+      // Spaced filler: an unbroken 32+ character run would itself be redacted as token-like.
+      const first = `${home}/bin/claude: No such file or directory ${"x ".repeat(150)}`;
       const r = await run(127, `\n${first}\nsecond-line-marker ${home}\n`);
       expect(r.code).toBe(EXIT_DEPENDENCY);
       expect(r.summary).toContain("caffeinate exit 127: ~/bin/claude: No such file or directory");
       expect(r.summary).not.toContain(home);
       expect(r.summary).not.toContain("second-line-marker");
-      expect(r.summary).not.toContain("x".repeat(170));
+      expect(r.summary).not.toContain("x ".repeat(100));
+      const reason = /caffeinate exit 127: [^"\n]*/.exec(r.summary)?.[0] ?? "";
+      expect(reason.length).toBe("caffeinate exit 127: ".length + 200);
+    });
+
+    it("redacts a token-shaped stderr line before it reaches the summary", async () => {
+      const r = await run(127, "claude: No such file or directory Bearer abcdefghij1234567890\n");
+      expect(r.code).toBe(EXIT_DEPENDENCY);
+      expect(r.summary).not.toContain("abcdefghij1234567890");
     });
   });
 

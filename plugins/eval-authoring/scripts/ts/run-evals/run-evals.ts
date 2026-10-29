@@ -37,7 +37,7 @@ import {
   type Invocation,
 } from "./plan.ts";
 import { runPreflight } from "./preflight.ts";
-import { caseRow, renderBlock, renderSummary, withBlock } from "./summary.ts";
+import { caseRow, redact, renderBlock, renderSummary, withBlock } from "./summary.ts";
 import {
   DEFAULT_JUDGE_MODEL,
   DEFAULT_MODEL,
@@ -379,8 +379,11 @@ export const unwrapExit = (
 ): SpawnResult => {
   const line = r.stderr.split("\n").map((l) => l.trim()).find((l) => l !== "") ?? "";
   if ((r.status !== 127 && r.status !== 126) || hasResult || !EXEC_FAILURE.test(line)) return r;
-  // The reason lands in run-evals-summary.json and the --pr comment: one line, capped, home masked.
-  const detail = line.replaceAll(home, "~").slice(0, 200);
+  // The reason lands in run-evals-summary.json and the --pr comment: one line, home masked,
+  // redacted before the cap so a cut secret is never left half-visible. A home of "" or "/"
+  // would garble every path, so it is only masked when it is a real prefix.
+  const masked = home.length > 1 ? line.replaceAll(home, "~") : line;
+  const detail = redact(masked).slice(0, 200);
   return { ...r, status: null, error: `caffeinate exit ${String(r.status)}: ${detail}` };
 };
 
