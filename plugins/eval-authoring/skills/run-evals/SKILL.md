@@ -52,7 +52,10 @@ it, do not rebuild any of that.
    come from `<eval-dir>/grants.yaml` ([format](../../docs/grants-format.md)); each
    case runs in its own CLI invocation (`--case` takes one glob) under exactly its own
    grants. The wrapper never passes `--scaffold`, `--json` or `--report`; it reads
-   `aggregate-result.json` from a per-case directory under `<eval-dir>/results/`.
+   `aggregate-result.json` from a per-case directory under `<eval-dir>/results/`. Each
+   run's final reply and tool calls are written, redacted, to
+   `<eval-dir>/results/run-<time>/replies/<case>/<arm>-<run>.md`, so a low score can be
+   read there without the CLI's sandbox.
 4. **Run or hand off.** Run it from this session if the user asked for a run in this
    conversation. If they did not (you reached this skill while doing something else), ask
    in chat for a go-ahead, naming the tier and cost ceiling, and wait. If they decline or

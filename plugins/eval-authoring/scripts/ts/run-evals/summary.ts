@@ -43,14 +43,14 @@ export const quoteSafe = (text: string, max: number = REPLY_MAX): string => {
 };
 
 type Rec = Readonly<Record<string, unknown>>;
-const isRec = (v: unknown): v is Rec =>
+export const isRec = (v: unknown): v is Rec =>
   typeof v === "object" && v !== null && !Array.isArray(v);
 const num = (v: unknown): number | undefined =>
   typeof v === "number" && Number.isFinite(v) ? v : undefined;
 
-const list = (v: unknown): readonly unknown[] => (Array.isArray(v) ? v : []);
+export const list = (v: unknown): readonly unknown[] => (Array.isArray(v) ? v : []);
 
-const parse = (text: string | undefined): Rec | undefined => {
+export const parse = (text: string | undefined): Rec | undefined => {
   if (text === undefined) return undefined;
   try {
     const j: unknown = JSON.parse(text);
@@ -60,16 +60,37 @@ const parse = (text: string | undefined): Rec | undefined => {
   }
 };
 
-/** The text of the last assistant message in a `trace.jsonl` (stream-json lines); undefined when there is none. */
-export const finalReply = (trace: string | undefined): string | undefined => {
-  const texts = (trace ?? "").split("\n").flatMap((line) => {
+/** The content blocks of each assistant message in a `trace.jsonl` (stream-json lines), in order. */
+const assistantContent = (trace: string | undefined): readonly (readonly unknown[])[] =>
+  (trace ?? "").split("\n").map((line) => {
     const e = parse(line);
-    const content = isRec(e) && e["type"] === "assistant" && isRec(e["message"]) ? list(e["message"]["content"]) : [];
+    return isRec(e) && e["type"] === "assistant" && isRec(e["message"]) ? list(e["message"]["content"]) : [];
+  });
+
+/** The text of the last assistant message in a `trace.jsonl`; undefined when there is none. */
+export const finalReply = (trace: string | undefined): string | undefined => {
+  const texts = assistantContent(trace).flatMap((content) => {
     const t = content.flatMap((b) => (isRec(b) && b["type"] === "text" && typeof b["text"] === "string" ? [b["text"]] : []));
     return t.length > 0 ? [t.join("\n")] : [];
   });
   return texts.at(-1);
 };
+
+export interface ToolCall {
+  readonly name: string;
+  /** The call's input as JSON text (unredacted: quote it through `quoteSafe` or `redact`). */
+  readonly input: string;
+}
+
+/** Every tool call in a `trace.jsonl`, in order. */
+export const toolCalls = (trace: string | undefined): readonly ToolCall[] =>
+  assistantContent(trace).flatMap((content) =>
+    content.flatMap((b) =>
+      isRec(b) && b["type"] === "tool_use" && typeof b["name"] === "string"
+        ? [{ name: b["name"], input: JSON.stringify(b["input"] ?? null) }]
+        : [],
+    ),
+  );
 
 export interface FailedGrader {
   readonly run: number;
