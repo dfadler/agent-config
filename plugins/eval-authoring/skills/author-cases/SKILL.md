@@ -41,6 +41,12 @@ draft them there: tell the user to commit the skill and start a fresh session, t
 
 ## Steps
 
+0. **Read real replies before writing cases.** Run the skill on a few real prompts, or read
+   20 to 50 replies from a prior run's result directory (`run-evals --keep-temp` keeps
+   them). Note what a bare model already does and where the skill changes the reply. Write
+   cases that grade only the part the skill adds; a case on behavior the bare model already
+   shows cannot tell the plugin from no plugin. The numbers are a rule of thumb, not a
+   measured cutoff. This is procedure, not tooling.
 1. **Read the plugin first.** Read the `SKILL.md` or agent file under test, its manifest,
    and any existing cases and `grants.yaml`. Write criteria from what the files say the
    plugin does, not from a summary of it. Start each case from a real failing transcript
