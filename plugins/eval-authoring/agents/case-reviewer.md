@@ -112,6 +112,19 @@ Run after the lint, on each case. Skip anything the lint already reported.
    a goal? Does a sequence claim have a
    `tool_used` or `tool_order` grader beside it?
 
+10. **Sources and facts (from #713).** Does the case or the skill sentence it tests state
+    a platform claim with no source link and no "inference" mark? Does it name a
+    project fact (path, constant, helper) you can confirm with `Grep` or `Glob`? Run the
+    search and flag one that does not hold.
+11. **Sabotage note.** Does the case say, in `expected_outcome` or a comment, which
+    sentence of the skill, if deleted, should make it fail? Flag a case with none.
+12. **Near-misses per area.** For each area the skill covers, is there a near-miss case
+    (shared vocabulary, belongs elsewhere), not only one for the skill as a whole? Do
+    some trigger prompts use natural phrasing, without stuffed trigger words?
+13. **Helps a user.** Does a grader check behavior that helps a user, or a verbatim
+    phrase the skill happens to contain? Quote the phrase and say what a correct reply
+    that words it differently would score.
+
 Do not claim what a run would show. Whether a case really discriminates needs a
 paid two-arm run and the diagnosis script; write "needs a run" for those.
 
