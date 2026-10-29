@@ -42,6 +42,14 @@ describe("main", () => {
     });
     expect(out.stdout).not.toContain("split-judge-votes");
     expect(raw).toContain('"judgeVotes": [');
+    // The fixture carries grader definitions, so a grader that passes in every
+    // run of both arms (commit_named) is a warn, not an info, and the with-only
+    // skill_fired is not named.
+    expect(d).toMatchObject({
+      cases: [{ findings: [{ kind: "vacuous-graders", severity: "warn" }] }],
+    });
+    expect(out.stdout).toContain("commit_named (with 2/2, without 2/2)");
+    expect(out.stdout).not.toContain("skill_fired (");
   });
 
   it("prints JSON verdicts for a recorded three-run result", () => {

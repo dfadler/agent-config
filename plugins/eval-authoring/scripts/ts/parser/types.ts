@@ -486,7 +486,6 @@ export interface CaseAggregates {
   readonly passRateWithout?: number;
 }
 
-/** One case in the result document (`cases[]`). */
 /**
  * A grader as the case defined it (`cases[].graders[]` in the result file):
  * the part of `case.yaml` the diagnosis needs to read a run's grader results
@@ -495,12 +494,21 @@ export interface CaseAggregates {
 export interface CaseGraderDef {
   readonly name?: string;
   readonly type?: string;
-  /** What the grader reads: `config.target` (regex) or `config.focus` (llm); `last_message` by default for those two. */
-  readonly target?: string;
+  /**
+   * What the grader reads: `config.target` (regex) or `config.focus` (llm), a
+   * keyword or a `{source: file, path}` mapping; `last_message` only when a
+   * regex or llm grader wrote neither.
+   */
+  readonly target?: GraderTarget;
   /** A regex grader's `match` (`contains` or `not_contains`). */
   readonly match?: string;
+  /** A `tool_used` grader's `max`; 0 or 1 is a guard shape. */
+  readonly max?: number;
+  /** A `file_exists` grader's `exists`; false is a guard shape. */
+  readonly exists?: boolean;
 }
 
+/** One case in the result document (`cases[]`). */
 export interface CaseResult {
   readonly name: string;
   readonly aggregates: CaseAggregates;

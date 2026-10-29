@@ -15,7 +15,14 @@ const doc = (extra: Record<string, unknown> = {}): string =>
         graders: [
           { name: "g", type: "regex", config: { match: "not_contains" } },
           { name: "j", type: "llm", config: { focus: "trace" } },
-          { name: "t", type: "tool_used", config: { tool: "Skill" } },
+          { name: "t", type: "tool_used", config: { tool: "Skill", max: 1 } },
+          {
+            name: "f",
+            type: "regex",
+            config: { target: { source: "file", path: "scripts/x.sh" }, match: "contains" },
+          },
+          { name: "o", type: "regex", config: { target: { source: "trace" } } },
+          { name: "e", type: "file_exists", config: { path: "x", exists: false } },
         ],
         arms: {
           with: [
@@ -77,9 +84,13 @@ describe("readAggregateResult", () => {
     expect(c1?.maxTurns).toBe(4);
     expect(c2?.maxTurns).toBeUndefined();
     expect(c1?.graders).toEqual([
-      { name: "g", type: "regex", target: "last_message", match: "not_contains" },
-      { name: "j", type: "llm", target: "trace" },
-      { name: "t", type: "tool_used" },
+      { name: "g", type: "regex", target: { kind: "last_message" }, match: "not_contains" },
+      { name: "j", type: "llm", target: { kind: "trace" } },
+      { name: "t", type: "tool_used", max: 1 },
+      // An object target is a file, never the regex default (#713).
+      { name: "f", type: "regex", target: { kind: "file", path: "scripts/x.sh" }, match: "contains" },
+      { name: "o", type: "regex", target: { kind: "unknown", raw: '{"source":"trace"}' } },
+      { name: "e", type: "file_exists", exists: false },
     ]);
     expect(c2?.graders).toBeUndefined();
     expect(c1?.withRuns).toEqual([

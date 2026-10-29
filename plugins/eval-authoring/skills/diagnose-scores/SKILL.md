@@ -76,7 +76,7 @@ interprets the verdict.
   the last turn (no grader definitions or no `last_message` grader); say so and move on.
 - **`vacuous-graders`:** the named graders pass in every run of both arms, so they cannot
   discriminate: a check the baseline satisfies trivially ("did not read X" with no X), or a
-  negative pattern the prompt itself contains. A negative guard (`match: not_contains`) is
+  negative pattern the prompt itself contains. A guard (`match: not_contains`, `tool_used` with `max` 0 or 1, `file_exists` with `exists: false`) is
   expected to pass in both arms and is not named when the result carries the case's grader
   definitions; at `info` it could not be told apart, so check `case.yaml` first. Otherwise
   reword each one; a should-not-fire case is the exception.
