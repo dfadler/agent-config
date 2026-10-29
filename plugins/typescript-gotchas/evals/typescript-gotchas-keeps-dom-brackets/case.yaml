@@ -21,12 +21,14 @@
 # not the rule itself (that is reads-index-with-at's job). The read stays `.at(-1)` because the
 # exception is about the last child; a variable index would not exercise it.
 # Can fail: `names[names.length - 1]` fails names_read_with_at; `list.children.at(-1)` (a type
-# error, since HTMLCollection has no `.at`) or an alias of it (`const k = list.children;
-# k.at(-1)`) fails no_at_on_dom_collection; a reply that never assigns `textContent` fails
+# error, since HTMLCollection has no `.at`) or an alias of it, typed or not (`const k =
+# list.children; k.at(-1)`, `const c: HTMLCollection = list.children; c.at(-1)`) fails
+# no_at_on_dom_collection; a reply that never assigns `textContent` fails
 # sets_text. `Array.from(list.children).at(-1)` is a real array and passes.
 # good-reply: export function labelLast(names: string[], list: HTMLUListElement): void { list.children[list.children.length - 1].textContent = names.at(-1)!; }
 # bad-reply: export function labelLast(names: string[], list: HTMLUListElement): void { list.children.at(-1)!.textContent = names[names.length - 1]; }
 #   export function labelLast(names: string[], list: HTMLUListElement): void { const k = list.children; k.at(-1)!.textContent = names.at(-1)!; }
+#   export function labelLast(names: string[], list: HTMLUListElement): void { const c: HTMLCollection = list.children; c.at(-1)!.textContent = names.at(-1)!; }
 schema_version: "1.1"
 name: typescript-gotchas-keeps-dom-brackets
 description: >
@@ -71,7 +73,7 @@ graders:
   - name: no_at_on_dom_collection
     type: regex
     target: last_message
-    pattern: '\b(?:children|childNodes)\.at\(|querySelectorAll\([^)]*\)\.at\(|\b(\w+)\s*=\s*[\w.]+\.(?:children|childNodes)\b[\s\S]*?\b\1\.at\('
+    pattern: '\b(?:children|childNodes)\.at\(|querySelectorAll\([^)]*\)\.at\(|\b(\w+)(?::\s*[\w<>\[\]]+)?\s*=\s*[\w.]+\.(?:children|childNodes)\b[\s\S]*?\b\1\.at\('
     match: not_contains
     arm: both
 
