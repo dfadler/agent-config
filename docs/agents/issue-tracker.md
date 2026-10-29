@@ -19,7 +19,7 @@ Infer the repo from `git remote -v`; `gh` does this automatically when run insid
 
 When set to `yes`, PRs run through the same labels and states as issues, using the `gh pr` equivalents:
 
-- **Read a PR**: `gh pr view <number> --comments` and `gh pr diff <number>` for the diff.
+- **Read a PR**: `gh pr view <number> --json number,title,body,labels,comments,reviews` (`--comments` alone omits the body when piped) and `gh pr diff <number>` for the diff.
 - **List external PRs for triage**: `gh api repos/{owner}/{repo}/pulls --paginate --jq '.[] | select(.author_association | IN("CONTRIBUTOR","FIRST_TIME_CONTRIBUTOR","NONE")) | {number, title, body, author: .user.login, association: .author_association}'` (`gh pr list --json` has no `authorAssociation` field, so use the REST API).
 - **Comment / label / close**: `gh pr comment`, `gh pr edit --add-label`/`--remove-label`, `gh pr close`.
 
