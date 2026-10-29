@@ -460,7 +460,15 @@ const persistReplies = (
   repliesDir: string,
   resultText: string | undefined,
 ): string | undefined => {
-  const replies = replyFiles(repliesDir, resultText, io.readFile, io.home);
+  // A malformed trace must not cost the summary of a paid run.
+  const replies = ((): ReturnType<typeof replyFiles> => {
+    try {
+      return replyFiles(repliesDir, resultText, io.readFile, io.home);
+    } catch (e: unknown) {
+      io.err(`run-evals: ${label}: could not read the run traces (${errorText(e)}); no replies written\n`);
+      return [];
+    }
+  })();
   if (replies.length === 0 && runCount(resultText) > 0) {
     io.err(`run-evals: ${label}: no readable trace for any of its ${String(runCount(resultText))} run(s); no replies written\n`);
   }
