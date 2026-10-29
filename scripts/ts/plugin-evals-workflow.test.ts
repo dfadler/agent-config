@@ -57,3 +57,51 @@ describe("plan job: plugins without evals", () => {
     expect(r.summary).toContain("Every plugin");
   });
 });
+
+// The notify job's step (#738), run against a fake `gh` that logs its argv.
+const notifyStep = (
+  /- name: Open or update failure issue\n {8}env:[\s\S]*?run: \|\n([\s\S]*)$/.exec(
+    workflow,
+  )?.[1] ?? ""
+).replace(/^ {10}/gm, "");
+
+const notify = (existing: string) => {
+  const dir = mkdtempSync(join(tmpdir(), "notify-"));
+  const bin = join(dir, "bin");
+  mkdirSync(bin);
+  const log = join(dir, "gh.log");
+  writeFileSync(
+    join(bin, "gh"),
+    `#!/bin/bash\necho "$1 $2" >> "${log}"\n[ "$1 $2" = "issue list" ] && echo "${existing}"\nexit 0\n`,
+    { mode: 0o755 },
+  );
+  const r = spawnSync("bash", ["-c", notifyStep], {
+    encoding: "utf8",
+    env: {
+      ...process.env,
+      ["PATH"]: `${bin}:${process.env["PATH"] ?? ""}`,
+      ["GITHUB_REPOSITORY"]: "o/r",
+      ["RUN_URL"]: "https://x/run/1",
+    },
+  });
+  return { status: r.status, calls: readFileSync(log, "utf8") };
+};
+
+describe("notify job: failure issue", () => {
+  it("runs only on failure, with issues: write on that job alone", () => {
+    expect(workflow).toMatch(/notify:[\s\S]*if: \$\{\{ failure\(\) \}\}/);
+    expect(workflow.match(/^ +issues: write$/gm)).toHaveLength(1);
+  });
+
+  it("creates an issue when none is open", () => {
+    const r = notify("");
+    expect(r.status).toBe(0);
+    expect(r.calls).toContain("issue create");
+  });
+
+  it("comments on the open issue instead of duplicating", () => {
+    const r = notify("42");
+    expect(r.calls).toContain("issue comment");
+    expect(r.calls).not.toContain("issue create");
+  });
+});

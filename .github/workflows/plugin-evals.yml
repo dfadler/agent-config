@@ -163,3 +163,34 @@ jobs:
           path: eval-results/${{ matrix.plugin }}/
           if-no-files-found: warn
           retention-days: 30
+
+  # Failure notification (#738): a failed or inconclusive run opens or updates one
+  # issue. GITHUB_TOKEN only, so no new secret; issues: write lives on this job alone.
+  notify:
+    name: notify on failure
+    needs: [plan, eval]
+    if: ${{ failure() }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    permissions:
+      contents: read
+      issues: write
+    steps:
+      - name: Open or update failure issue
+        env:
+          GH_TOKEN: ${{ github.token }}
+          RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+        run: |
+          set -euo pipefail
+          title="Plugin evals failed"
+          body="A plugin-evals run failed or was inconclusive: $RUN_URL
+
+          The Check results step summary lists per-case verdicts and cases ungated by delta; results are in the plugin-eval-* run artifacts (30 days)."
+          existing=$(gh issue list --repo "$GITHUB_REPOSITORY" --state open \
+            --search "\"$title\" in:title" --json number,title \
+            --jq "[.[] | select(.title == \"$title\")][0].number // empty")
+          if [ -n "$existing" ]; then
+            gh issue comment "$existing" --repo "$GITHUB_REPOSITORY" --body "$body"
+          else
+            gh issue create --repo "$GITHUB_REPOSITORY" --title "$title" --body "$body"
+          fi
