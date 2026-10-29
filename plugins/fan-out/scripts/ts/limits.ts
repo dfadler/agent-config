@@ -5,7 +5,7 @@
  * shares. Exit 0 on success, 2 with `{"error": ...}` on an invalid flag.
  */
 import { realpathSync } from "node:fs";
-import { pathToFileURL } from "node:url";
+import { fileURLToPath } from "node:url";
 
 export const FALLBACK_BUDGET = 20;
 export const MAX_DEPTH = 3;
@@ -69,9 +69,20 @@ export const resolveLimits = (args: readonly string[], env: Record<string, strin
   return { budget, depth, width, prompt: args.slice(i).join(" "), shares: split(budget - 1, children) };
 };
 
-// `import.meta.url` is the real path, so resolve argv[1] too: the skill is linked into ~/.claude/skills.
-const entry = process.argv[1];
-if (entry !== undefined && import.meta.url === pathToFileURL(realpathSync(entry)).href) {
+/**
+ * True when this file is the entry script. Compares real paths on both sides: the skill is linked into
+ * ~/.claude/skills, and `--preserve-symlinks-main` keeps the link in `import.meta.url`. An `argv[1]` that is
+ * not a file (`node -e ... arg`) means we were imported.
+ */
+const isMain = (): boolean => {
+  try {
+    return realpathSync(process.argv[1] ?? "") === realpathSync(fileURLToPath(import.meta.url));
+  } catch {
+    return false;
+  }
+};
+
+if (isMain()) {
   const out = resolveLimits(process.argv.slice(2), process.env);
   console.log(JSON.stringify(out));
   process.exit("error" in out ? 2 : 0);
