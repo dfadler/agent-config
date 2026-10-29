@@ -468,6 +468,8 @@ export interface RunResult {
   readonly aborted?: boolean;
   /** Judge graders skipped over the cost ceiling; the score is not comparable. */
   readonly skippedPaidGraders?: boolean;
+  /** Agent turns the run used; at `CaseResult.maxTurns` the run was cut off (#713). */
+  readonly turns?: number;
   readonly graders?: readonly GraderResult[];
 }
 
@@ -485,9 +487,27 @@ export interface CaseAggregates {
 }
 
 /** One case in the result document (`cases[]`). */
+/**
+ * A grader as the case defined it (`cases[].graders[]` in the result file):
+ * the part of `case.yaml` the diagnosis needs to read a run's grader results
+ * (#713). Omitted in older results.
+ */
+export interface CaseGraderDef {
+  readonly name?: string;
+  readonly type?: string;
+  /** What the grader reads: `config.target` (regex) or `config.focus` (llm); `last_message` by default for those two. */
+  readonly target?: string;
+  /** A regex grader's `match` (`contains` or `not_contains`). */
+  readonly match?: string;
+}
+
 export interface CaseResult {
   readonly name: string;
   readonly aggregates: CaseAggregates;
+  /** The case's turn limit (`max_turns`); omitted in older results. */
+  readonly maxTurns?: number;
+  /** The case's grader definitions; omitted in older results. */
+  readonly graders?: readonly CaseGraderDef[];
   /** `arms.with[]`: runs with the plugin. */
   readonly withRuns: readonly RunResult[];
   /** `arms.without[]`: runs without it; empty for a one-arm or `--ablation none` run. */

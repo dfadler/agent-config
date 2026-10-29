@@ -2,6 +2,7 @@
 import type {
   AggregateResult,
   CaseAggregates,
+  CaseGraderDef,
   CaseResult,
   GraderResult,
   ReadResultOutcome,
@@ -57,11 +58,30 @@ const readGrader = (g: Rec): GraderResult => {
   };
 };
 
+/** A case-level grader definition; `target`/`focus` default to `last_message` for regex and llm. */
+const readGraderDef = (g: Rec): CaseGraderDef => {
+  const name = optStr(g["name"]);
+  const type = optStr(g["type"]);
+  const config = isRec(g["config"]) ? g["config"] : {};
+  const target =
+    optStr(config["target"]) ??
+    optStr(config["focus"]) ??
+    (type === "regex" || type === "llm" ? "last_message" : undefined);
+  const match = optStr(config["match"]);
+  return {
+    ...(name === undefined ? {} : { name }),
+    ...(type === undefined ? {} : { type }),
+    ...(target === undefined ? {} : { target }),
+    ...(match === undefined ? {} : { match }),
+  };
+};
+
 const readRun = (r: Rec): RunResult => {
   const score = optNum(r["score"]);
   const error = errorOf(r["error"]);
   const aborted = optBool(r["aborted"]);
   const skipped = optBool(r["skippedPaidGraders"]);
+  const turns = optNum(r["turns"]);
   const graders = Array.isArray(r["graders"])
     ? arr(r["graders"]).filter(isRec).map(readGrader)
     : undefined;
@@ -70,6 +90,7 @@ const readRun = (r: Rec): RunResult => {
     ...(error === undefined ? {} : { error }),
     ...(aborted === undefined ? {} : { aborted }),
     ...(skipped === undefined ? {} : { skippedPaidGraders: skipped }),
+    ...(turns === undefined ? {} : { turns }),
     ...(graders === undefined ? {} : { graders }),
   };
 };
@@ -89,9 +110,15 @@ const readCaseResult = (c: Rec): CaseResult => {
     ...(scoreWithout === undefined ? {} : { scoreWithout }),
     ...(passRateWithout === undefined ? {} : { passRateWithout }),
   };
+  const maxTurns = optNum(c["maxTurns"]);
+  const graders = Array.isArray(c["graders"])
+    ? arr(c["graders"]).filter(isRec).map(readGraderDef)
+    : undefined;
   return {
     name: optStr(c["name"]) ?? "",
     aggregates: outAggregates,
+    ...(maxTurns === undefined ? {} : { maxTurns }),
+    ...(graders === undefined ? {} : { graders }),
     withRuns: arr(arms["with"]).filter(isRec).map(readRun),
     withoutRuns: arr(arms["without"]).filter(isRec).map(readRun),
   };

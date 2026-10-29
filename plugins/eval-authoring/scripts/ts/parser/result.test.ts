@@ -11,7 +11,12 @@ const doc = (extra: Record<string, unknown> = {}): string =>
       {
         name: "c1",
         dir: "d",
-        graders: [{ name: "g", type: "regex" }],
+        maxTurns: 4,
+        graders: [
+          { name: "g", type: "regex", config: { match: "not_contains" } },
+          { name: "j", type: "llm", config: { focus: "trace" } },
+          { name: "t", type: "tool_used", config: { tool: "Skill" } },
+        ],
         arms: {
           with: [
             {
@@ -19,6 +24,7 @@ const doc = (extra: Record<string, unknown> = {}): string =>
               passed: true,
               error: null,
               skippedPaidGraders: false,
+              turns: 3,
               tracePath: "t",
               graders: [
                 {
@@ -68,11 +74,20 @@ describe("readAggregateResult", () => {
       scoreWithout: 0.5,
       passRateWithout: 0,
     });
+    expect(c1?.maxTurns).toBe(4);
+    expect(c2?.maxTurns).toBeUndefined();
+    expect(c1?.graders).toEqual([
+      { name: "g", type: "regex", target: "last_message", match: "not_contains" },
+      { name: "j", type: "llm", target: "trace" },
+      { name: "t", type: "tool_used" },
+    ]);
+    expect(c2?.graders).toBeUndefined();
     expect(c1?.withRuns).toEqual([
       {
         score: 1,
         error: null,
         skippedPaidGraders: false,
+        turns: 3,
         graders: [
           {
             name: "g",

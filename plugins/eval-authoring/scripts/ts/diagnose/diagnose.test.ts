@@ -58,7 +58,12 @@ describe("main", () => {
           name: "example-asks-first",
           verdict: "weak-signal",
           delta: 0.25,
-          findings: [{ kind: "split-judge-votes" }],
+          // The fixture carries no case-level grader definitions, so a
+          // not_contains guard cannot be told apart: info, not warn.
+          findings: [
+            { kind: "split-judge-votes" },
+            { kind: "vacuous-graders", severity: "info" },
+          ],
         },
         {
           name: "example-runs-with-permission",
