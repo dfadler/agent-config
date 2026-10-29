@@ -47,7 +47,7 @@ so pre-allow exactly that command, with Node 22.18 or later first on `PATH`
 
 ```bash
 PATH="<node-22.18+-bin-dir>:$PATH" claude -p --agent case-reviewer \
-  --allowedTools "Bash(node *lint/cli.ts*)" "Read" "Grep" "Glob" \
+  --allowedTools "Bash(node *lint/cli.ts*)" "Bash(git log*)" "Read" "Grep" "Glob" \
   "Review plugins/<name>/evals"
 ```
 
@@ -127,10 +127,13 @@ Run after the lint, on each case. Skip anything the lint already reported.
 14. **Independent of the skill (from #773).** (a) Does a `regex` or `llm` criterion echo a
     distinctive phrase from the targeted `SKILL.md` verbatim? `Grep` the phrase in the
     skill; a hit means the case tests whether the text was pasted, not whether the
-    behavior happened. Quote the phrase and the skill line. (b) Does `git log` show the
-    skill change and its new cases in one commit, with no before/after scores (author-cases
-    step 9, run-evals before/after rule)? The cases may have been written to pass the new
-    text. Report it as "written alongside the skill, needs a run".
+    behavior happened. Quote the phrase and the skill line. (b) On an unmerged branch, does
+    `git log <base>..HEAD -- <skill> <cases>` show the skill change and its new cases landing
+    together with no before/after scores (author-cases `## Independence`, run-evals
+    before/after rule)? The cases may have been written to pass the new text. Report it in
+    the Output shape with "written alongside the skill, needs a run" as the wrong field.
+    Meaningless after a squash merge (every PR is one commit on main); if `git` is not
+    allowed, report (b) as not run.
 
 Do not claim what a run would show. Whether a case really discriminates needs a
 paid two-arm run and the diagnosis script; write "needs a run" for those.
