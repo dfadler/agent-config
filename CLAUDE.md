@@ -5,7 +5,7 @@ Repo-specific mechanics for this repo. See `~/.claude/CLAUDE.md` (sourced from
 
 ## Pull request labels
 
-Do NOT apply any labels when creating PRs in this repo. This repo has no label taxonomy and the global label instructions do not apply here.
+Do NOT apply any labels when creating PRs in this repo. This repo has no PR label taxonomy and the global label instructions do not apply here.
 
 ## Issue tracker
 GitHub Issues
