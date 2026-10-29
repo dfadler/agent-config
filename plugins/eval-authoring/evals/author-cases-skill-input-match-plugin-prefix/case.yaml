@@ -4,8 +4,9 @@
 # Rewritten for #746: the prompt now presents a failing grader and its symptom instead of asking
 # for the answer; it never mentions a prefix. The reply is graded on the grader it hands back
 # (the fixed input_match must accept both call forms), not on a doc phrase.
-# Regression guard, no expected delta: in traces the skill does not fire here (0 of 6 runs) and the
-# no-plugin model already answers with an optional prefix group, so the arms tie. No skill_fired
+# Delta 0 by observation, not a regression guard (that label is for should-not-fire cases): in
+# traces the skill does not fire here (0 of 6 runs) and the no-plugin model already answers with
+# an optional prefix group, so the arms tie and the case does not discriminate. No skill_fired
 # grader for that reason. The grader once required a non-capturing `(?:` group and failed correct
 # replies that wrote `(deploy-helper:)?`; it now accepts both. Prompt no longer says "installed".
 schema_version: "1.1"
