@@ -91,8 +91,11 @@ it, do not rebuild any of that.
      as a pass.
    - `20`: internal error. `130` and `143`: interrupted or terminated.
 
-   Exit 1, a negative delta or a score that does not match the replies goes to the free
-   [diagnose-scores](../diagnose-scores/SKILL.md) skill before any paid re-run.
+   Exit 1 covers below-threshold, load failure and no cases; only below-threshold writes an
+   `aggregate-result.json`. For a below-threshold exit 1, a negative delta or a score that does
+   not match the replies, go to the free [diagnose-scores](../diagnose-scores/SKILL.md) skill
+   before any paid re-run. For a load failure or no cases, read the wrapper output and run the
+   eval-authoring lint instead.
 
 **A PR line from pasted scores.** When the user quotes scores and wants a delta in the PR,
 and the scores are `quick` or 3-run (`standard`) or the suite has fewer than about 20 cases,
