@@ -7,7 +7,6 @@ import {
   EXIT_INTERRUPTED,
   EXIT_OK,
   EXIT_PARTIAL,
-  EXIT_TERMINATED,
   EXIT_USAGE,
 } from "./exit-codes.ts";
 import { isRepoPlugin, main, parseArgs } from "./run-evals.ts";
@@ -254,28 +253,22 @@ describe("main", () => {
     expect(cliCalls(linux.calls)).toHaveLength(1);
   });
 
-  it("maps a caffeinate-wrapped 128+signal or 127 status back to what a bare spawn sees", async () => {
-    const run = async (status: number, platform = "darwin") => {
-      const s = setup({ cases: [{ name: "a" }], onPath: withCaffeinate, platform, cliResult: spawned({ status }) });
+  it("maps caffeinate's own exec failure (127/126) to could-not-start and passes other statuses through", async () => {
+    const run = async (status: number, stderr = "") => {
+      const s = setup({ cases: [{ name: "a" }], onPath: withCaffeinate, cliResult: spawned({ status, stderr }) });
       const code = await main([s.root], { io: s.io, pluginsDir: "/p" });
       return { code, err: s.err.join(""), summary: [...s.written.values()].join("") };
     };
-    const killed = await run(137);
-    expect(killed.code).toBe(EXIT_PARTIAL);
-    expect(killed.err).toContain("signal SIGKILL");
-    const term = await run(143);
-    expect(term.code).toBe(EXIT_TERMINATED);
-    // Recorded as the signal death a bare spawn sees, not as status 143.
-    expect(term.summary).toContain('"cliStatus": null');
-    const missing = await run(127);
+    const missing = await run(127, "claude: No such file or directory\n");
     expect(missing.code).toBe(EXIT_DEPENDENCY);
-    expect(missing.summary).toContain("could not start claude: caffeinate exit 127");
+    expect(missing.summary).toContain("could not start claude: caffeinate exit 127: claude: No such file or directory");
+    const nonexec = await run(126, "claude: Permission denied\n");
+    expect(nonexec.code).toBe(EXIT_DEPENDENCY);
+    expect(nonexec.summary).toContain("could not start claude: caffeinate exit 126: claude: Permission denied");
+    // caffeinate execs claude in place, so claude's own status is not an artifact.
     const plain = await run(3);
     expect(plain.code).toBe(EXIT_FAILURE);
     expect(plain.err).toContain("unexpected CLI exit status 3");
-    const bare = await run(137, "linux");
-    expect(bare.code).toBe(EXIT_FAILURE);
-    expect(bare.err).toContain("unexpected CLI exit status 137");
   });
 
   it("does not pass --trust-plugin for a plugin outside the repo's plugins directory", async () => {

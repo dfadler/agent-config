@@ -5,7 +5,6 @@
  *
  * Usage: see USAGE below, or run with --help.
  */
-import { constants as osConstants } from "node:os";
 import { basename, dirname, join, resolve } from "node:path";
 import { readGrantsFile, readSuite } from "../parser/index.ts";
 import { buildCliArgs, type Reporting, type RunSpec } from "./command.ts";
@@ -360,19 +359,18 @@ const locateResult = (
     })[0];
 
 /**
- * caffeinate reports a child that died on a signal as 128 + signal and one it
- * could not exec as 127: give the judge what a bare spawn would have seen.
+ * caffeinate "execs" the utility (man caffeinate, EXAMPLES), and on macOS it
+ * does so in place: the utility runs in the pid Node spawned (verified: the
+ * child's $$ equals the spawn's pid). So claude's exit status and a signal
+ * death ({status: null, signal}) arrive exactly as a bare spawn sees them. The
+ * only wrapping artifact is caffeinate's own exec failure, 127 (not found) or
+ * 126 (not executable), with "<cmd>: <reason>" on stderr.
  */
 export const unwrapExit = (r: SpawnResult): SpawnResult => {
-  if (r.status === 127) {
-    return { ...r, status: null, error: "caffeinate exit 127: claude not found" };
-  }
-  const signum = r.status === null ? 0 : r.status - 128;
-  const name =
-    signum > 0
-      ? Object.entries(osConstants.signals).find(([, n]) => n === signum)?.[0]
-      : undefined;
-  return name === undefined ? r : { ...r, status: null, signal: name };
+  if (r.status !== 127 && r.status !== 126) return r;
+  const detail = r.stderr.trim();
+  const reason = `caffeinate exit ${String(r.status)}${detail === "" ? "" : `: ${detail}`}`;
+  return { ...r, status: null, error: reason };
 };
 
 const runInvocation = async (
@@ -405,8 +403,8 @@ const runInvocation = async (
     command: ["claude", ...args],
     allottedUsd: budgetUsd,
   };
-  // macOS: keep the machine awake for the invocation. caffeinate exits with
-  // its child's status, so the result is unwrapped to what a bare spawn sees.
+  // macOS: keep the machine awake for the invocation. caffeinate execs claude
+  // in place, so only its own 126/127 exec failure needs unwrapping.
   const [cmd, argv]: readonly [string, readonly string[]] =
     io.platform === "darwin" && io.findOnPath("caffeinate").length > 0
       ? ["caffeinate", ["-i", "--", "claude", ...args]]
