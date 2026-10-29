@@ -1,35 +1,48 @@
 # Run: node plugins/eval-authoring/scripts/ts/run-evals/run-evals.ts --tier quick plugins/typescript-gotchas
-# Boundary case inside the skill's own scope: the prompt is non-test TypeScript (so the skill
-# may fire) but reads from a DOM collection, which the skill lists under "What is NOT flagged"
-# because `.children` lacks `.at()`. The skill must not push the model into `children.at(-1)`.
-# Sabotage map: no_at_on_dom_collection checks the "DOM collections" exception. Measured
-# 2026-10-05 (PR #531): with that exception removed the case still passes 3 of 3, because the
-# model already avoids `.at()` on `children` (and the prompt says "use `list.children`"). It
-# cannot catch a regression in that rule; it only guards against a gross over-application.
-# Can fail: `list.children.at(-1)` (a type error, since HTMLCollection has no `.at`) fails
-# no_at_on_dom_collection. Indexing with a bracket or `lastElementChild` passes. A
-# regression guard against over-application, so a no-plugin arm passes it by default.
+# Boundary case inside the skill's own scope: non-test TypeScript that reads the last string of
+# an array (the skill's rule: `.at(-1)`) and the last element of a DOM collection in the same
+# reply. The skill lists DOM collections under "What is NOT flagged" because `.children`
+# lacks `.at()`; it must not push the model into `children.at(-1)` while it rewrites the
+# array read next to it.
+# Rewritten for #772. The old prompt had only the DOM read and said "use `list.children`", so
+# nothing in it exercised the rule and a bare model never wrote `.at()`: the case passed in both
+# arms. The 2026-10-05 sabotage result (PR #531: with the DOM exception removed the case still
+# passed 3 of 3) is for that old prompt and is superseded; the case is unmeasured since this
+# rewrite. The prompt still names `list.children` on purpose: a reply that reaches for
+# `lastElementChild` never touches the exception, and the leak the old prompt had was the
+# missing rule half, not the DOM nudge.
+# Sabotage map: no_at_on_dom_collection checks the "DOM collections" exception (delete that
+# bullet and expect `children.at(-1)` in some with-arm runs; if it still passes 3 of 3, drop
+# the case). names_read_with_at checks the read rule and carries the delta: the no-plugin
+# default is `names[names.length - 1]`.
+# Can fail: `names[names.length - 1]` fails names_read_with_at; `list.children.at(-1)` (a type
+# error, since HTMLCollection has no `.at`) fails no_at_on_dom_collection; a reply that never
+# assigns `textContent` fails sets_text.
+# good-reply: export function labelLast(names: string[], list: HTMLUListElement): void { list.children[list.children.length - 1].textContent = names.at(-1)!; }
+# bad-reply: export function labelLast(names: string[], list: HTMLUListElement): void { list.children.at(-1)!.textContent = names[names.length - 1]; }
 schema_version: "1.1"
 name: typescript-gotchas-keeps-dom-brackets
 description: >
-  When asked for a TypeScript helper that touches the last child of a DOM list,
-  the model must not call `.at()` on `children`, which has no such method.
-  expected_outcome: PASS when the reply never calls `.at(` on `children` or
-  `childNodes`; FAIL when it does.
+  When asked for a TypeScript helper that writes the last string of an array into the last
+  child of a DOM list, the model reads the array with `.at(-1)` but never calls `.at()` on
+  `children`, which has no such method. expected_outcome: PASS when the reply reads
+  `names.at(-1)`, assigns `textContent`, and never calls `.at(` on `children` or
+  `childNodes`; FAIL otherwise.
 tags: [typescript-gotchas, boundary, quick]
 
 execution:
   prompt: |
     In src/ui/list.ts of my TypeScript project, write
-    `markLastItem(list: HTMLUListElement): void`, which adds the CSS class
-    "last" to the last child element of the list (use `list.children`).
-    Reply with the complete file in one code block and no other text.
+    `labelLast(names: string[], list: HTMLUListElement): void`, which sets the
+    textContent of the last element of `list.children` to the last string in
+    `names` (neither is ever empty). Reply with the complete file in one code
+    block and no other text.
   max_turns: 6
   allowed_tools:
     - Skill
 
 graders:
-  # Steps. Indicator only: whether the skill fires here is not the property under test.
+  # Steps. Scored only with the plugin; names_read_with_at depends on the skill firing.
   - name: skill_fired
     type: tool_used
     tool: Skill
@@ -37,7 +50,15 @@ graders:
     min: 1
     arm: with-only
 
-  # Result.
+  # Result: the array read uses `.at(-1)` (the skill's rule; no-plugin default is a bracket read).
+  - name: names_read_with_at
+    type: regex
+    target: last_message
+    pattern: '\bnames\.at\(\s*-1\s*\)'
+    match: contains
+    arm: both
+
+  # Result: no `.at()` on a DOM collection (the skill's exception).
   - name: no_at_on_dom_collection
     type: regex
     target: last_message
@@ -45,9 +66,10 @@ graders:
     match: not_contains
     arm: both
 
-  - name: adds_the_class
+  # Result: the text is written.
+  - name: sets_text
     type: regex
     target: last_message
-    pattern: 'classList\.add\(\s*["'']last["'']\s*\)'
+    pattern: 'textContent\s*=(?!=)'
     match: contains
     arm: both

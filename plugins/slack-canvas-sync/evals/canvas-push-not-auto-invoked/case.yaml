@@ -2,15 +2,21 @@
 # No grant needed (Skill only).
 # canvas-push has disable-model-invocation: true, so a plain-language request ("push my notes to
 # Slack canvases") cannot make the model call it: the skill is not in the model's skill list
-# (observed in the trace). The honest guard is that the model does not improvise a push: no Skill
-# call, no claimed push. The should-fire check lives in the slash-invocation cases.
-# Regression guard: the no-plugin arm passes it too, so the delta is about 0 by design.
+# (observed in the trace). What the case checks is that the model does not improvise a push: no
+# Skill call, no claimed push. The should-fire check lives in the slash-invocation cases.
+# Should-not-fire case: the skill is absent from the model's list in both arms, so the delta is 0
+# by design and the signal is in the with-plugin arm only (#772).
+# Sabotage: on a scratch copy of plugins/slack-canvas-sync/skills/canvas-push/SKILL.md, delete the
+# `disable-model-invocation: true` frontmatter line and run this case at quick (plugin arm only);
+# canvas_push_not_auto_invoked should then fail, since the description matches the prompt. Not
+# yet run; not committed.
+# mentions_slack was dropped (#772): the prompt says Slack, so the regex was trivially true (EVAL024).
 schema_version: "1.1"
 name: canvas-push-not-auto-invoked
 description: >
   A plain-language request to push local notes to Slack canvases does not auto-invoke the
-  user-invoked-only canvas-push and the reply claims no push. expected_outcome (regression guard):
-  PASS when no Skill call fires and no push is claimed and the reply mentions Slack; FAIL otherwise.
+  user-invoked-only canvas-push and the reply claims no push. expected_outcome (should not
+  fire): PASS when no Skill call fires and no push is claimed; FAIL otherwise.
 tags: [canvas-push, trigger, quick]
 
 execution:
@@ -38,12 +44,4 @@ graders:
     pattern: '(created|updated|pushed)\s+\d+\s+canvas|canvases?\s+(was|were|have been)\s+(created|updated|pushed)'
     flags: i
     match: not_contains
-    arm: both
-
-  - name: mentions_slack
-    type: regex
-    target: last_message
-    pattern: 'slack'
-    flags: i
-    match: contains
     arm: both
