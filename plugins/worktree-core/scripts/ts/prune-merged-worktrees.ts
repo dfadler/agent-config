@@ -13,7 +13,10 @@
 //   * it is NOT locked (Claude Code locks a worktree while a session uses it)
 //   * it is NOT the worktree this script is being run from
 //   * its name does not contain "keep" and it holds no gitignored content other
-//     than node_modules (e.g. paid eval results), which removal would delete
+//     than node_modules (e.g. paid eval results), which removal would delete,
+//     unless the project lists it in .claude/settings.json under
+//     worktree.autoPruneDisposableIgnored (path prefixes; `*` spans one
+//     segment), e.g. ["plugins/*/evals/results/"]
 //   * its working tree is clean AND has no commits that aren't pushed to its
 //     upstream
 //   * a MERGED pull request exists for its branch at the SAME commit the
@@ -187,15 +190,42 @@ export const keepNameReason = (name: string): string | undefined =>
 export const lockedReason = (locked: boolean): string | undefined =>
   locked ? "locked (another session is using it)" : undefined;
 
-/** Gitignored content (paid eval results, kept traces) is lost on removal; node_modules is fine. */
+/** Repo-declared disposable ignored paths (`worktree.autoPruneDisposableIgnored`): path prefixes where `*` spans one segment. */
+const readDisposable = (repoRoot: string): readonly RegExp[] => {
+  try {
+    const parsed: unknown = JSON.parse(
+      readFileSync(`${repoRoot}/.claude/settings.json`, "utf8"),
+    );
+    const list = asArray(
+      asObject(asObject(parsed)?.["worktree"])?.["autoPruneDisposableIgnored"],
+    );
+    return (list ?? [])
+      .filter((g): g is string => typeof g === "string" && g !== "")
+      .map(
+        (g) =>
+          new RegExp(
+            `^${g.replace(/[.+?^${}()|[\]\\]/g, "\\$&").replace(/\*/g, "[^/]*")}`,
+          ),
+      );
+  } catch {
+    // Absent or malformed config: nothing is declared disposable.
+    return [];
+  }
+};
+
+/** Gitignored content (paid eval results, kept traces) is lost on removal; node_modules and `disposable` paths are fine. */
 export const ignoredContentReason = (
   git: (args: readonly string[], at?: string) => { readonly stdout: string },
   path: string,
+  disposable: readonly RegExp[] = [],
 ): string | undefined => {
   const held = git(["status", "--porcelain", "--ignored"], path)
     .stdout.split("\n")
     .filter(
-      (l) => l.startsWith("!! ") && !/(^|\/)node_modules\//.test(l.slice(3)),
+      (l) =>
+        l.startsWith("!! ") &&
+        !/(^|\/)node_modules\//.test(l.slice(3)) &&
+        !disposable.some((re) => re.test(l.slice(3))),
     )
     .map((l) => l.slice(3));
   return held.length === 0
@@ -245,6 +275,7 @@ export const main = (argv: readonly string[], ctx: Ctx): number => {
   const common = git(["rev-parse", "--git-common-dir"]).stdout.trim();
   const repoRoot = realpathSync(resolve(cwd, common, ".."));
   const wtPrefix = `${repoRoot}/.claude/worktrees/`;
+  const disposable = readDisposable(repoRoot);
 
   // --unsafe: local rules only (locked, keep name, gitignored content), no
   // GitHub. Used by doctor to list worktrees that are not safe to remove.
@@ -256,7 +287,7 @@ export const main = (argv: readonly string[], ctx: Ctx): number => {
       const why =
         lockedReason(rec.locked) ??
         keepNameReason(name) ??
-        ignoredContentReason(git, rec.path);
+        ignoredContentReason(git, rec.path, disposable);
       if (why !== undefined) ctx.out(`${name} — ${why}`);
     }
     return 0;
@@ -402,7 +433,7 @@ export const main = (argv: readonly string[], ctx: Ctx): number => {
         ? undefined
         : "uncommitted changes";
     },
-    (p) => ignoredContentReason(git, p),
+    (p) => ignoredContentReason(git, p, disposable),
     (p) => (pushedOrOnMain(p) ? undefined : "unpushed commits (or no upstream)"),
   ];
 

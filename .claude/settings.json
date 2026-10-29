@@ -23,7 +23,8 @@
   "worktree": {
     "enforce": "block",
     "autoPrune": true,
-    "symlinkCheck": "on"
+    "symlinkCheck": "on",
+    "autoPruneDisposableIgnored": ["plugins/*/evals/results/"]
   },
   "env": {
     "MEMORY_HYGIENE_REMINDER": "on"
