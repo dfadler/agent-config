@@ -32,6 +32,12 @@ const WRAPPER = join(
   "lint-on-edit.sh",
 );
 
+// Worker body that blocks the thread synchronously forever. A sleeping
+// Atomics.wait, not a busy loop: terminating a JIT-hot `for (;;) {}` about
+// 100 times per soak is the likeliest cause of the SIGTRAP in #830.
+const BLOCK_FOREVER =
+  "Atomics.wait(new Int32Array(new SharedArrayBuffer(4)), 0, 0);\n";
+
 const GOOD_CASE = [
   'schema_version: "1.1"',
   "name: good",
@@ -217,7 +223,7 @@ describe("runHook: failure containment", () => {
   it("enforces the deadline on synchronous blocking work in the worker", async () => {
     const root = makePlugin();
     const blocker = join(root, "blocker.mjs");
-    writeFileSync(blocker, "for (;;) {}\n");
+    writeFileSync(blocker, BLOCK_FOREVER);
     let workerRun: ReturnType<typeof workerLint> | undefined;
     const lint: LintFn = (r, s) => {
       workerRun = workerLint(r, s, pathToFileURL(blocker));
@@ -234,7 +240,7 @@ describe("runHook: failure containment", () => {
   it("terminates a blocked worker when the signal aborts", async () => {
     const root = makePlugin();
     const blocker = join(root, "blocker.mjs");
-    writeFileSync(blocker, "for (;;) {}\n");
+    writeFileSync(blocker, BLOCK_FOREVER);
     const ctl = new AbortController();
     const run = workerLint(root, ctl.signal, pathToFileURL(blocker));
     setTimeout(() => {
