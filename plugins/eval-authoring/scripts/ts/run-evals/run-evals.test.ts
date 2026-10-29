@@ -71,6 +71,88 @@ describe("parseArgs", () => {
     const p = parseArgs(["p"]);
     expect(p.kind === "options" && p.options.tier.name).toBe("standard");
   });
+  it("takes --changed bare or with =<ref>, never beside --case", () => {
+    const changed = (a: string[]) => {
+      const p = parseArgs(["p", ...a]);
+      return p.kind === "options" ? p.options.changed : p.kind;
+    };
+    expect(changed([])).toBeUndefined();
+    expect(changed(["--changed"])).toBe("");
+    expect(changed(["--changed=v1.2"])).toBe("v1.2");
+    expect(changed(["--changed", "--case", "a"])).toBe("error");
+  });
+});
+
+describe("--changed", () => {
+  /** A git fake whose diff lists `paths` NUL-separated, as `-z` does. */
+  const gitOf =
+    (paths: readonly string[], mergeBase = 0) =>
+    (args: readonly string[]) =>
+      args.includes("merge-base")
+        ? spawned({ status: mergeBase, stdout: "abc\n", stderr: "fatal: no ref\n" })
+        : args.includes("diff")
+          ? spawned({ stdout: paths.map((p) => `${p}\0`).join("") })
+          : args.includes("--version")
+            ? spawned({ stdout: "git version 2.39.3\n" })
+            : spawned();
+  const run = (s: ReturnType<typeof setup>, extra: string[]) =>
+    main([s.root, ...extra], { io: s.io, pluginsDir: "/p" });
+
+  it("exits 0 and runs nothing when nothing changed", async () => {
+    const s = setup({ onGit: gitOf([]) });
+    expect(await run(s, ["--changed=base"])).toBe(EXIT_OK);
+    expect(cliCalls(s.calls)).toHaveLength(0);
+    expect(s.out.join("")).toContain("nothing changed since base");
+  });
+
+  it("exits 0 when the changed cases are outside the tier's tag", async () => {
+    const s = setup({ onGit: gitOf(["evals/b/case.yaml"]) });
+    expect(await run(s, ["--tier", "quick", "--changed=base"])).toBe(EXIT_OK);
+    expect(cliCalls(s.calls)).toHaveLength(0);
+    expect(s.out.join("")).toContain("tagged 'quick'");
+    expect(s.out.join("")).not.toContain("nothing changed");
+  });
+
+  it("exits 1 naming the files when they changed but map to no case, unless --changed-allow-empty", async () => {
+    const s = setup({ onGit: gitOf(["README.md", "docs/a.md"]) });
+    expect(await run(s, ["--changed=base"])).toBe(EXIT_FAILURE);
+    expect(cliCalls(s.calls)).toHaveLength(0);
+    expect(s.err.join("")).toContain("  README.md\n  docs/a.md");
+    expect(s.err.join("")).toContain("2 files changed, none map to a case");
+    expect(s.out.join("")).not.toContain("nothing changed");
+    const t = setup({ onGit: gitOf(["README.md"]) });
+    expect(await run(t, ["--changed=base", "--changed-allow-empty"])).toBe(EXIT_OK);
+    expect(t.err.join("")).toContain("1 files changed, none map to a case");
+    expect(parseArgs(["p", "--changed-allow-empty"]).kind).toBe("error");
+  });
+
+  it("plans only the changed case, still listing the unmapped files", async () => {
+    const s = setup({ onGit: gitOf(["evals/b/case.yaml", "README.md"]) });
+    expect(await run(s, ["--changed=base", "--dry-run"])).toBe(EXIT_OK);
+    expect(s.out.join("")).toContain("invocation 1/1");
+    expect(s.out.join("")).toContain("--case b");
+    expect(s.err.join("")).toContain("files that map to no case:\n  README.md");
+  });
+
+  it("records the resolved ref and the subset in the summary file", async () => {
+    const s = setup({ onGit: gitOf(["evals/b/case.yaml"]), onCli: okCli() });
+    expect(await run(s, ["--changed=base"])).toBe(EXIT_OK);
+    const written = [...s.written.values()][0] ?? "{}";
+    expect(JSON.parse(written)).toMatchObject({
+      changedSince: "base",
+      subset: "subset: 1 of 2 cases, --changed since base",
+    });
+    expect(s.out.join("")).toContain("## Eval results\n\nsubset: 1 of 2 cases, --changed since base\n\n");
+    const whole = setup({ onCli: okCli() });
+    await run(whole, []);
+    expect(JSON.parse([...whole.written.values()][0] ?? "{}")).toMatchObject({ changedSince: null, subset: null });
+  });
+
+  it("is a usage error when the ref has no merge base", async () => {
+    const s = setup({ onGit: gitOf([], 128) });
+    expect(await main([s.root, "--changed=nope"], { io: s.io, pluginsDir: "/p" })).toBe(EXIT_USAGE);
+    expect(s.err.join("")).toContain("nope");
+  });
 });
 
 describe("--max-cost-usd", () => {
