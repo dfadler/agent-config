@@ -1,35 +1,45 @@
 # Run: node plugins/eval-authoring/scripts/ts/run-evals/run-evals.ts --tier quick plugins/typescript-gotchas
-# Boundary case inside the skill's scope: non-test TypeScript that writes to the last
-# element. The skill lists "Assignment" under "What is NOT flagged" because `.at()` is
-# read-only. The model must not write `.at(-1) = value`, which is a syntax error.
-# Sabotage map: no_at_assignment checks that "Assignment" exception. Measured 2026-10-05
-# (PR #531): with the exception removed the case still passes 3 of 3, because the model never
-# writes `.at(-1) = v`. It cannot catch a regression in that rule; it only fails against a much
-# worse model.
-# Can fail: `.at(-1) = v` fails no_at_assignment; a reply with neither a bracket
-# assignment nor `splice(-1` fails replaces_in_place. A regression guard against
-# over-application, so a no-plugin arm passes it by default and shows no delta.
+# Boundary case inside the skill's scope: non-test TypeScript that reads the last element of
+# one array and writes the last element of another in place. The skill's rule ("prefer `.at()`
+# for indexed reads") and its "Assignment" exception under "What is NOT flagged" (`.at()` is
+# read-only; bracket assignment stays) both apply in one reply. The read is what only the skill
+# adds; the write is where it must not over-apply.
+# Rewritten for #772. The old prompt ("overwrite the last element") contained no read, so the
+# skill had nothing to rewrite and a bare model never touched `.at()`: the case passed in both
+# arms. The 2026-10-05 sabotage result (PR #531: with the Assignment exception removed the case
+# still passed 3 of 3) is for that old prompt and is superseded; the case is unmeasured since
+# this rewrite.
+# Sabotage map: no_at_assignment checks the Assignment exception (delete that bullet and
+# expect `dst.at(-1) = ...` in some with-arm runs; if it still passes 3 of 3, drop the case).
+# reads_src_with_at checks the read rule and carries the delta: the no-plugin default is
+# `src[src.length - 1]`.
+# Can fail: `src[src.length - 1]` fails reads_src_with_at; `dst.at(-1) = v`, `dst.at(-1)! = v`
+# or `dst.at(-1)++` fails no_at_assignment; a reply with neither a bracket write to `dst` nor
+# `dst.splice(-1` fails writes_dst_with_bracket.
+# good-reply: export function copyLast(src: number[], dst: number[]): void { dst[dst.length - 1] = src.at(-1)!; }
+# bad-reply: export function copyLast(src: number[], dst: number[]): void { dst.at(-1)! = src[src.length - 1]; }
 schema_version: "1.1"
 name: typescript-gotchas-keeps-assignment-brackets
 description: >
-  When asked for a TypeScript helper that overwrites the last element of an array
-  in place, the model must not assign through `.at()`. expected_outcome: PASS when
-  the reply assigns by bracket (`arr[arr.length - 1] = v`) or `splice(-1, ...)` and
-  never writes `.at(-1) =`; FAIL otherwise.
+  When asked for a TypeScript helper that copies the last element of one array over the
+  last element of another in place, the model reads with `.at(-1)` and writes by bracket,
+  never assigning through `.at()`. expected_outcome: PASS when the reply reads
+  `src.at(-1)`, writes `dst[...] =` (or `dst.splice(-1, ...)`) and never writes
+  `.at(...) =`; FAIL otherwise.
 tags: [typescript-gotchas, boundary, quick]
 
 execution:
   prompt: |
-    In src/utils/stack.ts of my TypeScript project, write
-    `replaceTop(stack: number[], value: number): void`, which overwrites the
-    last element of the array in place (it is never empty). Reply with the
-    complete file in one code block and no other text.
+    In src/utils/sync.ts of my TypeScript project, write
+    `copyLast(src: number[], dst: number[]): void`, which overwrites the last
+    element of `dst` in place with the last element of `src` (neither array is
+    ever empty). Reply with the complete file in one code block and no other text.
   max_turns: 6
   allowed_tools:
     - Skill
 
 graders:
-  # Steps. Indicator only: whether the skill fires here is not the property under test.
+  # Steps. Scored only with the plugin; reads_src_with_at depends on the skill firing.
   - name: skill_fired
     type: tool_used
     tool: Skill
@@ -37,17 +47,27 @@ graders:
     min: 1
     arm: with-only
 
-  # Result.
+  # Result: the read uses `.at(-1)` (the skill's rule; no-plugin default is a bracket read).
+  - name: reads_src_with_at
+    type: regex
+    target: last_message
+    pattern: '\bsrc\.at\(\s*-1\s*\)'
+    match: contains
+    arm: both
+
+  # Result: no assignment, compound assignment or increment through `.at()` (a syntax error).
+  # `!= null`, `!==` and `===` after `.at()` do not match.
   - name: no_at_assignment
     type: regex
     target: last_message
-    pattern: '\.at\([^)]*\)\s*=[^=]'
+    pattern: '\.at\([^)]*\)(?:!(?!=))?\s*(?:[-+*/%]|\*\*|\?\?|\|\||&&)?=(?!=)|\.at\([^)]*\)(?:!(?!=))?\s*(?:\+\+|--)'
     match: not_contains
     arm: both
 
-  - name: replaces_in_place
+  # Result: the write goes through a bracket (or splice), the only option for assignment.
+  - name: writes_dst_with_bracket
     type: regex
     target: last_message
-    pattern: '\w\[\s*[\w.]+\.length\s*-\s*1\s*\]\s*=[^=]|splice\(\s*-1'
+    pattern: '\bdst\[[^\]]+\]\s*=(?!=)|\bdst\.splice\(\s*-1'
     match: contains
     arm: both
