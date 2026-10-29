@@ -5,6 +5,7 @@
  *
  * Usage: see USAGE below, or run with --help.
  */
+import { constants as osConstants } from "node:os";
 import { basename, dirname, join, resolve } from "node:path";
 import { readGrantsFile, readSuite } from "../parser/index.ts";
 import { buildCliArgs, type Reporting, type RunSpec } from "./command.ts";
@@ -18,7 +19,7 @@ import {
   worstExit,
   type ExitCode,
 } from "./exit-codes.ts";
-import { nodeIo, type Io } from "./io.ts";
+import { nodeIo, type Io, type SpawnResult } from "./io.ts";
 import {
   AGGREGATE_FILE,
   candidateResultDirs,
@@ -55,6 +56,8 @@ export const USAGE = `Usage: run-evals.ts [options] <plugin-path>
 Run a plugin's eval cases at a cost tier. The CLI's --case takes one glob, so
 the wrapper makes one CLI invocation per case, each under exactly that case's
 grants (<eval-dir>/grants.yaml). Never passes --scaffold, --json or --report.
+On macOS each invocation runs under caffeinate -i so the machine stays awake;
+the recorded rerun command omits that prefix on purpose, so it pastes anywhere.
 
 Options:
   --tier <name>        quick | standard | thorough (default: ${DEFAULT_TIER})
@@ -356,6 +359,22 @@ const locateResult = (
       return text === undefined ? [] : [{ dir: d, text }];
     })[0];
 
+/**
+ * caffeinate reports a child that died on a signal as 128 + signal and one it
+ * could not exec as 127: give the judge what a bare spawn would have seen.
+ */
+export const unwrapExit = (r: SpawnResult): SpawnResult => {
+  if (r.status === 127) {
+    return { ...r, status: null, error: "caffeinate exit 127: claude not found" };
+  }
+  const signum = r.status === null ? 0 : r.status - 128;
+  const name =
+    signum > 0
+      ? Object.entries(osConstants.signals).find(([, n]) => n === signum)?.[0]
+      : undefined;
+  return name === undefined ? r : { ...r, status: null, signal: name };
+};
+
 const runInvocation = async (
   io: Io,
   options: Options,
@@ -386,10 +405,17 @@ const runInvocation = async (
     command: ["claude", ...args],
     allottedUsd: budgetUsd,
   };
-  const ran = await io.spawn("claude", args, {
+  // macOS: keep the machine awake for the invocation. caffeinate exits with
+  // its child's status, so the result is unwrapped to what a bare spawn sees.
+  const [cmd, argv]: readonly [string, readonly string[]] =
+    io.platform === "darwin" && io.findOnPath("caffeinate").length > 0
+      ? ["caffeinate", ["-i", "--", "claude", ...args]]
+      : ["claude", args];
+  const raw = await io.spawn(cmd, argv, {
     onStdout: io.out,
     onStderr: io.err,
   });
+  const ran = cmd === "caffeinate" ? unwrapExit(raw) : raw;
   if (ran.error !== undefined) {
     return {
       summary: {
