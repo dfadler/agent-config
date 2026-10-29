@@ -91,11 +91,13 @@ it, do not rebuild any of that.
      as a pass.
    - `20`: internal error. `130` and `143`: interrupted or terminated.
 
-   A run with at least one loaded case writes `aggregate-result.json` under `<eval-dir>/results/`,
-   whatever the exit code, so exit 1 can also mean a case failed to load. If the file exists
-   and the delta is negative or a score does not match the replies, go to the free
-   [diagnose-scores](../diagnose-scores/SKILL.md) skill before any paid re-run. If it does
-   not, read the wrapper output and run the eval-authoring lint instead.
+   When a case ran, the wrapper records each case's `resultDir` in
+   `run-evals-summary.json` in this run's `<eval-dir>/results/run-<time>/` directory. If that
+   `resultDir`'s `aggregate-result.json` shows a negative delta or a score that does not
+   match the replies, go to the free [diagnose-scores](../diagnose-scores/SKILL.md) skill on
+   that file before any paid re-run, never on an older file under `results/`. When no case ran
+   (an untrusted directory, an invalid option, no cases), nothing is written: read the wrapper
+   output and run the eval-authoring lint instead.
 
 **A PR line from pasted scores.** When the user quotes scores and wants a delta in the PR,
 and the scores are `quick` or 3-run (`standard`) or the suite has fewer than about 20 cases,
