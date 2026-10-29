@@ -27,6 +27,9 @@ const EDIT_TOOLS: readonly string[] = ["Write", "Edit", "MultiEdit"];
 /** Keep the injected context small; the full report is one lint run away. */
 const MAX_CONTEXT_CHARS = 8000;
 
+/** Under the 60s harness timeout in hooks.json, so a slow lint gets a message instead of a silent kill. */
+const LINT_DEADLINE_MS = 45_000;
+
 /** Runs the lint for a plugin root. Injected so tests can simulate a crash. */
 export type LintFn = (pluginRoot: string) => Promise<LintOutcome>;
 
@@ -169,13 +172,24 @@ const truncate = (text: string): string =>
 export const runHook = async (
   raw: string,
   lint: LintFn = defaultLint,
+  deadlineMs: number = LINT_DEADLINE_MS,
 ): Promise<string> => {
   const edited = parseInput(raw);
   if (edited === undefined) return "";
   const scope = scopeOf(edited.filePath);
   if (scope === undefined) return "";
   try {
-    const outcome = await lint(scope.pluginRoot);
+    let timer: NodeJS.Timeout | undefined;
+    const deadline = new Promise<never>((_, reject) => {
+      timer = setTimeout(() => {
+        reject(new Error(`lint exceeded ${String(deadlineMs)}ms; skipped`));
+      }, deadlineMs);
+    });
+    const outcome = await Promise.race([lint(scope.pluginRoot), deadline]).finally(
+      () => {
+        clearTimeout(timer);
+      },
+    );
     if (!outcome.ok) return "";
     const findings = relevantFindings(outcome.report, scope);
     if (findings.length === 0) return "";

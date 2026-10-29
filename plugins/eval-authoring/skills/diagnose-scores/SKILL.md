@@ -66,8 +66,8 @@ interprets the verdict.
   `--ablation` back to two arms).
 - **`judge-skipped`:** the cost ceiling skipped paid graders; not a signal. Recommend a higher
   ceiling or a free grader.
-- **`weak-signal`:** Δ inside noise, positive or negative (a drop smaller than 2 standard errors lands here, not under `negative-delta`). Recommend more runs before changing anything.
-- **`both-arms-pass-all` / `both-arms-fail-all`:** a case that cannot fail, or never passes
+- **`weak-signal`:** Δ inside noise, positive or negative (a drop within the t cutoff below lands here, not under `negative-delta`). Recommend more runs before changing anything, unless both arms have SD 0 (the 0.05 floor sets the bar, so more identical runs cannot change the verdict): then a larger effect or a sharper grader is the lever.
+- **`both-arms-pass-all` / `both-arms-fail-all`:** a case that cannot fail (or has almost no headroom, both means at least 0.95), or never passes
   (check graders and grants).
 - **`discriminates`:** one line; do not invent a problem.
 
@@ -81,15 +81,17 @@ without-arm mean over usable runs.
 
 | Verdict | Rule |
 |---|---|
-| `negative-delta` | Δ ≤ -0.05 and beyond 2 standard errors; with unknown noise, any Δ ≤ -0.05 |
+| `negative-delta` | Δ ≤ -0.05 and beyond the t cutoff; with unknown noise, any Δ ≤ -0.05 |
 | `no-discrimination` | -0.05 < Δ < 0.05 |
-| `weak-signal` | \|Δ\| ≥ 0.05 and within 2 standard errors (only when both arms' standard deviations are known) |
-| `discriminates` | Δ ≥ 0.05 and Δ > 2 standard errors; with unknown noise, any Δ ≥ 0.05 |
+| `weak-signal` | \|Δ\| ≥ 0.05 and within the t cutoff; also any Δ ≥ 0.05 when an arm has under two usable runs (noise unknown) |
+| `discriminates` | Δ ≥ 0.05 and Δ > the t cutoff, with both arms' standard deviations known |
+
+The t cutoff is the two-sided 95% t quantile at the smaller arm's run count minus one (4.30 at 3 runs, 2.78 at 5, 2 from 31) times the standard error of Δ, floored at 0.05 so two arms with SD 0 do not count as noise-free. The `both-arms-pass-all` finding fires when both arm means are at least 0.95.
 
 Δ is rounded to three decimals before these comparisons, so an exact ±0.05 lands the same way every time.
 | `high-variance` finding | an arm's run-score standard deviation is above 0.25 |
 
-The 0.05 band, the 2 standard errors and the 0.25 SD are rules of thumb the script chose,
+The 0.05 band, the t cutoff, the 0.05 SE floor, the 0.95 ceiling and the 0.25 SD are rules of thumb the script chose,
 not measured limits. They may change; `verdict.ts` is the authority.
 
 ## Reading `mock-recordings/`

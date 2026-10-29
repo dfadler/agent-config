@@ -86,6 +86,13 @@ describe("check-plugin-eval", () => {
     expect(none.tag === "ok" && none.value).not.toContain("warning");
   });
 
+  it("lists a case with no delta as ungated, not as a warning (#738)", () => {
+    const none = check("0", result());
+    expect(none.tag === "ok" && none.value).toContain("ungated by delta");
+    const has = check("0", result({ delta: 0.3 }));
+    expect(has.tag === "ok" && has.value).not.toContain("ungated");
+  });
+
   it("rejects an empty or blank --cli-exit as a usage error", () => {
     expect(codeOf(check("", result()))).toBe(2);
     expect(codeOf(check("  ", result()))).toBe(2);

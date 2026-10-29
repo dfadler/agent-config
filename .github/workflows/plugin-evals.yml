@@ -144,10 +144,6 @@ jobs:
               --cli-exit "$cli" --threshold 1 --delta-floor 0 "$f" 2>&1 | tee -a "$GITHUB_STEP_SUMMARY"
             rc="${PIPESTATUS[0]}"
             [ "$rc" -gt "$worst" ] && worst="$rc"
-            # #738: a case with no delta (plugin-arm-only, --ablation none) skips the
-            # delta gate; list it so "ungated by delta" is visible, not silent.
-            jq -r '.cases[]? | select((.aggregates.delta // null) == null) | "- ungated by delta (no-plugin arm absent): \(.name)"' "$f" \
-              | tee -a "$GITHUB_STEP_SUMMARY"
           done < <(find "$OUT_DIR" -name aggregate-result.json | sort)
           if [ "$found" -eq 0 ]; then
             echo "::error::No aggregate-result.json under $OUT_DIR (wrapper exit $wrapper_exit)"
