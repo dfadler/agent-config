@@ -73,9 +73,10 @@ graders are indicators only when the mocked server is plugin-declared, unless `a
 
 - **Fixed** when the result is a function of this one call's input: `{{input.<field>}}` and
   `{{file:...}}` cover it, it is deterministic, costs no model call, and it is the only type
-  that takes `error: true`. Default to it. Live example: the `./bin/gh` stub in
-  `plugins/github-pr/evals/issue-triage-fires-on-backlog-sweep/scaffold-script` is a fixed
-  mock as a CLI, canned JSON for three issues and `exit 1` for anything else.
+  that takes `error: true`. Default to it. Analogy, not a mock file: the `./bin/gh` shell stub
+  in `plugins/github-pr/evals/issue-triage-fires-on-backlog-sweep/scaffold-script` is a canned stand-in
+  for a live CLI: it prints fixed JSON for `gh issue list` and `gh issue view`, `exit 1` otherwise.
+  No live suite in this repo uses an MCP mock file yet.
 - **Agent** only when answers must stay consistent across a sequence of calls (the judge
   "sees earlier calls as history") or inputs are too varied to template. It varies between
   runs, draws on the 4 x `max_turns` call budget, and needs a committed `.replay/` to be
@@ -89,5 +90,6 @@ about failure with no mock file carrying `error: true` and no grader naming the 
 `expect:` is not the error path: a violation aborts the run with score 0, it never returns
 an error to Claude. Smallest fix: one sibling case whose own `mocks/<server>/<tool>.md`
 (overrides the suite file) sets `error: true` with the error body, plus one grader on the
-claimed fallback. Shape (a lint fixture, not a live case):
+claimed fallback. Shape (a lint fixture, not a live case; ignore its unrelated `expect:` line,
+only `type: fixed` and `error: true` matter here):
 `plugins/eval-authoring/tests/lint-fixtures/EVAL013/good-case-yaml/cases/case1/mocks/tracker/close_issue.md`.
