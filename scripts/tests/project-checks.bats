@@ -145,7 +145,7 @@ write_rules() {
   run_doctor
   assert_success
   assert_output_contains "not safe to remove"
-  assert_output_contains "evals — holds gitignored content (results/)"
+  assert_output_contains "evals — holds gitignored content (results/run1.json)"
   assert_output_contains "keep-me — name contains 'keep'"
   refute_output_contains "plain —"
 }

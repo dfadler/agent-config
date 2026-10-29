@@ -116,6 +116,44 @@ describe("classification (dry run)", () => {
     expect(existsSync(join(p, "results", "r.json"))).toBe(true);
   });
 
+  it("removes a worktree whose only ignored content is declared disposable, still keeps other ignored content", () => {
+    const p = sb.addWorktree("a");
+    put(join(p, ".gitignore"), "results/\ncache/\n");
+    sb.git(p, "add", ".gitignore");
+    sb.git(p, "commit", "-q", "-m", "ignore");
+    sb.git(p, "push", "-q", "origin", "HEAD");
+    sb.markMerged("worktree-a", sb.head(p));
+    put(
+      join(sb.repo, ".claude", "settings.json"),
+      JSON.stringify({ worktree: { autoPruneDisposableIgnored: ["res*/"] } }),
+    );
+    put(join(p, "cache", "c.json"), "{}");
+    expect(go(["--yes"]).out).toMatch(/holds gitignored content \(cache\//);
+    expect(existsSync(p)).toBe(true);
+    rmSync(join(p, "cache"), { recursive: true });
+    put(join(p, "results", "r.json"), "{}");
+    go(["--yes"]);
+    expect(existsSync(p)).toBe(false);
+  });
+
+  it("matches disposable content even when git collapses it under an all-ignored parent", () => {
+    const p = sb.addWorktree("a");
+    put(join(p, ".gitignore"), "evals/\n");
+    sb.git(p, "add", ".gitignore");
+    sb.git(p, "commit", "-q", "-m", "ignore");
+    sb.git(p, "push", "-q", "origin", "HEAD");
+    sb.markMerged("worktree-a", sb.head(p));
+    put(
+      join(sb.repo, ".claude", "settings.json"),
+      JSON.stringify({
+        worktree: { autoPruneDisposableIgnored: ["evals/results/"] },
+      }),
+    );
+    put(join(p, "evals", "results", "r.json"), "{}");
+    go(["--yes"]);
+    expect(existsSync(p)).toBe(false);
+  });
+
   it("keeps a merged worktree with keep in its name", () => {
     const p = mergedWorktree("a-keep");
     expect(go(["--yes"]).out).toMatch(/name contains 'keep'/);
