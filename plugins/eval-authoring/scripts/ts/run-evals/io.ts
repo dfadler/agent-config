@@ -5,14 +5,19 @@
 import { spawn } from "node:child_process";
 import {
   accessSync,
+  chmodSync,
   constants,
+  existsSync,
+  lstatSync,
   mkdirSync,
   readFileSync,
   readdirSync,
   realpathSync,
+  rmSync,
   writeFileSync,
 } from "node:fs";
-import { delimiter, dirname, join } from "node:path";
+import { homedir, tmpdir } from "node:os";
+import { delimiter, dirname, join, resolve } from "node:path";
 import { createInterface } from "node:readline/promises";
 
 export interface SpawnOptions {
@@ -56,6 +61,16 @@ export interface Io {
   readonly readFile: (path: string) => string | undefined;
   /** Writes a file, creating parent directories. */
   readonly writeFile: (path: string, text: string) => void;
+  /** The user's home directory, shown as `~` in the replies files. */
+  readonly home: string;
+  /** Where the CLI puts run sandboxes; `removeDir` refuses anything not strictly under one of these. */
+  readonly tempRoots: readonly string[];
+  /**
+   * Removes a directory tree under one of `tempRoots`, making it writable first
+   * (the CLI leaves a mode-000 `sealed/` in each sandbox). Throws on anything
+   * else, including a path outside the roots.
+   */
+  readonly removeDir: (path: string) => void;
   /** Asks a yes/no question on the terminal. False (never a guess) when there is no one to ask. */
   readonly confirm: (question: string) => Promise<boolean>;
 }
@@ -113,6 +128,31 @@ const real = (path: string): string => {
   }
 };
 
+/**
+ * Where the CLI puts run sandboxes: the platform temp dir, and `/tmp` (where
+ * `claude plugin eval` writes `e-*` even when TMPDIR differs), each as given
+ * and through symlinks, since a `tracePath` may be spelled either way.
+ */
+const TEMP_ROOTS: readonly string[] = [...new Set([tmpdir(), real(tmpdir()), "/tmp", real("/tmp")])];
+
+/** Strictly under one of `TEMP_ROOTS`, as spelled or through symlinks (a missing path cannot be resolved, so both forms are tried). */
+const underTempRoot = (path: string): boolean => {
+  const p = resolve(path);
+  return [p, real(p)].some((q) => TEMP_ROOTS.some((r) => q.startsWith(`${r}/`)));
+};
+
+/** `chmod -R u+rwx`, top-down: a mode-000 directory must be opened before its children can be listed. Symlinks are left alone so nothing outside the tree is touched. */
+const makeWritable = (path: string): void => {
+  const st = lstatSync(path);
+  if (st.isSymbolicLink()) return;
+  chmodSync(path, (st.mode & 0o7777) | 0o700);
+  if (st.isDirectory()) {
+    readdirSync(path).forEach((e) => {
+      makeWritable(join(path, e));
+    });
+  }
+};
+
 /** `which -a`: all matches on `pathVar`, resolved and de-duplicated. */
 export const findExecutables = (
   name: string,
@@ -157,6 +197,16 @@ export const nodeIo = (env: Readonly<Record<string, string | undefined>>): Io =>
   writeFile: (path, text) => {
     mkdirSync(dirname(path), { recursive: true });
     writeFileSync(path, text);
+  },
+  home: homedir(),
+  tempRoots: TEMP_ROOTS,
+  removeDir: (path) => {
+    if (!underTempRoot(path)) {
+      throw new Error(`refusing to remove ${path}: not under ${TEMP_ROOTS.join(" or ")}`);
+    }
+    if (!existsSync(path)) return; // the CLI already removed it: nothing to warn about
+    makeWritable(path);
+    rmSync(path, { recursive: true, force: true });
   },
   confirm: async (question) => {
     if (!process.stdin.isTTY) return false;

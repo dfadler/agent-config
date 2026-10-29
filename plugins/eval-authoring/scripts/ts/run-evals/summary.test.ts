@@ -1,4 +1,5 @@
 import { readFileSync } from "node:fs";
+import { join } from "node:path";
 import { describe, expect, it } from "vitest";
 import { EXIT_OK, EXIT_PARTIAL, EXIT_USAGE } from "./exit-codes.ts";
 import { main, parseArgs } from "./run-evals.ts";
@@ -9,16 +10,20 @@ import {
   BLOCK_START,
   caseRow,
   finalReply,
+  maskHome,
   quoteSafe,
   redact,
   renderBlock,
   renderSummary,
+  truncatedTrace,
   withBlock,
 } from "./summary.ts";
 
 const FAKE_TOKEN = `ghp_${"a1B2c3D4e5".repeat(3)}`;
 
-const TRACE_PATH = "/t/trace.jsonl";
+/** Shaped like the CLI's: `<sandbox>/runN/trace.jsonl` under /tmp. */
+const SANDBOX = "/tmp/e-TEST";
+const TRACE_PATH = `${SANDBOX}/run0/trace.jsonl`;
 const LONG_REPLY = `here it is: token=${FAKE_TOKEN} and more ${"x ".repeat(400)}`;
 /** A trace in the real stream-json shape whose last assistant message is LONG_REPLY. */
 const TRACE = [
@@ -78,6 +83,18 @@ describe("redact and quoteSafe", () => {
     expect(redact(`sk-${"z9".repeat(12)}`)).toBe("[REDACTED]");
     expect(redact("AKIAABCDEFGHIJKLMNOP")).toBe("[REDACTED]");
     expect(redact("a plain sentence")).toBe("a plain sentence");
+  });
+  it("masks the home directory only on a path boundary", () => {
+    expect(maskHome('{"cwd":"/Users/x","f":"/Users/x/r/a.ts"} /Users/xavier/b /Users/x', "/Users/x/")).toBe(
+      '{"cwd":"~","f":"~/r/a.ts"} /Users/xavier/b ~',
+    );
+    expect(maskHome("/Users/x/r", "")).toBe("/Users/x/r");
+    expect(maskHome("C:\\Users\\x\\r", "C:\\Users\\x")).toBe("~\\r");
+  });
+  it("tells a trace cut mid-line from a whole one", () => {
+    expect(truncatedTrace(`${TRACE}\n`)).toBe(false);
+    expect(truncatedTrace(`${TRACE}\n{"type":"assis`)).toBe(true);
+    expect(truncatedTrace("")).toBe(false);
   });
   it("truncates, flattens, and cannot fake a block marker or close a code span", () => {
     const q = quoteSafe(`a\n\nb \`c\` <!-- run-evals:end -->${"y ".repeat(300)}`, 50);
@@ -246,6 +263,57 @@ describe("printed summary", () => {
     const text = s.out.join("");
     expect(text).toContain("(no readable result)");
     expect(text).toMatch(/\| beta \| not run \|/);
+  });
+});
+
+describe("replies files", () => {
+  const STAMP = "run-2026-01-02T03-04-05-000Z";
+  const summaryOf = (s: ReturnType<typeof setup>): unknown =>
+    JSON.parse(s.written.get(join(s.root, "evals", "results", STAMP, "run-evals-summary.json")) ?? "null");
+  it("has the CLI keep the sandboxes, writes each run's redacted reply and tool calls beside the results, then removes the sandboxes", async () => {
+    const s = setup();
+    expect(await main([s.root, "--case", "alpha"], deps(s))).toBe(EXIT_OK);
+    const cli = s.calls.find((c) => c.args[0] === "plugin");
+    expect(cli?.args).toContain("--keep-temp");
+    const dir = join(s.root, "evals", "results", STAMP, "replies", "01-alpha");
+    const file = s.written.get(join(dir, "alpha", "with-1.md")) ?? "";
+    expect(file).toContain("# alpha: with arm, run 1");
+    expect(file).toContain("failed graders: g");
+    expect(file).toContain("token=[REDACTED]");
+    expect(file).not.toContain(FAKE_TOKEN);
+    expect(s.written.has(join(dir, "alpha", "without-1.md"))).toBe(false);
+    expect(summaryOf(s)).toMatchObject({ invocations: [{ caseName: "alpha", repliesDir: dir }] });
+    expect(s.err.join("")).toContain(`1 run replies in ${dir}`);
+    expect(s.removed).toEqual([SANDBOX]);
+  });
+  it("keeps the sandboxes with --keep-temp", async () => {
+    const s = setup();
+    expect(await main([s.root, "--case", "alpha", "--keep-temp"], deps(s))).toBe(EXIT_OK);
+    expect(s.removed).toEqual([]);
+    expect(s.written.has(join(s.root, "evals", "results", STAMP, "replies", "01-alpha", "alpha", "with-1.md"))).toBe(true);
+  });
+  it("leaves repliesDir unset and says so when no trace is readable; a sandbox that cannot be removed is one warning", async () => {
+    const s = setup({ files: {}, onRemove: () => { throw new Error("EACCES"); } });
+    expect(await main([s.root, "--case", "alpha"], deps(s))).toBe(EXIT_OK);
+    expect([...s.written.keys()].some((k) => k.includes("/replies/"))).toBe(false);
+    expect(summaryOf(s)).toMatchObject({ invocations: [{ caseName: "alpha" }] });
+    expect(JSON.stringify(summaryOf(s))).not.toContain("repliesDir");
+    const err = s.err.join("");
+    expect(err).toContain("invocation 1/1 (alpha): no readable trace for any of its 2 run(s); no replies written");
+    expect(err).toContain(`could not remove sandbox ${SANDBOX} (EACCES)`);
+  });
+  it("warns once, drops repliesDir and goes on with the run and the summary when a replies file cannot be written", async () => {
+    const s = setup({ onWrite: (p) => { if (p.includes("/replies/")) throw new Error("ENOSPC"); } });
+    expect(await main([s.root, "--case", "al*"], deps(s))).toBe(EXIT_OK);
+    expect(s.calls.filter((c) => c.args[0] === "plugin")).toHaveLength(2);
+    expect([...s.written.keys()].some((k) => k.includes("/replies/"))).toBe(false);
+    expect(summaryOf(s)).toMatchObject({ invocations: [{ caseName: "alpha", exit: EXIT_OK }, { caseName: "alpine", exit: EXIT_OK }] });
+    expect(JSON.stringify(summaryOf(s))).not.toContain("repliesDir");
+    const warnings = s.err.filter((l) => l.includes("could not write the replies files"));
+    expect(warnings).toHaveLength(2);
+    expect(warnings[0]).toContain("invocation 1/2 (alpha): could not write the replies files (");
+    expect(warnings[0]).toContain("/replies/01-alpha/alpha/with-1.md: ENOSPC); continuing");
+    expect(s.out.join("")).toContain("| alpha |");
   });
 });
 
