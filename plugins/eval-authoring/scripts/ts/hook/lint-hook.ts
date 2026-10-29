@@ -16,6 +16,7 @@
  * this imports only from the plugin's own scripts.
  */
 import { existsSync, writeSync } from "node:fs";
+import { Worker } from "node:worker_threads";
 import { dirname, isAbsolute, join, relative, resolve, sep } from "node:path";
 import { resolveEvalDir } from "../parser/index.ts";
 import type { Finding } from "../lint/types.ts";
@@ -31,7 +32,10 @@ const MAX_CONTEXT_CHARS = 8000;
 const LINT_DEADLINE_MS = 45_000;
 
 /** Runs the lint for a plugin root. Injected so tests can simulate a crash. */
-export type LintFn = (pluginRoot: string) => Promise<LintOutcome>;
+export type LintFn = (
+  pluginRoot: string,
+  signal?: AbortSignal,
+) => Promise<LintOutcome>;
 
 export interface EditedFile {
   readonly filePath: string;
@@ -150,14 +154,46 @@ export const hookOutput = (context: string): string =>
     },
   })}\n`;
 
-/** The default lint: load the real rules and run them. Imported lazily so a no-op edit never loads them. */
-export const defaultLint: LintFn = async (pluginRoot) => {
-  const { discoverRules } = await import("../lint/discover.ts");
-  const { lintPlugin } = await import("../lint/runner.ts");
-  const found = await discoverRules();
-  if (!found.ok) throw new Error(found.message);
-  return lintPlugin(pluginRoot, found.rules);
-};
+/**
+ * Run the lint in a worker thread so synchronous lint work cannot block the
+ * parent's deadline timer. Aborting `signal` terminates the worker. The worker
+ * (and the rules) load only when this is called, so a no-op edit never pays.
+ */
+export const workerLint = (
+  pluginRoot: string,
+  signal?: AbortSignal,
+  workerUrl: URL = new URL("./lint-worker.ts", import.meta.url),
+): Promise<LintOutcome> =>
+  new Promise((resolveOutcome, reject) => {
+    const worker = new Worker(workerUrl, { workerData: pluginRoot });
+    const stop = (): void => {
+      void worker.terminate();
+    };
+    signal?.addEventListener("abort", stop, { once: true });    const done = (settle: () => void): void => {
+      signal?.removeEventListener("abort", stop);
+      stop();
+      settle();
+    };
+    worker.once("message", (m: LintOutcome) => {
+      done(() => {
+        resolveOutcome(m);
+      });
+    });
+    worker.once("error", (e) => {
+      done(() => {
+        reject(e);
+      });
+    });
+    worker.once("exit", () => {
+      done(() => {
+        reject(new Error("lint worker exited without a result"));
+      });
+    });
+  });
+
+/** The default lint: runs in a worker so the parent can enforce the deadline. */
+export const defaultLint: LintFn = (pluginRoot, signal) =>
+  workerLint(pluginRoot, signal);
 
 const truncate = (text: string): string =>
   text.length <= MAX_CONTEXT_CHARS
@@ -180,14 +216,17 @@ export const runHook = async (
   if (scope === undefined) return "";
   try {
     let timer: NodeJS.Timeout | undefined;
+    const abort = new AbortController();
     const deadline = new Promise<never>((_, reject) => {
       timer = setTimeout(() => {
+        abort.abort();
         reject(new Error(`lint exceeded ${String(deadlineMs)}ms; skipped`));
       }, deadlineMs);
     });
-    const outcome = await Promise.race([lint(scope.pluginRoot), deadline]).finally(
+    const outcome = await Promise.race([lint(scope.pluginRoot, abort.signal), deadline]).finally(
       () => {
         clearTimeout(timer);
+        abort.abort();
       },
     );
     if (!outcome.ok) return "";
