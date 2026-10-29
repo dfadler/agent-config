@@ -388,6 +388,41 @@ describe("mechanical findings", () => {
     expect(kinds(v)).not.toContain("split-judge-votes");
   });
 
+  it("flags runs that hit the turn limit, per arm, and keeps their scores (#713 1d)", () => {
+    // A cut-off run still has failing graders, so it is a real 0, not a silent one.
+    const starved = run(0, {
+      turns: 4,
+      graders: [{ ...scoredGrader, passed: false }],
+    });
+    const v = diagnoseCase(
+      caseOf([], [], 0, {
+        maxTurns: 4,
+        withRuns: [starved, run(1, { turns: 2 })],
+        withoutRuns: [starved, starved],
+      }),
+    );
+    const f = v.findings.filter((x) => x.kind === "turn-limit");
+    expect(f.map((x) => x.message)).toEqual([
+      expect.stringContaining("1 of 2 with runs hit the turn limit (max_turns 4)"),
+      expect.stringContaining("2 of 2 without runs hit the turn limit"),
+    ]);
+    expect(v.with.usedRuns).toBe(2);
+  });
+
+  it("does not flag the turn limit without maxTurns or turns, or under the limit", () => {
+    const under = caseOf([], [], 0, {
+      maxTurns: 4,
+      withRuns: [run(1, { turns: 3 })],
+      withoutRuns: [run(1, { turns: 3 })],
+    });
+    const noLimit = caseOf([], [], 0, {
+      withRuns: [run(1, { turns: 4 })],
+      withoutRuns: [run(1)],
+    });
+    expect(kinds(diagnoseCase(under))).not.toContain("turn-limit");
+    expect(kinds(diagnoseCase(noLimit))).not.toContain("turn-limit");
+  });
+
   it("flags high variance in an arm", () => {
     const v = diagnoseCase(caseOf([1, 0, 1, 0], [0, 0, 0, 0], 0.5));
     expect(kinds(v)).toContain("high-variance");

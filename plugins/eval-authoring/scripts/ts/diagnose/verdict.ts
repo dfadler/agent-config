@@ -46,7 +46,9 @@ export type FindingKind =
   | "single-run"
   | "both-arms-pass-all"
   | "both-arms-fail-all"
-  | "delta-recomputed";
+  | "delta-recomputed"
+  /** A run used every allowed turn, so it had no final reply to grade (#713 1d). */
+  | "turn-limit";
 
 export interface Finding {
   readonly kind: FindingKind;
@@ -230,6 +232,12 @@ const runFindings = (c: CaseResult): readonly Finding[] => {
     const errors = runs.filter(isErrored);
     const aborted = runs.filter((r) => r.aborted === true).length;
     const skipped = runs.filter((r) => r.skippedPaidGraders === true).length;
+    const starved = runs.filter(
+      (r) =>
+        c.maxTurns !== undefined &&
+        r.turns !== undefined &&
+        r.turns >= c.maxTurns,
+    ).length;
     const out: readonly Finding[] = [
       ...(errors.length === 0
         ? []
@@ -256,6 +264,15 @@ const runFindings = (c: CaseResult): readonly Finding[] => {
               kind: "skipped-paid-graders" as const,
               severity: "warn" as const,
               message: `${String(skipped)} ${arm} runs skipped paid judge graders over the cost ceiling; their scores are not comparable and are left out`,
+            },
+          ]),
+      ...(starved === 0
+        ? []
+        : [
+            {
+              kind: "turn-limit" as const,
+              severity: "warn" as const,
+              message: `${String(starved)} of ${String(runs.length)} ${arm} runs hit the turn limit (max_turns ${String(c.maxTurns)}): a cut-off run has no final reply, so every text grader fails for the wrong reason (the score is still counted); raise max_turns or trim the work before judging the case`,
             },
           ]),
     ];

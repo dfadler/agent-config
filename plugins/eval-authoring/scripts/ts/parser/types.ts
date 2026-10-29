@@ -468,6 +468,8 @@ export interface RunResult {
   readonly aborted?: boolean;
   /** Judge graders skipped over the cost ceiling; the score is not comparable. */
   readonly skippedPaidGraders?: boolean;
+  /** Agent turns the run used; at `CaseResult.maxTurns` the run was cut off (#713). */
+  readonly turns?: number;
   readonly graders?: readonly GraderResult[];
 }
 
@@ -488,6 +490,8 @@ export interface CaseAggregates {
 export interface CaseResult {
   readonly name: string;
   readonly aggregates: CaseAggregates;
+  /** The case's turn limit (`max_turns`); omitted in older results. */
+  readonly maxTurns?: number;
   /** `arms.with[]`: runs with the plugin. */
   readonly withRuns: readonly RunResult[];
   /** `arms.without[]`: runs without it; empty for a one-arm or `--ablation none` run. */
