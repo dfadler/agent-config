@@ -9,6 +9,7 @@ import {
 } from "node:fs";
 import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
+import { pathToFileURL } from "node:url";
 import { afterEach, describe, expect, it } from "vitest";
 import {
   findPluginRoot,
@@ -17,6 +18,7 @@ import {
   relevantFindings,
   runHook,
   scopeOf,
+  workerLint,
   type LintFn,
 } from "./lint-hook.ts";
 
@@ -210,6 +212,41 @@ describe("runHook: failure containment", () => {
     const hang: LintFn = () => new Promise(() => undefined);
     const out = await runHook(event(join(root, "evals/bad/case.yaml")), hang, 20);
     expect(out).toBe("");
+  });
+
+  it("enforces the deadline on synchronous blocking work in the worker", async () => {
+    const root = makePlugin();
+    const blocker = join(root, "blocker.mjs");
+    writeFileSync(blocker, "for (;;) {}\n");
+    let workerRun: ReturnType<typeof workerLint> | undefined;
+    const lint: LintFn = (r, s) => {
+      workerRun = workerLint(r, s, pathToFileURL(blocker));
+      return workerRun;
+    };
+    const t0 = Date.now();
+    const out = await runHook(event(join(root, "evals/bad/case.yaml")), lint, 200);
+    expect(out).toBe("");
+    expect(Date.now() - t0).toBeLessThan(3000);
+    // The deadline abort must terminate the worker, not just stop waiting for it.
+    await expect(workerRun).rejects.toThrow("exited without a result");
+  });
+
+  it("terminates a blocked worker when the signal aborts", async () => {
+    const root = makePlugin();
+    const blocker = join(root, "blocker.mjs");
+    writeFileSync(blocker, "for (;;) {}\n");
+    const ctl = new AbortController();
+    const run = workerLint(root, ctl.signal, pathToFileURL(blocker));
+    setTimeout(() => {
+      ctl.abort();
+    }, 100);
+    await expect(run).rejects.toThrow("exited without a result");
+  });
+
+  it("returns real findings through the default worker lint", async () => {
+    const root = makePlugin();
+    const out = await runHook(event(join(root, "evals/bad/case.yaml")));
+    expect(out).toContain("EVAL001");
   });
 
   it("returns nothing when the lint refuses the plugin", async () => {
