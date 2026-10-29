@@ -1,5 +1,4 @@
 # Run: node plugins/eval-authoring/scripts/ts/run-evals/run-evals.ts --tier standard plugins/vite
-# (use `--ablation none`: the no-plugin arm cannot dispatch a plugin agent.)
 # Quiet half of the vite-plugin-reviewer boundary: shares "Vite" and "config" with the agent's
 # description but is a dev-server routing question with no plugin file or diff to review.
 # Smoke guard (no expected delta): the no-plugin arm passes the not-dispatched check by
@@ -17,9 +16,9 @@ tags: [vite, reviewer, agent, trigger, smoke]
 
 execution:
   prompt: |
-    My Vite app sets base: '/app/' in vite.config.ts. In dev, fetch('/api/users') returns my
-    index.html instead of JSON. Which config option fixes it? Two sentences, no files, no
-    commands.
+    My Vite app sets base: '/app/' in vite.config.ts. In dev, fetch('/app/api/users') returns my
+    index.html instead of JSON, and my API runs on localhost:4000. Which config option fixes it?
+    Two sentences, no files, no commands.
   max_turns: 4
   allowed_tools:
     - Agent
