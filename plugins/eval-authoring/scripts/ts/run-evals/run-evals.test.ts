@@ -7,6 +7,7 @@ import {
   EXIT_INTERRUPTED,
   EXIT_OK,
   EXIT_PARTIAL,
+  EXIT_TERMINATED,
   EXIT_USAGE,
 } from "./exit-codes.ts";
 import { isRepoPlugin, main, parseArgs } from "./run-evals.ts";
@@ -47,6 +48,12 @@ const okCli =
   });
 
 const STAMP = "run-2026-01-02T03-04-05-000Z";
+
+const withCaffeinate = {
+  claude: ["/bin/claude"],
+  git: ["/bin/git"],
+  caffeinate: ["/usr/bin/caffeinate"],
+};
 
 const cliCalls = (calls: readonly { command: string; args: readonly string[] }[]) =>
   calls.filter((c) => c.command === "claude" && c.args[0] === "plugin");
@@ -234,11 +241,6 @@ describe("main", () => {
   });
 
   it("runs the CLI under caffeinate -i on macOS when it is on PATH, and bare elsewhere", async () => {
-    const withCaffeinate = {
-      claude: ["/bin/claude"],
-      git: ["/bin/git"],
-      caffeinate: ["/usr/bin/caffeinate"],
-    };
     const mac = setup({ cases: [{ name: "a" }], onPath: withCaffeinate, onCli: okCli() });
     await main([mac.root], { io: mac.io, pluginsDir: "/p" });
     const wrapped = mac.calls.filter((c) => c.command === "caffeinate");
@@ -250,6 +252,30 @@ describe("main", () => {
     await main([linux.root], { io: linux.io, pluginsDir: "/p" });
     expect(linux.calls.some((c) => c.command === "caffeinate")).toBe(false);
     expect(cliCalls(linux.calls)).toHaveLength(1);
+  });
+
+  it("maps a caffeinate-wrapped 128+signal or 127 status back to what a bare spawn sees", async () => {
+    const run = async (status: number, platform = "darwin") => {
+      const s = setup({ cases: [{ name: "a" }], onPath: withCaffeinate, platform, cliResult: spawned({ status }) });
+      const code = await main([s.root], { io: s.io, pluginsDir: "/p" });
+      return { code, err: s.err.join(""), summary: [...s.written.values()].join("") };
+    };
+    const killed = await run(137);
+    expect(killed.code).toBe(EXIT_PARTIAL);
+    expect(killed.err).toContain("signal SIGKILL");
+    const term = await run(143);
+    expect(term.code).toBe(EXIT_TERMINATED);
+    // Recorded as the signal death a bare spawn sees, not as status 143.
+    expect(term.summary).toContain('"cliStatus": null');
+    const missing = await run(127);
+    expect(missing.code).toBe(EXIT_DEPENDENCY);
+    expect(missing.summary).toContain("could not start claude: caffeinate exit 127");
+    const plain = await run(3);
+    expect(plain.code).toBe(EXIT_FAILURE);
+    expect(plain.err).toContain("unexpected CLI exit status 3");
+    const bare = await run(137, "linux");
+    expect(bare.code).toBe(EXIT_FAILURE);
+    expect(bare.err).toContain("unexpected CLI exit status 137");
   });
 
   it("does not pass --trust-plugin for a plugin outside the repo's plugins directory", async () => {
