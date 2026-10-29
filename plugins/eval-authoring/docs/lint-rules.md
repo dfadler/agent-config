@@ -19,7 +19,6 @@ the authority; the severity is the default.
 
 | ID | Sev | Why it matters | Fix |
 |---|---|---|---|
-| EVAL001 | error | A case with no grader cannot fail. | Add at least one grader. |
 | EVAL002 | error | The CLI ignores or rejects keys it does not know, so a typo silently drops a check. | Use only documented keys, put run fields (`max_turns`, `allowed_tools`...) under `execution:`, and start `case.yaml` with `schema_version` and `name`. |
 | EVAL003 | error | A value outside the schema (bad `runs`, `weight`, `arm`, grader `type`, an `env` key not starting `EVAL_`) fails to load or changes scoring. | Set the field to a value the message's range allows. |
 | EVAL004 | error | A case cannot grant itself `Bash`, `Write`, `Edit`, `WebFetch` or `WebSearch`; without a recorded grant the tool is denied and the case cannot pass. | Add the exact entry to `grants.yaml`, or drop the tool from `allowed_tools`. |
@@ -49,7 +48,7 @@ The Sev column is the rule's default. EVAL007, EVAL012, EVAL014 and EVAL023 over
 
 ## Audit (#811)
 
-Hits from running the lint over every plugin with evals (30 plugins, 269 cases), 2026-10-28. Details and rule origins: [#811](https://github.com/dfadler/agent-config/issues/811). CLI overlap was not checked against the live CLI.
+Hits from running the lint over every plugin with evals (30 plugins, 269 cases), 2026-10-28. Details and rule origins: [#811](https://github.com/dfadler/agent-config/issues/811). CLI overlap for 001, 003 and 005 was checked with free `--max-cost-usd 0` probes (#811); the rest was not.
 
 - 009: 143 info. Open: fires on over half of cases; delete or make opt-in?
 - 024: 56 warn. Keep: real prompt-echo findings; the fixes are case edits.
@@ -57,7 +56,8 @@ Hits from running the lint over every plugin with evals (30 plugins, 269 cases),
 - 025: 6 warn. Keep.
 - 022: 0. Keep; the false positive was fixed in #812.
 - 014: 0. The `fixtures/bin` check was removed (a probe in #450 refuted it); the rest stays.
-- 001, 005: 0. Open: the CLI may already reject these.
+- 001: deleted; the CLI rejects an empty or missing `graders:` with a clear message.
+- 005: 0. Open: the CLI warns for `min: 1`, not for `max: 0`.
 - 003, 004, 008, 010, 021: 0. Open merge candidates (003 into 002, 004 with 021, 008 with 010).
 - All other rules: 0. Keep.
 
