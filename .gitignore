@@ -8,6 +8,7 @@ coverage/
 coverage-py/
 .coverage
 node_modules/
+.DS_Store
 
 # `claude plugin eval` run output (report.html, aggregate-result.json, traces)
 # — local-only, regenerated on every run. Run against a plugin path it lands in
