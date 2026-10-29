@@ -30,6 +30,14 @@ describe("main", () => {
     );
   });
 
+  it("applies a threshold flag to the verdicts", () => {
+    const argv = ["--neutral-band", "0.9", "--format", "json", "r.json"];
+    const out = main(argv, io({ "r.json": fixture("two-cases-one-run.json") }));
+    expect(out.code).toBe(EXIT_OK);
+    expect(out.stdout).toContain('"verdict": "no-discrimination"');
+    expect(out.stdout).not.toContain('"verdict": "weak-signal"');
+  });
+
   // Trimmed copy of a real `claude plugin eval` llm-graded result. Real, but
   // every judge sample is unanimous (PASS PASS PASS / FAIL FAIL FAIL): no real split.
   it("reads a real llm-graded result: judgeVotes parsed, no split finding", () => {
@@ -96,6 +104,8 @@ describe("main", () => {
     ["a bad format", ["--format", "xml", "a.json"]],
     ["a missing format value", ["a.json", "--format"]],
     ["an unknown flag", ["--nope"]],
+    ["a non-numeric threshold", ["--neutral-band", "abc", "a.json"]],
+    ["a missing threshold value", ["a.json", "--se-floor"]],
     ["a missing file", ["missing.json"]],
   ])("exits 2 for %s", (_label, argv) => {
     const out = main(argv, io({ "a.json": "{}" }));
