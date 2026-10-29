@@ -46,7 +46,11 @@ export type FindingKind =
   | "single-run"
   | "both-arms-pass-all"
   | "both-arms-fail-all"
-  | "delta-recomputed";
+  | "delta-recomputed"
+  /** A run used every allowed turn, so it had no final reply to grade (#713 1d). */
+  | "turn-limit"
+  /** Graders that pass in every run of both arms, so they cannot discriminate (#713 1c). */
+  | "vacuous-graders";
 
 export interface Finding {
   readonly kind: FindingKind;
@@ -230,6 +234,12 @@ const runFindings = (c: CaseResult): readonly Finding[] => {
     const errors = runs.filter(isErrored);
     const aborted = runs.filter((r) => r.aborted === true).length;
     const skipped = runs.filter((r) => r.skippedPaidGraders === true).length;
+    const starved = runs.filter(
+      (r) =>
+        c.maxTurns !== undefined &&
+        r.turns !== undefined &&
+        r.turns >= c.maxTurns,
+    ).length;
     const out: readonly Finding[] = [
       ...(errors.length === 0
         ? []
@@ -258,9 +268,68 @@ const runFindings = (c: CaseResult): readonly Finding[] => {
               message: `${String(skipped)} ${arm} runs skipped paid judge graders over the cost ceiling; their scores are not comparable and are left out`,
             },
           ]),
+      ...(starved === 0
+        ? []
+        : [
+            {
+              kind: "turn-limit" as const,
+              severity: "warn" as const,
+              message: `${String(starved)} of ${String(runs.length)} ${arm} runs hit the turn limit (max_turns ${String(c.maxTurns)}): a cut-off run has no final reply, so every text grader fails for the wrong reason (the score is still counted); raise max_turns or trim the work before judging the case`,
+            },
+          ]),
     ];
     return out;
   });
+};
+
+/**
+ * Graders that pass in every usable run of both arms cannot tell the plugin
+ * from no plugin (#713 1c): "did not read X" when the baseline has no X, or a
+ * phrase the prompt itself contains. Needs grader detail in both arms.
+ * With-only graders are absent from the no-plugin score by design and are
+ * skipped, as are graders excluded from the score in every run.
+ */
+const vacuousGraderFindings = (c: CaseResult): readonly Finding[] => {
+  const graded = (
+    runs: readonly RunResult[],
+  ): readonly (readonly GraderResult[])[] =>
+    runs.flatMap((r) =>
+      r.graders === undefined || isErrored(r) || isSilentZero(r)
+        ? []
+        : [r.graders],
+    );
+  const w = graded(c.withRuns);
+  const wo = graded(c.withoutRuns);
+  if (w.length === 0 || wo.length === 0) return [];
+  const all = [...w, ...wo].flat();
+  const names = [
+    ...new Set(all.flatMap((g) => (g.name === undefined ? [] : [g.name]))),
+  ];
+  const has = (lists: readonly (readonly GraderResult[])[], name: string): number =>
+    lists.filter((l) => l.some((g) => g.name === name)).length;
+  const vacuous = names.filter((name) => {
+    const entries = all.filter((g) => g.name === name);
+    return (
+      has(w, name) > 0 &&
+      has(wo, name) > 0 &&
+      entries.every((g) => g.withOnly !== true && g.passed === true) &&
+      entries.some((g) => g.scored !== false)
+    );
+  });
+  return vacuous.length === 0
+    ? []
+    : [
+        {
+          kind: "vacuous-graders",
+          severity: "warn",
+          message: `graders pass in every run of both arms, so they cannot discriminate (a check the baseline satisfies trivially, or a negative pattern the prompt itself contains; a should-not-fire case is the exception): ${vacuous
+            .map(
+              (name) =>
+                `${name} (with ${String(has(w, name))}/${String(has(w, name))}, without ${String(has(wo, name))}/${String(has(wo, name))})`,
+            )
+            .join("; ")}`,
+        },
+      ];
 };
 
 interface Judged {
@@ -424,7 +493,11 @@ const judgeCase = (c: CaseResult, t: Thresholds): Judged => {
   const w = armStats(c.withRuns);
   const wo = armStats(c.withoutRuns);
   const scored = scoredGraderCount(c);
-  const base = [...runFindings(c), ...splitVoteFindings(c)];
+  const base = [
+    ...runFindings(c),
+    ...splitVoteFindings(c),
+    ...vacuousGraderFindings(c),
+  ];
   const stop = (j: Judged): Judged => withFindings(j, base);
 
   if (c.withRuns.length === 0) {

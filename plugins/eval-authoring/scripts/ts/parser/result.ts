@@ -62,6 +62,7 @@ const readRun = (r: Rec): RunResult => {
   const error = errorOf(r["error"]);
   const aborted = optBool(r["aborted"]);
   const skipped = optBool(r["skippedPaidGraders"]);
+  const turns = optNum(r["turns"]);
   const graders = Array.isArray(r["graders"])
     ? arr(r["graders"]).filter(isRec).map(readGrader)
     : undefined;
@@ -70,6 +71,7 @@ const readRun = (r: Rec): RunResult => {
     ...(error === undefined ? {} : { error }),
     ...(aborted === undefined ? {} : { aborted }),
     ...(skipped === undefined ? {} : { skippedPaidGraders: skipped }),
+    ...(turns === undefined ? {} : { turns }),
     ...(graders === undefined ? {} : { graders }),
   };
 };
@@ -89,9 +91,11 @@ const readCaseResult = (c: Rec): CaseResult => {
     ...(scoreWithout === undefined ? {} : { scoreWithout }),
     ...(passRateWithout === undefined ? {} : { passRateWithout }),
   };
+  const maxTurns = optNum(c["maxTurns"]);
   return {
     name: optStr(c["name"]) ?? "",
     aggregates: outAggregates,
+    ...(maxTurns === undefined ? {} : { maxTurns }),
     withRuns: arr(arms["with"]).filter(isRec).map(readRun),
     withoutRuns: arr(arms["without"]).filter(isRec).map(readRun),
   };
