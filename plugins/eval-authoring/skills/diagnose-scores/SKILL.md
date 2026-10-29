@@ -56,8 +56,8 @@ interprets the verdict.
 - **`no-discrimination` with a `tool_used: Skill` grader failing in the with arm:** the
   skill's description did not trigger on the prompt. Compare the two and propose a
   description change. If the Skill grader passes and Δ is still about zero, the model does
-  this by default: reword the case around what the skill adds, or mark it a regression
-  guard in `expected_outcome`.
+  this by default: reword the case around what the skill adds, or drop it. Only a
+  should-not-fire case is a regression guard (delta 0 by design; say so in `expected_outcome`).
 - **`split-judge-votes`, `high-variance`:** an unstable criterion. Name the grader, the
   condition two judges could read differently, and the rewording.
 - **`no-scored-graders`, `no-delta-signal`:** every grader is excluded from scoring
@@ -67,7 +67,7 @@ interprets the verdict.
 - **`judge-skipped`:** the cost ceiling skipped paid graders; not a signal. Recommend a higher
   ceiling or a free grader.
 - **`weak-signal`:** Δ inside noise, positive or negative (a drop within the t cutoff below lands here, not under `negative-delta`). Recommend more runs before changing anything, unless both arms have SD 0 (the 0.05 floor sets the bar, so more identical runs cannot change the verdict): then a larger effect or a sharper grader is the lever.
-- **`both-arms-pass-all` / `both-arms-fail-all`:** a case that cannot fail (or has almost no headroom, both means at least 0.95), or never passes
+- **`both-arms-pass-all` / `both-arms-fail-all`:** a case that cannot fail (or has almost no headroom, both means at least 0.95: check for a leaked answer, then fix or drop it), or never passes
   (check graders and grants).
 - **`discriminates`:** one line; do not invent a problem.
 
