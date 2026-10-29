@@ -423,6 +423,39 @@ describe("mechanical findings", () => {
     expect(kinds(diagnoseCase(noLimit))).not.toContain("turn-limit");
   });
 
+  it("names graders that pass in every run of both arms, skipping with-only ones (#713 1c)", () => {
+    const vacuous: GraderResult = { name: "did_not_read_x", passed: true, scored: true };
+    const real = (passed: boolean): GraderResult => ({ name: "asks", passed, scored: true });
+    const fired: GraderResult = { name: "skill_fired", passed: true, withOnly: true, scored: false };
+    const v = diagnoseCase(
+      caseOf([], [], 0.5, {
+        withRuns: [
+          run(1, { graders: [vacuous, real(true), fired] }),
+          run(1, { graders: [vacuous, real(true), fired] }),
+        ],
+        withoutRuns: [run(0.5, { graders: [vacuous, real(false), fired] })],
+      }),
+    );
+    const f = v.findings.find((x) => x.kind === "vacuous-graders");
+    expect(f?.message).toContain("did_not_read_x (with 2/2, without 1/1)");
+    expect(f?.message).not.toContain("asks");
+    expect(f?.message).not.toContain("skill_fired");
+  });
+
+  it("does not call a grader vacuous with one arm, or when it ever fails", () => {
+    const g = (passed: boolean): GraderResult => ({ name: "g", passed, scored: true });
+    const oneArm = caseOf([], [], undefined, {
+      withRuns: [run(1, { graders: [g(true)] })],
+      withoutRuns: [],
+    });
+    const fails = caseOf([], [], 0, {
+      withRuns: [run(1, { graders: [g(true)] })],
+      withoutRuns: [run(1, { graders: [g(true)] }), run(0, { graders: [g(false)] })],
+    });
+    expect(kinds(diagnoseCase(oneArm))).not.toContain("vacuous-graders");
+    expect(kinds(diagnoseCase(fails))).not.toContain("vacuous-graders");
+  });
+
   it("flags high variance in an arm", () => {
     const v = diagnoseCase(caseOf([1, 0, 1, 0], [0, 0, 0, 0], 0.5));
     expect(kinds(v)).toContain("high-variance");

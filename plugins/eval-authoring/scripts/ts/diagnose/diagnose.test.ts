@@ -58,7 +58,6 @@ describe("main", () => {
           name: "example-asks-first",
           verdict: "weak-signal",
           delta: 0.25,
-          findings: [{ kind: "split-judge-votes" }],
         },
         {
           name: "example-runs-with-permission",
@@ -66,6 +65,8 @@ describe("main", () => {
         },
       ],
     });
+    expect(out.stdout).toContain('"kind": "split-judge-votes"');
+    expect(out.stdout).toContain('"kind": "vacuous-graders"');
   });
 
   it("handles a partial document and a one-arm case", () => {
