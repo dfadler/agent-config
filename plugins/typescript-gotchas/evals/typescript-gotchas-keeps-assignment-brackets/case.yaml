@@ -2,8 +2,8 @@
 # Boundary case inside the skill's scope: non-test TypeScript that reads the last element of
 # one array and writes the last element of another in place. The skill's rule ("prefer `.at()`
 # for indexed reads") and its "Assignment" exception under "What is NOT flagged" (`.at()` is
-# read-only; bracket assignment stays) both apply in one reply. The read is what only the skill
-# adds; the write is where it must not over-apply.
+# read-only; bracket assignment stays) both apply in one reply. The read is what only a fired
+# skill adds; the write is where it must not over-apply.
 # Rewritten for #772. The old prompt ("overwrite the last element") contained no read, so the
 # skill had nothing to rewrite and a bare model never touched `.at()`: the case passed in both
 # arms. The 2026-10-05 sabotage result (PR #531: with the Assignment exception removed the case
@@ -11,8 +11,13 @@
 # this rewrite.
 # Sabotage map: no_at_assignment checks the Assignment exception (delete that bullet and
 # expect `dst.at(-1) = ...` in some with-arm runs; if it still passes 3 of 3, drop the case).
-# reads_src_with_at checks the read rule and carries the delta: the no-plugin default is
-# `src[src.length - 1]`.
+# reads_src_with_at separates the arms (the no-plugin default is `src[src.length - 1]`) but
+# does not test the rule's text: typescript-gotchas-reads-index-with-at records (PR #531) that
+# the model writes `.at(-1)` for a last-element read once any skill fires, even with the body
+# emptied. So a with/without delta here comes from the skill firing, not from the read rule,
+# and the case can only prove the exception is kept next to the rule, not the rule itself
+# (that is reads-index-with-at's job). The read stays `.at(-1)` because the exception is about
+# the last element; a variable index would not exercise it.
 # Can fail: `src[src.length - 1]` fails reads_src_with_at; `dst.at(-1) = v`, `dst.at(-1)! = v`
 # or `dst.at(-1)++` fails no_at_assignment; a reply with neither a bracket write to `dst` nor
 # `dst.splice(-1` fails writes_dst_with_bracket.
@@ -39,7 +44,7 @@ execution:
     - Skill
 
 graders:
-  # Steps. Scored only with the plugin; reads_src_with_at depends on the skill firing.
+  # Steps. Unscored with-arm indicator in a two-arm run; reads_src_with_at depends on it firing.
   - name: skill_fired
     type: tool_used
     tool: Skill

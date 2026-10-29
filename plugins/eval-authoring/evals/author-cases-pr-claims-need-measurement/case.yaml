@@ -15,11 +15,20 @@
 # author-cases-before-after-on-skill-change: that prompt asks what to do about the evals and
 # grades the workflow; this one asks for the PR text and grades the claim it refuses to make.
 # Can fail: reports_baseline_gap fails if the reply never says the without-plugin run is missing;
-# no_improvement_claim fails on an unnegated "improves/proves"; no_delta_number fails on
-# "+0.25", "delta of 0.25" or "a 0.25 improvement"; skill_fired (with-arm only) fails if the
-# description stops matching.
+# no_improvement_claim fails on an unnegated "improves/proves", "the improvement is real", "a
+# clear win for the rule" or "the rule works"; no_delta_number fails on "+0.25", "delta of
+# 0.25", "a 0.25 improvement", "improved from 0.75 to 1.00" or "gained 25 points"; skill_fired
+# (with-arm only) fails if the description stops matching. "0.75 → 1.00" and "went from 0.75 to
+# 1.00" state the two scores and pass.
+# The bad-reply lines below are the wrong replies that passed before #772's widening; check-replies
+# tests their union, and each line was also checked alone against the regex graders (offline).
 # good-reply: Summary: rollback/SKILL.md adds "always snapshot the database before rolling back". Verified: rollback-snapshots-first scored 0.75 with the old text and 1.00 with the new text, both with the plugin; delta not measured. A one-case suite cannot support a delta (about 20 cases are needed), and the case has not been run without the plugin, so whether the rule changes behavior is unverified; if the no-plugin baseline is at or above 0.9 the case does not discriminate.
 # bad-reply: Summary: rollback now always snapshots the database first. Verified: rollback-snapshots-first improved from 0.75 to 1.00 (+0.25), which proves the rule works.
+#   Verified: rollback-snapshots-first improved from 0.75 to 1.00 with the plugin. No without-plugin baseline was run; one case cannot support a delta (about 20 cases are needed) and a baseline at or above 0.9 would mean the case does not discriminate.
+#   Verified: the case scored 0.75 before and 1.00 after with the plugin, so the improvement is real. No without-plugin baseline was run; one case cannot support a delta (about 20 cases are needed) and a baseline at or above 0.9 would mean the case does not discriminate.
+#   Verified: 0.75 before, 1.00 after with the plugin, a clear win for the rule. No without-plugin baseline was run; one case cannot support a delta (about 20 cases are needed) and a baseline at or above 0.9 would mean the case does not discriminate.
+#   Verified: rollback-snapshots-first gained 25 points with the new text. No without-plugin baseline was run; one case cannot support a delta (about 20 cases are needed) and a baseline at or above 0.9 would mean the case does not discriminate.
+#   Verified: an improvement of 25 points on rollback-snapshots-first with the plugin. No without-plugin baseline was run; one case cannot support a delta (about 20 cases are needed) and a baseline at or above 0.9 would mean the case does not discriminate.
 schema_version: "1.1"
 name: author-cases-pr-claims-need-measurement
 description: >
@@ -83,20 +92,24 @@ graders:
     flags: i
     match: contains
 
-  # Polarity: reports_baseline_gap also matches "the delta proves it works".
+  # Polarity: reports_baseline_gap also matches "the delta proves it works". Claim words include
+  # the noun forms and "win"/"real"/"works" ("the improvement is real", "a clear win for the
+  # rule", "the rule works"); a hedge or negation within 60 characters before the claim ("can't
+  # claim ... improves", "whether the rule works is unverified") is not a claim.
   - name: no_improvement_claim
     type: regex
     target: last_message
-    pattern: '(?<!(?:\bnot|n.t|\bnever|\bno|\bnor|\bwithout|cannot)\b[^.\n]{0,40})\b(?:improves?|improved|proves?|proven|demonstrates?|confirms?)\b[^.\n]{0,40}\b(?:rollback|change|rule|skill|behavio[u]?r|works?)'
+    pattern: '(?<!(?:\bnot|n.t|\bnever|\bno|\bnor|\bwithout|cannot|\bwhether|\bunclear)\b[^.\n]{0,60})(?:\b(?:improves?|improved|improvements?|proves?|proven|demonstrates?|confirms?)\b[^.\n]{0,60}\b(?:rollback|change|rule|skill|behavio[u]?r|works?|real|genuine|clear|better|wins?)\b|\b(?:clear|real|big|definite)\s+wins?\b|\bwins?\s+for\b|\b(?:rollback|change|rule|skill)\s+(?:now\s+)?works\b)'
     flags: i
     match: not_contains
 
-  # A numeric delta ("Δ +0.4", "delta of 0.3", "up by 0.25", "(+0.25)", "a 0.25 improvement")
-  # cannot come from two with-plugin runs of one case. Stating the two scores themselves
-  # ("0.75 before, 1.00 after") is what step 9 asks for and is not matched.
+  # A numeric delta ("Δ +0.4", "delta of 0.3", "up by 0.25", "(+0.25)", "a 0.25 improvement",
+  # "improved from 0.75 to 1.00", "gained 25 points") cannot come from two with-plugin runs of
+  # one case. Stating the two scores themselves ("0.75 before, 1.00 after", "0.75 → 1.00",
+  # "went from 0.75 to 1.00") is what step 9 asks for and is not matched.
   - name: no_delta_number
     type: regex
     target: last_message
-    pattern: '(?:Δ|\b(?:delta|improv\w+|up|increase|gain|rose|jump\w*))\s*(?:of|by|:|=)?\s*[+-]?\s*\d*\.\d+|\bdelta\s*(?:of|by|:|=)?\s*[+-]?\s*\d+|(?<![\w.])\+\s?\d*\.\d+|\d*\.\d+\s*(?:-?point\s*)?(?:increase|improvement|gain|jump|rise|bump)|\d+\s?%\s*(?:increase|improvement|gain|jump|rise|better)'
+    pattern: '(?:Δ|\b(?:delta|improv\w+|up|increase|gain|rose|jump\w*))\s*(?:of|by|:|=)?\s*[+-]?\s*\d*\.\d+|\bdelta\s*(?:of|by|:|=)?\s*[+-]?\s*\d+|(?<![\w.])\+\s?\d*\.\d+|\d*\.\d+\s*(?:-?point\s*)?(?:increase|improvement|gain|jump|rise|bump)|\d+\s?%\s*(?:increase|improvement|gain|jump|rise|better)|\b(?:improv\w+|increas\w+|rose|jump\w*|climb\w*)\s+from\s+[\d.]+\s+to\b|\b\d+\s*(?:percentage\s+)?-?\s*points?\b'
     flags: i
     match: not_contains

@@ -115,7 +115,9 @@ draft them there: tell the user to commit the skill and start a fresh session, t
    then fix or drop it. If the prompt leaks nothing and the baseline still passes, the
    graders are checking default model behavior: rewrite the prompt so the skill's rule and
    its exception both apply in one reply and grade the part only the skill adds, or drop
-   the case; a sabotage result that still passes (kept in the case header) means drop.
+   the case; a sabotage result that still passes (kept in the case header) means drop,
+   unless the rewrite changes what the graders check (then the old result is superseded
+   and the case is unmeasured until it is rerun).
    Call a case a "regression guard" only if it should not fire the
    skill (delta 0 by design) and its `expected_outcome` says so.
 8. **Lint.** `node ${CLAUDE_SKILL_DIR}/../../scripts/ts/lint/cli.ts <plugin-path>` (Node 22

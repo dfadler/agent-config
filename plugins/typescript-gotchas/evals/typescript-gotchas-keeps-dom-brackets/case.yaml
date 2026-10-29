@@ -13,13 +13,20 @@
 # missing rule half, not the DOM nudge.
 # Sabotage map: no_at_on_dom_collection checks the "DOM collections" exception (delete that
 # bullet and expect `children.at(-1)` in some with-arm runs; if it still passes 3 of 3, drop
-# the case). names_read_with_at checks the read rule and carries the delta: the no-plugin
-# default is `names[names.length - 1]`.
+# the case). names_read_with_at separates the arms (the no-plugin default is
+# `names[names.length - 1]`) but does not test the rule's text: typescript-gotchas-reads-index-with-at
+# records (PR #531) that the model writes `.at(-1)` for a last-element read once any skill
+# fires, even with the body emptied. So a with/without delta here comes from the skill firing,
+# not from the read rule, and the case can only prove the exception is kept next to the rule,
+# not the rule itself (that is reads-index-with-at's job). The read stays `.at(-1)` because the
+# exception is about the last child; a variable index would not exercise it.
 # Can fail: `names[names.length - 1]` fails names_read_with_at; `list.children.at(-1)` (a type
-# error, since HTMLCollection has no `.at`) fails no_at_on_dom_collection; a reply that never
-# assigns `textContent` fails sets_text.
+# error, since HTMLCollection has no `.at`) or an alias of it (`const k = list.children;
+# k.at(-1)`) fails no_at_on_dom_collection; a reply that never assigns `textContent` fails
+# sets_text. `Array.from(list.children).at(-1)` is a real array and passes.
 # good-reply: export function labelLast(names: string[], list: HTMLUListElement): void { list.children[list.children.length - 1].textContent = names.at(-1)!; }
 # bad-reply: export function labelLast(names: string[], list: HTMLUListElement): void { list.children.at(-1)!.textContent = names[names.length - 1]; }
+#   export function labelLast(names: string[], list: HTMLUListElement): void { const k = list.children; k.at(-1)!.textContent = names.at(-1)!; }
 schema_version: "1.1"
 name: typescript-gotchas-keeps-dom-brackets
 description: >
@@ -42,7 +49,7 @@ execution:
     - Skill
 
 graders:
-  # Steps. Scored only with the plugin; names_read_with_at depends on the skill firing.
+  # Steps. Unscored with-arm indicator in a two-arm run; names_read_with_at depends on it firing.
   - name: skill_fired
     type: tool_used
     tool: Skill
@@ -58,11 +65,13 @@ graders:
     match: contains
     arm: both
 
-  # Result: no `.at()` on a DOM collection (the skill's exception).
+  # Result: no `.at()` on a DOM collection (the skill's exception), directly or through an alias
+  # assigned a bare `.children`/`.childNodes` member chain (`const k = list.children; k.at(-1)`).
+  # `Array.from(list.children).at(-1)` and `[...list.children].at(-1)` are real arrays and pass.
   - name: no_at_on_dom_collection
     type: regex
     target: last_message
-    pattern: '\b(children|childNodes)\.at\(|querySelectorAll\([^)]*\)\.at\('
+    pattern: '\b(?:children|childNodes)\.at\(|querySelectorAll\([^)]*\)\.at\(|\b(\w+)\s*=\s*[\w.]+\.(?:children|childNodes)\b[\s\S]*?\b\1\.at\('
     match: not_contains
     arm: both
 
