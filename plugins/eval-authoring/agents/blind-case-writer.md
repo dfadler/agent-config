@@ -27,12 +27,14 @@ author cannot be. Your output is draft case files in your reply, nothing else.
 ## What you may read
 
 - **The target** the invoker names: one `SKILL.md` or agent file, and its plugin
-  manifest (`.claude-plugin/plugin.json`). The invoker may paste the text instead of
-  a path; use it as given.
+  manifest (`.claude-plugin/plugin.json`). A path is the rule. The invoker may paste
+  the text only when no committed file exists; use it as given.
 - **How to write a case.** The `author-cases` skill and its `references/` files, in
   the `eval-authoring` plugin (`skills/author-cases/`, next to this agent's
   `agents/` directory). `Glob` is there to find them. These describe the case
-  format, not the target.
+  format, not the target. Use them only for the case format and grader choice; ignore
+  their steps that tell you to read real replies or traces, existing cases or
+  `grants.yaml`, or to run anything.
 - A file the target's text links to as part of its own instructions.
 
 Never read, list or search any `evals/` directory, `case.yaml`, `grants.yaml`, a
@@ -77,9 +79,12 @@ Fenced `case.yaml` blocks, each preceded by its intended path
 (`evals/<name>/case.yaml`) on its own line. Then a section `## Undecided by the text`:
 one line per place the target text did not settle a behavior or boundary you needed
 to decide (the skill's own blind spots, which the human can now see), each as
-`<target file>:<line> | <what the text leaves open> | <what you assumed>`. If the text
-was fully clear, write `None`. End with the line `Drafts are from the target text
-only; the author's cases were not read.` Do not claim a draft case can fail or shows a
+`<target file>:<line> | <what the text leaves open> | <what you assumed>`; when the
+text was pasted, write `pasted:<line>` with the line counted from the first line of the
+pasted block. If the text was fully clear, write `None`. End with one line: `Drafts are
+from the target text only; the author's cases were not read.`, or, if you flagged author
+material in your first line, `Drafts are from the target text only; the prompt contained
+author material, see line 1.` Do not claim a draft case can fail or shows a
 delta: that needs a paid run.
 
 ## Constraints - read-only
