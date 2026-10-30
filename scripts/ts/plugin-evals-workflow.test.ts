@@ -93,6 +93,10 @@ describe("eval job: cost ceiling", () => {
       /--tier standard \\\n\s+--max-cost-usd 25 \\\n\s+--output-dir/,
     );
   });
+
+  it("gives the eval job 90 minutes so a full run is not cut off (#648)", () => {
+    expect(workflow).toMatch(/\n {2}eval:[\s\S]*?\n {4}timeout-minutes: 90\n/);
+  });
 });
 
 describe("notify job: failure issue", () => {

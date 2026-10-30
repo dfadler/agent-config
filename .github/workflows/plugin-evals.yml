@@ -85,7 +85,9 @@ jobs:
     name: eval (${{ matrix.plugin }})
     needs: plan
     runs-on: ubuntu-latest
-    timeout-minutes: 45
+    # 90: the $25 ceiling lets big suites run to the end (#648); the longest job
+    # was about 24 minutes when the old $5 ceiling stopped it part way.
+    timeout-minutes: 90
     # Protected environment holds CLAUDE_CODE_OAUTH_TOKEN, a one-year token from
     # `claude setup-token` (Pro/Max/Team/Enterprise). Runs count against that
     # plan's usage limits; --max-cost-usd below is a list-price ceiling, not a
