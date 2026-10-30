@@ -1,6 +1,8 @@
 import { spawnSync } from "node:child_process";
 import {
   chmodSync,
+  existsSync,
+  readFileSync,
   mkdirSync,
   mkdtempSync,
   rmSync,
@@ -18,7 +20,7 @@ import {
   relevantFindings,
   runHook,
   scopeOf,
-  workerLint,
+  childLint,
   type LintFn,
 } from "./lint-hook.ts";
 
@@ -32,9 +34,9 @@ const WRAPPER = join(
   "lint-on-edit.sh",
 );
 
-// Worker body that blocks the thread synchronously forever. A sleeping
-// Atomics.wait, not a busy loop: terminating a JIT-hot `for (;;) {}` about
-// 100 times per soak is the likeliest cause of the SIGTRAP in #830.
+// Child body that blocks its main thread synchronously forever. The hook kills
+// it with SIGKILL; it is a process, not a worker thread, because terminating a
+// blocked worker thread ~100 times per soak crashed vitest's fork (#830, #871).
 const BLOCK_FOREVER =
   "Atomics.wait(new Int32Array(new SharedArrayBuffer(4)), 0, 0);\n";
 
@@ -225,42 +227,53 @@ describe("runHook: failure containment", () => {
     expect(out).toBe("");
   });
 
-  it("enforces the deadline on synchronous blocking work in the worker", async () => {
+  it("enforces the deadline on synchronous blocking work in the child process", async () => {
     const root = makePlugin();
     const blocker = join(root, "blocker.mjs");
     writeFileSync(blocker, BLOCK_FOREVER);
-    let workerRun: ReturnType<typeof workerLint> | undefined;
+    let childRun: ReturnType<typeof childLint> | undefined;
     const lint: LintFn = (r, s) => {
-      workerRun = workerLint(r, s, pathToFileURL(blocker));
-      return workerRun;
+      childRun = childLint(r, s, pathToFileURL(blocker));
+      return childRun;
     };
     const t0 = performance.now();
     const out = await runHook(event(join(root, "evals/bad/case.yaml")), lint, 200);
     expect(out).toBe("");
     expect(performance.now() - t0).toBeLessThan(3000);
-    // The deadline abort must terminate the worker, not just stop waiting for it.
-    await expect(workerRun).rejects.toThrow("exited without a result");
+    // The deadline abort must kill the child, not just stop waiting for it.
+    await expect(childRun).rejects.toThrow("exited without a result");
     // A blocker that exited on its own would reject the same way, so also require
     // that the rejection arrived no earlier than the deadline (10 ms tolerance).
     expect(performance.now() - t0).toBeGreaterThanOrEqual(200 - 10);
   });
 
-  it("terminates a blocked worker when the signal aborts", async () => {
+  it("kills a blocked child process when the signal aborts", async () => {
     const root = makePlugin();
     const blocker = join(root, "blocker.mjs");
-    writeFileSync(blocker, BLOCK_FOREVER);
+    const pidFile = join(root, "pid");
+    writeFileSync(
+      blocker,
+      `import { writeFileSync } from "node:fs";\nwriteFileSync(${JSON.stringify(pidFile)}, String(process.pid));\n${BLOCK_FOREVER}`,
+    );
     const ctl = new AbortController();
-    const t0 = performance.now();
-    const run = workerLint(root, ctl.signal, pathToFileURL(blocker));
-    setTimeout(() => {
-      ctl.abort();
-    }, 100);
+    let settled = false;
+    const run = childLint(root, ctl.signal, pathToFileURL(blocker)).finally(() => {
+      settled = true;
+    });
+    run.catch(() => undefined);
+    // Wait until the child is up and about to block, so the abort hits a live process.
+    for (let i = 0; i < 500 && !existsSync(pidFile); i++) {
+      await new Promise((r) => setTimeout(r, 20));
+    }
+    await new Promise((r) => setTimeout(r, 50));
+    expect(settled).toBe(false);
+    ctl.abort();
     await expect(run).rejects.toThrow("exited without a result");
-    // A self-exiting blocker rejects the same way; require the abort delay elapsed.
-    expect(performance.now() - t0).toBeGreaterThanOrEqual(100 - 10);
+    // Once the rejection arrives the child is reaped: signal 0 only probes, and throws ESRCH.
+    expect(() => process.kill(Number(readFileSync(pidFile, "utf8")), 0)).toThrow("ESRCH");
   });
 
-  it("returns real findings through the default worker lint", async () => {
+  it("returns real findings through the default child-process lint", async () => {
     const root = makePlugin();
     const out = await runHook(event(join(root, "evals/bad/case.yaml")));
     expect(out).toContain("EVAL019");
