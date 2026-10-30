@@ -80,7 +80,7 @@ it, do not rebuild any of that.
    "Eval results" heading. Report the wrapper's output and exit code without
    reinterpreting; relay its preflight errors verbatim. Exit codes:
    - `0`: passed, results trustworthy.
-   - `1`: below threshold, load failure, or no cases.
+   - `1`: below threshold, load failure, no cases, untrusted directory, or invalid option.
    - `2`: wrapper usage error.
    - `3`: bad cases or grants file.
    - `4`: unmet requirement (Claude Code or git too old, sandbox backend, `claude`
@@ -90,6 +90,14 @@ it, do not rebuild any of that.
      result that could not be read). Its scores are unreliable; never report it
      as a pass.
    - `20`: internal error. `130` and `143`: interrupted or terminated.
+
+   When a case ran, the wrapper records each case's `resultDir` in
+   `run-evals-summary.json` in this run's `<eval-dir>/results/run-<time>/` directory. If that
+   `resultDir`'s `aggregate-result.json` shows a negative delta or a score that does not
+   match the replies, go to the free [diagnose-scores](../diagnose-scores/SKILL.md) skill on
+   that file before any paid re-run, never on an older file under `results/`. When no case ran
+   (an untrusted directory, an invalid option, no cases), nothing is written: read the wrapper
+   output and run the eval-authoring lint instead.
 
 **A PR line from pasted scores.** When the user quotes scores and wants a delta in the PR,
 and the scores are `quick` or 3-run (`standard`) or the suite has fewer than about 20 cases,
@@ -147,7 +155,7 @@ Levers, biggest first. Times and costs are rough figures from one 9-case plugin
 |---|---|---|
 | Iterate on one case | `run-evals.ts --tier quick <plugin> --case <name>` (raw: `<case-dir> --runs 3 --ablation none -j 5`) | ~1 min, ~$0.70 |
 | Full suite, pushed | raw: `<plugin> --runs 5 -j 6` | ~8 min |
-| Pre-merge | `run-evals.ts --tier standard <plugin>` (`thorough` for a noisy verdict or a release) | tier-dependent |
+| Pre-merge | `run-evals.ts --tier standard <plugin>` (`thorough` for a release or a delta claim; a noisy verdict wants more cases, see step 1) | tier-dependent |
 
 Only `-j 3` (16 min) and `-j 6` (8 min) were timed; the `-j 5` in the first row is a guess
 (a one-case run has too few runs to use it), and `-j 9` is untested. The wrapper sets no `-j`.
