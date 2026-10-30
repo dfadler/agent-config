@@ -151,7 +151,7 @@ const round = (n: number): number => Math.round(n * 1000) / 1000;
 const fmt = (n: number): string => String(round(n));
 
 /** A run that can be compared: no error, no silent 0, judges not skipped. */
-const comparable = (r: RunResult): boolean =>
+export const comparable = (r: RunResult): boolean =>
   !isErrored(r) && !isSilentZero(r) && r.skippedPaidGraders !== true;
 
 /** Scores of the comparable runs that have one. */

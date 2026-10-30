@@ -33,6 +33,7 @@ import {
 import { scanOutput } from "./output.ts";
 import { BLOCK_END, BLOCK_START } from "./summary.ts";
 import {
+  TRIGGER_TAG,
   needsBash,
   planGroups,
   planInvocations,
@@ -54,6 +55,9 @@ import {
   type Tier,
 } from "./tiers.ts";
 import { replyFiles, runCount, safeName } from "./traces.ts";
+import { manifestOf } from "./plan.ts";
+import { checkNeighbours, checkStageable, parseNeighbours, stageNeighbours } from "./stage.ts";
+import { routablesOf, triggerRows } from "./trigger.ts";
 
 export const USAGE = `Usage: run-evals.ts [options] <plugin-path>
 
@@ -112,6 +116,27 @@ ${Object.values(TIERS).map((t) => `                         ${t.name}: ${t.descr
                        with --changed: run the mapped cases (exit 0 when
                        there are none) instead of exiting 1 over the
                        changed files that map to no case
+  --neighbours <a,b>   trigger-set mode: run only the cases tagged 'trigger',
+                       with the named sibling plugins (directly under plugins/)
+                       loaded beside the plugin under test, as other skills
+                       compete for the same prompts in real use. The CLI has no
+                       flag for this, so the wrapper stages a temp copy of the
+                       plugin, copies each neighbour to <copy>/neighbours/<name>
+                       and adds plugins: [<copy>, <copy>/neighbours/<name>, ...]
+                       to the copy of each case (committed cases are never
+                       edited). A case that already has a plugins: list is
+                       refused. The plugin under test must itself be under
+                       plugins/ (the copy is passed --trust-plugin only then).
+                       The summary gains a Trigger set section with fire rate,
+                       false-fire rate and description length per skill.
+                       Combines with --tier and --changed; --keep-temp keeps
+                       the copy. Always plugin arm only (--ablation none,
+                       whatever the tier): the injected plugins: list names
+                       the plugin under test, so a baseline arm that honours
+                       it would load the plugin and any delta would mean
+                       nothing; the summary has no without or delta column.
+                       Neighbour hooks run inside the eval as you, under the
+                       copy's trust; node_modules is not copied
   --output-dir <dir>   base results directory (default: <eval-dir>/results).
                        Each wrapper run writes <dir>/run-<time>/<NN>-<case>
   --publish-report     publish the report (default: --no-publish)
@@ -167,6 +192,8 @@ interface Options {
   readonly changedAllowEmpty: boolean;
   readonly pr: string | undefined;
   readonly yes: boolean;
+  /** `--neighbours`: sibling plugins to load beside the plugin under test; undefined when off. */
+  readonly neighbours: readonly string[] | undefined;
 }
 
 type Parsed =
@@ -183,6 +210,7 @@ const VALUE_FLAGS: readonly string[] = [
   "--output-dir",
   "--case",
   "--pr",
+  "--neighbours",
 ];
 const BOOL_FLAGS: readonly string[] = [
   "--publish-report",
@@ -258,6 +286,14 @@ export const parseArgs = (argv: readonly string[]): Parsed => {
   if (!values.has("--changed") && bools.has("--changed-allow-empty")) {
     return { kind: "error", message: "--changed-allow-empty only applies with --changed" };
   }
+  const neighboursText = values.get("--neighbours");
+  const neighbours = neighboursText === undefined ? undefined : parseNeighbours(neighboursText);
+  if (neighboursText !== undefined && neighbours === undefined) {
+    return {
+      kind: "error",
+      message: `--neighbours takes comma-separated plugin names (letters, digits, . _ -; no repeats), got '${neighboursText}'`,
+    };
+  }
   const [plugin, ...extra] = positionals;
   if (plugin === undefined) {
     return { kind: "error", message: "missing <plugin-path>" };
@@ -272,7 +308,8 @@ export const parseArgs = (argv: readonly string[]): Parsed => {
     kind: "options",
     options: {
       plugin,
-      tier: TIERS[tierName],
+      // Trigger-set mode reads the plugin arm only, whatever the tier (see --neighbours in USAGE).
+      tier: neighbours === undefined ? TIERS[tierName] : { ...TIERS[tierName], ablation: "none" },
       model: values.get("--model"),
       judgeModel: values.get("--judge-model"),
       maxCostUsd,
@@ -289,6 +326,7 @@ export const parseArgs = (argv: readonly string[]): Parsed => {
       changedAllowEmpty: bools.has("--changed-allow-empty"),
       pr,
       yes: bools.has("--yes"),
+      neighbours,
     },
   };
 };
@@ -323,6 +361,8 @@ export interface RunSummary {
   readonly changedSince: string | null;
   /** "subset: N of M cases, --changed since <ref>" when `--changed` narrowed the run; null otherwise. */
   readonly subset: string | null;
+  /** The `--neighbours` plugins loaded beside the plugin under test; null when the flag was off. */
+  readonly neighbours: readonly string[] | null;
 }
 
 export interface InvocationSummary {
@@ -593,10 +633,26 @@ interface Progress {
   readonly outOfBudget: boolean;
 }
 
-/** Run the wrapper. Returns the process exit code; writes only through `deps.io`. */
-export const main = async (
+/**
+ * Run the wrapper. Returns the process exit code; writes only through `deps.io`.
+ * Whatever `run` registers in `cleanups` (the staged copy of `--neighbours`)
+ * runs on every way out, a throw included.
+ */
+export const main = async (argv: readonly string[], deps: Deps): Promise<ExitCode> => {
+  const cleanups: (() => void)[] = [];
+  try {
+    return await run(argv, deps, cleanups);
+  } finally {
+    cleanups.forEach((c) => {
+      c();
+    });
+  }
+};
+
+const run = async (
   argv: readonly string[],
   deps: Deps,
+  cleanups: (() => void)[],
 ): Promise<ExitCode> => {
   const { io } = deps;
   const parsed = parseArgs(argv);
@@ -656,10 +712,57 @@ export const main = async (
     }
     io.err(`run-evals: --changed since ${changed.ref}: ${picked.join(", ")}\n`);
   }
-  const plan = planGroups(suite, grants, tag, options.only, picked);
+  // Trigger-set mode runs the trigger cases only (those still inside --changed, when given).
+  const triggerNames = suite.cases
+    .filter((c) => c.tags.value.includes(TRIGGER_TAG))
+    .map((c) => c.name.value);
+  const pickedNames =
+    options.neighbours === undefined
+      ? picked
+      : (picked ?? triggerNames).filter((n) => triggerNames.includes(n));
+  if (options.neighbours !== undefined) {
+    const bad = checkNeighbours(io, deps.pluginsDir, target, options.neighbours);
+    if (bad !== undefined) return fail(io, EXIT_USAGE, bad);
+    if (triggerNames.length === 0) {
+      return fail(io, EXIT_CONFIG, `--neighbours: no case tagged '${TRIGGER_TAG}' to run under ${suite.evalDir}`);
+    }
+    if (pickedNames?.length === 0) {
+      // --changed alone exits 0 when nothing it selected applies; so does --changed with --neighbours.
+      io.out(`run-evals: no trigger case among the changed cases (${(picked ?? []).join(", ")}); no case to run\n`);
+      return EXIT_OK;
+    }
+  }
+  const plan = planGroups(
+    suite,
+    grants,
+    tag,
+    options.only,
+    pickedNames,
+    changed === undefined ? "trigger" : options.neighbours === undefined ? "--changed" : "--changed trigger",
+  );
   if (!plan.ok) return fail(io, EXIT_CONFIG, plan.reason);
 
   const trust = isRepoPlugin(target, deps.pluginsDir, io.realpath);
+  const stageInput =
+    options.neighbours === undefined
+      ? undefined
+      : {
+          target,
+          pluginsDir: deps.pluginsDir,
+          evalDir: suite.evalDir,
+          neighbours: options.neighbours,
+          cases: suite.cases.filter((c) => plan.groups.some((g) => g.cases.includes(c.name.value))),
+        };
+  if (stageInput !== undefined) {
+    if (!trust) {
+      // The staged copy lives in a temp dir, so the CLI would ask for trust. Skipping that is safe only
+      // when the copy is built entirely from plugins/ content, so a plugin outside plugins/ is refused.
+      return fail(io, EXIT_USAGE, `--neighbours: ${target} is not directly under ${deps.pluginsDir}; only this repo's plugins can be staged and trusted`);
+    }
+    // What staging would refuse is reported here, before --dry-run returns, not only on a real run.
+    const unstageable = checkStageable(io, stageInput);
+    if (unstageable !== undefined) return fail(io, EXIT_CONFIG, unstageable);
+  }
   const base =
     options.reporting.outputDir === undefined
       ? join(suite.evalDir, "results")
@@ -693,6 +796,11 @@ export const main = async (
     io.out(
       `note: each invocation shows the full ceiling; a real run gives later invocations only the budget left after earlier results\n`,
     );
+    if (options.neighbours !== undefined) {
+      io.out(
+        `note: --neighbours ${options.neighbours.join(",")}: a real run runs these cases against a temp copy of the plugin (shown above as the plugin path), with ${options.neighbours.join(", ")} under neighbours/ and a plugins: list added to the copy of each case\n`,
+      );
+    }
     return EXIT_OK;
   }
 
@@ -708,6 +816,22 @@ export const main = async (
     return blocking.reduce<ExitCode>((c, f) => worstExit(c, f.code), EXIT_OK);
   }
 
+  const staged = stageInput === undefined ? undefined : stageNeighbours(io, stageInput);
+  if (staged?.ok === false) return fail(io, EXIT_CONFIG, staged.reason);
+  if (staged !== undefined) {
+    // From here the staged copy is removed on every way out: return, throw, or SIGINT/SIGTERM.
+    cleanups.push(
+      io.onInterrupt(() => {
+        io.remove(staged.tempDir);
+      }),
+      () => {
+        if (options.reporting.keepTemp) io.err(`run-evals: kept the staged copy at ${staged.root}\n`);
+        else io.remove(staged.tempDir);
+      },
+    );
+    io.err(`run-evals: --neighbours ${(options.neighbours ?? []).join(",")}: running against the staged copy ${staged.root}\n`);
+  }
+  const runTarget = staged?.root ?? target;
   const progress = await invocations.reduce<Promise<Progress>>(
     async (accP, inv, i) => {
       const acc = await accP;
@@ -718,7 +842,7 @@ export const main = async (
       const r = await runInvocation(
         io,
         options,
-        target,
+        runTarget,
         trust,
         i + 1,
         total,
@@ -780,6 +904,7 @@ export const main = async (
     exit,
     changedSince: changed?.ok === true ? changed.ref : null,
     subset,
+    neighbours: options.neighbours ?? null,
   };
   io.writeFile(
     join(runDir, SUMMARY_FILE),
@@ -798,6 +923,13 @@ export const main = async (
     exit,
     command: `node plugins/eval-authoring/scripts/ts/run-evals/run-evals.ts ${argv.map(shellWord).join(" ")}`,
     unstarted,
+    neighbours: options.neighbours,
+    trigger: triggerRows(
+      suite,
+      routablesOf(io, target),
+      manifestOf(target).name,
+      done.map((d, i) => ({ caseName: d.caseName, text: progress.texts[i] })),
+    ),
     cases: done.map((d, i) => ({
       caseName: d.caseName,
       exit: d.exit,
