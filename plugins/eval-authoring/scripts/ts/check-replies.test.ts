@@ -1,8 +1,9 @@
 import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
+import { readSuite } from "./parser/index.ts";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
-import { checkPlugin, exitCode, headerReplies } from "./check-replies.ts";
+import { checkPlugin, exitCode, headerReplies, probeCase } from "./check-replies.ts";
 
 let root = "";
 beforeEach(() => {
@@ -71,5 +72,15 @@ describe("checkPlugin", () => {
     writeFileSync(join(dir, "graders", "g.md"), "---\nname: says_hi\ntype: regex\npattern: 'hi'\n---\n");
     const r = checkPlugin(root);
     expect(r[0]?.status).toBe("ok");
+  });
+});
+
+describe("probeCase", () => {
+  it("reports pass or FAIL per last_message regex and not-run for the rest", () => {
+    addCase("p", "", REGEX + LLM);
+    const c = readSuite(root).cases[0];
+    if (c === undefined) throw new Error("no case");
+    expect(probeCase(c, "hi")).toEqual(["pass says_hi", "not-run judge (llm)"]);
+    expect(probeCase(c, "nope")).toEqual(["FAIL says_hi", "not-run judge (llm)"]);
   });
 });
