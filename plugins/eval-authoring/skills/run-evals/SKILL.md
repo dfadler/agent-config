@@ -87,8 +87,11 @@ it, do not rebuild any of that.
    with those plugins loaded beside it through each case's `plugins:` (the CLI has no flag
    for this; committed cases are not edited, and a case with its own `plugins:` is
    refused). The summary then has a Trigger set table: fire rate, false-fire rate and
-   description length per skill. Read the plugin arm only: whether the baseline arm
-   loads the neighbours is unverified.
+   description length per skill. It always runs the plugin arm only (`--ablation none`
+   whatever the tier), because the injected `plugins:` list names the plugin itself and
+   a baseline arm that honours it would load the plugin: no without or delta column.
+   Neighbour hooks run inside the eval under the copy's trust, and `node_modules` is
+   not copied.
    To put the results in a PR, add `--pr <n>`: it prints the exact
    marked block, asks, then replaces the `run-evals` block in the PR body with `gh pr
    edit`. It is off by default, refuses `--dry-run`, and `--yes` skips only the question.

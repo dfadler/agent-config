@@ -56,7 +56,7 @@ import {
 } from "./tiers.ts";
 import { replyFiles, runCount, safeName } from "./traces.ts";
 import { manifestOf } from "./plan.ts";
-import { checkNeighbours, parseNeighbours, stageNeighbours } from "./stage.ts";
+import { checkNeighbours, checkStageable, parseNeighbours, stageNeighbours } from "./stage.ts";
 import { routablesOf, triggerRows } from "./trigger.ts";
 
 export const USAGE = `Usage: run-evals.ts [options] <plugin-path>
@@ -130,8 +130,13 @@ ${Object.values(TIERS).map((t) => `                         ${t.name}: ${t.descr
                        The summary gains a Trigger set section with fire rate,
                        false-fire rate and description length per skill.
                        Combines with --tier and --changed; --keep-temp keeps
-                       the copy. Whether the baseline arm loads the neighbours
-                       is unverified: read the plugin arm only
+                       the copy. Always plugin arm only (--ablation none,
+                       whatever the tier): the injected plugins: list names
+                       the plugin under test, so a baseline arm that honours
+                       it would load the plugin and any delta would mean
+                       nothing; the summary has no without or delta column.
+                       Neighbour hooks run inside the eval as you, under the
+                       copy's trust; node_modules is not copied
   --output-dir <dir>   base results directory (default: <eval-dir>/results).
                        Each wrapper run writes <dir>/run-<time>/<NN>-<case>
   --publish-report     publish the report (default: --no-publish)
@@ -303,7 +308,8 @@ export const parseArgs = (argv: readonly string[]): Parsed => {
     kind: "options",
     options: {
       plugin,
-      tier: TIERS[tierName],
+      // Trigger-set mode reads the plugin arm only, whatever the tier (see --neighbours in USAGE).
+      tier: neighbours === undefined ? TIERS[tierName] : { ...TIERS[tierName], ablation: "none" },
       model: values.get("--model"),
       judgeModel: values.get("--judge-model"),
       maxCostUsd,
@@ -627,10 +633,26 @@ interface Progress {
   readonly outOfBudget: boolean;
 }
 
-/** Run the wrapper. Returns the process exit code; writes only through `deps.io`. */
-export const main = async (
+/**
+ * Run the wrapper. Returns the process exit code; writes only through `deps.io`.
+ * Whatever `run` registers in `cleanups` (the staged copy of `--neighbours`)
+ * runs on every way out, a throw included.
+ */
+export const main = async (argv: readonly string[], deps: Deps): Promise<ExitCode> => {
+  const cleanups: (() => void)[] = [];
+  try {
+    return await run(argv, deps, cleanups);
+  } finally {
+    cleanups.forEach((c) => {
+      c();
+    });
+  }
+};
+
+const run = async (
   argv: readonly string[],
   deps: Deps,
+  cleanups: (() => void)[],
 ): Promise<ExitCode> => {
   const { io } = deps;
   const parsed = parseArgs(argv);
@@ -701,18 +723,45 @@ export const main = async (
   if (options.neighbours !== undefined) {
     const bad = checkNeighbours(io, deps.pluginsDir, target, options.neighbours);
     if (bad !== undefined) return fail(io, EXIT_USAGE, bad);
-    if (pickedNames?.length === 0) {
+    if (triggerNames.length === 0) {
       return fail(io, EXIT_CONFIG, `--neighbours: no case tagged '${TRIGGER_TAG}' to run under ${suite.evalDir}`);
     }
+    if (pickedNames?.length === 0) {
+      // --changed alone exits 0 when nothing it selected applies; so does --changed with --neighbours.
+      io.out(`run-evals: no trigger case among the changed cases (${(picked ?? []).join(", ")}); no case to run\n`);
+      return EXIT_OK;
+    }
   }
-  const plan = planGroups(suite, grants, tag, options.only, pickedNames);
+  const plan = planGroups(
+    suite,
+    grants,
+    tag,
+    options.only,
+    pickedNames,
+    changed === undefined ? "trigger" : options.neighbours === undefined ? "--changed" : "--changed trigger",
+  );
   if (!plan.ok) return fail(io, EXIT_CONFIG, plan.reason);
 
   const trust = isRepoPlugin(target, deps.pluginsDir, io.realpath);
-  if (options.neighbours !== undefined && !trust) {
-    // The staged copy lives in a temp dir, so the CLI would ask for trust. Skipping that is safe only
-    // when the copy is built entirely from plugins/ content, so a plugin outside plugins/ is refused.
-    return fail(io, EXIT_USAGE, `--neighbours: ${target} is not directly under ${deps.pluginsDir}; only this repo's plugins can be staged and trusted`);
+  const stageInput =
+    options.neighbours === undefined
+      ? undefined
+      : {
+          target,
+          pluginsDir: deps.pluginsDir,
+          evalDir: suite.evalDir,
+          neighbours: options.neighbours,
+          cases: suite.cases.filter((c) => plan.groups.some((g) => g.cases.includes(c.name.value))),
+        };
+  if (stageInput !== undefined) {
+    if (!trust) {
+      // The staged copy lives in a temp dir, so the CLI would ask for trust. Skipping that is safe only
+      // when the copy is built entirely from plugins/ content, so a plugin outside plugins/ is refused.
+      return fail(io, EXIT_USAGE, `--neighbours: ${target} is not directly under ${deps.pluginsDir}; only this repo's plugins can be staged and trusted`);
+    }
+    // What staging would refuse is reported here, before --dry-run returns, not only on a real run.
+    const unstageable = checkStageable(io, stageInput);
+    if (unstageable !== undefined) return fail(io, EXIT_CONFIG, unstageable);
   }
   const base =
     options.reporting.outputDir === undefined
@@ -767,20 +816,19 @@ export const main = async (
     return blocking.reduce<ExitCode>((c, f) => worstExit(c, f.code), EXIT_OK);
   }
 
-  const staged =
-    options.neighbours === undefined
-      ? undefined
-      : stageNeighbours(io, {
-          target,
-          pluginsDir: deps.pluginsDir,
-          evalDir: suite.evalDir,
-          neighbours: options.neighbours,
-          cases: suite.cases.filter((c) =>
-            plan.groups.some((g) => g.cases.includes(c.name.value)),
-          ),
-        });
+  const staged = stageInput === undefined ? undefined : stageNeighbours(io, stageInput);
   if (staged?.ok === false) return fail(io, EXIT_CONFIG, staged.reason);
   if (staged !== undefined) {
+    // From here the staged copy is removed on every way out: return, throw, or SIGINT/SIGTERM.
+    cleanups.push(
+      io.onInterrupt(() => {
+        io.remove(staged.tempDir);
+      }),
+      () => {
+        if (options.reporting.keepTemp) io.err(`run-evals: kept the staged copy at ${staged.root}\n`);
+        else io.remove(staged.tempDir);
+      },
+    );
     io.err(`run-evals: --neighbours ${(options.neighbours ?? []).join(",")}: running against the staged copy ${staged.root}\n`);
   }
   const runTarget = staged?.root ?? target;
@@ -813,11 +861,6 @@ export const main = async (
     },
     Promise.resolve({ done: [], texts: [], spentUsd: 0, stopped: false, outOfBudget: false }),
   );
-  if (staged?.ok === true) {
-    // Remove exactly the directory mkTemp returned; --keep-temp keeps it for inspection.
-    if (options.reporting.keepTemp) io.err(`run-evals: kept the staged copy at ${staged.root}\n`);
-    else io.remove(staged.tempDir);
-  }
   // After the whole loop, so the summary below still reads each trace for its failing reply.
   const done = !options.reporting.keepTemp
     ? progress.done

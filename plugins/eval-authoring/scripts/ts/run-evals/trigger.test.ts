@@ -49,11 +49,15 @@ const plugin = () => {
   return root;
 };
 
-const run = (...graders: readonly (readonly [string, boolean])[]): unknown => ({
+const run = (...graders: readonly (readonly [string, boolean])[]): Record<string, unknown> => ({
   graders: graders.map(([name, passed]) => ({ name, passed })),
 });
 const result = (caseName: string, runs: readonly unknown[]): string =>
-  JSON.stringify({ cases: [{ name: caseName, arms: { with: runs, without: [run(["x", false])] } }] });
+  JSON.stringify({
+    schemaVersion: 1,
+    partial: false,
+    cases: [{ name: caseName, arms: { with: runs, without: [run(["x", false])] } }],
+  });
 
 describe("routablesOf", () => {
   it("reads each skill's name and description length, falling back to the directory name", () => {
@@ -86,6 +90,21 @@ describe("armTally", () => {
     expect(armTally(text, "c", "missing")).toEqual({ runs: 0, passed: 0 });
     expect(armTally(text, "nope", "g")).toEqual({ runs: 0, passed: 0 });
     expect(armTally(undefined, "c", "g")).toEqual({ runs: 0, passed: 0 });
+  });
+
+  it("leaves out runs that cannot say whether the skill fired, and results with no verdict", () => {
+    const ok = run(["g", true]);
+    const text = result("c", [
+      ok,
+      { ...run(["g", false]), error: "rate limit" },
+      { ...run(["g", false]), aborted: true },
+      { ...run(["g", false]), skippedPaidGraders: true },
+      { score: 0 },
+      // A grader result with no `passed` is no verdict, so it is not a false fire.
+      { graders: [{ name: "g" }] },
+      run(["g", false]),
+    ]);
+    expect(armTally(text, "c", "g")).toEqual({ runs: 2, passed: 1 });
   });
 });
 
@@ -140,6 +159,19 @@ describe("renderSummary trigger section", () => {
     expect(plain).not.toContain("Neighbours loaded");
     expect(renderSummary({ ...base, trigger: [] })).not.toContain("Trigger set");
     expect(renderSummary(base)).not.toContain("Trigger set");
+  });
+  it("drops the without and delta columns in neighbours mode, even at the thorough tier", () => {
+    const row = { caseName: "t1", exit: 0, row: { caseName: "t1", with: 1, without: 0.5, delta: 0.5, failed: [], skillMissed: 0, skillRuns: 0 } };
+    const one = renderSummary({ ...base, tier: "thorough", neighbours: ["sib"], trigger: rows, cases: [row], unstarted: ["t2"] });
+    expect(one).toContain("| case | score | exit |");
+    expect(one).toContain("| t1 | 1.00 | 0 |");
+    expect(one).toContain("| t2 | not run | |");
+    expect(one).not.toContain("| without |");
+    expect(one).not.toContain("0.50");
+    expect(one).not.toMatch(/Delta not (measured|significant)/);
+    const two = renderSummary({ ...base, tier: "thorough", trigger: rows, cases: [row] });
+    expect(two).toContain("| case | with | without | delta | exit |");
+    expect(two).toContain("| t1 | 1.00 | 0.50 | 0.50 | 0 |");
   });
   it("says so when neighbours were loaded but no grader could be tabulated", () => {
     expect(renderSummary({ ...base, neighbours: ["sib"], trigger: [] })).toContain("nothing to tabulate");

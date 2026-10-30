@@ -64,6 +64,7 @@ export const planGroups = (
   tag: string | undefined,
   only?: string,
   pick?: readonly string[],
+  pickSource = "--changed",
 ): Plan => {
   const names = suite.cases.map((c) => c.name.value);
   const checked = checkGrantCaseNames(grants, names);
@@ -84,7 +85,7 @@ export const planGroups = (
       reason:
         tag === undefined && only === undefined && pick === undefined
           ? `no cases found under ${suite.evalDir}`
-          : `no cases${tag === undefined ? "" : ` tagged '${tag}'`}${only === undefined ? "" : ` matching --case '${only}'`}${pick === undefined ? "" : ` among the --changed cases (${pick.join(", ")})`} under ${suite.evalDir}`,
+          : `no cases${tag === undefined ? "" : ` tagged '${tag}'`}${only === undefined ? "" : ` matching --case '${only}'`}${pick === undefined ? "" : ` among the ${pickSource} cases (${pick.join(", ")})`} under ${suite.evalDir}`,
     };
   }
   const globby = selected.map((c) => c.name.value).filter(hasGlobMeta);

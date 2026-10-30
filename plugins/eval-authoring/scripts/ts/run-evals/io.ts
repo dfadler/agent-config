@@ -66,6 +66,11 @@ export interface Io {
   readonly copyDir: (src: string, dest: string, skip: (relPath: string) => boolean) => void;
   /** Removes exactly `path` (a directory `mkTemp` returned) and everything under it. */
   readonly remove: (path: string) => void;
+  /**
+   * Runs `cleanup` once if the process gets SIGINT or SIGTERM, then lets that
+   * signal take its course. Returns a function that unregisters the handler.
+   */
+  readonly onInterrupt: (cleanup: () => void) => () => void;
   /** The user's home directory, shown as `~` in the replies files. */
   readonly home: string;
   /** Asks a yes/no question on the terminal. False (never a guess) when there is no one to ask. */
@@ -176,6 +181,22 @@ export const nodeIo = (env: Readonly<Record<string, string | undefined>>): Io =>
   },
   remove: (path) => {
     rmSync(path, { recursive: true, force: true });
+  },
+  onInterrupt: (cleanup) => {
+    const off = (): void => {
+      handlers.forEach(({ sig, fn }) => process.off(sig, fn));
+    };
+    const handlers = (["SIGINT", "SIGTERM"] as const).map((sig) => ({
+      sig,
+      fn: (): void => {
+        off();
+        cleanup();
+        // With our handlers gone, the default action for the signal now applies.
+        process.kill(process.pid, sig);
+      },
+    }));
+    handlers.forEach(({ sig, fn }) => process.on(sig, fn));
+    return off;
   },
   home: homedir(),
   confirm: async (question) => {

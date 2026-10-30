@@ -8,7 +8,7 @@
  * and writes `plugins: [<copy>, <copy>/neighbours/<name>, ...]` into the copy
  * of each case it runs. Committed cases are never edited.
  */
-import { basename, join, relative, sep } from "node:path";
+import { basename, dirname, join, relative, sep } from "node:path";
 import { splitFrontmatter, type EvalCase } from "../parser/index.ts";
 import type { Io } from "./io.ts";
 
@@ -76,7 +76,11 @@ export type Staged =
     }
   | { readonly ok: false; readonly reason: string };
 
-/** A neighbour must be a plugin directly under `pluginsDir`: only repo content is copied and trusted. */
+/**
+ * A neighbour must be a plugin that really is a direct child of `pluginsDir`
+ * (symlinks resolved, so a link to a directory elsewhere is refused): only repo
+ * content is copied and trusted.
+ */
 export const checkNeighbours = (
   io: Io,
   pluginsDir: string,
@@ -86,63 +90,83 @@ export const checkNeighbours = (
   const bad = neighbours.find(
     (n) =>
       n === basename(target) ||
-      io.readFile(join(pluginsDir, n, ".claude-plugin", "plugin.json")) === undefined,
+      io.readFile(join(pluginsDir, n, ".claude-plugin", "plugin.json")) === undefined ||
+      dirname(io.realpath(join(pluginsDir, n))) !== io.realpath(pluginsDir),
   );
   return bad === undefined
     ? undefined
     : bad === basename(target)
       ? `--neighbours: '${bad}' is the plugin under test; name its siblings`
-      : `--neighbours: '${bad}' is not a plugin under ${pluginsDir} (no .claude-plugin/plugin.json)`;
+      : `--neighbours: '${bad}' is not a plugin directly under ${pluginsDir} (needs .claude-plugin/plugin.json and no symlink out)`;
+};
+
+/**
+ * Everything staging would refuse, found without writing anything, so a
+ * `--dry-run` reports what the real run would: a bad neighbour, an eval dir
+ * outside the plugin, a case with its own `plugins:`, a case file that cannot
+ * be read.
+ */
+export const checkStageable = (io: Io, input: StageInput): string | undefined => {
+  const { target, pluginsDir, evalDir, neighbours, cases } = input;
+  const bad = checkNeighbours(io, pluginsDir, target, neighbours);
+  if (bad !== undefined) return bad;
+  const evalRel = relative(target, evalDir);
+  if (evalRel === "" || evalRel.startsWith("..")) {
+    return `--neighbours: eval dir ${evalDir} is not inside ${target}`;
+  }
+  const withOwn = cases.find((c) => c.plugins.explicit);
+  if (withOwn !== undefined) {
+    return `--neighbours: case '${withOwn.name.value}' already has its own plugins: list (${withOwn.plugins.loc.file}:${String(withOwn.plugins.loc.line)}); the wrapper only adds the line to cases without one`;
+  }
+  const unreadable = cases.find((c) => {
+    const t = targetFile(c, io);
+    return t === undefined || io.readFile(t.file) === undefined;
+  });
+  return unreadable === undefined
+    ? undefined
+    : `--neighbours: case '${unreadable.name.value}' has no readable case.yaml or prompt.md frontmatter to add plugins: to`;
 };
 
 const skipCommon = (rel: string): boolean =>
   rel.split(sep).some((p) => p === ".git" || p === "node_modules");
 
-/** Build the staged copy and rewrite its cases. Writes only under a fresh temp directory. */
+/**
+ * Build the staged copy and rewrite its cases. Writes only under a fresh temp
+ * directory, which is removed again if anything throws midway.
+ */
 export const stageNeighbours = (io: Io, input: StageInput): Staged => {
   const { target, pluginsDir, evalDir, neighbours, cases } = input;
-  const problem = checkNeighbours(io, pluginsDir, target, neighbours);
+  const problem = checkStageable(io, input);
   if (problem !== undefined) return { ok: false, reason: problem };
   const evalRel = relative(target, evalDir);
-  if (evalRel === "" || evalRel.startsWith("..")) {
-    return { ok: false, reason: `--neighbours: eval dir ${evalDir} is not inside ${target}` };
-  }
-  const withOwn = cases.find((c) => c.plugins.explicit);
-  if (withOwn !== undefined) {
-    return {
-      ok: false,
-      reason: `--neighbours: case '${withOwn.name.value}' already has its own plugins: list (${withOwn.plugins.loc.file}:${String(withOwn.plugins.loc.line)}); the wrapper only adds the line to cases without one`,
-    };
-  }
   const tempDir = io.mkTemp("run-evals-neighbours-");
   const root = join(tempDir, basename(target));
-  io.copyDir(target, root, (rel) => skipCommon(rel) || rel === join(evalRel, "results"));
-  neighbours.forEach((n) => {
-    io.copyDir(
-      join(pluginsDir, n),
-      join(root, NEIGHBOURS_DIR, n),
-      // A neighbour contributes its skills; its own evals stay behind.
-      (rel) => skipCommon(rel) || rel === "evals" || rel.startsWith(`evals${sep}`),
-    );
-  });
-  const rewritten = cases.map((c): string | undefined => {
-    const t = targetFile(c, io);
-    const text = t === undefined ? undefined : io.readFile(t.file);
-    if (t === undefined || text === undefined) {
-      return `case '${c.name.value}' has no readable case.yaml or prompt.md frontmatter to add plugins: to`;
-    }
-    const caseDir = join(root, relative(target, c.dir));
-    const entries = [
-      relative(caseDir, root) || ".",
-      ...neighbours.map((n) => relative(caseDir, join(root, NEIGHBOURS_DIR, n))),
-    ];
-    io.writeFile(join(root, relative(target, t.file)), addPluginsLine(text, t.kind, entries));
-    return undefined;
-  });
-  const failed = rewritten.find((r) => r !== undefined);
-  if (failed !== undefined) {
+  try {
+    io.copyDir(target, root, (rel) => skipCommon(rel) || rel === join(evalRel, "results"));
+    neighbours.forEach((n) => {
+      io.copyDir(
+        join(pluginsDir, n),
+        join(root, NEIGHBOURS_DIR, n),
+        // A neighbour contributes its skills; its own evals stay behind.
+        (rel) => skipCommon(rel) || rel === "evals" || rel.startsWith(`evals${sep}`),
+      );
+    });
+    cases.forEach((c) => {
+      const t = targetFile(c, io);
+      const text = t === undefined ? undefined : io.readFile(t.file);
+      if (t === undefined || text === undefined) {
+        throw new Error(`case '${c.name.value}' lost its case file between the check and the copy`);
+      }
+      const caseDir = join(root, relative(target, c.dir));
+      const entries = [
+        relative(caseDir, root) || ".",
+        ...neighbours.map((n) => relative(caseDir, join(root, NEIGHBOURS_DIR, n))),
+      ];
+      io.writeFile(join(root, relative(target, t.file)), addPluginsLine(text, t.kind, entries));
+    });
+  } catch (e: unknown) {
     io.remove(tempDir);
-    return { ok: false, reason: `--neighbours: ${failed}` };
+    throw e;
   }
   return { ok: true, tempDir, root };
 };

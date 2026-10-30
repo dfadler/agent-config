@@ -10,10 +10,17 @@
  * `input_match` against each skill and agent name (`matchesCall`).
  */
 import { join } from "node:path";
-import { parseYaml, splitFrontmatter, type EvalCase, type EvalSuite } from "../parser/index.ts";
+import { comparable } from "../diagnose/verdict.ts";
+import {
+  parseYaml,
+  readAggregateResult,
+  splitFrontmatter,
+  type EvalCase,
+  type EvalSuite,
+} from "../parser/index.ts";
 import type { Io } from "./io.ts";
 import { manifestOf, matchesCall } from "./plan.ts";
-import { isRec, list, parse, type TriggerRow, type Tally } from "./summary.ts";
+import type { TriggerRow, Tally } from "./summary.ts";
 
 export interface Routable {
   readonly name: string;
@@ -79,18 +86,25 @@ export const triggerGraders = (
     return role === undefined || names.length === 0 ? [] : [{ grader, role, names }];
   });
 
-/** In the plugin arm of a result: runs that carried grader `grader` of case `caseName`, and how many of them passed. */
+/**
+ * In the plugin arm of a result: the runs that gave grader `grader` of case
+ * `caseName` an explicit verdict, and how many of those passed. A run that
+ * errored, was stopped by a mock, skipped paid graders or scored a silent zero
+ * (`comparable`, the diagnosis's own predicate) is not counted, and neither is a
+ * grader result with no `passed`, so neither can pass for a fire or a false fire.
+ */
 export const armTally = (
   text: string | undefined,
   caseName: string,
   grader: string,
 ): { readonly runs: number; readonly passed: number } => {
-  const c = list(parse(text)?.["cases"]).find((x) => isRec(x) && x["name"] === caseName);
-  const arms = isRec(c) && isRec(c["arms"]) ? c["arms"] : {};
-  const graded = list(arms["with"]).flatMap((r) =>
-    isRec(r) ? list(r["graders"]).filter((g) => isRec(g) && g["name"] === grader) : [],
-  );
-  return { runs: graded.length, passed: graded.filter((g) => isRec(g) && g["passed"] === true).length };
+  const read = text === undefined ? undefined : readAggregateResult(text);
+  const c = read?.ok === true ? read.result.cases.find((x) => x.name === caseName) : undefined;
+  const verdicts = (c?.withRuns ?? [])
+    .filter((r) => comparable(r) && r.aborted !== true)
+    .flatMap((r) => (r.graders ?? []).filter((g) => g.name === grader))
+    .flatMap((g) => (g.passed === undefined ? [] : [g.passed]));
+  return { runs: verdicts.length, passed: verdicts.filter((p) => p).length };
 };
 
 const add = (a: Tally | undefined, hit: number, runs: number): Tally => ({
