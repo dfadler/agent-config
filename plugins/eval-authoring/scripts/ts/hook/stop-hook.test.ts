@@ -117,6 +117,19 @@ describe("runStopHook in a real repo", () => {
     expect(stop(top, sid())).toContain('"decision":"block"');
   });
 
+  it("falls back to @{upstream} when neither origin/main nor main exists (#753)", () => {
+    const top = repoWithPlugin();
+    git(top, "init", "-q", "-b", "trunk");
+    git(top, "add", "-A");
+    git(top, "commit", "-q", "-m", "base");
+    git(top, "checkout", "-q", "-b", "feature");
+    git(top, "branch", "--set-upstream-to=trunk");
+    touch(top, "plugins/p/skills/s/SKILL.md");
+    git(top, "add", "-A");
+    git(top, "commit", "-q", "-m", "skill");
+    expect(stop(top, sid())).toContain('"decision":"block"');
+  });
+
   it("writes no marker for an unsafe session_id", () => {
     expect(markerPath("../escape")).toBeUndefined();
     expect(markerPath("a/b")).toBeUndefined();

@@ -18,3 +18,14 @@ HOOK="$REPO_ROOT/plugins/eval-authoring/hooks/scripts/eval-gap-on-stop.sh"
   [ -z "$output" ]
   [ "$stderr" = "eval-authoring stop hook skipped: needs git on PATH" ]
 }
+
+@test "node missing or too old exits 0 with one stderr line" {
+  BIN="$BATS_TEST_TMPDIR/bin"
+  mkdir -p "$BIN"
+  printf '#!/bin/sh\nexit 1\n' >"$BIN/node"
+  chmod +x "$BIN/node"
+  run --separate-stderr env PATH="$BIN" /bin/bash "$HOOK" </dev/null
+  assert_success
+  [ -z "$output" ]
+  [ "$stderr" = "eval-authoring stop hook skipped: needs node 22.18 or later on PATH" ]
+}

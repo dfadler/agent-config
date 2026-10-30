@@ -1,0 +1,9 @@
+# max 0 with the default min 1 on an ungranted tool is EVAL019's finding; EVAL005 stays quiet so one grader is not reported twice (#753).
+schema_version: "1.1"
+name: max-zero-alone
+execution:
+  prompt: Do the work.
+graders:
+  - type: tool_used
+    tool: Bash
+    max: 0
