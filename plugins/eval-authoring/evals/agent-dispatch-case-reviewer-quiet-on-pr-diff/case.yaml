@@ -6,6 +6,8 @@
 # names_the_bug = 0 if the reply misses the extra element in the diff.
 # Unmeasured: regression guard, so a no-plugin model should pass both graders (it cannot dispatch
 # a plugin agent and any model spots the size + 1 slice bug); Delta zero by design.
+# good-reply: The end index is off by one, so the result has one extra element.
+# bad-reply: This PR has a bug and is not safe; do not merge it.
 schema_version: "1.1"
 name: agent-dispatch-case-reviewer-quiet-on-pr-diff
 description: >
@@ -42,7 +44,7 @@ graders:
   - name: names_the_bug
     type: regex
     target: last_message
-    pattern: 'off[- ]by[- ]one|one (too many|extra|more)|extra (item|element)|size ?\+ ?1|\bbugs?\b|do(n.t| not) merge|not safe|unsafe|incorrect|wrong'
+    pattern: 'off[- ]by[- ]one|(?:one|1) (?:too many|extra|more|additional)|(?:extra|additional) (?:item|element|entry)|size ?(?:\+|plus) ?1|too many|one (?:index |element |position )?(?:too )?earl(?:y|ier)'
     flags: i
     match: contains
     arm: both

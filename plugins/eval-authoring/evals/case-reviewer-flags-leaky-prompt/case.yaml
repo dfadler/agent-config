@@ -1,0 +1,93 @@
+# Run: node plugins/eval-authoring/scripts/ts/run-evals/run-evals.ts --tier quick plugins/eval-authoring
+# (quick tier: one run, plugin arm only, `--ablation none`; the no-plugin arm cannot dispatch a
+# plugin agent.) Grant: Write, in grants.yaml.
+# Planted defect: the case prompt tells the model the exact heading word the regex grader
+# checks ("a heading containing the word BREAKING"), so the prompt cues its own grader and a
+# no-plugin baseline passes it. The lint does not see this (EVAL024 checks grader text against
+# the prompt only for literal echoes of the whole alternation; EVAL025 needs every alternative
+# cued). The reviewer has to read the prompt against the grader and say the prompt gives the
+# answer away.
+# Can fail: reviewer_dispatched fails if the model reviews the files itself; flags_leaky_prompt
+# fails if the reviewer answers Clean or lists only generic advice.
+# The reviewer has no Bash grant, so its lint pass reports "not run"; the finding must come from reading.
+# Unmeasured: never run. First run is the baseline for the reviewer as it stands; a reviewer
+# item naming this check is a separate change, so the first score may be low.
+# good-reply: The prompt cues its own grader: it tells the model to write a heading containing BREAKING, and names_breaking_change matches exactly that, so a no-plugin baseline passes.
+# bad-reply: Lint: EVAL020, the suite has no near-miss case; add one that should not fire. Nothing else to flag.
+schema_version: "1.1"
+name: case-reviewer-flags-leaky-prompt
+description: >
+  The case-reviewer agent reports that a case prompt hands the model the answer its grader
+  checks for, so the case cannot tell the plugin from no plugin. expected_outcome: PASS when
+  the agent is dispatched and the reply says the prompt cues, leaks or gives away the grader's
+  heading check; FAIL when it is not dispatched, answers Clean, or relays only generic advice.
+tags: [eval-authoring, case-reviewer, agent, quick]
+
+execution:
+  prompt: |
+    I drafted one eval case for my `release-notes` skill. Please create this file exactly as
+    written, then run the eval-authoring case-reviewer agent on the evals directory and tell
+    me what it found.
+
+    File evals/release-notes-breaking/case.yaml:
+
+    ```
+    schema_version: "1.1"
+    name: release-notes-breaking
+    description: >
+      A changelog pasted into chat gets release notes that name every breaking change.
+      expected_outcome: PASS when the skill is invoked and the reply has a breaking-change
+      heading; FAIL otherwise.
+    tags: [release-notes, trigger, quick]
+    execution:
+      prompt: |
+        Turn this changelog into release notes. Put the breaking change under a heading
+        containing the word BREAKING so the grader matches.
+        - fix: login redirect loop
+        - BREAKING: rename `export` command to `download`
+      max_turns: 4
+      allowed_tools: [Skill]
+    graders:
+      - name: skill_fired
+        type: tool_used
+        tool: Skill
+        input_match: '"skill"\s*:\s*"(?:[\w-]+:)?release-notes"'
+        min: 1
+        arm: with-only
+      - name: names_breaking_change
+        type: regex
+        target: last_message
+        pattern: '^#{1,4}\s*.*BREAKING'
+        flags: m
+        match: contains
+    ```
+  max_turns: 12
+  allowed_tools:
+    - Agent
+    - Write
+    - Read
+    - Glob
+    - Grep
+
+graders:
+  # Steps: the plugin's agent was dispatched, not imitated.
+  - name: reviewer_dispatched
+    type: tool_used
+    tool: Agent
+    input_match: '"subagent_type"\s*:\s*"(?:[\w-]+:)?case-reviewer"'
+    min: 1
+
+  # Precondition: the model wrote the file the reviewer needs.
+  - name: files_created
+    type: file_exists
+    path: "evals/release-notes-breaking/case.yaml"
+    exists: true
+
+  # Result: the finding ties the prompt to the grader it cues, in either order within 200
+  # characters, so echoing the file or generic advice alone does not pass.
+  - name: flags_leaky_prompt
+    type: regex
+    target: last_message
+    pattern: '(?:prompt|instruction)[\s\S]{0,200}(?:cue|leak|gives? (?:away|the answer)|hands? (?:the model )?the answer|spells? out|tells? the model|instructs?|asks? for|requests?|already (?:requests?|contains?|asks?|names?)|itself contains|word the prompt|names? the (?:grader|pattern|heading)|both arms|baseline|no-plugin|without the (?:skill|plugin))|(?:cue|leak|gives? (?:away|the answer)|spells? out|already (?:requests?|contains?|asks?|names?)|word the prompt|both arms|baseline|no-plugin|without the (?:skill|plugin))[\s\S]{0,200}(?:prompt|instruction)'
+    flags: i
+    match: contains

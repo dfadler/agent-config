@@ -8,6 +8,8 @@
 # Can fail: author_cases_not_invoked fails if the description over-triggers on judge/rubric talk;
 # writes_rubric fails if the reply has no rubric at all.
 # Unmeasured: a regression guard; a no-plugin arm passes it by default, so no delta by design.
+# good-reply: PASS if every claim in the answer is supported by the help text. FAIL if the answer includes unsupported claims or invents a feature the help text does not mention.
+# bad-reply: PASS if the answer is helpful and accurate. FAIL if it is unhelpful.
 schema_version: "1.1"
 name: author-cases-quiet-on-app-judge-rubric
 description: >
@@ -39,7 +41,7 @@ graders:
   - name: writes_rubric
     type: regex
     target: last_message
-    pattern: '(?:PASS|FAIL)(?:\W{0,6}(?:if|when|only|means|the|an?|every|all|each|answer|response|reply|it)\b|\W{0,3}:)[\s\S]{0,800}(?:PASS|FAIL)(?:\W{0,6}(?:if|when|only|means|the|an?|every|all|each|answer|response|reply|it)\b|\W{0,3}:)'
+    pattern: '(?=[\s\S]*\bPASS\b)(?=[\s\S]*\bFAIL\b[\s\S]{0,300}(?:unsupported|not (?:in|found in|supported by|stated in|contained in|present in)|outside|beyond|external|invent|fabricat|hallucinat|general knowledge|not (?:covered|mentioned)|not grounded|ungrounded|cannot be traced|not (?:traceable|derived|drawn|based on)|absent from|makes? up|made up|elsewhere))'
     flags: i
     match: contains
     arm: both

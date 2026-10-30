@@ -8,6 +8,8 @@
 # run (every reply said results-fixture did not exist, all runs scored 0), and Bash is denied anyway.
 # Sabotage map: delete the "consistent judge" bullet in diagnose-scores/SKILL.md; the old text says
 # "suspect the judge first" for every negative-delta, so release-notes-tone gets rubric advice.
+# good-reply: Two different causes. release-notes-tone: unanimous FAIL votes mean the replies got worse, so edit the skill and read its transcripts. changelog-style: split votes mean the rubric wording is unstable, so tighten the criteria.
+# bad-reply: Both cases dropped because the judge is too strict; lower the threshold and rerun.
 schema_version: "1.1"
 name: diagnose-scores-two-negative-cases
 description: >
