@@ -68,7 +68,7 @@ describe("discoverRules", () => {
   it("finds the structural rules", async () => {
     const r = await discoverRules();
     expect(r.ok && r.rules.map((x) => x.id)).toEqual(
-      expect.arrayContaining(["EVAL001", "EVAL002", "EVAL003"]),
+      expect.arrayContaining(["EVAL002", "EVAL003"]),
     );
   });
 });
@@ -262,9 +262,10 @@ describe("cli main", () => {
 
 describe("mainWithDiscoveredRules", () => {
   it("runs the real rules end to end", async () => {
-    put("evals/a/prompt.md", "no grader here");
+    put("evals/a/prompt.md", "do it");
+    put("evals/a/graders/never.md", "---\ntype: tool_used\ntool: Read\nmax: 0\n---\n");
     const r = await mainWithDiscoveredRules([root]);
     expect(r.code).toBe(1);
-    expect(r.stdout).toContain("error EVAL001");
+    expect(r.stdout).toContain("error EVAL019");
   });
 });

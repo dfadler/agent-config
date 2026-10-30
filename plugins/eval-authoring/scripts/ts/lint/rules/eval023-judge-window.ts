@@ -5,9 +5,10 @@ import type { Problem, Rule } from "../types.ts";
 const JUDGE_TRACE_WINDOW = 12;
 
 /**
- * EVAL023: two judge weaknesses. A bare `llm` grader on `last_message` can be
- * manipulated by the graded reply, and an `llm` grader on `trace` is blind to
- * the middle of a long run.
+ * EVAL023: two judge weaknesses. A bare `llm` grader on `last_message` may be
+ * manipulated by the graded reply (claimed in #743, unproven: the research doc
+ * it cites is not public), and an `llm` grader on `trace` is blind to the
+ * middle of a long run (documented).
  */
 export const rule: Rule = {
   id: "EVAL023",
@@ -15,7 +16,7 @@ export const rule: Rule = {
   title:
     "llm grader on last_message with no regex backstop, or on trace with max_turns above 12",
   source:
-    "from #743: a reply can manipulate its judge (Eval Research, Judges), and an llm judge reads only the first and last 12 trace messages (plugin-evals docs)",
+    "from #743: that a reply can manipulate its judge is unproven (cited from Eval Research, Judges, a doc that is not public); that an llm judge reads only the first and last 12 trace messages is in the plugin-evals docs",
   checkCase: (c) => {
     const hasReplyRegex = c.graders.some(
       (g) => g.type === "regex" && g.target.value.kind === "last_message",
@@ -26,7 +27,7 @@ export const rule: Rule = {
       if (kind === "last_message" && !hasReplyRegex) {
         return [
           {
-            message: `${graderLabel(g)} is an llm judge on last_message and the case has no regex on last_message, so the reply being graded can talk the judge into a pass (from #743).`,
+            message: `${graderLabel(g)} is an llm judge on last_message and the case has no regex on last_message, so nothing stops the reply being graded from steering the judge; whether a reply can do that is unproven (claimed in #743 from a research doc that is not public).`,
             fix: "Add a regex on last_message that pins the claim, plus a negative regex (match: not_contains) for rubric-echo phrases such as 'score: 10'. Put the rubric in the judge criteria, not the reply, and add one adversarial case whose reply claims a perfect score and must score 0.",
             loc: g.focus.loc,
             // Info: existing suites (fetch-execute-guide) judge the reply with no regex; advice, not a failure.

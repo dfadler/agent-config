@@ -32,6 +32,12 @@ const WRAPPER = join(
   "lint-on-edit.sh",
 );
 
+// Worker body that blocks the thread synchronously forever. A sleeping
+// Atomics.wait, not a busy loop: terminating a JIT-hot `for (;;) {}` about
+// 100 times per soak is the likeliest cause of the SIGTRAP in #830.
+const BLOCK_FOREVER =
+  "Atomics.wait(new Int32Array(new SharedArrayBuffer(4)), 0, 0);\n";
+
 const GOOD_CASE = [
   'schema_version: "1.1"',
   "name: good",
@@ -49,12 +55,17 @@ const GOOD_CASE = [
   "",
 ].join("\n");
 
-/** No grader: EVAL001 fires. */
+/** `max: 0` with no `min: 0`: EVAL019 fires. */
 const BAD_CASE = [
   'schema_version: "1.1"',
   "name: bad",
   "execution:",
   "  prompt: Do the thing.",
+  "graders:",
+  "  - name: never-reads",
+  "    type: tool_used",
+  "    tool: Read",
+  "    max: 0",
   "",
 ].join("\n");
 
@@ -124,7 +135,7 @@ describe("runHook: in scope", () => {
     const out = await runHook(event(join(root, "evals/bad/case.yaml")));
     const ctx = contextOf(out);
     expect(ctx.hookEventName).toBe("PostToolUse");
-    expect(ctx.additionalContext).toContain("EVAL001");
+    expect(ctx.additionalContext).toContain("EVAL019");
     expect(ctx.additionalContext).toContain("Fix:");
     expect(ctx.additionalContext).toContain("Source:");
     expect(ctx.additionalContext).toContain("nothing was blocked");
@@ -139,14 +150,14 @@ describe("runHook: in scope", () => {
   it("reports every case when a file directly under the eval directory is edited", async () => {
     const root = makePlugin();
     const out = await runHook(event(join(root, "evals/grants.yaml")));
-    expect(contextOf(out).additionalContext).toContain("EVAL001");
+    expect(contextOf(out).additionalContext).toContain("EVAL019");
   });
 
   it("follows the manifest's experimental.evals", async () => {
     const root = makePlugin('{"experimental":{"evals":"checks"}}');
     const file = write(root, "checks/bad/case.yaml", BAD_CASE);
     const out = await runHook(event(file));
-    expect(contextOf(out).additionalContext).toContain("EVAL001");
+    expect(contextOf(out).additionalContext).toContain("EVAL019");
     expect(await runHook(event(join(root, "evals/bad/case.yaml")))).toBe("");
   });
 });
@@ -217,36 +228,42 @@ describe("runHook: failure containment", () => {
   it("enforces the deadline on synchronous blocking work in the worker", async () => {
     const root = makePlugin();
     const blocker = join(root, "blocker.mjs");
-    writeFileSync(blocker, "for (;;) {}\n");
+    writeFileSync(blocker, BLOCK_FOREVER);
     let workerRun: ReturnType<typeof workerLint> | undefined;
     const lint: LintFn = (r, s) => {
       workerRun = workerLint(r, s, pathToFileURL(blocker));
       return workerRun;
     };
-    const t0 = Date.now();
+    const t0 = performance.now();
     const out = await runHook(event(join(root, "evals/bad/case.yaml")), lint, 200);
     expect(out).toBe("");
-    expect(Date.now() - t0).toBeLessThan(3000);
+    expect(performance.now() - t0).toBeLessThan(3000);
     // The deadline abort must terminate the worker, not just stop waiting for it.
     await expect(workerRun).rejects.toThrow("exited without a result");
+    // A blocker that exited on its own would reject the same way, so also require
+    // that the rejection arrived no earlier than the deadline (10 ms tolerance).
+    expect(performance.now() - t0).toBeGreaterThanOrEqual(200 - 10);
   });
 
   it("terminates a blocked worker when the signal aborts", async () => {
     const root = makePlugin();
     const blocker = join(root, "blocker.mjs");
-    writeFileSync(blocker, "for (;;) {}\n");
+    writeFileSync(blocker, BLOCK_FOREVER);
     const ctl = new AbortController();
+    const t0 = performance.now();
     const run = workerLint(root, ctl.signal, pathToFileURL(blocker));
     setTimeout(() => {
       ctl.abort();
     }, 100);
     await expect(run).rejects.toThrow("exited without a result");
+    // A self-exiting blocker rejects the same way; require the abort delay elapsed.
+    expect(performance.now() - t0).toBeGreaterThanOrEqual(100 - 10);
   });
 
   it("returns real findings through the default worker lint", async () => {
     const root = makePlugin();
     const out = await runHook(event(join(root, "evals/bad/case.yaml")));
-    expect(out).toContain("EVAL001");
+    expect(out).toContain("EVAL019");
   });
 
   it("returns nothing when the lint refuses the plugin", async () => {
@@ -329,7 +346,7 @@ describe("lint-on-edit.sh (the shipped entry point)", () => {
     const root = makePlugin();
     const r = run(event(join(root, "evals/bad/case.yaml")));
     expect(r.status).toBe(0);
-    expect(contextOf(r.stdout).additionalContext).toContain("EVAL001");
+    expect(contextOf(r.stdout).additionalContext).toContain("EVAL019");
   });
 
   it("is silent and exits 0 for an out-of-scope path", () => {
@@ -373,7 +390,7 @@ describe("lint-on-edit.sh (the shipped entry point)", () => {
     symlinkSync(root, link);
     const r = run(event(join(link, "evals/bad/case.yaml")));
     expect(r.status).toBe(0);
-    expect(contextOf(r.stdout).additionalContext).toContain("EVAL001");
+    expect(contextOf(r.stdout).additionalContext).toContain("EVAL019");
   });
 
   it("prints usage for --help", () => {

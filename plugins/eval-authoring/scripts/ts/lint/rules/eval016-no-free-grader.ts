@@ -20,7 +20,7 @@ export const rule: Rule = {
   checkCase: (c) => {
     const paid = c.graders.filter((g) => PAID.has(g.type));
     const hasFree = c.graders.some((g) => FREE.has(g.type));
-    // No grader at all is EVAL001's finding; unknown types are EVAL003's.
+    // No grader at all is rejected by the CLI at load; unknown types are EVAL003's.
     if (hasFree || paid.length === 0) return [];
     const types = [...new Set(paid.map((g) => g.type))].join(" and ");
     return [
