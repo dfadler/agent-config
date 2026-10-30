@@ -19,7 +19,10 @@ the SE floored at 0.05): a delta below it reads as weak-signal. No model calls.
   --sd S                Per-run score standard deviation, in [0, 1]. There is
                         no default: none is recorded for this repo.
   --from-result FILE    Use the pooled SD of the arms in an earlier
-                        aggregate-result.json instead of --sd.
+                        aggregate-result.json instead of --sd. Arms that
+                        pass or fail every run have SD 0 and pull the pool
+                        down, so the cutoff is optimistic for a suite with
+                        many ceiling or floor cases.
   -h, --help            Show this message and exit.
 
 Exit codes: 0 printed, 1 unreadable result or no SD in it, 2 usage error.
@@ -71,6 +74,11 @@ export const main = (argv: readonly string[], io: Io): Outcome => {
   const known = new Set(["--runs", "--sd", "--from-result"]);
   const stray = argv.find((a) => a.startsWith("--") && !known.has(a));
   if (stray !== undefined) return usage(`unknown option ${stray}`);
+  const dangling = [...known].find((f) => {
+    const at = argv.indexOf(f);
+    return at !== -1 && (argv[at + 1] === undefined || argv[at + 1]?.startsWith("--") === true);
+  });
+  if (dangling !== undefined) return usage(`${dangling} needs a value`);
   const runsText = flagValue(argv, "--runs");
   const runs = Number(runsText);
   if (runsText === undefined || !Number.isInteger(runs) || runs < 2) {
@@ -97,12 +105,15 @@ export const main = (argv: readonly string[], io: Io): Outcome => {
       ? { code: EXIT_FAILURE, stdout: "", stderr: `${sd}\n` }
       : usage(sd);
   }
-  const delta = smallestDetectableDelta(runs, sd) ?? 0;
-  return {
-    code: EXIT_OK,
-    stdout: `With ${String(runs)} runs per arm and a per-run SD of ${sd.toFixed(2)}, a case cannot show a delta under ${delta.toFixed(2)} apart from noise at 95% confidence.\n`,
-    stderr: "",
-  };
+  const delta = smallestDetectableDelta(runs, sd);
+  if (delta === undefined) throw new Error("unreachable: --runs was validated as at least 2");
+  const head = `With ${String(runs)} runs per arm and a per-run SD of ${sd.toFixed(2)}`;
+  // Scores run 0 to 1, so a delta of 1 or more cannot happen.
+  const stdout =
+    delta >= 1
+      ? `${head}, no delta can clear the 95% bar at ${String(runs)} runs per arm (it would need to be ${delta.toFixed(2)}).\n`
+      : `${head}, a case cannot show a delta under ${delta.toFixed(2)} apart from noise at 95% confidence; a true delta this size clears it about half the time.\n`;
+  return { code: EXIT_OK, stdout, stderr: "" };
 };
 
 if (import.meta.main) {

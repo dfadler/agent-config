@@ -120,12 +120,13 @@ const T95 = [
   2.056, 2.052, 2.048, 2.045, 2.042,
 ];
 
-/** Two-sided 95% t quantile at `df` degrees of freedom (at least 1); 2 from 31 up. */
-export const tCutoff = (df: number): number => T95[df - 1] ?? 2;
+/** Two-sided 95% t quantile at `df` degrees of freedom; 2 from 31 up; undefined below 1 df (no estimate). */
+export const tCutoff = (df: number): number | undefined =>
+  df < 1 ? undefined : (T95[df - 1] ?? 2);
 
-/** t quantile at the smaller arm's df (conservative). */
+/** t quantile at the smaller arm's df (conservative); 2 when an arm has under two usable runs (the SE floor applies there). */
 const tQuantile = (w: ArmStats, wo: ArmStats): number =>
-  tCutoff(Math.min(w.usedRuns, wo.usedRuns) - 1);
+  tCutoff(Math.min(w.usedRuns, wo.usedRuns) - 1) ?? 2;
 
 /**
  * The 95% bar a delta must clear to count as more than noise: the t quantile

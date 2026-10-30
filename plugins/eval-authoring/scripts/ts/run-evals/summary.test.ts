@@ -219,6 +219,25 @@ describe("delta band", () => {
     expect(cell).toContain("0.25 (1 run/arm, noise unknown)");
     expect(cell).not.toContain("±");
   });
+  it("judges the band against the delta from usable runs, and shows both when an errored run moves it", () => {
+    // 3 usable with-runs at 1, 5 without at 0.4: usable delta 0.6, band 4.303 x 0.05 = 0.22.
+    // The file's delta (errored runs as 0) is 0.2, which would read as inside the band.
+    const errored = { score: 0, error: "rate limit", graders: g };
+    const text = JSON.stringify({
+      schemaVersion: 1,
+      partial: false,
+      cases: [
+        {
+          name: "c",
+          aggregates: { score: 0.6, scoreWithout: 0.4, delta: 0.2 },
+          arms: { with: [...arm([1, 1, 1]), errored, errored], without: arm([0.4, 0.4, 0.4, 0.4, 0.4]) },
+        },
+      ],
+    });
+    const cell = line(text);
+    expect(cell).toContain("0.20 (0.60 from usable runs) ± 0.22 (3/5 runs)");
+    expect(cell).not.toContain("inside band");
+  });
   it("adds no band or run count at a tier that does not measure a delta", () => {
     const cell = line(doc([1, 1, 1], [0, 0.5, 0], 0.83), "standard");
     expect(cell).not.toContain("±");

@@ -125,7 +125,8 @@ difference): a delta inside it is noise-level. It does not lift the suite-size r
 --sd 0.25` (or `--from-result <aggregate-result.json>` for the SD pooled over an earlier
 run's arms) prints the smallest per-case delta that clears the same 95% bar, so "5 runs
 cannot see a delta under 0.44" is known before the run. There is no default SD (none is
-recorded for this repo), so the figure is only as good as the SD you give it. It is a
+recorded for this repo), so the figure is only as good as the SD you give it (a result full
+of ceiling or floor cases pools in SD 0 and gives an optimistic cutoff). It is a
 cutoff, not a power calculation: a true delta of that size clears the bar about half the
 time. It cannot say how many cases a suite needs or whether a suite-level delta is
 detectable, and it is not wired into `--dry-run`.

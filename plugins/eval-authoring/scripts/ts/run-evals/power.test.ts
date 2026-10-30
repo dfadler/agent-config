@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { main, pooledSd, smallestDetectableDelta } from "./power.ts";
 import { readAggregateResult } from "../parser/index.ts";
+import { tCutoff } from "../diagnose/verdict.ts";
 
 const grader = [{ name: "g", passed: true, weight: 1, scored: true }];
 const arm = (scores: readonly number[]) => scores.map((score) => ({ score, error: null, graders: grader }));
@@ -54,6 +55,26 @@ describe("main", () => {
     expect(main(["--runs", "3", "--sd", "0.2", "--from-result", "r.json"], io({})).code).toBe(2);
     expect(main(["--runs", "3", "--from-result", "nope.json"], io({})).code).toBe(1);
     expect(main(["--runs", "3", "--from-result", "r.json"], io({ "r.json": result([1], [0]) })).code).toBe(1);
+  });
+  it("says no delta can clear the bar when the cutoff is 1 or more, still exit 0", () => {
+    // 2 runs, sd 0.25: t(1) 12.706 x SE 0.25 = 3.18, past the 0-to-1 score range.
+    const out = main(["--runs", "2", "--sd", "0.25"], io({}));
+    expect(out.code).toBe(0);
+    expect(out.stdout).toContain("no delta can clear the 95% bar at 2 runs per arm");
+    expect(out.stdout).not.toContain("cannot show a delta under");
+  });
+  it("states on the output line that a delta of that size clears the bar about half the time", () => {
+    expect(main(["--runs", "5", "--sd", "0.25"], io({})).stdout).toContain("clears it about half the time");
+  });
+  it("treats a flag with no value as a usage error, even --from-result last", () => {
+    expect(main(["--runs", "3", "--from-result"], io({})).code).toBe(2);
+    expect(main(["--runs", "3", "--sd"], io({})).code).toBe(2);
+    expect(main(["--runs", "--sd", "0.2"], io({})).code).toBe(2);
+  });
+  it("tCutoff has no estimate below 1 degree of freedom and keeps t(1) and the 2 from 31", () => {
+    expect(tCutoff(0)).toBeUndefined();
+    expect(tCutoff(1)).toBe(12.706);
+    expect(tCutoff(31)).toBe(2);
   });
   it("prints usage for --help", () => {
     expect(main(["--help"], io({})).stdout).toContain("Usage: power.ts");

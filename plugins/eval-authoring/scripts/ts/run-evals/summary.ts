@@ -135,8 +135,11 @@ export interface CaseRow {
   readonly with: number | undefined;
   readonly without: number | undefined;
   readonly delta: number | undefined;
-  /** Usable runs per arm (the smaller arm); omitted when the result could not be diagnosed. */
+  /** Usable runs in the plugin arm and in the no-plugin arm; omitted when the result could not be diagnosed. */
   readonly runs?: number;
+  readonly runsWithout?: number;
+  /** The delta diagnose() judges, recomputed from usable runs; the file's `delta` counts errored and skipped runs as 0. */
+  readonly usableDelta?: number;
   /** 95% bar for the delta (t quantile x SE of the difference); omitted when an arm has under two usable runs. */
   readonly band?: number;
   /** Graders that failed in the plugin arm. */
@@ -164,10 +167,10 @@ export const caseRow = (
   );
   const parsed = text === undefined ? undefined : readAggregateResult(text);
   const v = parsed?.ok === true ? diagnose(parsed.result).cases.find((x) => x.name === caseName) : undefined;
-  const usedRuns = v === undefined ? undefined : Math.min(v.with.usedRuns, v.without.usedRuns);
   const noiseKnown = v !== undefined && v.with.stdDev !== undefined && v.without.stdDev !== undefined;
   return {
-    ...(usedRuns === undefined ? {} : { runs: usedRuns }),
+    ...(v === undefined ? {} : { runs: v.with.usedRuns, runsWithout: v.without.usedRuns }),
+    ...(v?.delta === undefined ? {} : { usableDelta: v.delta }),
     ...(v !== undefined && noiseKnown ? { band: deltaBar(v.with, v.without).bar } : {}),
     skillRuns: skillGraders.length,
     skillMissed: skillGraders.filter((g) => isRec(g) && g["passed"] === false).length,
@@ -221,11 +224,18 @@ const cell = (s: string): string => s.replace(/\|/g, "\\|");
 
 /** The delta with its 95% band and run count, or the bare delta when the result carries no run detail. */
 const deltaCell = (row: CaseRow | undefined): string => {
-  const base = fmt(row?.delta);
-  if (row?.delta === undefined || row.runs === undefined) return base;
-  const runs = `${String(row.runs)} run${row.runs === 1 ? "" : "s"}/arm`;
+  const fileDelta = fmt(row?.delta);
+  if (row?.delta === undefined || row.runs === undefined) return fileDelta;
+  // The band is built from usable runs, so judge "inside" against the delta diagnose() judges, not the file's.
+  const judged = row.usableDelta ?? row.delta;
+  const base = fmt(judged) === fileDelta ? fileDelta : `${fileDelta} (${fmt(judged)} from usable runs)`;
+  const without = row.runsWithout ?? row.runs;
+  const runs =
+    without === row.runs
+      ? `${String(row.runs)} run${row.runs === 1 ? "" : "s"}/arm`
+      : `${String(row.runs)}/${String(without)} runs`;
   if (row.band === undefined) return `${base} (${runs}, noise unknown)`;
-  const inside = Math.abs(row.delta) <= row.band ? "; inside band" : "";
+  const inside = Math.abs(judged) <= row.band ? "; inside band" : "";
   return `${base} ± ${fmt(row.band)} (${runs}${inside})`;
 };
 
@@ -250,7 +260,7 @@ export const renderSummary = (s: SummaryInput): string => {
     ),
     ...s.unstarted.map((n) => `| ${cell(n)} | not run | | | |`),
     ...(hasDelta
-      ? ["", "Delta ± band: the 95% bar from the per-run scores (t quantile x standard error of the difference, SE floored at 0.05). A delta inside its band cannot be told from noise."]
+      ? ["", "Delta ± band: the 95% bar from the per-run scores (t quantile x standard error of the difference, SE floored at 0.05). A delta inside its band cannot be told from noise. Errored and skipped runs are left out of the band and the judged delta (shown as \"from usable runs\" when it differs from the file's); \"a/b runs\" is usable runs with and without the plugin."]
       : []),
     ...(hasDelta && s.cases.length + s.unstarted.length < DELTA_CASE_FLOOR
       ? ["", `Delta not significant below ${String(DELTA_CASE_FLOOR)} cases (this suite has ${String(s.cases.length + s.unstarted.length)}).`]
