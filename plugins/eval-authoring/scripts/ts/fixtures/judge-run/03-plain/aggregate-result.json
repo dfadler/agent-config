@@ -7,7 +7,7 @@
       "aggregates": { "score": 1 },
       "arms": {
         "with": [
-          { "score": 1, "error": null, "graders": [{ "name": "r", "type": "regex", "passed": true, "score": 1, "scored": true, "weight": 1 }] }
+          { "score": 1, "error": null, "graders": [{ "name": "r", "passed": true, "weight": 1, "explanation": "matched /ok/", "withOnly": false, "scored": true }] }
         ],
         "without": []
       }

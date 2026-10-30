@@ -66,7 +66,8 @@ export const rowsOf = (text: string): readonly Row[] => {
     (["with", "without"] as const).flatMap((arm) =>
       (arm === "with" ? c.withRuns : c.withoutRuns).flatMap((r, i) =>
         (r.graders ?? []).flatMap((g) => {
-          if (g.type !== "llm") return [];
+          // Real result entries carry no `type`: a judged grader is one with judgeVotes or a "judge votes:" explanation.
+          if (g.type !== "llm" && g.judgeVotes === undefined && !/judge votes:/i.test(g.explanation ?? "")) return [];
           const votes = graderVotes(g).map((v) => v === "PASS");
           const pass = votes.filter(Boolean).length;
           const verdict = g.passed ?? (votes.length === 0 ? undefined : pass * 2 > votes.length);

@@ -41,6 +41,17 @@ describe("judge-agreement", () => {
     expect(out.stdout).not.toContain("Agreement with human labels");
   });
 
+  it("finds judged graders in the real shape, which has no `type` field", () => {
+    for (const f of ["01-pick", "02-fallback", "03-plain"]) {
+      expect(fixture(`${f}/aggregate-result.json`)).not.toContain('"type"');
+    }
+    const out = main(["run/01-pick"], memory());
+    expect(out.stdout).toContain("Judge votes (1 llm graders)");
+    expect(out.stdout).not.toContain("No llm graders found");
+    // A regex grader entry looks the same minus judgeVotes and "judge votes:"; it is not a judge.
+    expect(main(["run/03-plain"], memory()).stdout).toContain("No llm graders found");
+  });
+
   it("falls back to the explanation text, and notes an llm grader with no votes", () => {
     const out = main(["run"], memory());
     expect(out.stdout).toContain("- fallback / text_only: 2 runs, votes PASS 1 / FAIL 3, unanimous 1 (50%), split 1");
