@@ -1,25 +1,32 @@
 # Run: node plugins/eval-authoring/scripts/ts/run-evals/run-evals.ts --tier quick plugins/eval-authoring
 # (quick tier: one run, plugin arm only, `--ablation none`; the no-plugin arm cannot dispatch a
 # plugin agent.) Grant: Write, in grants.yaml.
-# Clean-case control for case-reviewer-flags-planted-weak-case (#748). That case shows the
-# reviewer reports defects; this one shows it reports none when there are none, so a reviewer that
-# flags everything cannot pass both. The two files below follow the plugin's own guidance: natural
-# prompts, a should-fire and a near-miss case, free graders, no llm grader.
-# Can fail: reviewer_dispatched fails if the model reviews the files itself; says_clean fails if
-# the reviewer invents blocking findings or never gives a verdict; no_invented_defect fails if it
-# calls the free graders vague or the suite lopsided.
+# Control for case-reviewer-flags-planted-weak-case (#748). That case shows the reviewer reports
+# the planted defects (a vague llm criterion, a tautological `.*` regex, no near-miss prompt, no
+# sample replies); this one shows it does not report those defects on a suite that lacks them, so
+# a reviewer that flags everything cannot pass both. The two files below follow the plugin's own
+# guidance: natural prompts, a should-fire and a tagged near-miss, free graders, sabotage notes.
+# 2026-10-30: the earlier `says_clean` grader (reviewer must say "clean" / "no findings") failed 3
+# of 3 with-arm runs at 0.75 while no_invented_defect passed 3 of 3: the reviewer always finds
+# something on a two-case suite (a brittle heading regex, thin coverage), and a suite it calls
+# clean is not a fixture this checklist produces. Replaced by no_planted_defect_reported, the
+# true-negative mirror of the planted case's graders. Replies: evals/results run-2026-10-30T20-00.
+# Can fail: reviewer_dispatched fails if the model reviews the files itself;
+# no_planted_defect_reported fails if the reviewer calls a grader tautological or says it matches
+# every reply, or reports a missing near-miss prompt that is present; no_invented_defect fails if
+# it calls the free graders vague or subjective.
 # The reviewer has no Bash grant, so its lint pass reports "not run"; says_clean accepts "no findings" after that preamble.
 # Unmeasured: false-positive rate (TNR). Record it from a thorough run, then re-check after a
 # model change; paired planted case gives the true-positive side.
-# good-reply: Mechanical pass not run. Judgment: no findings. Both cases have a scored grader, the near-miss is a tagged smoke guard with a sabotage note, and no criterion is vague.
-# bad-reply: The suite has vague criteria and no negative prompt, so it is not clean.
+# good-reply: Mechanical pass not run. The heading regex is brittle and coverage is thin: add a second trigger prompt. Both cases have a scored grader and a sabotage note.
+# bad-reply: The has-text grader is tautological, it matches every reply; the criteria are vague and there is no negative prompt.
 schema_version: "1.1"
 name: case-reviewer-clean-case-control
 description: >
-  The case-reviewer agent, given a small suite with nothing wrong, says it is clean and does not
-  invent a defect. expected_outcome: PASS when the agent is dispatched and the reply gives a clean
-  verdict with no vagueness or missing-boundary finding; FAIL when it is not dispatched or it
-  reports a defect that is not there.
+  The case-reviewer agent, given a small suite without the planted-weak-case defects, does not
+  report those defects. expected_outcome: PASS when the agent is dispatched and the reply reports
+  no tautological or every-reply grader, no missing near-miss prompt and no vague criterion; FAIL
+  when it is not dispatched or it reports one of those defects that is not there.
 tags: [eval-authoring, case-reviewer, agent, quick]
 
 execution:
@@ -107,13 +114,15 @@ graders:
     path: "evals/release-notes-*/case.yaml"
     exists: true
 
-  # Verdict: the reviewer's all-clear, in its own words.
-  - name: says_clean
+  # True-negative mirror of case-reviewer-flags-planted-weak-case: none of its planted defects
+  # may be reported here. "near-miss" wording about adding MORE near-misses is allowed; claiming
+  # there is none is not.
+  - name: no_planted_defect_reported
     type: regex
     target: last_message
-    pattern: "\\bclean\\b|no (?:blocking |significant |real )?(?:findings|issues|problems|defects)|nothing to (?:flag|fix)|looks (?:good|fine|sound)|no (?:further|other|remaining) (?:findings|issues|problems)"
+    pattern: "tautolog\\w*|vacuous|matches (?:any|every) reply|(?:any|every) reply (?:matches|passes)|has_text|no (?:negative|non-firing|non-triggering|should-not)[\\s\\w-]{0,20}prompt"
     flags: i
-    match: contains
+    match: not_contains
 
   # Polarity: an invented defect on a clean suite. Negated phrases ("not vague") are tolerated
   # by requiring the finding words to sit right after a word that asserts the problem.
