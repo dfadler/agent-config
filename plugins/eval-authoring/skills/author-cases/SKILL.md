@@ -33,6 +33,12 @@ draft them there: tell the user to commit the skill and start a fresh session, t
   files (step 1: skill, manifest, existing cases, `grants.yaml`) and not from the
   session that wrote the skill; take the trigger description and output contract from
   the committed skill. If that is impossible, wait and return to it later.
+- When a fresh session is not possible, or to see what the author missed, dispatch the
+  [blind-case-writer agent](../../agents/blind-case-writer.md) and diff its drafts against
+  yours. Pass it only the path of the committed skill or agent file (it finds the manifest),
+  not the existing cases, the author's notes or a summary of what the skill should do: whatever
+  you put in the prompt it can copy. Its drafts are text for you to review, not cases to commit
+  unread, and a gap between the two sets is a question about the skill, not an error in either.
 - Check domain facts in graders against primary docs or source, not the skill text.
 - Same-session cases that all pass first try, or take under a minute each, probably do
   not test the boundary. A few independent cases beat many co-authored ones.

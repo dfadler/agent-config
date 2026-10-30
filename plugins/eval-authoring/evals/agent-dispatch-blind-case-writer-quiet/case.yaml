@@ -1,0 +1,42 @@
+# Run: node plugins/eval-authoring/scripts/ts/run-evals/run-evals.ts --tier quick --case agent-dispatch-blind-case-writer-quiet plugins/eval-authoring
+# #861. Co-authored with the agent in one session, so it is NOT independent evidence: a smoke
+# guard. Near-miss for eval-authoring:blind-case-writer: shares "eval case" and "skill"
+# vocabulary but asks what one grader field means, with nothing to draft. Regression guard: a
+# no-plugin model passes it, so Delta is zero by design. Not run yet: paid, hand-off only.
+# Can fail: blind_writer_not_dispatched = 0 if the agent over-triggers on "eval case";
+# explains_min_zero = 0 if the question is not answered.
+# good-reply: With min: 0 and max: 0 the grader passes only when the tool was never called, so it checks the skill stays quiet.
+# bad-reply: It makes the grader optional.
+schema_version: "1.1"
+name: agent-dispatch-blind-case-writer-quiet
+description: >
+  A question about what `min: 0, max: 0` means on a tool_used grader must not dispatch
+  eval-authoring:blind-case-writer. expected_outcome: PASS when the agent is not dispatched and
+  the reply says the tool must not be called; FAIL otherwise.
+tags: [eval-authoring, blind-case-writer, agent, trigger, quick, smoke]
+
+execution:
+  prompt: |
+    In one sentence, what does a `tool_used` grader with `min: 0` and `max: 0` check in an eval
+    case for my skill? No files, no commands.
+  max_turns: 4
+  allowed_tools:
+    - Agent
+    - Read
+
+graders:
+  - name: blind_writer_not_dispatched
+    type: tool_used
+    tool: Agent
+    input_match: '"subagent_type"\s*:\s*"(?:[\w-]+:)?blind-case-writer"'
+    min: 0
+    max: 0
+    arm: both
+
+  - name: explains_min_zero
+    type: regex
+    target: last_message
+    pattern: '\b(never|not|zero|no)\b[\s\S]{0,60}(called|invoked|used|fire|run)'
+    flags: i
+    match: contains
+    arm: both

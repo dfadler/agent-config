@@ -1,0 +1,64 @@
+# Run: node plugins/eval-authoring/scripts/ts/run-evals/run-evals.ts --tier quick --case agent-dispatch-blind-case-writer plugins/eval-authoring
+# (quick tier: one run, plugin arm only, `--ablation none`, which an agent case needs: the
+# no-plugin arm cannot dispatch a plugin agent, "Agent type ... not found".)
+# #861. Co-authored with the agent in one session, so it is NOT independent evidence: it is a
+# smoke test that the agent is dispatched, returns a case draft, and that the caller does not
+# leak the author's own case into the agent's prompt. Not run yet: paid, hand-off only.
+# No grant (Agent only). The skill text is inline because the workspace is empty.
+# Can fail: agent_dispatched = 0 if the main model drafts the cases itself; draft_not_leaked = 0 if
+# it forwards the planted "zebra-ledger" check (the leak the agent's caller is told to avoid);
+# reply_has_case_draft = 0 if the reply holds no case file. A no-plugin model cannot dispatch, so
+# this case has no delta by design.
+# Sabotage note: deleting the agent's "Fenced `case.yaml` blocks" output rule should fail
+# reply_has_case_draft; deleting its "What you may read" ban on the author's cases is not covered.
+# good-reply: Here is the blind draft. evals/changelog-fires/case.yaml: schema_version: "1.1" name: changelog-fires execution: prompt: Turn these commits into a changelog. graders: - name: skill_fired type: tool_used tool: Skill min: 1. Undecided by the text: SKILL.md:3 | does "release" cover hotfixes | assumed yes.
+# bad-reply: I wrote the cases myself instead: check that the reply says Added, Fixed and Changed.
+schema_version: "1.1"
+name: agent-dispatch-blind-case-writer
+description: >
+  Asked for an independent draft of eval cases for a skill whose text is pasted, with the
+  author's own check mentioned in the same message, the main model dispatches
+  eval-authoring:blind-case-writer without forwarding the author's check, and the reply holds
+  a draft case file. expected_outcome: PASS when the agent is dispatched, its prompt does not
+  contain the planted check, and the reply shows a case file with schema_version "1.1";
+  FAIL otherwise.
+tags: [eval-authoring, blind-case-writer, agent, quick, smoke]
+
+execution:
+  prompt: |
+    I just committed this skill and I already wrote one case for it: a regex that checks the
+    reply contains the exact phrase `zebra-ledger`. I want an independent set of draft cases to
+    compare mine against, so run the eval-authoring blind-case-writer agent and show me its
+    draft. Do not write any files.
+
+    ```
+    ---
+    name: changelog
+    description: Turn a list of commits into a user-facing changelog. Use when asked to write release notes or a changelog from commits.
+    ---
+    Group commits under Added, Changed and Fixed. Drop commits that only touch tests or CI.
+    Write each entry as one sentence in the past tense. Never invent a commit that was not given.
+    ```
+  max_turns: 8
+  allowed_tools:
+    - Agent
+
+graders:
+  - name: agent_dispatched
+    type: tool_used
+    tool: Agent
+    input_match: '"subagent_type"\s*:\s*"(?:[\w-]+:)?blind-case-writer"'
+    min: 1
+
+  - name: draft_not_leaked
+    type: tool_used
+    tool: Agent
+    input_match: 'zebra-ledger'
+    min: 0
+    max: 0
+
+  - name: reply_has_case_draft
+    type: regex
+    target: last_message
+    pattern: 'schema_version:\s*"?1\.1"?[\s\S]*graders:'
+    match: contains
