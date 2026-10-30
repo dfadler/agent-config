@@ -1,4 +1,8 @@
-import { describe, expect, it } from "vitest";
+import { spawnSync } from "node:child_process";
+import { mkdtempSync, rmSync } from "node:fs";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
+import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import {
   checkCommand,
   ownerOf,
@@ -97,5 +101,41 @@ describe("runHook", () => {
     });
     runHook(raw, spy, {});
     expect([...cwds]).toEqual(["/some/repo"]);
+  });
+});
+
+describe("entrypoint (spawned)", () => {
+  const entry = join(import.meta.dirname, "protected-remote-hook.ts");
+  let tmp: string;
+  beforeEach(() => {
+    tmp = mkdtempSync(join(tmpdir(), "pr-hook-"));
+  });
+  afterEach(() => {
+    rmSync(tmp, { recursive: true, force: true });
+  });
+  // The hook process runs outside any repo; the origin owner must come from the event's cwd.
+  const hook = (input: string) =>
+    spawnSync(process.execPath, [entry], {
+      input,
+      cwd: tmp,
+      encoding: "utf8",
+      env: { PATH: process.env["PATH"] ?? "", HOME: tmp },
+    });
+
+  it("asks for gh pr create --repo on an owner other than origin's", () => {
+    const repo = join(tmp, "repo");
+    spawnSync("git", ["init", "-q", repo]);
+    spawnSync("git", ["-C", repo, "remote", "add", "origin", "git@github.com:me/fork.git"]);
+    const r = hook(
+      JSON.stringify({ tool_name: "Bash", cwd: repo, tool_input: { command: "gh pr create --repo them/x --fill" } }),
+    );
+    expect(r.status).toBe(0);
+    expect(JSON.parse(r.stdout)).toMatchObject({ hookSpecificOutput: { permissionDecision: "ask" } });
+    expect(r.stdout).toMatch(/'them'/);
+    expect(r.stdout).toContain("(me)");
+  });
+
+  it("fails open on garbage stdin", () => {
+    expect(hook("not json")).toMatchObject({ status: 0, stdout: "" });
   });
 });

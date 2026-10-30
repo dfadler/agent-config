@@ -1,3 +1,5 @@
+import { spawnSync } from "node:child_process";
+import { join } from "node:path";
 import { describe, expect, it } from "vitest";
 import { run } from "./scratch-guard-hook.ts";
 
@@ -78,5 +80,22 @@ describe("scratch-guard hook", () => {
   it("fails open on bad input", () => {
     expect(call(undefined, {}, "not json")).toEqual({ code: 0, out: "", err: "" });
     expect(call(42)).toEqual({ code: 0, out: "", err: "" });
+  });
+});
+
+describe("entrypoint (spawned)", () => {
+  const entry = join(import.meta.dirname, "scratch-guard-hook.ts");
+  const hook = (input: string, env: Record<string, string> = {}) =>
+    spawnSync(process.execPath, [entry], { input, encoding: "utf8", env: { PATH: "", ...env } });
+
+  it("blocks a /tmp write in block mode", () => {
+    const r = hook(JSON.stringify({ tool_input: { file_path: "/tmp/x.txt" } }), { SCRATCH_GUARD: "block" });
+    expect(r.status).toBe(2);
+    expect(r.stdout).toBe("");
+    expect(r.stderr).toContain("/tmp/x.txt");
+  });
+
+  it("fails open on garbage stdin", () => {
+    expect(hook("not json")).toMatchObject({ status: 0, stdout: "", stderr: "" });
   });
 });

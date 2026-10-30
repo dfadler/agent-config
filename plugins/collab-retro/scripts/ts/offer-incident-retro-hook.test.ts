@@ -1,4 +1,8 @@
-import { describe, expect, it } from "vitest";
+import { spawnSync } from "node:child_process";
+import { chmodSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
+import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { run, type Deps, type Run } from "./offer-incident-retro-hook.ts";
 
 const PRS = JSON.stringify([
@@ -56,5 +60,38 @@ describe("offer-incident-retro-hook", () => {
   it("skips remote sessions and bad stdin", () => {
     expect(call(fake({ gh: { status: 0, stdout: PRS } }), "{}", { CLAUDE_CODE_REMOTE: "true" }).out).toBe("");
     expect(call(fake({ gh: { status: 0, stdout: PRS } }), "not json").out).toBe("");
+  });
+});
+
+describe("entrypoint (spawned)", () => {
+  const entry = join(import.meta.dirname, "offer-incident-retro-hook.ts");
+  let tmp: string;
+  beforeEach(() => {
+    tmp = mkdtempSync(join(tmpdir(), "cr-offer-"));
+    // A gh shim first on PATH answers `gh pr list` with the PRS fixture.
+    writeFileSync(join(tmp, "gh"), `#!/bin/sh\ncat <<'J'\n${PRS}\nJ\n`);
+    chmodSync(join(tmp, "gh"), 0o755);
+  });
+  afterEach(() => {
+    rmSync(tmp, { recursive: true, force: true });
+  });
+  // cwd is not a git repo, so the revert check is skipped and only the gh path runs.
+  const hook = (input: string) =>
+    spawnSync(process.execPath, [entry], {
+      input,
+      cwd: tmp,
+      encoding: "utf8",
+      env: { PATH: `${tmp}:${process.env["PATH"] ?? ""}`, HOME: tmp },
+    });
+
+  it("offers a retro for a closed-unmerged PR", () => {
+    const r = hook(JSON.stringify({ cwd: tmp }));
+    expect(r.status).toBe(0);
+    expect(r.stdout).toContain("PR #7 closed unmerged");
+    expect(r.stdout).not.toContain("#8");
+  });
+
+  it("fails open on garbage stdin", () => {
+    expect(hook("not json")).toMatchObject({ status: 0, stdout: "" });
   });
 });
