@@ -38,6 +38,33 @@ describe("main", () => {
     expect(out.stdout).not.toContain('"verdict": "weak-signal"');
   });
 
+  it("--high-variance replaces the cutoff for small and large arms alike", () => {
+    // sd 0.329 at 5 runs: under the default small-arm cutoff 0.35, over a 0.3 override.
+    const arm = (scores: number[]) =>
+      scores.map((score) => ({
+        score,
+        error: null,
+        skippedPaidGraders: false,
+        graders: [{ name: "g", passed: true, weight: 1, explanation: "", scored: true }],
+      }));
+    const doc = {
+      schemaVersion: 1,
+      partial: false,
+      cases: [
+        {
+          name: "c",
+          aggregates: { delta: 0.7 },
+          arms: { with: arm([1, 0.4, 1, 0.4, 1]), without: arm([0, 0, 0, 0, 0]) },
+        },
+      ],
+    };
+    const files = { "r.json": JSON.stringify(doc) };
+    expect(main(["r.json"], io(files)).stdout).not.toContain("run scores vary");
+    expect(main(["--high-variance", "0.3", "r.json"], io(files)).stdout).toContain(
+      "with run scores vary",
+    );
+  });
+
   it("prints the near-ceiling threshold in the ceiling finding", () => {
     const argv = ["--near-ceiling", "0.5", "r.json"];
     const out = main(argv, io({ "r.json": fixture("two-cases-one-run.json") }));

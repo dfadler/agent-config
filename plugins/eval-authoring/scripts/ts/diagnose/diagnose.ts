@@ -21,8 +21,11 @@ The verdicts do not change the exit code.
 
   --format text|json   Output format (default: text).
   --neutral-band N, --se-floor N, --near-ceiling N, --high-variance N
-                       Override a verdict cutoff for this run (defaults 0.05,
-                       0.05, 0.95, 0.25; see the diagnose-scores skill).
+                       Override a verdict cutoff for this run (defaults: no
+                       neutral band, 0.05, 0.95, 0.25 or 0.35 for an arm of 5
+                       runs or fewer; see the diagnose-scores skill).
+                       --neutral-band turns on a dead zone of that width around
+                       zero; --high-variance replaces both SD cutoffs.
                        Ranges: --neutral-band and --near-ceiling (0, 1];
                        --se-floor and --high-variance [0, 1].
   -h, --help           Show this message and exit.
@@ -104,7 +107,12 @@ export const main = (argv: readonly string[], io: Io): Outcome => {
       stderr: `${path}: ${parsed.reason}\n`,
     };
   }
-  const diagnosis = diagnose(parsed.result, { ...DEFAULT_THRESHOLDS, ...overrides });
+  const { highVariance } = overrides;
+  const diagnosis = diagnose(parsed.result, {
+    ...DEFAULT_THRESHOLDS,
+    ...overrides,
+    ...(highVariance === undefined ? {} : { highVarianceSmallArm: highVariance }),
+  });
   return {
     code: EXIT_OK,
     stdout: format === "json" ? formatJson(diagnosis) : formatText(diagnosis),

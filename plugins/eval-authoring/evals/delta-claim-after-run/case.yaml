@@ -1,7 +1,7 @@
 # Run: node plugins/eval-authoring/scripts/ts/run-evals/run-evals.ts --tier thorough --case delta-claim-after-run plugins/eval-authoring
 # Re-added for #724 after the run-evals description was widened to cover "PR line from pasted
 # scores". The user quotes quick-tier output and asks for a delta; the rule is in author-cases
-# step 9 and run-evals. Reply-only; skill_fired is an unscored indicator (EVAL009 info intended).
+# step 9 and run-evals. Reply-only; skill_fired is an unscored indicator.
 # Can fail: says_delta_unmeasured fails if the reply never declines; no_numeric_delta fails if it
 # writes the +0.33 the user hands over. Not yet run at the thorough tier since the grader fix (#724).
 # Sabotage-checked offline (#784): no_numeric_delta fails the bad reply, says_delta_unmeasured fails a

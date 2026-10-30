@@ -1,6 +1,6 @@
 # Run: claude plugin eval plugins/eval-authoring --case author-cases-fresh-session-for-cases --runs 5 --trust-plugin --no-publish
 # Covers the Independence bullet (#715): cases for a skill are written in a fresh session from the
-# committed files, not the session that wrote the skill. Reply-only; EVAL009 info is intentional.
+# committed files, not the session that wrote the skill. Reply-only.
 # Sabotage map: delete the "Commit the skill, then write cases in a fresh session" bullet and
 # fresh_session_named should fail in the with arm.
 # Can fail: a no-plugin reply starts writing cases at once and never names a fresh session.

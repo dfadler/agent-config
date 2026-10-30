@@ -79,7 +79,8 @@ blind-case-writer agent, second bullet), then stop.
    in [graders](references/graders.md). Pair a grader on the result with one on the steps.
    A reply-only skill case has no scored steps grader: `tool_used: Skill` is an unscored
    indicator in a two-arm run, and there is no other step to check. Keep the Skill check,
-   grade the reply with free `regex` graders, and accept the EVAL009 finding. Do not
+   grade the reply with free `regex` graders. (The lint rule that asks for the pair, EVAL009, is
+   off by default; `--enable EVAL009` turns it on.) Do not
    set `arm: both` on a should-fire Skill check to clear it: the no-plugin arm can never
    pass it, so it manufactures a delta that says nothing about the skill
    ([docs](https://code.claude.com/docs/en/plugin-evals#compare-against-a-no-plugin-baseline)).
