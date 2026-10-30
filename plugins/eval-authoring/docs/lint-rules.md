@@ -55,7 +55,7 @@ The Sev column is the rule's default; "opt-in" means the rule runs only with `--
 
 Hits from running the lint over every plugin with evals (30 plugins, 269 cases), 2026-10-28. Details and rule origins: [#811](https://github.com/dfadler/agent-config/issues/811). CLI overlap for 001, 003 and 005 was checked with free `--max-cost-usd 0` probes on CLI 2.1.300, 2026-10-29; the rest was not.
 
-- 009: 143 info. Made opt-in (`--enable EVAL009`); the rule and its fixtures stay. It fired on over half of cases and its own fix excuses reply-only skills.
+- 009: 143 info. Made opt-in (`--enable EVAL009`); the rule and its fixtures stay. It fired on over half of cases, mostly reply-only skills, and its fix now says a reply-only skill keeps the Skill check and leaves the rule off.
 - 024: 56 warn. Keep: real prompt-echo findings; the fixes are case edits.
 - 023: 12 info. Keep; the `last_message` half is unproven.
 - 025: 6 warn. Keep.

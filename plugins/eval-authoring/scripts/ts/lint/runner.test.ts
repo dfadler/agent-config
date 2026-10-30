@@ -253,6 +253,28 @@ describe("cli main", () => {
       expect(out).not.toContain("EVAL900  warn   test rule  (opt-in");
     });
 
+    it.each([[["--enable", ""]], [["--enable=,"]], [["--enable", "EVAL901,"]]])(
+      "exit 2 for an empty --enable operand %j",
+      (argv) => {
+        put("evals/a/prompt.md", "a");
+        const r = main([...argv, root], both);
+        expect(r.code).toBe(2);
+        expect(r.stderr).toMatch(/option --enable (needs rule IDs|requires a value)/);
+      },
+    );
+
+    it("exit 2 when --enable is the last argument and has no operand", () => {
+      const r = main([root, "--enable"], both);
+      expect(r.code).toBe(2);
+      expect(r.stderr).toContain("option --enable requires a value");
+    });
+
+    it("validates --enable before --list-rules returns", () => {
+      const r = main(["--list-rules", "--enable", "EVAL999"], both);
+      expect(r.code).toBe(2);
+      expect(r.stderr).toContain("unknown rule EVAL999");
+    });
+
     it("exit 2 for an unknown rule ID", () => {
       const r = main(["--enable", "EVAL999", root], both);
       expect(r.code).toBe(2);
@@ -270,6 +292,7 @@ describe("cli main", () => {
     );
     const on = await mainWithDiscoveredRules(["--enable", "EVAL009", root]);
     expect(on.stdout).toContain("info EVAL009");
+    expect(on.stdout).toContain("A reply-only skill has no step to check"); // the fix agrees with author-cases step 4
   });
 
   it("exit 0 with only warnings, report on stdout", () => {

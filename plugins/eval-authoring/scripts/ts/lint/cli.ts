@@ -110,7 +110,11 @@ const parse = (
       const inline = key === arg ? undefined : arg.slice(eq + 1);
       const value = inline ?? argv[i + 1];
       if (value === undefined) return { error: `option ${key} requires a value` };
-      if (key === "--enable") enable.push(...value.split(",").filter((id) => id !== ""));
+      if (key === "--enable") {
+        const ids = value.split(",");
+        if (ids.includes("")) return { error: `option --enable needs rule IDs, got "${value}"` };
+        enable.push(...ids);
+      }
       else values.set(key, value);
       if (inline === undefined) i += 1;
     } else if (arg.startsWith("-") && arg !== "-") {
@@ -156,16 +160,16 @@ export const main = (
   const args = parse(argv);
   if (args === "help") return done(EXIT_OK, USAGE);
   if ("error" in args) return usageError(args.error);
-  if (args.listRules) return done(EXIT_OK, listRulesText(rules));
-  if (args.format !== "text" && args.format !== "json") {
-    return usageError("--format must be text or json");
-  }
   const optIn = new Set(rules.filter((r) => r.optIn === true).map((r) => r.id));
   const unknown = args.enable.filter((id) => !rules.some((r) => r.id === id));
   if (unknown.length > 0) {
     return usageError(
       `--enable: unknown rule ${unknown.join(", ")} (opt-in rules: ${[...optIn].join(", ") || "none"})`,
     );
+  }
+  if (args.listRules) return done(EXIT_OK, listRulesText(rules));
+  if (args.format !== "text" && args.format !== "json") {
+    return usageError("--format must be text or json");
   }
   const pluginRoot = args.positionals[0] ?? ".";
   if (!isDirectory(pluginRoot)) {
