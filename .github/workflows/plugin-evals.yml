@@ -120,10 +120,13 @@ jobs:
         run: |
           set -uo pipefail
           mkdir -p "$OUT_DIR"
-          # Standard tier: every case, 3 runs, with and without the plugin, $5 ceiling.
+          # Standard tier: every case, 3 runs, with and without the plugin. The tier's
+          # flat $5 ceiling stopped the big suites part way (#648), so CI raises it to
+          # $25; a ceiling, not a spend (small suites cost $0.7 to $2).
           node plugins/eval-authoring/scripts/ts/run-evals/run-evals.ts \
             "plugins/$PLUGIN" \
             --tier standard \
+            --max-cost-usd 25 \
             --output-dir "$OUT_DIR" 2>&1 | tee "$OUT_DIR/eval.log"
           echo "${PIPESTATUS[0]}" > "$OUT_DIR/cli-exit"
 

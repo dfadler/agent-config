@@ -87,6 +87,14 @@ const notify = (existing: string) => {
   return { status: r.status, calls: readFileSync(log, "utf8") };
 };
 
+describe("eval job: cost ceiling", () => {
+  it("passes the wrapper a $25 ceiling on the standard tier (#648)", () => {
+    expect(workflow).toMatch(
+      /--tier standard \\\n\s+--max-cost-usd 25 \\\n\s+--output-dir/,
+    );
+  });
+});
+
 describe("notify job: failure issue", () => {
   it("runs only on failure, with issues: write on that job alone", () => {
     expect(workflow).toMatch(/notify:[\s\S]*if: \$\{\{ failure\(\) \}\}/);
