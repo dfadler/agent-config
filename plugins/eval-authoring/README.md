@@ -26,6 +26,7 @@ checks what a script can; the rest needs a paid run.
 | [`skills/diagnose-scores`](skills/diagnose-scores/SKILL.md) | Finds the result file, runs the script and interprets each verdict (cause, evidence, next step). |
 | [`scripts/ts/diagnose/`](scripts/ts/diagnose/diagnose.ts) | Free per-case verdict from an `aggregate-result.json` (delta, variance, run errors, split judge votes). |
 | [`agents/`](agents/) | `case-reviewer` (runs the lint, then judges wording and boundary coverage). Read-only. The score diagnoser was demoted to the `diagnose-scores` skill: the script's output is short, so isolation saved no context ([#465](https://github.com/dfadler/agent-config/issues/465)). |
+| [`agents/blind-case-writer`](agents/blind-case-writer.md) | Drafts cases (or just should-fire and near-miss prompts) from the committed skill text alone, returned as text, so the human can diff them against the author's cases ([#861](https://github.com/dfadler/agent-config/issues/861)). Read-only, never runs evals. |
 | [`docs/`](docs/) | [Grants file format](docs/grants-format.md), [adding a lint rule](docs/lint-rules.md). |
 | `evals/`, `tests/lint-fixtures/` | The plugin's own model-behavior cases and the lint's free fixtures. |
 
