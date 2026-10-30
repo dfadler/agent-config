@@ -18,6 +18,8 @@ const FIXTURES = join(import.meta.dirname, "..", "..", "..", "tests", "lint-fixt
 
 const found = await discoverRules();
 const rules = found.ok ? found.rules : [];
+/** Opt-in rules are off by default; their fixtures run with them on. */
+const optInIds = rules.filter((r) => r.optIn === true).map((r) => r.id);
 
 const dirs = (p: string): readonly string[] =>
   existsSync(p)
@@ -73,7 +75,7 @@ describe("fixture coverage", () => {
       const root = join(FIXTURES, id, fixture);
       const isBad = fixture.startsWith("bad-");
       it(isBad ? `fires ${id}` : `leaves ${id} quiet`, () => {
-        const outcome = lintPlugin(root, rules, { evalDir: "cases" });
+        const outcome = lintPlugin(root, rules, { evalDir: "cases", enable: optInIds });
         expect(outcome.ok).toBe(true);
         if (!outcome.ok) return;
         const { findings } = outcome.report;

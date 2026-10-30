@@ -227,6 +227,74 @@ describe("cli main", () => {
     expect(r.stderr).toContain(message);
   });
 
+  describe("opt-in rules", () => {
+    const optIn = rule({ id: "EVAL901", optIn: true });
+    const both = [rule(), optIn];
+
+    it("are skipped unless --enable names them, as a list or repeated", () => {
+      put("evals/a/prompt.md", "a");
+      expect(main([root], both).stdout).not.toContain("EVAL901");
+      expect(main(["--enable", "EVAL901", root], both).stdout).toContain("EVAL901");
+      expect(main(["--enable=EVAL900,EVAL901", root], both).stdout).toContain("EVAL901");
+      expect(main(["--enable", "EVAL900", "--enable", "EVAL901", root], both).stdout).toContain(
+        "EVAL901",
+      );
+    });
+
+    it("leave other rules running when one is enabled", () => {
+      put("evals/a/prompt.md", "a");
+      expect(main(["--enable", "EVAL901", root], both).stdout).toContain("EVAL900");
+    });
+
+    it("are marked in --list-rules, which still lists them", () => {
+      const out = main(["--list-rules"], both).stdout;
+      expect(out).toContain("EVAL901");
+      expect(out).toContain("(opt-in: --enable EVAL901)");
+      expect(out).not.toContain("EVAL900  warn   test rule  (opt-in");
+    });
+
+    it.each([[["--enable", ""]], [["--enable=,"]], [["--enable", "EVAL901,"]]])(
+      "exit 2 for an empty --enable operand %j",
+      (argv) => {
+        put("evals/a/prompt.md", "a");
+        const r = main([...argv, root], both);
+        expect(r.code).toBe(2);
+        expect(r.stderr).toMatch(/option --enable (needs rule IDs|requires a value)/);
+      },
+    );
+
+    it("exit 2 when --enable is the last argument and has no operand", () => {
+      const r = main([root, "--enable"], both);
+      expect(r.code).toBe(2);
+      expect(r.stderr).toContain("option --enable requires a value");
+    });
+
+    it("validates --enable before --list-rules returns", () => {
+      const r = main(["--list-rules", "--enable", "EVAL999"], both);
+      expect(r.code).toBe(2);
+      expect(r.stderr).toContain("unknown rule EVAL999");
+    });
+
+    it("exit 2 for an unknown rule ID", () => {
+      const r = main(["--enable", "EVAL999", root], both);
+      expect(r.code).toBe(2);
+      expect(r.stderr).toContain("unknown rule EVAL999");
+    });
+  });
+
+  it("EVAL009 is opt-in in the real rule set and runs under --enable EVAL009", async () => {
+    put("evals/a/prompt.md", "---\nmax_turns: 3\n---\nhi\n");
+    put("evals/a/graders/g.md", "---\ntype: regex\npattern: hi\n---\n");
+    const off = await mainWithDiscoveredRules([root]);
+    expect(off.stdout).not.toContain("EVAL009");
+    expect((await mainWithDiscoveredRules(["--list-rules"])).stdout).toMatch(
+      /EVAL009 .*\(opt-in: --enable EVAL009\)/,
+    );
+    const on = await mainWithDiscoveredRules(["--enable", "EVAL009", root]);
+    expect(on.stdout).toContain("info EVAL009");
+    expect(on.stdout).toContain("A reply-only skill has no step to check"); // the fix agrees with author-cases step 4
+  });
+
   it("exit 0 with only warnings, report on stdout", () => {
     put("evals/a/prompt.md", "a");
     const r = main([root], rules);

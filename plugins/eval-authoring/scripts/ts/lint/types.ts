@@ -54,6 +54,8 @@ export interface Rule {
   readonly title: string;
   /** Why the rule exists: a docs section, or "from #411" where the docs do not say. */
   readonly source: string;
+  /** Off unless the run names it (`--enable EVAL009`). For a rule that fires on most cases of a healthy suite. */
+  readonly optIn?: boolean;
   /** Called once per case. */
   readonly checkCase?: (
     evalCase: EvalCase,
