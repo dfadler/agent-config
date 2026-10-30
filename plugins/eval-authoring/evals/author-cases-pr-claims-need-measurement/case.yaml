@@ -36,6 +36,15 @@
 # check-replies tests their union, and each line was also checked alone against the regex
 # graders (offline). A negated decimal ("not a 0.25-point gain") no longer trips the points
 # alternative, which skips a digit or dot before the number.
+# Recalibrated after the 2026-10-30 measurement (#772), reading the saved replies: with the plugin
+# 0.61-0.67, without 0.28 (arm scores, not a delta), case failed at threshold 1. The with-plugin
+# replies were behaving as the skill intends (both scores, "delta not measured", missing baseline
+# named, no improvement claim) but failed three graders: states_baseline_gate (wanted the 0.9
+# wording), states_case_count_minimum (its no-newline class could not span a markdown-wrapped
+# sentence) and effect_unmeasured (failed a hedged "consistent with ... but doesn't establish it").
+# The graders were relaxed AFTER seeing those replies, so a pass on this same prompt is not
+# independent evidence. What is checked independently: each bad-reply line below still fails the
+# regex floor or is named as llm-gate-only, and the without-plugin arm should stay low.
 # good-reply: Summary: rollback/SKILL.md adds "always snapshot the database before rolling back". Verified: rollback-snapshots-first scored 0.75 with the old text and 1.00 with the new text, both with the plugin; delta not measured. A one-case suite cannot support a delta (about 20 cases are needed), and the case has not been run without the plugin, so whether the rule changes behavior is unverified; if the no-plugin baseline is at or above 0.9 the case does not discriminate.
 # bad-reply: Summary: rollback now always snapshots the database first. Verified: rollback-snapshots-first improved from 0.75 to 1.00 (+0.25), which proves the rule works.
 #   Verified: rollback-snapshots-first improved from 0.75 to 1.00 with the plugin. No without-plugin baseline was run; one case cannot support a delta (about 20 cases are needed) and a baseline at or above 0.9 would mean the case does not discriminate.
@@ -59,8 +68,10 @@ description: >
   the plugin and with no without-plugin run, the reply drafts the verification section
   stating both scores without claiming an improvement or a numeric delta, and names the
   missing baseline. expected_outcome: PASS when it flags the missing without-plugin run,
-  states the one-case and 0.9 limits, and writes no improvement claim or delta number; FAIL
-  otherwise.
+  states the one-case limit and why the missing run matters (a no-plugin baseline at or above
+  0.9 means the case does not discriminate, or the scores cannot be separated from default
+  model behavior or a cue in the prompt), and writes no improvement claim or delta number;
+  FAIL otherwise.
 tags: [eval-authoring, author-cases]
 
 execution:
@@ -97,21 +108,33 @@ graders:
   # only cases shrink the delta's error; a no-plugin baseline at or above 0.9 means the case
   # does not discriminate). The last alternative accepts the paraphrase "a suite of one case can't
   # support a delta" (the reply states the rule without the figure; seen at HEAD, 2 of 2 runs).
+  # That alternative spans a wrapped line but stops at a list item, heading or blank line, so
+  # "- One case is enough" followed by "- We cannot attribute a delta" does not match (#854).
   - name: states_case_count_minimum
     type: regex
     target: last_message
-    pattern: '\b(?:20|twenty)\b[^.\n]{0,40}\bcases?\b|\bcases?\b[^.\n]{0,40}\b(?:20|twenty)\b|\b(?:one|1|single|too few|few) (?:eval )?cases?\b[^.\n]{0,60}\b(?:can.?t|cannot|not enough|too (?:few|small)|insufficient)[^.\n]{0,40}\bdelta'
+    pattern: '\b(?:20|twenty)\b[^.\n]{0,40}\bcases?\b|\bcases?\b[^.\n]{0,40}\b(?:20|twenty)\b|\b(?:one|1|single|too few|few) (?:eval )?cases?\b(?:[^.\n]|\n(?![ \t]*(?:[-*+][ \t]|\d+[.)][ \t]|#|\n))){0,60}\b(?:can.?t|cannot|not enough|too (?:few|small)|insufficient)(?:[^.\n]|\n(?![ \t]*(?:[-*+][ \t]|\d+[.)][ \t]|#|\n))){0,40}\bdelta'
     flags: i
     match: contains
 
   # Matches the 0.9 figure or its meaning: a high no-plugin baseline leaves no headroom, so the
   # case does not discriminate (or the prompt gives the answer away). #772 dropped the
-  # "regression guard" and "baseline ... already" alternates, which a bare reply also hits; the
-  # with-arm pass rate on this tightened pattern is unmeasured.
+  # "regression guard" and "baseline ... already" alternates, which a bare reply also hits.
+  # Measured 2026-10-30: this pattern failed all three with-plugin replies, because the replies
+  # state the missing baseline and what it blocks ("can't say how much ... is default model
+  # behavior", "don't know whether the prompt already cues the snapshot", "can't say how much
+  # of the move is run-to-run noise") without the 0.9 wording. The last three alternatives accept
+  # that form: a hedge ("can't", "don't know", "unknown") followed in the same sentence by what
+  # the missing run would have told you (default model behavior, a cue in the prompt), "doesn't
+  # show ... over a bare model", or an explicit statement that the no-plugin arm/baseline/run is
+  # missing ("Not measured: a Δ against the no-plugin arm", "No no-plugin baseline"), which the
+  # owner chose to accept for this gate. A bare admission of noise is not accepted: it is a
+  # variance limit, not the baseline gate (#854 review). A span may wrap across lines but never
+  # across a list item, heading or blank line.
   - name: states_baseline_gate
     type: regex
     target: last_message
-    pattern: '0\.9\b|90 ?%|(?:not|cannot|can.t|doesn.t|never|no)[^.\n]{0,30}discriminat|(?:no|little|without)[^.\n]{0,20}headroom|prompt[^.\n]{0,40}(?:gives? away|hands? over|leaks?)'
+    pattern: '0\.9\b|90 ?%|(?:not|cannot|can.t|doesn.t|never|no)[^.\n]{0,30}discriminat|(?:no|little|without)[^.\n]{0,20}headroom|prompt[^.\n]{0,40}(?:gives? away|hands? over|leaks?|cues?)|(?:can.t|cannot|don.t know|do not know|unknown|unclear)(?:\d\.\d|[^.\n]|\n(?![ \t]*(?:[-*+][ \t]|\d+[.)][ \t]|#|\n))){0,70}(?:default[ -](?:model )?behavio[u]?r|bare model|cues?)|(?:don.t|doesn.t|do not|does not) show(?:\d\.\d|[^.\n]|\n(?![ \t]*(?:[-*+][ \t]|\d+[.)][ \t]|#|\n))){0,60}(?:over|beyond) (?:a )?(?:bare|no-plugin|baseline)|(?:no|not|isn.t|haven.t|didn.t|without|missing)(?:\d\.\d|[^.\n]|\n(?![ \t]*(?:[-*+][ \t]|\d+[.)][ \t]|#|\n))){0,40}\b(?:no|without)[ -]plugin[ -](?:arm|baseline|score|run|comparison)'
     flags: i
     match: contains
 
@@ -160,12 +183,17 @@ graders:
       change cannot be attributed to the rule or text. Do not fail
       for the words improvement, delta, gain, win, lift, effect or a percentage when they sit
       inside a negation or a denial of attribution ("I am not claiming a win", "nor a 25
-      percent change", "the improvement cannot be attributed to the text"), nor for style,
-      length, section order or formatting.
+      percent change", "the improvement cannot be attributed to the text"), nor for a hedged
+      remark that the scores are "consistent with" the rule working, "moved in the direction
+      intended" or "encouraging", when that sentence or the next one says the data do not
+      establish it or that the benefit is unconfirmed ("consistent with the new rule working,
+      but this run doesn't establish it", "the benefit is unconfirmed beyond this single
+      case"), nor for style, length, section order or formatting.
       FAIL if any sentence attributes the 0.75 to 1.00 change to the rule or the new text
       ("so the rule helps", "the rule is effective", "the new text lifts the score", "the rule
       makes the agent snapshot reliably", "which proves it"), presents the change as an
       improvement, win, lift, gain or effect of the rule in any wording, or states a delta,
       difference, percentage or point count as the rule's effect ("+0.25", "up by a quarter",
-      "plus twenty-five points", "a 33% lift", "25 pp higher"). Quote the sentence that makes
-      the claim.
+      "plus twenty-five points", "a 33% lift", "25 pp higher"). An unhedged assertion fails and
+      a hedge does not rescue it: "consistent with the rule working, which confirms it" fails.
+      Quote the sentence that makes the claim.
