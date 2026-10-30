@@ -7,7 +7,8 @@
 # skips_baseline_arm should drop; delete the warning that skipping the baseline loses the delta and
 # warns_delta_lost should drop. skill_fired is with-arm only.
 # Unknown until a two-arm run: whether the baseline already knows these levers (a high baseline
-# makes this a regression guard, not evidence the section helps).
+# would mean the case does not discriminate and the section's benefit is unverified; it is an
+# outcome case that should fire, so it is never a regression guard).
 schema_version: "1.1"
 name: run-evals-speed-levers
 description: >

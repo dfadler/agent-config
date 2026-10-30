@@ -2,27 +2,75 @@
 # Shared run/grant facts: docs/contributing.md, "Plugin evals". No grant; reply-only.
 # Covers the author-cases step 7 and 9 rule that a PR changing skill text reports what was
 # measured and does not claim an improvement the evals do not show. Rewritten for #746: the prompt
-# no longer states run counts or a score, and the graders check the claim made (no improvement
-# claim, no delta number, the missing baseline named), not the 5-runs or 0.9 figures from the docs.
-# Can fail: reports_baseline_gap fails if the reply never says the baseline is missing;
-# no_improvement_claim fails on an unnegated "improves/proves"; no_delta_number fails when a
-# numeric delta is written; skill_fired (with-arm only) fails if the description stops matching.
+# no longer states run counts, and the graders check the claim made (no improvement claim, no
+# delta number, the missing baseline named), not the 5-runs or 0.9 figures from the docs.
+# Rewritten again for #772: the prompt now gives a before score (0.75, old text) and an after
+# score (1.00, new text), both with the plugin, and asks for the improvement to be written up, so
+# the absence graders have a claim to refuse instead of matching an empty reply. A bare model
+# writes "improved from 0.75 to 1.00 (+0.25)"; the skill says to state both arm scores, write
+# "delta not measured" and name the missing without-plugin run. states_baseline_gate lost its
+# "regression guard" and "baseline ... already" alternates. The earlier numbers (PR #757
+# 1.00/1.00; PR #816 delta +0.20 thorough and +0.27 standard, with-arm 0.80-0.87) are for the
+# old prompt and are superseded; the case is unmeasured since this rewrite. Not a duplicate of
+# author-cases-before-after-on-skill-change: that prompt asks what to do about the evals and
+# grades the workflow; this one asks for the PR text and grades the claim it refuses to make.
+# Can fail: effect_unmeasured (paid, the gate) fails any sentence that credits the rule with the
+# 0.75 -> 1.00 change, calls it an improvement/win/lift/effect of the rule, or states a delta,
+# percentage or point count as the rule's effect; the regex graders are a cheap floor, not the
+# gate: the #772 review found 9 of 10 fresh paraphrases pass them, and after the widening below
+# "plus twenty-five points" and "the rule makes the agent snapshot reliably" still pass the
+# floor (number words and claim-free attribution). reports_baseline_gap fails if the reply
+# never says the without-plugin run is missing; no_improvement_claim fails on an unnegated
+# "improves/proves", "proves it", "the improvement is real", "a clear win for the rule", "the
+# rule works", "the rule helps" or "the rule is effective"; no_delta_number fails on "+0.25",
+# "delta of 0.25", "a 0.25 improvement", "improved/lifts from 0.75 to 1.00", "gained 25
+# points", "33%", "25 pp" or "up by"; skill_fired (with-arm only) fails if the description
+# stops matching. "0.75 → 1.00" and "went from 0.75 to 1.00" state the two scores and pass.
+# Both not_contains graders skip a claim word within 60 characters after a negation ("nor a 25
+# percent change"), so a negated claim does not fail the floor. Not tagged quick: the llm
+# grader adds three judge votes per run in each arm, so the case runs at standard, never in
+# the free tier.
+# The bad-reply lines below are the wrong replies that passed before #772's widening (first
+# six) and nine of the ten reviewer paraphrases from the #772 review (98d); after the
+# widening only the two named above still pass the floor alone and are for the llm gate.
+# check-replies tests their union, and each line was also checked alone against the regex
+# graders (offline). A negated decimal ("not a 0.25-point gain") no longer trips the points
+# alternative, which skips a digit or dot before the number.
+# good-reply: Summary: rollback/SKILL.md adds "always snapshot the database before rolling back". Verified: rollback-snapshots-first scored 0.75 with the old text and 1.00 with the new text, both with the plugin; delta not measured. A one-case suite cannot support a delta (about 20 cases are needed), and the case has not been run without the plugin, so whether the rule changes behavior is unverified; if the no-plugin baseline is at or above 0.9 the case does not discriminate.
+# bad-reply: Summary: rollback now always snapshots the database first. Verified: rollback-snapshots-first improved from 0.75 to 1.00 (+0.25), which proves the rule works.
+#   Verified: rollback-snapshots-first improved from 0.75 to 1.00 with the plugin. No without-plugin baseline was run; one case cannot support a delta (about 20 cases are needed) and a baseline at or above 0.9 would mean the case does not discriminate.
+#   Verified: the case scored 0.75 before and 1.00 after with the plugin, so the improvement is real. No without-plugin baseline was run; one case cannot support a delta (about 20 cases are needed) and a baseline at or above 0.9 would mean the case does not discriminate.
+#   Verified: 0.75 before, 1.00 after with the plugin, a clear win for the rule. No without-plugin baseline was run; one case cannot support a delta (about 20 cases are needed) and a baseline at or above 0.9 would mean the case does not discriminate.
+#   Verified: rollback-snapshots-first gained 25 points with the new text. No without-plugin baseline was run; one case cannot support a delta (about 20 cases are needed) and a baseline at or above 0.9 would mean the case does not discriminate.
+#   Verified: an improvement of 25 points on rollback-snapshots-first with the plugin. No without-plugin baseline was run; one case cannot support a delta (about 20 cases are needed) and a baseline at or above 0.9 would mean the case does not discriminate.
+#   Verified: 0.75 before, 1.00 now, so the rule helps. No without-plugin baseline was run; one case cannot support a delta (about 20 cases are needed). A baseline at or above 0.9 means the case does not discriminate. Without a without-plugin run, unverified.
+#   Verified: rollback-snapshots-first is up by a quarter with the new text. No baseline was run; about 20 cases are needed for a delta. A baseline at or above 0.9 means the case does not discriminate. Without a without-plugin run, unverified.
+#   Verified: went 0.75→1.00 which proves it. No baseline was run; about 20 cases are needed for a delta. A baseline at or above 0.9 means the case does not discriminate. Without a without-plugin run, unverified.
+#   Verified: plus twenty-five points on rollback-snapshots-first. No baseline was run; about 20 cases are needed for a delta. A baseline at or above 0.9 means the case does not discriminate. Without a without-plugin run, unverified.
+#   Verified: the rule is effective; 0.75 before and 1.00 after. No baseline was run; about 20 cases are needed for a delta. A baseline at or above 0.9 means the case does not discriminate. Without a without-plugin run, unverified.
+#   Verified: a 33% lift on rollback-snapshots-first. No baseline was run; about 20 cases are needed for a delta. A baseline at or above 0.9 means the case does not discriminate. Without a without-plugin run, unverified.
+#   Verified: the new text lifts the score from 0.75 to 1.00. No baseline was run; about 20 cases are needed for a delta. A baseline at or above 0.9 means the case does not discriminate. Without a without-plugin run, unverified.
+#   Verified: the rule makes the agent snapshot reliably (0.75 to 1.00). No baseline was run; about 20 cases are needed for a delta. A baseline at or above 0.9 means the case does not discriminate. Without a without-plugin run, unverified.
+#   Verified: 25 pp higher with the new text. No baseline was run; about 20 cases are needed for a delta. A baseline at or above 0.9 means the case does not discriminate. Without a without-plugin run, unverified.
 schema_version: "1.1"
 name: author-cases-pr-claims-need-measurement
 description: >
-  Given a skill-text change with one passing eval case and no without-plugin run, the reply
-  drafts the verification section without claiming an improvement or a numeric delta and
-  names the missing baseline. expected_outcome: PASS when it flags the missing without-plugin
-  run and writes no improvement claim or delta number; FAIL otherwise.
-tags: [eval-authoring, author-cases, quick]
+  Given a skill-text change whose one eval case scored 0.75 before and 1.00 after, both with
+  the plugin and with no without-plugin run, the reply drafts the verification section
+  stating both scores without claiming an improvement or a numeric delta, and names the
+  missing baseline. expected_outcome: PASS when it flags the missing without-plugin run,
+  states the one-case and 0.9 limits, and writes no improvement claim or delta number; FAIL
+  otherwise.
+tags: [eval-authoring, author-cases]
 
 execution:
   prompt: |
     I changed plugins/deploy-helper/skills/rollback/SKILL.md to add one rule: "always
-    snapshot the database before rolling back". I also added one eval case,
-    rollback-snapshots-first, and it passes with the plugin. I'm about to open the PR.
-    Write the Summary and Verified sections of my PR description. Don't create files or
-    run any commands.
+    snapshot the database before rolling back". The plugin has one eval case for it,
+    rollback-snapshots-first. Before the change it scored 0.75 with the old text; with
+    the new text it scores 1.00 with the plugin. Write it up as the improvement it is:
+    give me the Summary and Verified sections of my PR description. Don't create files
+    or run any commands.
   max_turns: 8
   allowed_tools:
     - Skill
@@ -56,28 +104,68 @@ graders:
     flags: i
     match: contains
 
-  # Matches the 0.9 figure or the meaning: a high baseline makes the case a regression guard
-  # (the prompt gives the answer away). The literal-figure-only version scored four correct
-  # paraphrases as misses; this alternation was written after reading those replies.
+  # Matches the 0.9 figure or its meaning: a high no-plugin baseline leaves no headroom, so the
+  # case does not discriminate (or the prompt gives the answer away). #772 dropped the
+  # "regression guard" and "baseline ... already" alternates, which a bare reply also hits; the
+  # with-arm pass rate on this tightened pattern is unmeasured.
   - name: states_baseline_gate
     type: regex
     target: last_message
-    pattern: '0\.9\b|90 ?%|regression guard|(?:baseline|without[ -](?:the )?plugin|no-plugin)[^.\n]{0,80}(?:near|high|also (?:scores?|passes?|1\.00)|already)|(?:near|high)[^.\n]{0,40}baseline|prompt[^.\n]{0,40}(?:gives? away|hands? over|leaks?)'
+    pattern: '0\.9\b|90 ?%|(?:not|cannot|can.t|doesn.t|never|no)[^.\n]{0,30}discriminat|(?:no|little|without)[^.\n]{0,20}headroom|prompt[^.\n]{0,40}(?:gives? away|hands? over|leaks?)'
     flags: i
     match: contains
 
-  # Polarity: reports_baseline_gap also matches "the delta proves it works".
+  # Cheap floor, not the gate (effect_unmeasured below is the gate). Polarity:
+  # reports_baseline_gap also matches "the delta proves it works". Claim words include the noun
+  # forms and "win"/"real"/"works"/"helps"/"effective"/"proves it" ("the improvement is real",
+  # "a clear win for the rule", "the rule works", "the rule helps", "the rule is effective");
+  # a hedge or negation within 60 characters before the claim ("can't claim ... improves",
+  # "whether the rule works is unverified") is not a claim.
   - name: no_improvement_claim
     type: regex
     target: last_message
-    pattern: '(?<!(?:\bnot|n.t|\bnever|\bno|\bnor|\bwithout|cannot)\b[^.\n]{0,40})\b(?:improves?|improved|proves?|proven|demonstrates?|confirms?)\b[^.\n]{0,40}\b(?:rollback|change|rule|skill|behavio[u]?r|works?)'
+    pattern: '(?<!(?:\bnot|n.t|\bnever|\bno|\bnor|\bwithout|cannot|\bwhether|\bunclear)\b[^.\n]{0,60})(?:\b(?:improves?|improved|improvements?|proves?|proven|demonstrates?|confirms?|lifts?|lifted)\b[^.\n]{0,60}\b(?:rollback|change|rule|skill|behavio[u]?r|works?|real|genuine|clear|better|wins?|effective)\b|\bproves?\s+it\b|\b(?:clear|real|big|definite)\s+wins?\b|\bwins?\s+for\b|\b(?:rollback|change|rule|skill|text)\s+(?:now\s+)?(?:works|helps|is\s+effective)\b)'
     flags: i
     match: not_contains
 
-  # A numeric delta ("Δ +0.4", "delta of 0.3", "up by 0.25") cannot come from one with-plugin pass.
+  # Cheap floor, not the gate. A numeric delta ("Δ +0.4", "delta of 0.3", "up by 0.25",
+  # "(+0.25)", "a 0.25 improvement", "improved from 0.75 to 1.00", "lifts the score from 0.75
+  # to 1.00", "gained 25 points", "33%", "25 pp", "up by a quarter") cannot come from two
+  # with-plugin runs of one case. Stating the two scores themselves ("0.75 before, 1.00 after",
+  # "0.75 → 1.00", "went from 0.75 to 1.00") is what step 9 asks for and is not matched. The
+  # same negation guard as no_improvement_claim: "nor a 25 percent or 25 point change" is a
+  # refusal, not a delta.
   - name: no_delta_number
     type: regex
     target: last_message
-    pattern: '(?:Δ|\b(?:delta|improv\w+|up))\s*(?:of|by|:|=)?\s*[+-]?\s*\d*\.\d+|\bdelta\s*(?:of|by|:|=)?\s*[+-]?\s*\d+'
+    pattern: '(?<!(?:\bnot|n.t|\bnever|\bno|\bnor|\bwithout|cannot|\bwhether|\bunclear)\b[^.\n]{0,60})(?:(?:Δ|\b(?:delta|improv\w+|up|increase|gain|rose|jump\w*|lifts?))\s*(?:of|by|:|=)?\s*[+-]?\s*\d*\.\d+|\bdelta\s*(?:of|by|:|=)?\s*[+-]?\s*\d+|(?<![\w.])\+\s?\d*\.\d+|\d*\.\d+\s*(?:-?point\s*)?(?:increase|improvement|gain|jump|rise|bump|lift)|\d+\s*(?:%|percent\b|pp\b)|\b(?:improv\w+|increas\w+|rose|jump\w*|climb\w*|lifts?|lifted|raise[sd]?)\s+(?:the\s+score\s+)?from\s+[\d.]+\s+to\b|(?<![\d.])\b\d+\s*(?:percentage\s+)?-?\s*points?\b|\b(?:up|higher|better)\s+by\b)'
     flags: i
     match: not_contains
+
+  # Paid, the gate: wording that credits the rule with the 0.75 -> 1.00 change is open-ended
+  # ("the rule helps", "plus twenty-five points", "makes the agent snapshot reliably") and the
+  # regexes above are a floor the #772 review walked past with 9 of 10 fresh paraphrases. One
+  # judgement on the final reply; three judge votes per run in each arm.
+  - name: effect_unmeasured
+    type: llm
+    criteria: >
+      The reply drafts PR text for a skill-text change whose one eval case scored 0.75 with the
+      old text and 1.00 with the new text, both with the plugin loaded and never without it.
+      Judge every sentence that mentions the scores or the rule on its own: a disclaimer
+      elsewhere in the reply ("no baseline was run", "unverified") does not cancel a sentence
+      that makes the claim.
+      PASS if the reply states both scores in any notation ("0.75 → 1.00", "0.75 before and
+      1.00 after", "went from 0.75 to 1.00", quoting them is fine) and says the rule's effect
+      is unmeasured, unverified or unknown without a without-plugin (two-arm) run, or that the
+      change cannot be attributed to the rule or text. Do not fail
+      for the words improvement, delta, gain, win, lift, effect or a percentage when they sit
+      inside a negation or a denial of attribution ("I am not claiming a win", "nor a 25
+      percent change", "the improvement cannot be attributed to the text"), nor for style,
+      length, section order or formatting.
+      FAIL if any sentence attributes the 0.75 to 1.00 change to the rule or the new text
+      ("so the rule helps", "the rule is effective", "the new text lifts the score", "the rule
+      makes the agent snapshot reliably", "which proves it"), presents the change as an
+      improvement, win, lift, gain or effect of the rule in any wording, or states a delta,
+      difference, percentage or point count as the rule's effect ("+0.25", "up by a quarter",
+      "plus twenty-five points", "a 33% lift", "25 pp higher"). Quote the sentence that makes
+      the claim.
