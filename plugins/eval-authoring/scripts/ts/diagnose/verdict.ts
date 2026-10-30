@@ -120,9 +120,30 @@ const T95 = [
   2.056, 2.052, 2.048, 2.045, 2.042,
 ];
 
-/** t quantile at the smaller arm's df (conservative); 2 from 31 df up. */
+/** Two-sided 95% t quantile at `df` degrees of freedom (at least 1); 2 from 31 up. */
+export const tCutoff = (df: number): number => T95[df - 1] ?? 2;
+
+/** t quantile at the smaller arm's df (conservative). */
 const tQuantile = (w: ArmStats, wo: ArmStats): number =>
-  T95[Math.min(w.usedRuns, wo.usedRuns) - 2] ?? 2;
+  tCutoff(Math.min(w.usedRuns, wo.usedRuns) - 1);
+
+/**
+ * The 95% bar a delta must clear to count as more than noise: the t quantile
+ * times the standard error of the difference, the SE floored (default
+ * `DEFAULT_THRESHOLDS.seFloor`) so two arms with SD 0 are not noise-free.
+ * `se`/`mult` are returned so a caller can print them.
+ */
+export const deltaBar = (
+  w: ArmStats,
+  wo: ArmStats,
+  seFloor: number = DEFAULT_THRESHOLDS.seFloor,
+): { readonly se: number; readonly mult: number; readonly bar: number } => {
+  const seW = (w.stdDev ?? 0) ** 2 / Math.max(w.usedRuns, 1);
+  const seWo = (wo.stdDev ?? 0) ** 2 / Math.max(wo.usedRuns, 1);
+  const se = Math.max(Math.sqrt(seW + seWo), seFloor);
+  const mult = tQuantile(w, wo);
+  return { se, mult, bar: mult * se };
+};
 
 const mean = (xs: readonly number[]): number | undefined =>
   xs.length === 0
@@ -414,11 +435,7 @@ const judgeDelta = (
   // Float noise: 0.35 - 0.30 is 0.04999999999999999, which must count as 0.05.
   const delta = round(rawDelta);
   const d = fmt(delta);
-  const seW = (w.stdDev ?? 0) ** 2 / Math.max(w.usedRuns, 1);
-  const seWo = (wo.stdDev ?? 0) ** 2 / Math.max(wo.usedRuns, 1);
-  const se = Math.max(Math.sqrt(seW + seWo), t.seFloor);
-  const mult = tQuantile(w, wo);
-  const bar = mult * se;
+  const { se, mult, bar } = deltaBar(w, wo, t.seFloor);
   const noiseKnown = w.stdDev !== undefined && wo.stdDev !== undefined;
   const ceiling =
     (w.mean ?? 0) >= t.nearCeiling && (wo.mean ?? 0) >= t.nearCeiling

@@ -3,6 +3,8 @@
  * it in a PR body. Pure: no I/O, so it is tested from recorded result text.
  */
 import { isAbsolute } from "node:path";
+import { readAggregateResult } from "../parser/index.ts";
+import { deltaBar, diagnose } from "../diagnose/verdict.ts";
 
 export const BLOCK_START = "<!-- run-evals:start -->";
 export const BLOCK_END = "<!-- run-evals:end -->";
@@ -133,6 +135,10 @@ export interface CaseRow {
   readonly with: number | undefined;
   readonly without: number | undefined;
   readonly delta: number | undefined;
+  /** Usable runs per arm (the smaller arm); omitted when the result could not be diagnosed. */
+  readonly runs?: number;
+  /** 95% bar for the delta (t quantile x SE of the difference); omitted when an arm has under two usable runs. */
+  readonly band?: number;
   /** Graders that failed in the plugin arm. */
   readonly failed: readonly FailedGrader[];
   /** Plugin-arm runs where skill_fired failed, and how many runs had that grader. */
@@ -156,7 +162,13 @@ export const caseRow = (
   const skillGraders = runs.flatMap((r) =>
     isRec(r) ? list(r["graders"]).filter((g) => isRec(g) && g["name"] === "skill_fired") : [],
   );
+  const parsed = text === undefined ? undefined : readAggregateResult(text);
+  const v = parsed?.ok === true ? diagnose(parsed.result).cases.find((x) => x.name === caseName) : undefined;
+  const usedRuns = v === undefined ? undefined : Math.min(v.with.usedRuns, v.without.usedRuns);
+  const noiseKnown = v !== undefined && v.with.stdDev !== undefined && v.without.stdDev !== undefined;
   return {
+    ...(usedRuns === undefined ? {} : { runs: usedRuns }),
+    ...(v !== undefined && noiseKnown ? { band: deltaBar(v.with, v.without).bar } : {}),
     skillRuns: skillGraders.length,
     skillMissed: skillGraders.filter((g) => isRec(g) && g["passed"] === false).length,
     caseName,
@@ -207,6 +219,16 @@ export const DELTA_CASE_FLOOR = 20;
 const fmt = (n: number | undefined): string => (n === undefined ? "-" : n.toFixed(2));
 const cell = (s: string): string => s.replace(/\|/g, "\\|");
 
+/** The delta with its 95% band and run count, or the bare delta when the result carries no run detail. */
+const deltaCell = (row: CaseRow | undefined): string => {
+  const base = fmt(row?.delta);
+  if (row?.delta === undefined || row.runs === undefined) return base;
+  const runs = `${String(row.runs)} run${row.runs === 1 ? "" : "s"}/arm`;
+  if (row.band === undefined) return `${base} (${runs}, noise unknown)`;
+  const inside = Math.abs(row.delta) <= row.band ? "; inside band" : "";
+  return `${base} ± ${fmt(row.band)} (${runs}${inside})`;
+};
+
 /** The paste-ready Markdown. Heading "Eval results" is what the PR convention looks for. */
 export const renderSummary = (s: SummaryInput): string => {
   const failures = s.cases.flatMap((c) => c.row?.failed.map((f) => ({ c: c.caseName, f })) ?? []);
@@ -224,9 +246,12 @@ export const renderSummary = (s: SummaryInput): string => {
     "| --- | --- | --- | --- | --- |",
     ...s.cases.map(
       (c) =>
-        `| ${cell(c.caseName)} | ${fmt(c.row?.with)} | ${fmt(c.row?.without)} | ${showDelta ? fmt(c.row?.delta) : "-"} | ${String(c.exit)}${c.row === undefined ? " (no readable result)" : ""} |`,
+        `| ${cell(c.caseName)} | ${fmt(c.row?.with)} | ${fmt(c.row?.without)} | ${showDelta ? deltaCell(c.row) : "-"} | ${String(c.exit)}${c.row === undefined ? " (no readable result)" : ""} |`,
     ),
     ...s.unstarted.map((n) => `| ${cell(n)} | not run | | | |`),
+    ...(hasDelta
+      ? ["", "Delta ± band: the 95% bar from the per-run scores (t quantile x standard error of the difference, SE floored at 0.05). A delta inside its band cannot be told from noise."]
+      : []),
     ...(hasDelta && s.cases.length + s.unstarted.length < DELTA_CASE_FLOOR
       ? ["", `Delta not significant below ${String(DELTA_CASE_FLOOR)} cases (this suite has ${String(s.cases.length + s.unstarted.length)}).`]
       : []),

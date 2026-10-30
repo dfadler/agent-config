@@ -191,6 +191,41 @@ describe("delta note", () => {
   });
 });
 
+describe("delta band", () => {
+  const g = [{ name: "g", passed: true, weight: 1, scored: true }];
+  const arm = (scores: readonly number[]) => scores.map((score) => ({ score, error: null, graders: g }));
+  const doc = (withS: readonly number[], withoutS: readonly number[], delta: number): string =>
+    JSON.stringify({
+      schemaVersion: 1,
+      partial: false,
+      cases: [{ name: "c", aggregates: { score: 0.5, scoreWithout: 0.2, delta }, arms: { with: arm(withS), without: arm(withoutS) } }],
+    });
+  const line = (text: string, tier = "thorough"): string =>
+    renderSummary({
+      plugin: "p", tier, model: "m", judgeModel: "j", spentUsd: 0, ceilingUsd: 1,
+      exit: 0, command: "c", unstarted: [], cases: [{ caseName: "c", exit: 0, row: caseRow("c", text) }],
+    }).split("\n").find((l) => l.startsWith("| c |")) ?? "";
+
+  it("prints the 95% band and runs per arm beside a delta clear of its band", () => {
+    // without sd 0.289, SE 0.167, t(2) 4.303: band 0.72.
+    expect(line(doc([1, 1, 1], [0, 0.5, 0], 0.83))).toContain("0.83 ± 0.72 (3 runs/arm) |");
+  });
+  it("marks a delta inside its band", () => {
+    // with sd 0.3 over 3 runs: SE 0.173, band 0.75.
+    expect(line(doc([0.8, 0.2, 0.5], [0.3, 0.3, 0.3], 0.2))).toContain("0.20 ± 0.75 (3 runs/arm; inside band)");
+  });
+  it("says noise is unknown for one run per arm and prints no band", () => {
+    const cell = line(failing("c"));
+    expect(cell).toContain("0.25 (1 run/arm, noise unknown)");
+    expect(cell).not.toContain("±");
+  });
+  it("adds no band or run count at a tier that does not measure a delta", () => {
+    const cell = line(doc([1, 1, 1], [0, 0.5, 0], 0.83), "standard");
+    expect(cell).not.toContain("±");
+    expect(cell).not.toContain("runs/arm");
+  });
+});
+
 describe("withBlock", () => {
   const block = renderBlock("NEW");
   it("appends when there is no block, and replaces in place when there is", () => {
