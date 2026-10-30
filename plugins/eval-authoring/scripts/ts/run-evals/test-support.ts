@@ -83,6 +83,8 @@ export interface FakeIoOptions {
   readonly confirm?: boolean;
   /** Reply for a spawned `gh` call, given its argv. */
   readonly onGh?: (args: readonly string[]) => SpawnResult;
+  /** Reply for a spawned `git` call, given its argv; default is a version string. */
+  readonly onGit?: (args: readonly string[]) => SpawnResult;
 }
 
 export interface FakeIo {
@@ -120,7 +122,9 @@ export const fakeIo = (o: FakeIoOptions = {}): FakeIo => {
         return Promise.resolve(o.onGh?.(args) ?? spawned());
       }
       if (command === "git") {
-        return Promise.resolve(spawned({ stdout: "git version 2.39.3\n" }));
+        return Promise.resolve(
+          o.onGit?.(args) ?? spawned({ stdout: "git version 2.39.3\n" }),
+        );
       }
       cliCount += 1;
       const reply = o.onCli?.(args, cliCount);

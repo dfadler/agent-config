@@ -330,6 +330,35 @@ describe("--pr", () => {
     expect(await main(argv(r), deps(r))).toBe(4);
     expect(ghCalls(r.calls).map((c) => c.args[1])).toEqual(["view"]);
   });
+  const changedGit = (a: readonly string[]) =>
+    a.includes("merge-base") || a.includes("--version")
+      ? spawned({ stdout: a.includes("merge-base") ? "abc\n" : "git version 2.39.3\n" })
+      : spawned({ stdout: a.includes("diff") ? "evals/beta/case.yaml\0" : "" });
+
+  it("with --changed, says the block is a subset and records the ref", async () => {
+    const s = prSetup({ confirm: true, onGit: changedGit });
+    expect(await main([s.root, "--changed=base", "--pr", "7"], deps(s))).toBe(EXIT_OK);
+    const subset = "subset: 1 of 3 standard cases, --changed since base";
+    const body = ghCalls(s.calls).find((c) => c.args[1] === "edit")?.args[4] ?? "";
+    expect(body).toContain(`## Eval results\n\n${subset}\n\n`);
+    expect(s.out.join("")).toContain(subset);
+    expect(JSON.parse([...s.written.values()][0] ?? "{}")).toMatchObject({ changedSince: "base", subset });
+    expect(s.err.join("")).not.toContain("holds a full run");
+  });
+
+  it("warns before the question when a --changed subset replaces a block that held a full run", async () => {
+    const bodyWith = (block: string) => (a: readonly string[]) =>
+      a[1] === "view" ? spawned({ stdout: `Intro\n${renderBlock(block)}\nOutro\n` }) : spawned();
+    const full = prSetup({ onGit: changedGit, onGh: bodyWith("## Eval results\n\n| case |") });
+    expect(await main([full.root, "--changed=base", "--pr", "7"], deps(full))).toBe(EXIT_OK);
+    const warned = full.err.findIndex((l) => l.includes("PR #7's run-evals block holds a full run"));
+    expect(warned).toBeGreaterThanOrEqual(0);
+    expect(full.questions).toHaveLength(1);
+    expect(full.err.slice(0, warned + 1).join("")).not.toContain("not edited");
+    const sub = prSetup({ onGit: changedGit, onGh: bodyWith("## Eval results\n\nsubset: 1 of 3 standard cases, --changed since base\n\n| case |") });
+    expect(await main([sub.root, "--changed=base", "--pr", "7"], deps(sub))).toBe(EXIT_OK);
+    expect(sub.err.join("")).not.toContain("holds a full run");
+  });
   it("keeps the worse run exit code when publishing succeeds", async () => {
     const s = prSetup({ confirm: true, onCli: () => ({ result: "garbage" }) });
     expect(await main(argv(s), deps(s))).toBe(EXIT_PARTIAL);
