@@ -10,8 +10,9 @@ everything that was tried. Answer in this shape:
 3. **Next step** — the smallest corrective action, or a single question that would
    confirm or decide it.
 
-This is about the shape of the answer, not about pausing more often — it doesn't
-change the general bias toward proceeding rather than stopping to ask; it only
-applies once the user has already asked a direct question and wants the real answer,
-not a recap of what should have happened.
+This is about the shape of the answer, not about pausing more often — it does not by
+itself license more questions (ask only when two readings of the request would lead to
+materially different work; see `user-evidence-over-spec.md` for the vague-rebuke case);
+it only applies once the user has already asked a direct question and wants the real
+answer, not a recap of what should have happened.
 
