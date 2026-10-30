@@ -53,6 +53,7 @@ import {
   type AblationMode,
   type Tier,
 } from "./tiers.ts";
+import { replyFiles, runCount, safeName } from "./traces.ts";
 
 export const USAGE = `Usage: run-evals.ts [options] <plugin-path>
 
@@ -114,7 +115,9 @@ ${Object.values(TIERS).map((t) => `                         ${t.name}: ${t.descr
   --output-dir <dir>   base results directory (default: <eval-dir>/results).
                        Each wrapper run writes <dir>/run-<time>/<NN>-<case>
   --publish-report     publish the report (default: --no-publish)
-  --keep-temp          keep run traces
+  --keep-temp          keep run traces and write replies/ next to the result:
+                       each run's final reply and tool calls, redacted, at
+                       <dir>/run-<time>/replies/<NN>-<case>/<case>/<arm>-<run>.md
   --skip-unavailable   exit 0 when plugin eval is in early access or down
   --dry-run            print the commands and exit; runs nothing
   --pr <n>             after the run, write the results summary into a marked
@@ -334,6 +337,8 @@ export interface InvocationSummary {
   readonly exit: ExitCode;
   readonly reasons: readonly string[];
   readonly resultDir: string | undefined;
+  /** Where each run's final reply and tool calls went (`<arm>-<run>.md`); unset when no trace was readable. */
+  readonly repliesDir?: string | undefined;
 }
 
 const scoringNote = (a: AblationMode): string =>
@@ -357,9 +362,6 @@ const fail = (io: Io, code: ExitCode, message: string): ExitCode => {
 
 /** Round to the 4 decimals a `--max-cost-usd` is given in; also keeps float drift out of the running total. */
 const round4 = (n: number): number => Math.round(n * 10000) / 10000;
-
-/** A directory-name-safe form of a case name. */
-const safeName = (name: string): string => name.replace(/[^\w.-]/g, "_");
 
 const runStamp = (io: Io): string => io.now().toISOString().replace(/[:.]/g, "-");
 
@@ -537,6 +539,52 @@ const runInvocation = async (
   };
 };
 
+const errorText = (e: unknown): string => (e instanceof Error ? e.message : String(e));
+
+/**
+ * Write an invocation's replies files under `repliesDir` (only with
+ * `--keep-temp`: otherwise the CLI has already deleted the traces). Nothing here
+ * aborts the run: a failed write is one stderr line. Returns `repliesDir` when
+ * every replies file was written and there was at least one; undefined otherwise.
+ */
+const persistReplies = (
+  io: Io,
+  label: string,
+  repliesDir: string,
+  resultText: string | undefined,
+): string | undefined => {
+  // A malformed trace must not cost the summary of a paid run.
+  const replies = ((): ReturnType<typeof replyFiles> => {
+    try {
+      return replyFiles(repliesDir, resultText, io.readFile, io.home);
+    } catch (e: unknown) {
+      io.err(`run-evals: ${label}: could not read the run traces (${errorText(e)}); no replies written\n`);
+      return [];
+    }
+  })();
+  if (replies.length === 0 && runCount(resultText) > 0) {
+    io.err(`run-evals: ${label}: no readable trace for any of its ${String(runCount(resultText))} run(s); no replies written\n`);
+  }
+  const written = replies.reduce<{ readonly n: number; readonly error: string | undefined }>(
+    (acc, f) => {
+      if (acc.error !== undefined) return acc;
+      try {
+        io.writeFile(f.path, f.text);
+        return { ...acc, n: acc.n + 1 };
+      } catch (e: unknown) {
+        return { ...acc, error: `${f.path}: ${errorText(e)}` };
+      }
+    },
+    { n: 0, error: undefined },
+  );
+  if (written.error !== undefined) {
+    io.err(`run-evals: ${label}: could not write the replies files (${written.error}); continuing\n`);
+  } else if (written.n > 0) {
+    io.err(`run-evals: ${label}: ${String(written.n)} run replies in ${repliesDir}\n`);
+  }
+  return written.error === undefined && written.n > 0 ? repliesDir : undefined;
+};
+
 interface Progress {
   readonly done: readonly InvocationSummary[];
   readonly texts: readonly (string | undefined)[];
@@ -666,6 +714,7 @@ export const main = async (
       if (acc.stopped || acc.outOfBudget) return acc;
       const remaining = round4(ceilingUsd - acc.spentUsd);
       if (remaining <= 0) return { ...acc, outOfBudget: true };
+      const outDir = invocationDir(runDir, i + 1, total, inv);
       const r = await runInvocation(
         io,
         options,
@@ -674,7 +723,7 @@ export const main = async (
         i + 1,
         total,
         inv,
-        invocationDir(runDir, i + 1, total, inv),
+        outDir,
         remaining,
         shareUsd,
       );
@@ -688,6 +737,18 @@ export const main = async (
     },
     Promise.resolve({ done: [], texts: [], spentUsd: 0, stopped: false, outOfBudget: false }),
   );
+  // After the whole loop, so the summary below still reads each trace for its failing reply.
+  const done = !options.reporting.keepTemp
+    ? progress.done
+    : progress.done.map((d, i) => {
+        const repliesDir = persistReplies(
+          io,
+          `invocation ${String(i + 1)}/${String(total)} (${d.caseName})`,
+          join(runDir, "replies", basename(invocationDir(runDir, i + 1, total, d))),
+          progress.texts[i],
+        );
+        return repliesDir === undefined ? d : { ...d, repliesDir };
+      });
   const unstarted = invocations
     .slice(progress.done.length)
     .map((inv) => inv.caseName);
@@ -714,7 +775,7 @@ export const main = async (
     ceilingUsd,
     ceilingBasis: ceiling.basis,
     spentUsd: progress.spentUsd,
-    invocations: progress.done,
+    invocations: done,
     unstarted,
     exit,
     changedSince: changed?.ok === true ? changed.ref : null,
@@ -737,7 +798,7 @@ export const main = async (
     exit,
     command: `node plugins/eval-authoring/scripts/ts/run-evals/run-evals.ts ${argv.map(shellWord).join(" ")}`,
     unstarted,
-    cases: progress.done.map((d, i) => ({
+    cases: done.map((d, i) => ({
       caseName: d.caseName,
       exit: d.exit,
       row: caseRow(d.caseName, progress.texts[i], io.readFile),

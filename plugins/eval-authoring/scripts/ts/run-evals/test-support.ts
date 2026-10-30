@@ -79,6 +79,8 @@ export interface FakeIoOptions {
   readonly files?: Readonly<Record<string, string>>;
   /** Directory listings to return, by path. */
   readonly dirs?: Readonly<Record<string, readonly string[]>>;
+  /** Called before each write is recorded; throw to make that write fail. */
+  readonly onWrite?: (path: string) => void;
   /** The answer to a confirm() question; default is no. */
   readonly confirm?: boolean;
   /** Reply for a spawned `gh` call, given its argv. */
@@ -151,8 +153,10 @@ export const fakeIo = (o: FakeIoOptions = {}): FakeIo => {
     ],
     readFile: (p) => files.get(p),
     writeFile: (p, t) => {
+      o.onWrite?.(p);
       written.set(p, t);
     },
+    home: "/home/u",
     confirm: (q) => {
       questions.push(q);
       return Promise.resolve(o.confirm ?? false);

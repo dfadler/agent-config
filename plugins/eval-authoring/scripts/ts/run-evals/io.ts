@@ -12,6 +12,7 @@ import {
   realpathSync,
   writeFileSync,
 } from "node:fs";
+import { homedir } from "node:os";
 import { delimiter, dirname, join } from "node:path";
 import { createInterface } from "node:readline/promises";
 
@@ -56,6 +57,8 @@ export interface Io {
   readonly readFile: (path: string) => string | undefined;
   /** Writes a file, creating parent directories. */
   readonly writeFile: (path: string, text: string) => void;
+  /** The user's home directory, shown as `~` in the replies files. */
+  readonly home: string;
   /** Asks a yes/no question on the terminal. False (never a guess) when there is no one to ask. */
   readonly confirm: (question: string) => Promise<boolean>;
 }
@@ -158,6 +161,7 @@ export const nodeIo = (env: Readonly<Record<string, string | undefined>>): Io =>
     mkdirSync(dirname(path), { recursive: true });
     writeFileSync(path, text);
   },
+  home: homedir(),
   confirm: async (question) => {
     if (!process.stdin.isTTY) return false;
     const rl = createInterface({ input: process.stdin, output: process.stderr });

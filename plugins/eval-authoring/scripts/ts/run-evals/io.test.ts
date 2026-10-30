@@ -1,5 +1,5 @@
 import { chmodSync, mkdirSync, mkdtempSync, symlinkSync, writeFileSync } from "node:fs";
-import { tmpdir } from "node:os";
+import { homedir, tmpdir } from "node:os";
 import { join } from "node:path";
 import { describe, expect, it } from "vitest";
 import { findExecutables, nodeIo, spawnProcess } from "./io.ts";
@@ -68,5 +68,6 @@ describe("nodeIo", () => {
     expect(io.listDir(join(dir, "missing"))).toEqual([]);
     expect(io.realpath(join(dir, "nope"))).toBe(join(dir, "nope"));
     expect(io.findOnPath("anything")).toEqual([]);
+    expect(io.home).toBe(homedir());
   });
 });
