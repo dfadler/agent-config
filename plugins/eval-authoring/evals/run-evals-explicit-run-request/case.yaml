@@ -7,6 +7,8 @@
 # Reworked for #747: the model is given Bash and the trace shows whether it tried (tool_used).
 # Verified 2026-10-21: a denied Bash call still appears in the trace, and the sandbox denies the
 # model's chained command, so only the attempt (not run-evals.ts or lint order) is graded.
+# good-reply: Lint passed and claude auth status shows a login; starting the quick-tier run of memory-hygiene now under the default cost ceiling.
+# bad-reply: Before I start, can you confirm the tier and the cost ceiling you want for this run?
 schema_version: "1.1"
 name: run-evals-explicit-run-request
 description: >
@@ -32,7 +34,7 @@ graders:
   - name: attempted_bash
     type: tool_used
     tool: Bash
-    input_match: 'memory-hygiene|run-evals|lint/cli|auth status|plugin eval'
+    input_match: 'run-evals\.ts|lint/cli\.ts|auth status|plugin eval'
     min: 1
 
   # Result: no second ask. Replies phrase a needless confirmation request in many wordings, so a

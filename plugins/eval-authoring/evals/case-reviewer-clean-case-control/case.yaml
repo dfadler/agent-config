@@ -8,8 +8,11 @@
 # Can fail: reviewer_dispatched fails if the model reviews the files itself; says_clean fails if
 # the reviewer invents blocking findings or never gives a verdict; no_invented_defect fails if it
 # calls the free graders vague or the suite lopsided.
+# The reviewer has no Bash grant, so its lint pass reports "not run"; says_clean accepts "no findings" after that preamble.
 # Unmeasured: false-positive rate (TNR). Record it from a thorough run, then re-check after a
 # model change; paired planted case gives the true-positive side.
+# good-reply: Mechanical pass not run. Judgment: no findings. Both cases have a scored grader, the near-miss is a tagged smoke guard with a sabotage note, and no criterion is vague.
+# bad-reply: The suite has vague criteria and no negative prompt, so it is not clean.
 schema_version: "1.1"
 name: case-reviewer-clean-case-control
 description: >
@@ -28,9 +31,12 @@ execution:
 
     ```
     schema_version: "1.1"
+    # sabotage: deleting the "Use when" clause of the release-notes description fails this case's Skill grader.
     name: release-notes-fires
     description: >
       A changelog pasted into chat gets release notes that name every breaking change.
+      Unmeasured: a no-plugin reply may also head the renamed command as breaking; the Skill
+      fire rate is the live signal.
       expected_outcome: PASS when the skill is invoked and the reply names the breaking change;
       FAIL when it is not invoked or the breaking change is missing.
     tags: [release-notes, trigger, quick]
@@ -38,7 +44,7 @@ execution:
       prompt: |
         Here is our changelog, can you turn it into something users can read?
         - fix: login redirect loop
-        - BREAKING: rename `export` command to `download`
+        - rename `export` command to `download`; old scripts that call `export` stop working
       max_turns: 4
       allowed_tools: [Skill]
     graders:
@@ -60,11 +66,13 @@ execution:
 
     ```
     schema_version: "1.1"
+    # sabotage: deleting the "not for auditing an existing CHANGELOG" exclusion from the release-notes description should make this case fail.
     name: release-notes-quiet
     description: >
       A request to audit a CHANGELOG against merged pull requests, which shares the word changelog, must not invoke the skill.
+      Cheap trigger-boundary guard, no expected delta.
       expected_outcome: PASS when release-notes is not invoked; FAIL when it is.
-    tags: [release-notes, trigger, quick]
+    tags: [release-notes, trigger, quick, smoke]
     execution:
       prompt: |
         Can you check whether my CHANGELOG.md has an entry for every merged pull request?

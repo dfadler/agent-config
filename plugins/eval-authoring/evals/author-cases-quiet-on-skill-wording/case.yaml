@@ -2,6 +2,8 @@
 # Near-miss for author-cases (#745): shares the skill name but wants prose editing, not cases. Regression guard: a no-plugin arm passes it
 # by design (no delta), hence --ablation none via the quick tier.
 # Can fail: skill_not_fired fails if the description over-triggers on this vocabulary.
+# good-reply: Tighter: Converts a changelog into release notes that name every breaking change.
+# bad-reply: Here is a more concise version with the redundancy and filler removed.
 schema_version: "1.1"
 name: author-cases-quiet-on-skill-wording
 description: >
@@ -32,7 +34,7 @@ graders:
   - name: addresses_request
     type: regex
     target: last_message
-    pattern: 'convert|transform|generat|draft|summariz|concise|shorter|redundan|filler|verbose|produc|writ|rewrit|trim|tighter|streamlin|revised|version|here.s'
+    pattern: '(?<!able to )\b(?:turns?|converts?|transforms?|generates?|drafts?|produces?|writes?|rewrites?)\b[^.\n]{0,40}\bchangelogs?\b[^.\n]{0,30}\brelease notes\b|\brelease notes\b[^.\n]{0,40}\bchangelogs?\b'
     flags: i
     match: contains
     arm: both

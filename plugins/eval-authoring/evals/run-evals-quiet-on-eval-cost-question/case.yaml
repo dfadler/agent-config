@@ -2,6 +2,8 @@
 # Near-miss for run-evals (#745): shares "cost" but is pricing, not a run. Regression guard: a no-plugin arm passes it
 # by design (no delta), hence --ablation none via the quick tier.
 # Can fail: skill_not_fired fails if the description over-triggers on this vocabulary.
+# good-reply: Roughly $6 per developer per day on a typical workload; the breakdown is at code.claude.com/docs/en/costs.
+# bad-reply: It depends on usage; costs vary a lot and rate limits apply, so the average is hard to state.
 schema_version: "1.1"
 name: run-evals-quiet-on-eval-cost-question
 description: >
@@ -32,7 +34,7 @@ graders:
   - name: addresses_request
     type: regex
     target: last_message
-    pattern: '\$\s?\d|per (?:month|developer|user|seat)|/month|subscription|pay-as-you-go|rate limits?|depends|varies|average'
+    pattern: '\$\s?\d[\d,]*(?:\.\d+)?[^.\n]{0,60}\b(?:per|a|each|/)\s*(?:developer|dev|user|month|day|seat)\b|\b(?:per|a|each)\s*(?:developer|dev|month|day)\b[^.\n]{0,40}\$\s?\d|\$\s?\d[\d,]*(?:\.\d+)?[^.\n]{0,20}\b(?:monthly|daily|weekly|/mo)\b|code\.claude\.com/docs/\S*cost'
     flags: i
     match: contains
     arm: both

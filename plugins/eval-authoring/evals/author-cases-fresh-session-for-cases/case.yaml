@@ -5,6 +5,8 @@
 # fresh_session_named should fail in the with arm.
 # Can fail: a no-plugin reply starts writing cases at once and never names a fresh session.
 # Likely delta: positive if the prompt does not name the answer; unmeasured until a two-arm run.
+# good-reply: Commit the skill first, then write the cases in a fresh session that reads the committed files; I will stop here.
+# bad-reply: Sure, here are five cases for the skill we just wrote, drafted now in this session:
 schema_version: "1.1"
 name: author-cases-fresh-session-for-cases
 description: >
@@ -39,7 +41,7 @@ graders:
   - name: fresh_session_named
     type: regex
     target: last_message
-    pattern: '(?:fresh|new|separate|different|clean)[ -](?:claude )?(?:session|conversation|context)'
+    pattern: '(?:fresh|new|separate|different|clean|another|later|second)[ -](?:claude )?(?:session|conversation|context|chat|window|thread)'
     flags: i
     match: contains
 

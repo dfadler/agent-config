@@ -3,6 +3,8 @@
 # Regression guard: a no-plugin arm passes it by design (no delta), hence --ablation none via the
 # quick tier.
 # Can fail: skill_not_fired fails if the description over-triggers on this vocabulary.
+# good-reply: def test_render_notes_names_breaking(tmp_path): out = render_notes(tmp_path / 'CHANGELOG.md'); assert 'BREAKING' in out
+# bad-reply: Write a pytest that calls render_notes with a sample changelog and checks the output has the breaking change.
 schema_version: "1.1"
 name: author-cases-quiet-on-script-pytest
 description: >
@@ -34,7 +36,7 @@ graders:
   - name: addresses_request
     type: regex
     target: last_message
-    pattern: 'def test_|\bassert\b|tmp_path|subprocess|capsys'
+    pattern: '(?=[\s\S]*\bdef test_\w+)(?=[\s\S]*\brender_notes\b)(?=[\s\S]*\bassert\b)(?=[\s\S]*(?:tmp_path|tmpdir|tmp_file|NamedTemporaryFile|subprocess|capsys|capfd|StringIO|redirect_stdout|monkeypatch))'
     flags: i
     match: contains
     arm: both
