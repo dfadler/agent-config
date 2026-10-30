@@ -12,6 +12,7 @@ import type { Rule } from "../types.ts";
 export const rule: Rule = {
   id: "EVAL009",
   severity: "info",
+  optIn: true, // #811: fired on about half of all cases, and its own fix excuses reply-only skills // #811: fired on about half of all cases, and its own fix excuses reply-only skills
   title: "Case pairs a result grader with a steps grader",
   source: fromDocs("graders that give a stable signal"),
   checkCase: (c, context) => {
@@ -30,7 +31,7 @@ export const rule: Rule = {
     return [
       {
         message: `Case '${c.name.value}' has no ${missing.join(" and no ")}, so it lacks the result plus steps pair that gives a stable signal.`,
-        fix: "Add one grader on the outcome (regex on last_message or a file, file_exists) and one on the steps (tool_used other than Skill, tool_order, or a trace or mock_calls target). Use `arm: both` where a negative check must count in both arms.",
+        fix: "Add one grader on the outcome (regex on last_message or a file, file_exists) and one on the steps (tool_used other than Skill, tool_order, or a trace or mock_calls target). Use `arm: both` where a negative check must count in both arms. A reply-only skill has no step to check: keep its unscored Skill check and grade the reply, and leave this rule off.",
         loc: c.graders[0]?.origin.loc ?? c.name.loc,
       },
     ];

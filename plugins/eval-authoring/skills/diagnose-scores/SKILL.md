@@ -103,19 +103,25 @@ without-arm mean over usable runs.
 
 | Verdict | Rule |
 |---|---|
-| `negative-delta` | Δ ≤ -0.05 and beyond the t cutoff; with unknown noise, any Δ ≤ -0.05 |
-| `no-discrimination` | -0.05 < Δ < 0.05 |
-| `weak-signal` | \|Δ\| ≥ 0.05 and within the t cutoff; also any Δ ≥ 0.05 when an arm has under two usable runs (noise unknown) |
-| `discriminates` | Δ ≥ 0.05 and Δ > the t cutoff, with both arms' standard deviations known |
+| `negative-delta` | Δ < 0 and beyond the t cutoff |
+| `no-discrimination` | Δ = 0 exactly |
+| `weak-signal` | Δ ≠ 0 and within the t cutoff, positive or negative; also any positive Δ beyond it when an arm has under two usable runs (noise unknown) |
+| `discriminates` | Δ > 0 and Δ > the t cutoff, with both arms' standard deviations known |
 
-The t cutoff is the two-sided 95% t quantile at the smaller arm's run count minus one (4.30 at 3 runs, 2.78 at 5, 2 from 31) times the standard error of Δ, floored at 0.05 so two arms with SD 0 do not count as noise-free. The `both-arms-pass-all` finding fires when both arm means are at least 0.95.
+There is no fixed neutral band: a small Δ is called noise by the t cutoff, not by a dead zone around zero.
 
-Δ is rounded to three decimals before these comparisons, so an exact ±0.05 lands the same way every time.
-| `high-variance` finding | an arm's run-score standard deviation is above 0.25 |
+The t cutoff is the two-sided 95% t quantile at the smaller arm's run count minus one (4.30 at 3 runs, 2.78 at 5, 2 from 31) times the standard error of Δ, floored at 0.05 so two arms with SD 0 do not count as noise-free. With an arm under two usable runs the SE is the 0.05 floor and the quantile is 2, so the cutoff is 0.10. The `both-arms-pass-all` finding fires when both arm means are at least 0.95.
 
-The 0.05 band, the t cutoff, the 0.05 SE floor, the 0.95 ceiling and the 0.25 SD are rules of thumb the script chose,
+Δ is rounded to three decimals before these comparisons, so float error cannot move a Δ across a cutoff.
+
+| Finding | Rule |
+|---|---|
+| `high-variance` | an arm's run-score standard deviation is above 0.35 when the arm has 5 usable runs or fewer, above 0.25 with more |
+
+The t cutoff, the 0.05 SE floor, the 0.95 ceiling and the 0.35 / 0.25 SD cutoffs are rules of thumb the script chose,
 not measured limits. They may change; `verdict.ts` is the authority. Override one for a run with
-`--neutral-band N`, `--se-floor N`, `--near-ceiling N` or `--high-variance N`.
+`--se-floor N`, `--near-ceiling N` or `--high-variance N` (replaces both SD cutoffs), or opt in to a dead zone with
+`--neutral-band N`: a Δ below N reads as `no-discrimination`.
 
 ## Reading `mock-recordings/`
 

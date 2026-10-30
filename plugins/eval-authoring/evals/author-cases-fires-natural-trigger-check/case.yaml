@@ -1,7 +1,7 @@
 # Run: node plugins/eval-authoring/scripts/ts/run-evals/run-evals.ts --tier quick plugins/eval-authoring
 # Natural-phrasing should-fire case (#745): the request names neither the skill nor trigger words
-# from its description. Reply-only, so the Skill check is an unscored indicator (EVAL009 info is
-# intentional; see author-cases step 4). Read its fire rate across runs, not one run.
+# from its description. Reply-only, so the Skill check is an unscored indicator (a reply-only skill
+# has no scored steps grader; see author-cases step 4). Read its fire rate across runs, not one run.
 # Can fail: skill_fired fails on any run where the description does not match this phrasing;
 # the result regex fails if the reply never addresses the request.
 schema_version: "1.1"

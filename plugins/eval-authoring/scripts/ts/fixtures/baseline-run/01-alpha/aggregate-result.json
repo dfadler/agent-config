@@ -1,0 +1,32 @@
+{
+  "schemaVersion": 1,
+  "startedAt": "2026-10-30T09:00:00.000Z",
+  "partial": false,
+  "suite": {
+    "ablation": "with-without",
+    "modelOverride": "claude-sonnet-5-5",
+    "judgeModel": "claude-sonnet-5-5",
+    "plugins": [
+      { "name": "companion", "version": "9.9.9" },
+      { "name": "demo-plugin", "version": "1.2.3" }
+    ]
+  },
+  "cases": [
+    {
+      "name": "alpha",
+      "aggregates": { "score": 1, "scoreWithout": 0, "delta": 1 },
+      "arms": {
+        "with": [
+          { "score": 1, "error": null, "graders": [{ "name": "g", "type": "regex", "passed": true, "score": 1, "scored": true, "weight": 1 }] },
+          { "score": 1, "error": null, "graders": [{ "name": "g", "type": "regex", "passed": true, "score": 1, "scored": true, "weight": 1 }] },
+          { "score": 1, "error": null, "graders": [{ "name": "g", "type": "regex", "passed": true, "score": 1, "scored": true, "weight": 1 }] }
+        ],
+        "without": [
+          { "score": 0, "error": null, "graders": [{ "name": "g", "type": "regex", "passed": false, "score": 0, "scored": true, "weight": 1 }] },
+          { "score": 0, "error": null, "graders": [{ "name": "g", "type": "regex", "passed": false, "score": 0, "scored": true, "weight": 1 }] },
+          { "score": 0, "error": null, "graders": [{ "name": "g", "type": "regex", "passed": false, "score": 0, "scored": true, "weight": 1 }] }
+        ]
+      }
+    }
+  ]
+}

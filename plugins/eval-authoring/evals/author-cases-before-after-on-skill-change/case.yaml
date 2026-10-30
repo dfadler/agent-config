@@ -7,7 +7,7 @@
 # reply says "rerun your tests and compare" and likely still passes it (expect ~0.5-0.8 without). The
 # order grader needs "update the cases" then "before ... score"; a plain reply may pass it too, so
 # only the run-evals/Eval results grader is expected to carry the delta. Needs a standard before/after run.
-# Near-miss boundary: author-cases-stays-quiet-on-unit-tests. EVAL009 info is intentional (reply-only skill case).
+# Near-miss boundary: author-cases-stays-quiet-on-unit-tests. Reply-only skill case.
 schema_version: "1.1"
 name: author-cases-before-after-on-skill-change
 description: >

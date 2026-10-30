@@ -1,7 +1,7 @@
 # Run: node plugins/eval-authoring/scripts/ts/run-evals/run-evals.ts --tier quick plugins/eval-authoring
 # Natural-phrasing should-fire case with no plugin vocabulary: no "eval", "grader", "case", "test"
 # or skill name; it asks how to know a skill still works after an edit. Reply-only, so the Skill
-# check is an unscored indicator (EVAL009 info intentional). Read its fire rate across runs.
+# check is an unscored indicator. Read its fire rate across runs.
 # Can fail: skill_fired fails when the description does not match this phrasing; names_eval_command
 # fails when the reply never names the `claude plugin eval` mechanism (a generic "write some tests"
 # or "try it by hand" reply); names_two_arms fails when it never mentions comparing with and without

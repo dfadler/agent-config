@@ -2,7 +2,7 @@
 # Covers step 7 and the Independence bullet: with a 0.92 baseline, the reply opens with the check
 # (does the prompt give the answer away?) and does not open with a keep/rewrite/drop verdict.
 # Follow-up to #717, where an llm judge could not grade this order reliably; this uses a free
-# regex on the opening of the reply instead. Reply-only; EVAL009 info is intentional.
+# regex on the opening of the reply instead. Reply-only.
 # Merged with the former author-cases-high-baseline-is-signal (#745): same scenario, so its
 # no_flat_leak_claim polarity check lives here. Sabotage map: delete the "do not open with a verdict" sentence in step 7 and
 # no_verdict_opener should fail in the with arm.
