@@ -82,6 +82,13 @@ it, do not rebuild any of that.
    `subset:` line names the tier and the finished count; with `--pr` it warns when the
    block it replaces held a full run. The mapping is a heuristic and can miss cases, so
    run the full tier before a release.
+   To measure routing against competing skills, add `--neighbours <plugin,...>` (siblings
+   under `plugins/`): it runs only the `trigger` cases against a temp copy of the plugin
+   with those plugins loaded beside it through each case's `plugins:` (the CLI has no flag
+   for this; committed cases are not edited, and a case with its own `plugins:` is
+   refused). The summary then has a Trigger set table: fire rate, false-fire rate and
+   description length per skill. Read the plugin arm only: whether the baseline arm
+   loads the neighbours is unverified.
    To put the results in a PR, add `--pr <n>`: it prints the exact
    marked block, asks, then replaces the `run-evals` block in the PR body with `gh pr
    edit`. It is off by default, refuses `--dry-run`, and `--yes` skips only the question.

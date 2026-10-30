@@ -183,6 +183,21 @@ export const caseRow = (
   };
 };
 
+/** Runs that hit (fired, for a fire rate; fired anyway, for a false-fire rate) out of the runs graded. */
+export interface Tally {
+  readonly hit: number;
+  readonly runs: number;
+}
+
+/** One skill (or set of skills one pattern accepts) in the trigger table; a side with no grader is undefined. */
+export interface TriggerRow {
+  readonly skill: string;
+  readonly fires: Tally | undefined;
+  readonly falseFires: Tally | undefined;
+  /** Characters of the SKILL.md or agent description; "-" when unreadable. */
+  readonly descriptionChars: string;
+}
+
 export interface SummaryInput {
   readonly plugin: string;
   readonly tier: string;
@@ -193,6 +208,10 @@ export interface SummaryInput {
   readonly exit: number;
   readonly command: string;
   readonly unstarted: readonly string[];
+  /** The `--neighbours` plugins loaded beside the plugin under test; undefined when the flag was off. */
+  readonly neighbours?: readonly string[] | undefined;
+  /** The trigger table rows; empty or undefined leaves the table out. */
+  readonly trigger?: readonly TriggerRow[] | undefined;
   /** One per invocation, in run order; `row` undefined when no result could be read. */
   readonly cases: readonly {
     readonly caseName: string;
@@ -206,6 +225,41 @@ export const DELTA_CASE_FLOOR = 20;
 
 const fmt = (n: number | undefined): string => (n === undefined ? "-" : n.toFixed(2));
 const cell = (s: string): string => s.replace(/\|/g, "\\|");
+
+const rate = (t: Tally | undefined): string =>
+  t === undefined || t.runs === 0
+    ? "-"
+    : `${String(t.hit)}/${String(t.runs)} (${(t.hit / t.runs).toFixed(2)})`;
+
+/** The trigger section: the neighbours line (when the flag was on) and the table; empty when there is neither. */
+const triggerLines = (s: SummaryInput): readonly string[] => {
+  const rows = s.trigger ?? [];
+  return s.neighbours === undefined && rows.length === 0
+    ? []
+    : [
+        "",
+        "### Trigger set",
+        "",
+        ...(s.neighbours === undefined
+          ? []
+          : [
+              `Neighbours loaded beside \`${s.plugin}\` through each case's \`plugins:\` (a staged copy; committed cases untouched): ${s.neighbours.map((n) => `\`${n}\``).join(", ")}. The without column is not interpreted in this mode.`,
+              "",
+            ]),
+        ...(rows.length === 0
+          ? ["No tool_used grader on Skill or Agent in the cases that ran, so there is nothing to tabulate."]
+          : [
+              "Plugin arm only. Fire rate: runs that fired over runs of cases that must fire. False-fire rate: runs that fired over runs of must-not-fire cases. Roles come from each grader's min and max, not its name.",
+              "",
+              "| skill | fire rate | false-fire rate | description chars |",
+              "| --- | --- | --- | --- |",
+              ...rows.map(
+                (r) =>
+                  `| ${cell(r.skill)} | ${rate(r.fires)} | ${rate(r.falseFires)} | ${cell(r.descriptionChars)} |`,
+              ),
+            ]),
+      ];
+};
 
 /** The paste-ready Markdown. Heading "Eval results" is what the PR convention looks for. */
 export const renderSummary = (s: SummaryInput): string => {
@@ -233,6 +287,7 @@ export const renderSummary = (s: SummaryInput): string => {
     ...(s.tier === "thorough"
       ? []
       : ["", `Delta not measured at tier \`${s.tier}\`: report arm scores only, not a delta, in a PR (even marked preliminary). Re-run at \`thorough\` for a delta.`]),
+    ...triggerLines(s),
     ...(unfired.length === 0
       ? []
       : [
