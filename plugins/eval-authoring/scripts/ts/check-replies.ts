@@ -13,10 +13,11 @@
  * reported "unchecked". A case with an `llm` grader and no header replies is
  * reported "missing" (so is a regex-only case); that is an error only with --require.
  *
- * Probe (#859): `node check-replies.ts --probe CASE --reply TEXT [PLUGIN_ROOT]` runs the
- * same regex graders on one reply you supply and prints pass/FAIL per grader, so the
- * grader-red-team agent can test a wrong reply without writing a file. Always exits 0
- * (2 on an unknown case): a FAIL there is the wanted result for a wrong reply.
+ * Probe (#859): `node check-replies.ts --probe CASE --reply - [PLUGIN_ROOT] <<'__REPLY__'`
+ * runs the same regex graders on the reply read from stdin and prints pass/FAIL per
+ * grader, so the grader-red-team agent can test a wrong reply without writing a file or
+ * putting reply text in a shell argument. Exits 0 (2 on an unknown case, a missing reply
+ * or a bad flag): a FAIL there is the wanted result for a wrong reply.
  */
 import { readFileSync } from "node:fs";
 import { parseArgs } from "node:util";
@@ -124,30 +125,43 @@ export const checkPlugin = (pluginRoot: string): readonly CaseReport[] => {
 export const exitCode = (reports: readonly CaseReport[], require: boolean): number =>
   reports.some((r) => r.status === "fail" || (require && r.status === "missing")) ? 1 : 0;
 
-if (import.meta.main) {
+/** The probe's reply: stdin for `--reply -` or no `--reply`, else the literal value. Undefined when empty. */
+const readReply = (flag: string | undefined): string | undefined => {
+  const text =
+    flag !== undefined && flag !== "-"
+      ? flag
+      : process.stdin.isTTY
+        ? ""
+        : readFileSync(0, "utf8").replace(/\r?\n$/, ""); // a heredoc adds one newline
+  return text === "" ? undefined : text;
+};
+
+const main = (): number => {
   const { values, positionals } = parseArgs({
     allowPositionals: true,
     options: { require: { type: "boolean" }, probe: { type: "string" }, reply: { type: "string" } },
   });
   const root = positionals[0] ?? ".";
   if (values.probe !== undefined) {
+    const reply = readReply(values.reply);
+    if (reply === undefined) throw new Error("--probe needs a reply on stdin: pass `--reply -` and a heredoc");
     const c = readSuite(root).cases.find((x) => x.dirName === values.probe);
-    if (c === undefined) {
-      process.stderr.write(`no case named ${values.probe} under ${root}\n`);
-      process.exit(2);
-    }
-    process.stdout.write(`${probeCase(c, values.reply ?? "").join("\n")}\n`);
-    process.exit(0);
+    if (c === undefined) throw new Error(`no case named ${values.probe} under ${root}`);
+    process.stdout.write(`${probeCase(c, reply).join("\n")}\n`);
+    return 0;
   }
-  let reports: readonly CaseReport[];
-  try {
-    reports = checkPlugin(root);
-  } catch (e) {
-    process.stderr.write(`${e instanceof Error ? e.message : String(e)}\n`);
-    process.exit(2);
-  }
+  const reports = checkPlugin(root);
   for (const r of reports) {
     if (r.status !== "skipped") process.stdout.write(`${r.status.padEnd(9)} ${r.name}: ${r.detail}\n`);
   }
-  process.exitCode = exitCode(reports, values.require === true);
+  return exitCode(reports, values.require === true);
+};
+
+if (import.meta.main) {
+  try {
+    process.exitCode = main();
+  } catch (e) {
+    process.stderr.write(`${e instanceof Error ? e.message : String(e)}\n`);
+    process.exitCode = 2;
+  }
 }

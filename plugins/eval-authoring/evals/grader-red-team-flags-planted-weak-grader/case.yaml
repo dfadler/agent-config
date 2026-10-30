@@ -14,7 +14,7 @@
 # Sabotage note: deleting the "Never clear one" or the recipe's wrong-reply step from
 # agents/grader-red-team.md should make an agent give generic advice and fail names_weak_grader.
 # good-reply: names_breaking_change | by hand | wrong reply: "No breaking changes this release." | passes because the pattern is the bare word breaking | Fix: anchor it to the renamed command
-# bad-reply: names_breaking_change looks clean, nothing to flag
+# bad-reply: Clean. names_breaking_change rejects every weak reply it tried.
 schema_version: "1.1"
 name: grader-red-team-flags-planted-weak-grader
 description: >
@@ -64,12 +64,21 @@ graders:
     input_match: '"subagent_type"\s*:\s*"(?:[\w-]+:)?grader-red-team"'
     min: 1
 
-  # Result: the finding ties the weak grader's name to a pass-type word, either order within
-  # 400 characters, so echoing the file alone does not pass. Wording regex: a differently
-  # worded finding can miss it.
+  # Result: the finding is in the agent's output shape, the grader name followed within 400
+  # characters by "wrong reply" (`<case>:<grader> | <probe or by hand> | wrong reply: ...`),
+  # so a wrong verdict that merely mentions the name ("Clean. names_breaking_change rejects
+  # every weak reply") does not pass. Wording regex: a reformatted relay can miss it.
   - name: names_weak_grader
     type: regex
     target: last_message
-    pattern: "names_breaking_change[\\s\\S]{0,400}(wrongly|would pass|still pass|passes|accepts|false pass|too loose|weak)|(wrongly|would pass|still pass|passes|accepts|false pass|too loose|weak)[\\s\\S]{0,400}names_breaking_change"
+    pattern: "names_breaking_change[\\s\\S]{0,400}wrong reply"
     flags: i
     match: contains
+
+  # Polarity: a bare Clean verdict is the wrong answer here, whatever else the relay says.
+  - name: not_bare_clean
+    type: regex
+    target: last_message
+    pattern: "^\\s*Clean\\s*$"
+    flags: im
+    match: not_contains
