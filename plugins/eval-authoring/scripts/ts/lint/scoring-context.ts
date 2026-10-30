@@ -1,4 +1,4 @@
-/** Scoring helpers shared by the scoring rules (EVAL008, EVAL010). */
+/** Scoring helpers shared by the scoring rules (EVAL008, EVAL009, EVAL010). */
 import {
   readMocks,
   type EvalCase,

@@ -284,7 +284,7 @@ describe("cli main", () => {
 
   it("EVAL009 is opt-in in the real rule set and runs under --enable EVAL009", async () => {
     put("evals/a/prompt.md", "---\nmax_turns: 3\n---\nhi\n");
-    put("evals/a/graders/g.md", "---\ntype: regex\npattern: hi\n---\n");
+    put("evals/a/graders/g.md", "---\ntype: tool_used\ntool: Read\n---\n");
     const off = await mainWithDiscoveredRules([root]);
     expect(off.stdout).not.toContain("EVAL009");
     expect((await mainWithDiscoveredRules(["--list-rules"])).stdout).toMatch(
@@ -292,7 +292,7 @@ describe("cli main", () => {
     );
     const on = await mainWithDiscoveredRules(["--enable", "EVAL009", root]);
     expect(on.stdout).toContain("info EVAL009");
-    expect(on.stdout).toContain("A reply-only skill has no step to check"); // the fix agrees with author-cases step 4
+    expect(on.stdout).toContain("no scored grader on the result");
   });
 
   it("exit 0 with only warnings, report on stdout", () => {

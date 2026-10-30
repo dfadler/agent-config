@@ -1,0 +1,15 @@
+schema_version: "1.1"
+name: cued-regex-syntax
+execution:
+  prompt: Please list the steps before you start.
+  allowed_tools:
+    - Skill
+graders:
+  - type: tool_used
+    tool: Skill
+    min: 0
+    max: 0
+    arm: both
+  - type: regex
+    pattern: 'list\s+the\s+steps'
+    flags: i
