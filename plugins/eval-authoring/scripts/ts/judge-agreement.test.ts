@@ -87,6 +87,28 @@ describe("judge-agreement", () => {
     expect(none.stdout).toContain("no label matched a judged run");
   });
 
+  it("refuses a label that matches runs in two result files, and a result field narrows it", () => {
+    const second = { "run2/01-pick/aggregate-result.json": fixture("01-pick/aggregate-result.json") };
+    const one = (extra: Record<string, unknown>): string =>
+      JSON.stringify([{ case: "pick", grader: "asks", arm: "with", run: 1, label: "PASS", ...extra }]);
+    const ambiguous = main(["--labels", "l.json", "run/01-pick", "run2"], memory({ ...second, "l.json": one({}) }));
+    expect(ambiguous.code).toBe(1);
+    expect(ambiguous.stderr).toContain("label pick / asks / with run 1 matches 2 judged runs");
+    expect(ambiguous.stderr).toContain("run2/01-pick/aggregate-result.json");
+    // Without labels the same two files are fine; with "result" the label counts once.
+    expect(main(["run/01-pick", "run2"], memory(second)).code).toBe(0);
+    const narrowed = main(["--labels", "l.json", "run/01-pick", "run2"], memory({ ...second, "l.json": one({ result: "run2/" }) }));
+    expect(narrowed.code).toBe(0);
+    expect(narrowed.stdout).toContain("(1 labels given, 1 matched a judged run)");
+  });
+
+  it("leaves out graders with scored: false, like diagnose does", () => {
+    const text = fixture("01-pick/aggregate-result.json").replace('"scored": true', '"scored": false');
+    const out = main(["x/aggregate-result.json"], memory({ "x/aggregate-result.json": text }));
+    // The first with-run's grader is gone: 4 judged runs, PASS 6 / FAIL 6, split 2, unanimous 2.
+    expect(out.stdout).toContain("- pick / asks: 4 runs, votes PASS 6 / FAIL 6, unanimous 2 (50%), split 2");
+  });
+
   it("rejects bad input with the right exit code", () => {
     expect(main([], memory()).code).toBe(2);
     expect(main(["--nope", "run"], memory()).code).toBe(2);
@@ -115,22 +137,43 @@ describe("agreement", () => {
       ...Array.from({ length: 40 }, (): [boolean, boolean] => [false, false]),
     ];
     const a = agreement(pairs);
-    expect(a.kappa).toBeCloseTo(0.6, 10);
-    expect(a.agreement).toBeCloseTo(0.8, 10);
-    expect(a.tpr).toBeCloseTo(0.8, 10);
-    expect(a.tnr).toBeCloseTo(0.8, 10);
+    expect(a?.kappa).toBeCloseTo(0.6, 10);
+    expect(a?.agreement).toBeCloseTo(0.8, 10);
+    expect(a?.tpr).toBeCloseTo(0.8, 10);
+    expect(a?.tnr).toBeCloseTo(0.8, 10);
   });
 
   it("gives kappa 0 for chance agreement and null when one class fills both sides", () => {
     // Judge always PASS, human half PASS: po 0.5, pe 0.5 -> kappa 0.
-    expect(agreement([[true, true], [true, false]]).kappa).toBeCloseTo(0, 10);
-    expect(agreement([[true, true], [true, true]]).kappa).toBeNull();
+    expect(agreement([[true, true], [true, false]])?.kappa).toBeCloseTo(0, 10);
+    expect(agreement([[true, true], [true, true]])).toMatchObject({ kappa: null });
+  });
+
+  it("returns null, not NaN, for no pairs", () => {
+    expect(agreement([])).toBeNull();
   });
 });
 
 describe("parseLabels", () => {
   it("accepts lower-case labels and rejects a run below 1", () => {
-    expect(parseLabels('[{"case":"a","grader":"g","arm":"with","run":1,"label":"fail"}]')).toBeInstanceOf(Map);
+    expect(parseLabels('[{"case":"a","grader":"g","arm":"with","run":1,"label":"fail"}]')).toMatchObject([{ pass: false }]);
     expect(parseLabels('[{"case":"a","grader":"g","arm":"with","run":0,"label":"FAIL"}]')).toContain("label 1");
+  });
+
+  it("rejects a duplicate label, but lets a different result field tell two apart", () => {
+    const l = (extra: string): string => `{"case":"a","grader":"g","arm":"with","run":1,"label":"PASS"${extra}}`;
+    expect(parseLabels(`[${l("")}, ${l("")}]`)).toBe("label 2: duplicates label 1");
+    expect(parseLabels(`[${l(',"result":"x"')}, ${l(',"result":"y"')}]`)).toHaveLength(2);
+    expect(parseLabels(`[${l(',"result":3')}]`)).toContain("label 1");
+  });
+
+  it("does not count a duplicate toward the labels given", () => {
+    const dup = JSON.stringify([
+      { case: "pick", grader: "asks", arm: "with", run: 1, label: "PASS" },
+      { case: "pick", grader: "asks", arm: "with", run: 1, label: "PASS" },
+    ]);
+    const out = main(["--labels", "l.json", "run"], memory({ "l.json": dup }));
+    expect(out.code).toBe(1);
+    expect(out.stderr).toContain("label 2: duplicates label 1");
   });
 });

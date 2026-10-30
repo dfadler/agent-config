@@ -21,8 +21,10 @@ true-positive and true-negative rates. Free: reads files, makes no model call.
   --labels FILE JSON array of human labels:
                 [{"case": "alpha", "grader": "g", "arm": "with", "run": 1, "label": "PASS"}]
                 arm is "with" or "without"; run counts from 1 in the result's
-                order; label is PASS or FAIL. A label applies to every result
-                with that case, grader, arm and run, so label one run set at a time.
+                order; label is PASS or FAIL. Optional "result": part of one
+                result file's path. A label that matches judged runs in more than
+                one place is refused (exit 1) until "result" narrows it; a
+                duplicate label is refused too. Graders with scored: false are skipped.
 
 The judge's verdict for a run is the grader's own passed value, else a strict
 majority of its votes (a tie is FAIL). PASS is the positive class: TPR is the
@@ -49,6 +51,8 @@ export interface Outcome {
 
 export interface Row {
   readonly key: string;
+  /** The result file this row came from. */
+  readonly file: string;
   readonly grader: string;
   readonly votes: readonly boolean[];
   /** The judge's final verdict, when known. */
@@ -59,19 +63,21 @@ export const labelKey = (c: string, g: string, arm: string, run: number): string
   JSON.stringify([c, g, arm, run]);
 
 /** One row per llm grader result, from the result text; `[]` when it has none. */
-export const rowsOf = (text: string): readonly Row[] => {
+export const rowsOf = (text: string, file: string): readonly Row[] => {
   const read = readAggregateResult(text);
   if (!read.ok) return [];
   return read.result.cases.flatMap((c) =>
     (["with", "without"] as const).flatMap((arm) =>
       (arm === "with" ? c.withRuns : c.withoutRuns).flatMap((r, i) =>
         (r.graders ?? []).flatMap((g) => {
+          // Like diagnose's split-vote finding, leave out graders that do not count toward the score.
+          if (g.scored === false) return [];
           // Real result entries carry no `type`: a judged grader is one with judgeVotes or a "judge votes:" explanation.
           if (g.type !== "llm" && g.judgeVotes === undefined && !/judge votes:/i.test(g.explanation ?? "")) return [];
           const votes = graderVotes(g).map((v) => v === "PASS");
           const pass = votes.filter(Boolean).length;
           const verdict = g.passed ?? (votes.length === 0 ? undefined : pass * 2 > votes.length);
-          return [{ key: labelKey(c.name, g.name ?? "", arm, i + 1), grader: `${c.name} / ${g.name ?? "(unnamed)"}`, votes, verdict }];
+          return [{ key: labelKey(c.name, g.name ?? "", arm, i + 1), file, grader: `${c.name} / ${g.name ?? "(unnamed)"}`, votes, verdict }];
         }),
       ),
     ),
@@ -111,9 +117,10 @@ export interface Agreement {
   readonly tnr: number | null;
 }
 
-/** [judge, human] pairs, PASS = true. Callers guard the empty case. */
-export const agreement = (pairs: readonly (readonly [boolean, boolean])[]): Agreement => {
+/** [judge, human] pairs, PASS = true; null when there are none. */
+export const agreement = (pairs: readonly (readonly [boolean, boolean])[]): Agreement | null => {
   const n = pairs.length;
+  if (n === 0) return null;
   const count = (j: boolean, h: boolean): number => pairs.filter(([a, b]) => a === j && b === h).length;
   const tp = count(true, true);
   const tn = count(false, false);
@@ -146,10 +153,16 @@ const statLine = (s: Stats): string => {
 const agreementLine = (a: Agreement): string =>
   `${String(a.n)} labelled: agreement ${pct(a.agreement)}, kappa ${num(a.kappa)}, TPR ${pct(a.tpr)}, TNR ${pct(a.tnr)}`;
 
-type Labels = ReadonlyMap<string, boolean>;
+export interface Label {
+  readonly key: string;
+  /** Substring of the result file path that narrows the match; absent means any file. */
+  readonly result: string | undefined;
+  readonly pass: boolean;
+  readonly name: string;
+}
 
 /** Parse the labels file; a string is the reason it is unusable. */
-export const parseLabels = (text: string): Labels | string => {
+export const parseLabels = (text: string): readonly Label[] | string => {
   const doc = ((): unknown => {
     try {
       return JSON.parse(text);
@@ -158,11 +171,13 @@ export const parseLabels = (text: string): Labels | string => {
     }
   })();
   if (!Array.isArray(doc)) return "labels file must be a JSON array";
-  const out = new Map<string, boolean>();
+  const out: Label[] = [];
+  const seen = new Map<string, number>();
   for (const [i, e] of doc.entries()) {
     const o = isRec(e) ? e : {};
     const label = typeof o["label"] === "string" ? o["label"].toUpperCase() : "";
     const run = o["run"];
+    const result = o["result"];
     if (
       typeof o["case"] !== "string" ||
       typeof o["grader"] !== "string" ||
@@ -170,20 +185,44 @@ export const parseLabels = (text: string): Labels | string => {
       typeof run !== "number" ||
       !Number.isInteger(run) ||
       run < 1 ||
-      (label !== "PASS" && label !== "FAIL")
+      (label !== "PASS" && label !== "FAIL") ||
+      (result !== undefined && typeof result !== "string")
     ) {
-      return `label ${String(i + 1)}: needs case, grader, arm (with|without), run (1, 2, ...) and label (PASS|FAIL)`;
+      return `label ${String(i + 1)}: needs case, grader, arm (with|without), run (1, 2, ...), label (PASS|FAIL) and, optionally, result (a string)`;
     }
-    out.set(labelKey(o["case"], o["grader"], o["arm"], run), label === "PASS");
+    const key = labelKey(o["case"], o["grader"], o["arm"], run);
+    const dupKey = JSON.stringify([key, result ?? null]);
+    const first = seen.get(dupKey);
+    if (first !== undefined) return `label ${String(i + 1)}: duplicates label ${String(first)}`;
+    seen.set(dupKey, i + 1);
+    out.push({ key, result, pass: label === "PASS", name: `${o["case"]} / ${o["grader"]} / ${o["arm"]} run ${String(run)}` });
   }
   return out;
+};
+
+/**
+ * Pair each label with the one judged row it names. A string is the reason to refuse: a label that
+ * matches more than one row (several result files share a case name, or a grader name repeats)
+ * would be counted more than once, so it must be narrowed with `result`.
+ */
+export const joinLabels = (rows: readonly Row[], labels: readonly Label[]): ReadonlyMap<Row, boolean> | string => {
+  const joined = new Map<Row, boolean>();
+  for (const l of labels) {
+    const hits = rows.filter((r) => r.key === l.key && (l.result === undefined || r.file.includes(l.result)));
+    if (hits.length > 1) {
+      return `label ${l.name} matches ${String(hits.length)} judged runs (${hits.map((h) => h.file).join(", ")}); add "result": a part of one result file path`;
+    }
+    const [hit] = hits;
+    if (hit !== undefined) joined.set(hit, l.pass);
+  }
+  return joined;
 };
 
 const NOTE =
   "Note: this cannot re-run the judge. A saved result keeps the votes, not a rationale, and the CLI has no regrade flag.\n" +
   "A true re-judge needs a direct model call, which costs money and is the owner's decision.\n";
 
-export const report = (rows: readonly Row[], labels: Labels | undefined): string => {
+export const report = (rows: readonly Row[], labels: ReadonlyMap<Row, boolean> | undefined, given: number): string => {
   if (rows.length === 0) return `No llm graders found in the results; nothing to report.\n${NOTE}`;
   const byGrader = new Map<string, Row[]>();
   for (const r of rows) byGrader.set(r.grader, [...(byGrader.get(r.grader) ?? []), r]);
@@ -192,17 +231,17 @@ export const report = (rows: readonly Row[], labels: Labels | undefined): string
   if (labels !== undefined) {
     const pairs = (rs: readonly Row[]): (readonly [boolean, boolean])[] =>
       rs.flatMap((r) => {
-        const h = labels.get(r.key);
+        const h = labels.get(r);
         return h === undefined || r.verdict === undefined ? [] : [[r.verdict, h] as const];
       });
-    const all = pairs(rows);
-    lines.push("", `Agreement with human labels (${String(labels.size)} labels given, ${String(all.length)} matched a judged run)`);
-    if (all.length === 0) lines.push("no label matched a judged run (check case, grader, arm and run)");
+    const allAgreement = agreement(pairs(rows));
+    lines.push("", `Agreement with human labels (${String(given)} labels given, ${String(allAgreement?.n ?? 0)} matched a judged run)`);
+    if (allAgreement === null) lines.push("no label matched a judged run (check case, grader, arm and run)");
     else {
-      lines.push(`all: ${agreementLine(agreement(all))}`);
+      lines.push(`all: ${agreementLine(allAgreement)}`);
       for (const [g, rs] of byGrader) {
-        const p = pairs(rs);
-        if (p.length > 0) lines.push(`- ${g}: ${agreementLine(agreement(p))}`);
+        const a = agreement(pairs(rs));
+        if (a !== null) lines.push(`- ${g}: ${agreementLine(a)}`);
       }
     }
   }
@@ -228,7 +267,7 @@ export const main = (argv: readonly string[], io: Io): Outcome => {
     else inputs.push(a);
   }
   if (inputs.length === 0) return fail(2, "expected at least one RESULTS path");
-  let labels: Labels | undefined;
+  let labels: readonly Label[] | undefined;
   if (labelsPath !== undefined) {
     const text = io.readFile(labelsPath);
     if (text === undefined) return fail(1, `cannot read ${labelsPath}`);
@@ -244,10 +283,12 @@ export const main = (argv: readonly string[], io: Io): Outcome => {
       const text = io.readFile(f);
       if (text === undefined) return fail(1, `cannot read ${f}`);
       if (!readAggregateResult(text).ok) return fail(1, `${f}: not a readable aggregate-result.json`);
-      rows.push(...rowsOf(text));
+      rows.push(...rowsOf(text, f));
     }
   }
-  return { code: 0, stdout: report(rows, labels), stderr: "" };
+  const joined = labels === undefined ? undefined : joinLabels(rows, labels);
+  if (typeof joined === "string") return fail(1, joined);
+  return { code: 0, stdout: report(rows, joined, labels?.length ?? 0), stderr: "" };
 };
 
 const nodeIo: Io = {
