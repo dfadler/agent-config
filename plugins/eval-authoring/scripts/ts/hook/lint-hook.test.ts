@@ -32,6 +32,12 @@ const WRAPPER = join(
   "lint-on-edit.sh",
 );
 
+// Worker body that blocks the thread synchronously forever. A sleeping
+// Atomics.wait, not a busy loop: terminating a JIT-hot `for (;;) {}` about
+// 100 times per soak is the likeliest cause of the SIGTRAP in #830.
+const BLOCK_FOREVER =
+  "Atomics.wait(new Int32Array(new SharedArrayBuffer(4)), 0, 0);\n";
+
 const GOOD_CASE = [
   'schema_version: "1.1"',
   "name: good",
@@ -217,30 +223,36 @@ describe("runHook: failure containment", () => {
   it("enforces the deadline on synchronous blocking work in the worker", async () => {
     const root = makePlugin();
     const blocker = join(root, "blocker.mjs");
-    writeFileSync(blocker, "for (;;) {}\n");
+    writeFileSync(blocker, BLOCK_FOREVER);
     let workerRun: ReturnType<typeof workerLint> | undefined;
     const lint: LintFn = (r, s) => {
       workerRun = workerLint(r, s, pathToFileURL(blocker));
       return workerRun;
     };
-    const t0 = Date.now();
+    const t0 = performance.now();
     const out = await runHook(event(join(root, "evals/bad/case.yaml")), lint, 200);
     expect(out).toBe("");
-    expect(Date.now() - t0).toBeLessThan(3000);
+    expect(performance.now() - t0).toBeLessThan(3000);
     // The deadline abort must terminate the worker, not just stop waiting for it.
     await expect(workerRun).rejects.toThrow("exited without a result");
+    // A blocker that exited on its own would reject the same way, so also require
+    // that the rejection arrived no earlier than the deadline (10 ms tolerance).
+    expect(performance.now() - t0).toBeGreaterThanOrEqual(200 - 10);
   });
 
   it("terminates a blocked worker when the signal aborts", async () => {
     const root = makePlugin();
     const blocker = join(root, "blocker.mjs");
-    writeFileSync(blocker, "for (;;) {}\n");
+    writeFileSync(blocker, BLOCK_FOREVER);
     const ctl = new AbortController();
+    const t0 = performance.now();
     const run = workerLint(root, ctl.signal, pathToFileURL(blocker));
     setTimeout(() => {
       ctl.abort();
     }, 100);
     await expect(run).rejects.toThrow("exited without a result");
+    // A self-exiting blocker rejects the same way; require the abort delay elapsed.
+    expect(performance.now() - t0).toBeGreaterThanOrEqual(100 - 10);
   });
 
   it("returns real findings through the default worker lint", async () => {
