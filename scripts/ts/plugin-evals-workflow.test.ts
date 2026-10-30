@@ -98,15 +98,21 @@ describe("eval job: cost ceiling", () => {
     const job = Number(
       /\n {2}eval:[\s\S]*?\n {4}timeout-minutes: (\d+)\n/.exec(workflow)?.[1],
     );
-    const deadline = Number(
+    const wrapped =
       /timeout --signal=INT --kill-after=(\d+)m (\d+)m \\\n\s+node plugins\/eval-authoring\/scripts\/ts\/run-evals\/run-evals\.ts/.exec(
         workflow,
-      )?.[2],
-    );
+      );
+    if (wrapped === null) {
+      throw new Error(
+        "wrapper call is not wrapped in `timeout --signal=INT --kill-after=Nm Mm node ...run-evals.ts`",
+      );
+    }
+    const grace = Number(wrapped[1]);
+    const deadline = Number(wrapped[2]);
     expect(job).toBe(180);
     expect(deadline).toBeGreaterThanOrEqual(120);
     // Room left after the deadline and kill grace for the Check and Upload steps.
-    expect(deadline + 2 + 5).toBeLessThanOrEqual(job);
+    expect(deadline + grace + 5).toBeLessThanOrEqual(job);
   });
 });
 
