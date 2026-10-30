@@ -87,6 +87,35 @@ const notify = (existing: string) => {
   return { status: r.status, calls: readFileSync(log, "utf8") };
 };
 
+describe("eval job: cost ceiling", () => {
+  it("passes the wrapper a $25 ceiling on the standard tier (#648)", () => {
+    expect(workflow).toMatch(
+      /--tier standard \\\n\s+--max-cost-usd 25 \\\n\s+--output-dir/,
+    );
+  });
+
+  it("ends the wrapper on its own deadline, before the eval job is cancelled (#648)", () => {
+    const job = Number(
+      /\n {2}eval:[\s\S]*?\n {4}timeout-minutes: (\d+)\n/.exec(workflow)?.[1],
+    );
+    const wrapped =
+      /timeout --signal=INT --kill-after=(\d+)m (\d+)m \\\n\s+node plugins\/eval-authoring\/scripts\/ts\/run-evals\/run-evals\.ts/.exec(
+        workflow,
+      );
+    if (wrapped === null) {
+      throw new Error(
+        "wrapper call is not wrapped in `timeout --signal=INT --kill-after=Nm Mm node ...run-evals.ts`",
+      );
+    }
+    const grace = Number(wrapped[1]);
+    const deadline = Number(wrapped[2]);
+    expect(job).toBe(180);
+    expect(deadline).toBeGreaterThanOrEqual(120);
+    // Room left after the deadline and kill grace for the Check and Upload steps.
+    expect(deadline + grace + 5).toBeLessThanOrEqual(job);
+  });
+});
+
 describe("notify job: failure issue", () => {
   it("runs only on failure, with issues: write on that job alone", () => {
     expect(workflow).toMatch(/notify:[\s\S]*if: \$\{\{ failure\(\) \}\}/);
