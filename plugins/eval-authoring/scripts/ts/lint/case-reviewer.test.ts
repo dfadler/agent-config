@@ -7,6 +7,10 @@ const body = readFileSync(
   "utf8",
 );
 
+it("case-reviewer.md runs the lint with the opt-in EVAL009 enabled", () => {
+  expect(body).toMatch(/lint\/cli\.ts --enable EVAL009 --format json/);
+});
+
 it.each([
   ["source link", /platform claim with no source link/],
   ["sabotage note", /which\s+sentence of the skill, if deleted/],
