@@ -69,6 +69,20 @@ interprets the verdict.
 - **`weak-signal`:** Δ inside noise, positive or negative (a drop within the t cutoff below lands here, not under `negative-delta`). Recommend more runs before changing anything, unless both arms have SD 0 (the 0.05 floor sets the bar, so more identical runs cannot change the verdict): then a larger effect or a sharper grader is the lever.
 - **`both-arms-pass-all` / `both-arms-fail-all`:** a case that cannot fail (or has almost no headroom, both means at least 0.95: check for a leaked answer, then fix or drop it), or never passes
   (check graders and grants).
+- **`turn-limit`:** a run used every allowed turn and every non-guard `last_message` grader
+  failed, which is consistent with a cut-off (no final reply, so those graders failed for the
+  wrong reason; its score still counts). Recommend a higher `max_turns` or less work in the
+  prompt before reading anything else into the case. At `info` the result could not tell a
+  cut-off from a reply on the last turn: no grader definitions, no `last_message` grader, every
+  `last_message` grader is a `not_contains` guard (see `vacuous-graders` below for the guard
+  shapes), or a grader has no pass/fail value. In the guard-only case the case cannot detect a
+  cut-off at all; it needs one positive `last_message` grader.
+- **`vacuous-graders`:** the named graders pass in every run of both arms, so they cannot
+  discriminate: a check the baseline satisfies trivially ("did not read X" with no X), or a
+  negative pattern the prompt itself contains. A guard (`match: not_contains`, `tool_used` with `max` 0 or 1, `file_exists` with `exists: false`) is
+  expected to pass in both arms and is not named when the result carries the case's grader
+  definitions; at `info` it could not be told apart, so check `case.yaml` first. Otherwise
+  reword each one; a should-not-fire case is the exception.
 - **`discriminates`:** one line; do not invent a problem.
 
 Partial results (the script prints `PARTIAL`) are left out of trends; say so.

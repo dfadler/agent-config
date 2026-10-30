@@ -169,7 +169,7 @@ const specDefaultBoolean = (
 };
 
 /** A `target` / `focus` keyword as a target; an unlisted word is `unknown`. */
-const keywordTarget = (text: string): GraderTarget => {
+export const keywordTarget = (text: string): GraderTarget => {
   switch (text) {
     case "last_message":
       return { kind: "last_message" };

@@ -15,7 +15,8 @@ export const USAGE = `Usage: diagnose.ts [-h|--help] [--format text|json] [--<th
 Print a per-case verdict from an aggregate-result.json: whether each case
 discriminates the plugin from no plugin (delta above zero on scored graders),
 plus mechanical findings (negative delta, split judge votes, run errors,
-skipped judges, partial results, run-to-run variance). No model calls.
+skipped judges, partial results, run-to-run variance, runs cut off at the
+turn limit, graders that pass in both arms). No model calls.
 The verdicts do not change the exit code.
 
   --format text|json   Output format (default: text).

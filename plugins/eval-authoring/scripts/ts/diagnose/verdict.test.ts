@@ -1,5 +1,10 @@
 import { describe, expect, it } from "vitest";
-import type { CaseResult, GraderResult, RunResult } from "../parser/index.ts";
+import type {
+  CaseGraderDef,
+  CaseResult,
+  GraderResult,
+  RunResult,
+} from "../parser/index.ts";
 import {
   DEFAULT_THRESHOLDS,
   diagnose,
@@ -386,6 +391,242 @@ describe("mechanical findings", () => {
       }),
     );
     expect(kinds(v)).not.toContain("split-judge-votes");
+  });
+
+  const lastMessageDef: CaseGraderDef = { name: "g", type: "regex", target: { kind: "last_message" } };
+
+  it("flags runs that hit the turn limit with every last_message grader failing, per arm (#713 1d)", () => {
+    // A cut-off run still has failing graders, so it is a real 0, not a silent one.
+    const starved = run(0, {
+      turns: 4,
+      graders: [{ ...scoredGrader, passed: false }],
+    });
+    const v = diagnoseCase(
+      caseOf([], [], 0, {
+        maxTurns: 4,
+        graders: [lastMessageDef],
+        withRuns: [starved, run(1, { turns: 2 })],
+        withoutRuns: [starved, starved],
+      }),
+    );
+    const f = v.findings.filter((x) => x.kind === "turn-limit");
+    expect(f.map((x) => x.severity)).toEqual(["warn", "warn"]);
+    expect(f.map((x) => x.message)).toEqual([
+      expect.stringContaining("1 of 2 with runs hit the turn limit (max_turns 4)"),
+      expect.stringContaining("2 of 2 without runs hit the turn limit"),
+    ]);
+    expect(v.with.usedRuns).toBe(2);
+  });
+
+  it("does not flag a run that replied on its last turn (a last_message grader passed)", () => {
+    const replied = run(1, { turns: 4, graders: [scoredGrader] });
+    const v = diagnoseCase(
+      caseOf([], [], 0, {
+        maxTurns: 4,
+        graders: [lastMessageDef],
+        withRuns: [replied, replied],
+        withoutRuns: [replied],
+      }),
+    );
+    expect(kinds(v)).not.toContain("turn-limit");
+  });
+
+  it("downgrades the turn limit to info when no last_message grader can tell a cut-off from a reply", () => {
+    const atLimit = run(0, { turns: 4, graders: [{ ...scoredGrader, passed: false }] });
+    const noDefs = caseOf([], [], 0, {
+      maxTurns: 4,
+      withRuns: [atLimit],
+      withoutRuns: [atLimit],
+    });
+    const traceOnly = caseOf([], [], 0, {
+      maxTurns: 4,
+      graders: [{ name: "g", type: "llm", target: { kind: "trace" } }],
+      withRuns: [atLimit],
+      withoutRuns: [atLimit],
+    });
+    for (const c of [noDefs, traceOnly]) {
+      const f = diagnoseCase(c).findings.filter((x) => x.kind === "turn-limit");
+      expect(f.map((x) => x.severity)).toEqual(["info", "info"]);
+      expect(f[0]?.message).toContain("may simply have replied on its last turn");
+    }
+  });
+
+  it("reports an errored run at the turn limit as run-error only, never turn-limit too", () => {
+    const errored: RunResult = { score: 0, error: "rate limited", turns: 4 };
+    const v = diagnoseCase(
+      caseOf([1], [0], 1, { maxTurns: 4, graders: [lastMessageDef], withRuns: [errored, run(1)] }),
+    );
+    expect(kinds(v)).toContain("run-error");
+    expect(kinds(v)).not.toContain("turn-limit");
+  });
+
+  it("does not flag the turn limit without maxTurns or turns, or under the limit", () => {
+    const under = caseOf([], [], 0, {
+      maxTurns: 4,
+      withRuns: [run(1, { turns: 3 })],
+      withoutRuns: [run(1, { turns: 3 })],
+    });
+    const noLimit = caseOf([], [], 0, {
+      withRuns: [run(1, { turns: 4 })],
+      withoutRuns: [run(1)],
+    });
+    expect(kinds(diagnoseCase(under))).not.toContain("turn-limit");
+    expect(kinds(diagnoseCase(noLimit))).not.toContain("turn-limit");
+  });
+
+  it("does not read a file-target grader as a reply grader", () => {
+    // Only grader reads a file ({source: file, path}): a failing one says nothing about a reply.
+    const atLimit = run(0, { turns: 4, graders: [{ ...scoredGrader, passed: false }] });
+    const v = diagnoseCase(
+      caseOf([], [], 0, {
+        maxTurns: 4,
+        graders: [{ name: "g", type: "regex", target: { kind: "file", path: "scripts/x.sh" }, match: "contains" }],
+        withRuns: [atLimit],
+        withoutRuns: [atLimit],
+      }),
+    );
+    const f = v.findings.filter((x) => x.kind === "turn-limit");
+    expect(f.map((x) => x.severity)).toEqual(["info", "info"]);
+  });
+
+  it("flags a starved run whose only last_message graders are guards (they pass on an empty reply)", () => {
+    const guards: readonly GraderResult[] = [
+      { name: "no_x", passed: true, scored: true },
+      { name: "no_extra_writes", passed: true, scored: true },
+    ];
+    const starved = run(0.5, { turns: 4, graders: guards });
+    const v = diagnoseCase(
+      caseOf([], [], 0, {
+        maxTurns: 4,
+        graders: [
+          { name: "no_x", type: "regex", target: { kind: "last_message" }, match: "not_contains" },
+          { name: "no_extra_writes", type: "tool_used", max: 1 },
+        ],
+        withRuns: [starved],
+        withoutRuns: [starved],
+      }),
+    );
+    const f = v.findings.filter((x) => x.kind === "turn-limit");
+    // A guard cannot tell a cut-off from a reply, so the run is flagged at info, not dropped.
+    expect(f.map((x) => x.severity)).toEqual(["info", "info"]);
+  });
+
+  it("treats a reply grader with no passed value as undecidable, not as a reply", () => {
+    const unknown = run(0, { turns: 4, graders: [{ name: "g", scored: true }] });
+    const v = diagnoseCase(
+      caseOf([], [], 0, {
+        maxTurns: 4,
+        graders: [lastMessageDef],
+        withRuns: [unknown],
+        withoutRuns: [unknown],
+      }),
+    );
+    const f = v.findings.filter((x) => x.kind === "turn-limit");
+    expect(f.map((x) => x.severity)).toEqual(["info", "info"]);
+  });
+
+  it("names graders that pass in every run of both arms, skipping with-only ones (#713 1c)", () => {
+    const vacuous: GraderResult = { name: "did_not_read_x", passed: true, scored: true };
+    const real = (passed: boolean): GraderResult => ({ name: "asks", passed, scored: true });
+    const fired: GraderResult = { name: "skill_fired", passed: true, withOnly: true, scored: false };
+    const v = diagnoseCase(
+      caseOf([], [], 0.5, {
+        withRuns: [
+          run(1, { graders: [vacuous, real(true), fired] }),
+          run(1, { graders: [vacuous, real(true), fired] }),
+        ],
+        withoutRuns: [run(0.5, { graders: [vacuous, real(false), fired] })],
+      }),
+    );
+    const f = v.findings.find((x) => x.kind === "vacuous-graders");
+    expect(f?.message).toContain("did_not_read_x (with 2/2, without 1/1)");
+    expect(f?.message).not.toContain("asks");
+    expect(f?.message).not.toContain("skill_fired");
+    expect(f?.message).not.toContain("drop");
+    // No case-level grader definitions: a not_contains guard cannot be told apart.
+    expect(f?.severity).toBe("info");
+  });
+
+  it("skips a not_contains guard that passes in both arms, and warns once definitions are known", () => {
+    const guard: GraderResult = { name: "no_x", passed: true, scored: true };
+    const vacuous: GraderResult = { name: "did_not_read_x", passed: true, scored: true };
+    const v = diagnoseCase(
+      caseOf([], [], 0, {
+        graders: [
+          { name: "no_x", type: "regex", target: { kind: "last_message" }, match: "not_contains" },
+          { name: "did_not_read_x", type: "regex", target: { kind: "last_message" }, match: "contains" },
+        ],
+        withRuns: [run(1, { graders: [guard, vacuous] })],
+        withoutRuns: [run(1, { graders: [guard, vacuous] })],
+      }),
+    );
+    const f = v.findings.find((x) => x.kind === "vacuous-graders");
+    expect(f?.severity).toBe("warn");
+    expect(f?.message).toContain("did_not_read_x");
+    expect(f?.message).not.toContain("no_x");
+    const guardOnly = diagnoseCase(
+      caseOf([], [], 0, {
+        graders: [{ name: "no_x", type: "regex", match: "not_contains" }],
+        withRuns: [run(1, { graders: [guard] })],
+        withoutRuns: [run(1, { graders: [guard] })],
+      }),
+    );
+    expect(kinds(guardOnly)).not.toContain("vacuous-graders");
+  });
+
+  it("does not call a tool_used max 0/1 or file_exists exists:false guard vacuous", () => {
+    const pass = (name: string): GraderResult => ({ name, passed: true, scored: true });
+    const graders = [pass("no_bash"), pass("one_write"), pass("no_file"), pass("real")];
+    const v = diagnoseCase(
+      caseOf([], [], 0, {
+        graders: [
+          { name: "no_bash", type: "tool_used", max: 0 },
+          { name: "one_write", type: "tool_used", max: 1 },
+          { name: "no_file", type: "file_exists", exists: false },
+          { name: "real", type: "regex", target: { kind: "last_message" }, match: "contains" },
+        ],
+        withRuns: [run(1, { graders })],
+        withoutRuns: [run(1, { graders })],
+      }),
+    );
+    const f = v.findings.find((x) => x.kind === "vacuous-graders");
+    expect(f?.severity).toBe("warn");
+    expect(f?.message).toContain("real (with 1/1, without 1/1)");
+    expect(f?.message).not.toContain("no_bash");
+    expect(f?.message).not.toContain("one_write");
+    expect(f?.message).not.toContain("no_file");
+  });
+
+  it("counts the runs a grader appears in over every usable run of the arm", () => {
+    const vacuous: GraderResult = { name: "v", passed: true, scored: true };
+    const other: GraderResult = { name: "o", passed: false, scored: true };
+    const v = diagnoseCase(
+      caseOf([], [], 0, {
+        graders: [{ name: "v", type: "regex" }, { name: "o", type: "regex" }],
+        withRuns: [
+          run(1, { graders: [vacuous, other] }),
+          run(1, { graders: [vacuous, other] }),
+          run(0, { graders: [other] }),
+        ],
+        withoutRuns: [run(1, { graders: [vacuous, other] })],
+      }),
+    );
+    const f = v.findings.find((x) => x.kind === "vacuous-graders");
+    expect(f?.message).toContain("v (with 2/3, without 1/1)");
+  });
+
+  it("does not call a grader vacuous with one arm, or when it ever fails", () => {
+    const g = (passed: boolean): GraderResult => ({ name: "g", passed, scored: true });
+    const oneArm = caseOf([], [], undefined, {
+      withRuns: [run(1, { graders: [g(true)] })],
+      withoutRuns: [],
+    });
+    const fails = caseOf([], [], 0, {
+      withRuns: [run(1, { graders: [g(true)] })],
+      withoutRuns: [run(1, { graders: [g(true)] }), run(0, { graders: [g(false)] })],
+    });
+    expect(kinds(diagnoseCase(oneArm))).not.toContain("vacuous-graders");
+    expect(kinds(diagnoseCase(fails))).not.toContain("vacuous-graders");
   });
 
   it("flags high variance in an arm", () => {
