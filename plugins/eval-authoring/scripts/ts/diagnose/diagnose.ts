@@ -3,14 +3,14 @@
 import { readFileSync } from "node:fs";
 import { readAggregateResult } from "../parser/index.ts";
 import { formatJson, formatText } from "./format.ts";
-import { diagnose } from "./verdict.ts";
+import { DEFAULT_THRESHOLDS, diagnose, type Thresholds } from "./verdict.ts";
 
 /** Shared exit-code taxonomy (docs/testing.md); only the codes this script uses. */
 export const EXIT_OK = 0;
 export const EXIT_FAILURE = 1;
 export const EXIT_USAGE = 2;
 
-export const USAGE = `Usage: diagnose.ts [-h|--help] [--format text|json] RESULT.json
+export const USAGE = `Usage: diagnose.ts [-h|--help] [--format text|json] [--<threshold> N]... RESULT.json
 
 Print a per-case verdict from an aggregate-result.json: whether each case
 discriminates the plugin from no plugin (delta above zero on scored graders),
@@ -19,6 +19,11 @@ skipped judges, partial results, run-to-run variance). No model calls.
 The verdicts do not change the exit code.
 
   --format text|json   Output format (default: text).
+  --neutral-band N, --se-floor N, --near-ceiling N, --high-variance N
+                       Override a verdict cutoff for this run (defaults 0.05,
+                       0.05, 0.95, 0.25; see the diagnose-scores skill).
+                       Ranges: --neutral-band and --near-ceiling (0, 1];
+                       --se-floor and --high-variance [0, 1].
   -h, --help           Show this message and exit.
 
 Exit codes: 0 verdicts printed, 1 unreadable or unsupported result,
@@ -36,6 +41,23 @@ export interface Io {
   readonly readFile: (path: string) => string | undefined;
 }
 
+/** Every threshold is at most 1; `zeroOk` says whether 0 is allowed too. */
+const THRESHOLD_FLAGS: Readonly<
+  Record<string, { readonly key: keyof Thresholds; readonly zeroOk: boolean }>
+> = {
+  "--neutral-band": { key: "neutralBand", zeroOk: false },
+  "--se-floor": { key: "seFloor", zeroOk: true },
+  "--near-ceiling": { key: "nearCeiling", zeroOk: false },
+  "--high-variance": { key: "highVariance", zeroOk: true },
+};
+
+/** A plain decimal ("0", "0.1", ".5") in [0, 1], or (0, 1] unless `zeroOk`; else undefined. */
+const parseThreshold = (text: string, zeroOk: boolean): number | undefined => {
+  if (!/^(?:\d+(?:\.\d*)?|\.\d+)$/.test(text)) return undefined;
+  const n = Number(text);
+  return n > 1 || (n === 0 && !zeroOk) ? undefined : n;
+};
+
 const usageError = (message: string): Outcome => ({
   code: EXIT_USAGE,
   stdout: "",
@@ -52,11 +74,23 @@ export const main = (argv: readonly string[], io: Io): Outcome => {
   if (format !== "text" && format !== "json") {
     return usageError("--format needs text or json");
   }
-  const rest = argv.filter(
-    (_, i) => formatAt === -1 || (i !== formatAt && i !== formatAt + 1),
-  );
+  const overrides: Partial<Record<keyof Thresholds, number>> = {};
+  const skip = new Set(formatAt === -1 ? [] : [formatAt, formatAt + 1]);
+  for (const [flag, { key, zeroOk }] of Object.entries(THRESHOLD_FLAGS)) {
+    const at = argv.indexOf(flag);
+    if (at === -1) continue;
+    const n = parseThreshold(argv[at + 1] ?? "", zeroOk);
+    if (n === undefined) {
+      return usageError(`${flag} needs a number in ${zeroOk ? "[" : "("}0, 1]`);
+    }
+    overrides[key] = n;
+    skip.add(at).add(at + 1);
+  }
+  const rest = argv.filter((_, i) => !skip.has(i));
+  const stray = rest.find((a) => a.startsWith("-"));
+  if (stray !== undefined) return usageError(`unknown or repeated option ${stray}`);
   const [path, ...extra] = rest;
-  if (path === undefined || extra.length > 0 || path.startsWith("-")) {
+  if (path === undefined || extra.length > 0) {
     return usageError("expected exactly one RESULT.json path");
   }
   const text = io.readFile(path);
@@ -69,7 +103,7 @@ export const main = (argv: readonly string[], io: Io): Outcome => {
       stderr: `${path}: ${parsed.reason}\n`,
     };
   }
-  const diagnosis = diagnose(parsed.result);
+  const diagnosis = diagnose(parsed.result, { ...DEFAULT_THRESHOLDS, ...overrides });
   return {
     code: EXIT_OK,
     stdout: format === "json" ? formatJson(diagnosis) : formatText(diagnosis),

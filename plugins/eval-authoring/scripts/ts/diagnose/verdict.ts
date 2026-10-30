@@ -293,7 +293,7 @@ const judgeDelta = (
             kind: "both-arms-pass-all",
             severity: "warn",
             message:
-              "both arms score at the ceiling (mean >= 0.95): almost nothing fails without the plugin, so the case cannot discriminate: check for a leaked answer, then fix or drop it (a should-not-fire case is the exception: delta 0 is by design, say so in expected_outcome)",
+              `both arms score at the ceiling (mean >= ${fmt(t.nearCeiling)}): almost nothing fails without the plugin, so the case cannot discriminate: check for a leaked answer, then fix or drop it (a should-not-fire case is the exception: delta 0 is by design, say so in expected_outcome)`,
           },
         ] as const)
       : [];
@@ -309,14 +309,14 @@ const judgeDelta = (
         ] as const)
       : [];
   const extra = [...ceiling, ...floor];
-  if (delta <= -t.neutralBand && noiseKnown && -delta <= bar) {
+  if (delta < 0 && delta <= -t.neutralBand && noiseKnown && -delta <= bar) {
     return {
       verdict: "weak-signal",
       reason: `delta ${d} is negative but within ${fmt(mult)} standard errors (${fmt(se)}) of zero, so it may be noise`,
       findings: extra,
     };
   }
-  if (delta <= -t.neutralBand) {
+  if (delta < 0 && delta <= -t.neutralBand) {
     return {
       verdict: "negative-delta",
       reason: `the plugin scores ${d} below no plugin`,

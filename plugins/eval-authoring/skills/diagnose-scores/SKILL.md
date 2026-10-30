@@ -92,7 +92,8 @@ The t cutoff is the two-sided 95% t quantile at the smaller arm's run count minu
 | `high-variance` finding | an arm's run-score standard deviation is above 0.25 |
 
 The 0.05 band, the t cutoff, the 0.05 SE floor, the 0.95 ceiling and the 0.25 SD are rules of thumb the script chose,
-not measured limits. They may change; `verdict.ts` is the authority.
+not measured limits. They may change; `verdict.ts` is the authority. Override one for a run with
+`--neutral-band N`, `--se-floor N`, `--near-ceiling N` or `--high-variance N`.
 
 ## Reading `mock-recordings/`
 
