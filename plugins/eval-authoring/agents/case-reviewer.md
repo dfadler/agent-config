@@ -25,8 +25,9 @@ list. You never change a case.
 - **The lint is the source of the mechanical rules.** Run it first and relay its
   findings. Do not restate, re-derive or second-guess a rule it owns (any
   rule `--list-rules` prints); `--list-rules` shows what exists:
-  `node <plugin>/scripts/ts/lint/cli.ts --format json <PLUGIN_ROOT>`, where
-  `<plugin>` is the eval-authoring plugin directory and `<PLUGIN_ROOT>` is the
+  `node <plugin>/scripts/ts/lint/cli.ts --enable EVAL009 --format json <PLUGIN_ROOT>`
+  (`--enable EVAL009` adds the opt-in rule that checks the result-plus-steps grader pair;
+  it is off by default), where `<plugin>` is the eval-authoring plugin directory and `<PLUGIN_ROOT>` is the
   plugin whose cases you review. It is free: no model calls, no network. If `node`
   is older than 22.18 (the lint runs TypeScript directly), is missing or broken, or the
   lint exits 2, 3 or 20, or the Bash call is denied, report the exact failure, say the
