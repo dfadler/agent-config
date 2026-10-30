@@ -1,0 +1,84 @@
+# Run: node plugins/eval-authoring/scripts/ts/run-evals/run-evals.ts --tier quick plugins/eval-authoring
+# (quick tier: one run, plugin arm only, `--ablation none`; the no-plugin arm cannot dispatch a
+# plugin agent: "Agent type ... not found".) No grant: the case text is in the prompt and the
+# agent is not given Bash here, so it traces the regex by hand (the probe is covered by
+# check-replies.test.ts, not by this case).
+# SMOKE, NOT INDEPENDENT EVIDENCE (#859): this case was written in the same session as the
+# grader-red-team agent it exercises, so it shares the agent's blind spots and scores
+# self-agreement. It only shows the agent can be dispatched and names a planted defect; an
+# independent case set written in a fresh session is still needed (author-cases, Independence).
+# Planted defect: `names_breaking_change` matches the bare word "breaking", so a reply that
+# says there are no breaking changes passes it.
+# Can fail: a main model that red-teams the case itself (reviewer_dispatched fails), an agent
+# that answers Clean or relays no grader name (names_weak_grader fails).
+# Sabotage note: deleting the "Never clear one" or the recipe's wrong-reply step from
+# agents/grader-red-team.md should make an agent give generic advice and fail names_weak_grader.
+# good-reply: names_breaking_change | by hand | wrong reply: "No breaking changes this release." | passes because the pattern is the bare word breaking | Fix: anchor it to the renamed command
+# bad-reply: Clean. names_breaking_change rejects every weak reply it tried.
+schema_version: "1.1"
+name: grader-red-team-flags-planted-weak-grader
+description: >
+  The grader-red-team agent names a deliberately weak regex grader and a wrong reply it would
+  accept. expected_outcome: PASS when the agent is dispatched and the reply ties the grader
+  name to a wrong reply that passes it; FAIL when it is not dispatched, answers Clean, or gives
+  only generic advice.
+tags: [eval-authoring, grader-red-team, agent, smoke, quick]
+
+execution:
+  prompt: |
+    Before I pay for a run, please use the eval-authoring grader-red-team agent to find
+    which grader in this case can be fooled by a wrong reply, and tell me what it found.
+    The case, as one file:
+
+    ```
+    schema_version: "1.1"
+    name: release-notes-breaking
+    description: >
+      A pasted changelog gets release notes that call out the breaking change.
+      expected_outcome: PASS when the reply names the renamed command; FAIL otherwise.
+    tags: [release-notes, quick]
+    execution:
+      prompt: |
+        Turn this changelog into release notes for users:
+        - fix: login redirect loop
+        - BREAKING: rename `export` command to `download`
+      max_turns: 4
+      allowed_tools: [Skill]
+    graders:
+      - name: names_breaking_change
+        type: regex
+        target: last_message
+        pattern: 'breaking'
+        flags: i
+        match: contains
+    ```
+  max_turns: 12
+  allowed_tools:
+    - Agent
+
+graders:
+  # Steps: the plugin's agent was dispatched, not imitated.
+  - name: reviewer_dispatched
+    type: tool_used
+    tool: Agent
+    input_match: '"subagent_type"\s*:\s*"(?:[\w-]+:)?grader-red-team"'
+    min: 1
+
+  # Result: the finding is in the agent's output shape, the grader name followed within 400
+  # characters by "wrong reply" (`<case>:<grader> | <probe or by hand> | wrong reply: ...`),
+  # so a wrong verdict that merely mentions the name ("Clean. names_breaking_change rejects
+  # every weak reply") does not pass. Wording regex: a reformatted relay can miss it.
+  - name: names_weak_grader
+    type: regex
+    target: last_message
+    pattern: "names_breaking_change[\\s\\S]{0,400}wrong reply"
+    flags: i
+    match: contains
+
+  # Polarity: a bare Clean verdict is the wrong answer here, whatever else the relay says.
+  - name: not_bare_clean
+    type: regex
+    target: last_message
+    pattern: "^\\s*Clean\\s*$"
+    flags: im
+    match: not_contains

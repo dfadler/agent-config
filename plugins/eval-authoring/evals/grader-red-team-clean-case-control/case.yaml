@@ -1,0 +1,75 @@
+# Run: node plugins/eval-authoring/scripts/ts/run-evals/run-evals.ts --tier quick plugins/eval-authoring
+# (quick tier: one run, plugin arm only, `--ablation none`; the no-plugin arm cannot dispatch a
+# plugin agent.) No grant (case text is in the prompt).
+# SMOKE, NOT INDEPENDENT EVIDENCE (#859): written in the same session as the grader-red-team
+# agent, so it shares the agent's blind spots. Control for grader-red-team-flags-planted-weak-
+# grader: that case shows the agent reports a weak grader, this one shows it reports none when
+# the one grader is anchored to the whole reply, so an agent that flags everything cannot pass
+# both.
+# Can fail: reviewer_dispatched fails if the model red-teams the case itself; says_clean fails if
+# the agent invents a weak grader or never gives a verdict; no_invented_defect fails if the
+# reply carries a finding row (`| probe |` or `| by hand |`) or a `Case accepts:` line.
+# Unmeasured: false-positive rate; needs a thorough run.
+# good-reply: Clean
+# bad-reply: Clean apart from this: status_object | by hand | wrong reply: "{"status":"ok"} thanks" | passes because the pattern is loose | Fix: anchor it
+schema_version: "1.1"
+name: grader-red-team-clean-case-control
+description: >
+  The grader-red-team agent, given a case whose single regex grader is anchored to the exact
+  expected reply, says Clean and invents no weak grader. expected_outcome: PASS when the agent
+  is dispatched and the reply gives a clean verdict with no wrong-reply-passes finding; FAIL
+  when it is not dispatched or it reports a weakness that is not there.
+tags: [eval-authoring, grader-red-team, agent, smoke, quick]
+
+execution:
+  prompt: |
+    Before I pay for a run, please use the eval-authoring grader-red-team agent on this
+    case and tell me what it found. The case, as one file:
+
+    ```
+    schema_version: "1.1"
+    name: status-json
+    description: >
+      The reply is exactly the status object and nothing else.
+      expected_outcome: PASS when the reply is the object alone; FAIL otherwise.
+    tags: [status, quick]
+    execution:
+      prompt: |
+        Reply with only the JSON object {"status":"ok"} and nothing else.
+      max_turns: 3
+      allowed_tools: [Skill]
+    graders:
+      - name: status_object
+        type: regex
+        target: last_message
+        pattern: '^\s*\{\s*"status"\s*:\s*"ok"\s*\}\s*$'
+        match: contains
+    ```
+  max_turns: 12
+  allowed_tools:
+    - Agent
+
+graders:
+  - name: reviewer_dispatched
+    type: tool_used
+    tool: Agent
+    input_match: '"subagent_type"\s*:\s*"(?:[\w-]+:)?grader-red-team"'
+    min: 1
+
+  # Verdict: the all-clear, in the agent's own words.
+  - name: says_clean
+    type: regex
+    target: last_message
+    pattern: "\\bclean\\b|no (?:blocking |significant |real )?(?:findings|issues|problems|weak)|nothing to (?:flag|fix)|looks (?:good|fine|sound)"
+    flags: i
+    match: contains
+
+  # Polarity: an invented weakness on a sound grader. Keyed on the agent's own output markers
+  # (a `| probe |` or `| by hand |` finding column, or the `Case accepts:` line), not on free
+  # prose, so a clean relay that says "no wrong reply would still pass" is not rejected.
+  - name: no_invented_defect
+    type: regex
+    target: last_message
+    pattern: "^Case accepts:|\\|\\s*(?:probe|by hand)\\s*\\|"
+    flags: im
+    match: not_contains
