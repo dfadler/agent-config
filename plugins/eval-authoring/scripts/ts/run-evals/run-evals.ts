@@ -435,13 +435,15 @@ const runInvocation = async (
   const located = locateResult(io, outputDir);
   const ran = cmd === "caffeinate" ? unwrapExit(raw, located !== undefined, homedir()) : raw;
   if (ran.error !== undefined) {
+    const reason = `could not start claude: ${ran.error}`;
+    io.err(`run-evals: ${label}: ${reason}\n`);
     return {
       summary: {
         ...base,
         cliStatus: null,
         chargedUsd: Math.min(shareUsd, budgetUsd),
         exit: EXIT_DEPENDENCY,
-        reasons: [`could not start claude: ${ran.error}`],
+        reasons: [reason],
         resultDir: undefined,
       },
       stop: true,
