@@ -26,6 +26,8 @@ export interface LintOptions {
   readonly evalDir?: string;
   /** `--grants`: the grants file; default `<eval dir>/grants.yaml`. */
   readonly grantsFile?: string;
+  /** `--enable`: IDs of opt-in rules (`Rule.optIn`) to run; every other rule always runs. */
+  readonly enable?: readonly string[];
 }
 
 export interface LintReport {
@@ -136,7 +138,10 @@ export const lintPlugin = (
     // A plugin root with no manifest is not this lint's business.
     ...(existsSync(manifest.file) ? manifest.issues : []),
   ];
-  const ruleFindings = rules.flatMap((rule) => [
+  const active = rules.filter(
+    (r) => r.optIn !== true || (options.enable ?? []).includes(r.id),
+  );
+  const ruleFindings = active.flatMap((rule) => [
     ...suite.cases.flatMap((c) =>
       rule.checkCase === undefined
         ? []

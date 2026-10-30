@@ -12,6 +12,7 @@ import type { Rule } from "../types.ts";
 export const rule: Rule = {
   id: "EVAL009",
   severity: "info",
+  optIn: true, // #811: fired on about half of all cases, and its own fix excuses reply-only skills // #811: fired on about half of all cases, and its own fix excuses reply-only skills
   title: "Case pairs a result grader with a steps grader",
   source: fromDocs("graders that give a stable signal"),
   checkCase: (c, context) => {

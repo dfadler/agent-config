@@ -10,7 +10,12 @@ Run it (no model calls, no network):
 ```bash
 node plugins/eval-authoring/scripts/ts/lint/cli.ts [PLUGIN_ROOT]   # --help for flags, output and exit codes
 node plugins/eval-authoring/scripts/ts/lint/cli.ts --list-rules
+node plugins/eval-authoring/scripts/ts/lint/cli.ts --enable EVAL009 [PLUGIN_ROOT]   # also run an opt-in rule
 ```
+
+A rule that sets `optIn: true` is skipped unless `--enable ID` names it (comma-separated or
+repeated). `--list-rules` still lists it and marks it. The fixture harness runs opt-in rules
+with them on, so an opt-in rule still needs its good and bad fixtures.
 
 ## Rules
 
@@ -26,7 +31,7 @@ the authority; the severity is the default.
 | EVAL006 | warn | A judge given no explicit pass and fail conditions guesses, and split votes make the score noise. | Write `PASS if ...` and `FAIL if ...` with observable conditions. |
 | EVAL007 | error | `tool_used: Skill` needs `Skill` in `allowed_tools`, or the check can never see a call; a `max: 0` Skill check on one arm only tests the arm that cannot fire it. | Add `Skill`; give a "must not fire" check `arm: both`. |
 | EVAL008 | warn | If every grader is excluded from scoring, both arms score alike and there is no delta. | Add a grader that counts (see EVAL010). |
-| EVAL009 | info | A result check alone can pass with the wrong steps and a steps check alone with the wrong answer. | Pair them, or accept the finding for a reply-only skill. |
+| EVAL009 | info, opt-in | A result check alone can pass with the wrong steps and a steps check alone with the wrong answer. Off by default (#811): it fired on about half of all cases, mostly reply-only skills with no step to check. Run it with `--enable EVAL009`. | Pair them, or skip it for a reply-only skill. |
 | EVAL010 | info | `mock_calls` on a mock the plugin declares is an indicator only (the no-plugin arm has no mock). | Add `arm: both`, or use a grader that counts. |
 | EVAL011 | warn | A judge reading the reply cannot see what was passed to a tool. | Use `focus: mock_calls` when the criteria are about tool inputs. |
 | EVAL012 | error | Inline regex flags, a pattern matched against a file path instead of its content, or an unescaped quote inside a traced value make a regex match nothing, or everything. | Use the `flags` key, `target: { source: file, path }`, and `\\"` for a quote in a trace. |
@@ -44,13 +49,13 @@ the authority; the severity is the default.
 | EVAL024 | warn | A `last_message` regex that already matches the case prompt passes (or trips) on a reply that echoes the prompt. | Match wording only the skill or a correct answer would add, or grade behavior with `tool_used`. |
 | EVAL025 | warn | A case whose graders are all "must not fire" Skill checks (the no-plugin arm passes them by construction) or regexes whose literal text is in the prompt has only the with-arm fire rate to fail on. | Grade a trace action in a fixture workspace, or tag the case `smoke` to label it a cheap trigger guard, or drop it. |
 
-The Sev column is the rule's default. EVAL007, EVAL012, EVAL014 and EVAL023 override it for some problems (a finding's own severity wins); run `--list-rules` or read the finding for the one you got.
+The Sev column is the rule's default; "opt-in" means the rule runs only with `--enable`. EVAL007, EVAL012, EVAL014 and EVAL023 override it for some problems (a finding's own severity wins); run `--list-rules` or read the finding for the one you got.
 
 ## Audit (#811)
 
 Hits from running the lint over every plugin with evals (30 plugins, 269 cases), 2026-10-28. Details and rule origins: [#811](https://github.com/dfadler/agent-config/issues/811). CLI overlap for 001, 003 and 005 was checked with free `--max-cost-usd 0` probes on CLI 2.1.300, 2026-10-29; the rest was not.
 
-- 009: 143 info. Open: fires on over half of cases; delete or make opt-in?
+- 009: 143 info. Made opt-in (`--enable EVAL009`); the rule and its fixtures stay. It fired on over half of cases and its own fix excuses reply-only skills.
 - 024: 56 warn. Keep: real prompt-echo findings; the fixes are case edits.
 - 023: 12 info. Keep; the `last_message` half is unproven.
 - 025: 6 warn. Keep.
