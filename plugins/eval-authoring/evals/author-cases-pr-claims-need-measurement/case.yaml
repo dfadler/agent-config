@@ -68,8 +68,10 @@ description: >
   the plugin and with no without-plugin run, the reply drafts the verification section
   stating both scores without claiming an improvement or a numeric delta, and names the
   missing baseline. expected_outcome: PASS when it flags the missing without-plugin run,
-  states the one-case and 0.9 limits, and writes no improvement claim or delta number; FAIL
-  otherwise.
+  states the one-case limit and why the missing run matters (a no-plugin baseline at or above
+  0.9 means the case does not discriminate, or the scores cannot be separated from default
+  model behavior or a cue in the prompt), and writes no improvement claim or delta number;
+  FAIL otherwise.
 tags: [eval-authoring, author-cases]
 
 execution:
@@ -106,10 +108,12 @@ graders:
   # only cases shrink the delta's error; a no-plugin baseline at or above 0.9 means the case
   # does not discriminate). The last alternative accepts the paraphrase "a suite of one case can't
   # support a delta" (the reply states the rule without the figure; seen at HEAD, 2 of 2 runs).
+  # That alternative spans a wrapped line but stops at a list item, heading or blank line, so
+  # "- One case is enough" followed by "- We cannot attribute a delta" does not match (#854).
   - name: states_case_count_minimum
     type: regex
     target: last_message
-    pattern: '\b(?:20|twenty)\b[^.\n]{0,40}\bcases?\b|\bcases?\b[^.\n]{0,40}\b(?:20|twenty)\b|\b(?:one|1|single|too few|few) (?:eval )?cases?\b[^.]{0,60}\b(?:can.?t|cannot|not enough|too (?:few|small)|insufficient)[^.]{0,40}\bdelta'
+    pattern: '\b(?:20|twenty)\b[^.\n]{0,40}\bcases?\b|\bcases?\b[^.\n]{0,40}\b(?:20|twenty)\b|\b(?:one|1|single|too few|few) (?:eval )?cases?\b(?:[^.\n]|\n(?![ \t]*(?:[-*+][ \t]|\d+[.)][ \t]|#|\n))){0,60}\b(?:can.?t|cannot|not enough|too (?:few|small)|insufficient)(?:[^.\n]|\n(?![ \t]*(?:[-*+][ \t]|\d+[.)][ \t]|#|\n))){0,40}\bdelta'
     flags: i
     match: contains
 
@@ -121,11 +125,16 @@ graders:
   # behavior", "don't know whether the prompt already cues the snapshot", "can't say how much
   # of the move is run-to-run noise") without the 0.9 wording. The last three alternatives accept
   # that form: a hedge ("can't", "don't know", "unknown") followed in the same sentence by what
-  # the missing run would have told you (default behavior, a cue in the prompt, noise).
+  # the missing run would have told you (default model behavior, a cue in the prompt), "doesn't
+  # show ... over a bare model", or an explicit statement that the no-plugin arm/baseline/run is
+  # missing ("Not measured: a Δ against the no-plugin arm", "No no-plugin baseline"), which the
+  # owner chose to accept for this gate. A bare admission of noise is not accepted: it is a
+  # variance limit, not the baseline gate (#854 review). A span may wrap across lines but never
+  # across a list item, heading or blank line.
   - name: states_baseline_gate
     type: regex
     target: last_message
-    pattern: '0\.9\b|90 ?%|(?:not|cannot|can.t|doesn.t|never|no)[^.\n]{0,30}discriminat|(?:no|little|without)[^.\n]{0,20}headroom|prompt[^.\n]{0,40}(?:gives? away|hands? over|leaks?|cues?)|(?:can.t|cannot|don.t know|do not know|unknown|unclear)(?:[^.]|\d\.\d){0,70}(?:default[ -](?:model )?behavio[u]?r|bare model|noise|variance|cues?)|(?:don.t|doesn.t|do not|does not) show(?:[^.]|\d\.\d){0,60}(?:over|beyond) (?:a )?(?:bare|no-plugin|baseline)'
+    pattern: '0\.9\b|90 ?%|(?:not|cannot|can.t|doesn.t|never|no)[^.\n]{0,30}discriminat|(?:no|little|without)[^.\n]{0,20}headroom|prompt[^.\n]{0,40}(?:gives? away|hands? over|leaks?|cues?)|(?:can.t|cannot|don.t know|do not know|unknown|unclear)(?:\d\.\d|[^.\n]|\n(?![ \t]*(?:[-*+][ \t]|\d+[.)][ \t]|#|\n))){0,70}(?:default[ -](?:model )?behavio[u]?r|bare model|cues?)|(?:don.t|doesn.t|do not|does not) show(?:\d\.\d|[^.\n]|\n(?![ \t]*(?:[-*+][ \t]|\d+[.)][ \t]|#|\n))){0,60}(?:over|beyond) (?:a )?(?:bare|no-plugin|baseline)|(?:no|not|isn.t|haven.t|didn.t|without|missing)(?:\d\.\d|[^.\n]|\n(?![ \t]*(?:[-*+][ \t]|\d+[.)][ \t]|#|\n))){0,40}\b(?:no|without)[ -]plugin[ -](?:arm|baseline|score|run|comparison)'
     flags: i
     match: contains
 
