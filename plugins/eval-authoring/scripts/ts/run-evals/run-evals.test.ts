@@ -1,3 +1,4 @@
+import { homedir } from "node:os";
 import { dirname, join } from "node:path";
 import { describe, expect, it } from "vitest";
 import {
@@ -47,6 +48,12 @@ const okCli =
   });
 
 const STAMP = "run-2026-01-02T03-04-05-000Z";
+
+const withCaffeinate = {
+  claude: ["/bin/claude"],
+  git: ["/bin/git"],
+  caffeinate: ["/usr/bin/caffeinate"],
+};
 
 const cliCalls = (calls: readonly { command: string; args: readonly string[] }[]) =>
   calls.filter((c) => c.command === "claude" && c.args[0] === "plugin");
@@ -231,6 +238,88 @@ describe("main", () => {
     await main([s.root], { io: s.io, pluginsDir: "/p" });
     expect(s.err.join()).toContain("preflight warning");
     expect(cliCalls(s.calls)).toHaveLength(1);
+  });
+
+  it("runs the CLI under caffeinate -i on macOS when it is on PATH, and bare elsewhere", async () => {
+    const mac = setup({ cases: [{ name: "a" }], onPath: withCaffeinate, onCli: okCli() });
+    await main([mac.root], { io: mac.io, pluginsDir: "/p" });
+    const wrapped = mac.calls.filter((c) => c.command === "caffeinate");
+    expect(wrapped).toHaveLength(1);
+    expect(wrapped[0]?.args.slice(0, 4)).toEqual(["-i", "--", "claude", "plugin"]);
+    expect(cliCalls(mac.calls)).toHaveLength(0);
+
+    const linux = setup({ cases: [{ name: "a" }], onPath: withCaffeinate, onCli: okCli(), platform: "linux" });
+    await main([linux.root], { io: linux.io, pluginsDir: "/p" });
+    expect(linux.calls.some((c) => c.command === "caffeinate")).toBe(false);
+    expect(cliCalls(linux.calls)).toHaveLength(1);
+  });
+
+  describe("caffeinate exec failure", () => {
+    const run = async (status: number, stderr = "", opts: FakeIoOptions = {}) => {
+      const s = setup({ cases: [{ name: "a" }], onPath: withCaffeinate, cliResult: spawned({ status, stderr }), ...opts });
+      const code = await main([s.root], { io: s.io, pluginsDir: "/p" });
+      return { code, err: s.err.join(""), summary: [...s.written.values()].join("") };
+    };
+
+    it("maps a wrapped 127/126 with an exec-failure stderr and no result to could-not-start", async () => {
+      const missing = await run(127, "claude: No such file or directory\n");
+      expect(missing.code).toBe(EXIT_DEPENDENCY);
+      expect(missing.summary).toContain("could not start claude: caffeinate exit 127: claude: No such file or directory");
+      const nonexec = await run(126, "claude: Permission denied\n");
+      expect(nonexec.code).toBe(EXIT_DEPENDENCY);
+      expect(nonexec.summary).toContain("could not start claude: caffeinate exit 126: claude: Permission denied");
+    });
+
+    it("passes 127/126 through unwrapped (linux), with empty stderr, or when a result was written", async () => {
+      // Bare claude: nothing to unwrap.
+      for (const status of [127, 126]) {
+        const linux = await run(status, "claude: No such file or directory\n", { platform: "linux" });
+        expect(linux.code).toBe(EXIT_FAILURE);
+        expect(linux.err).toContain(`unexpected CLI exit status ${String(status)}`);
+      }
+      // Wrapped, but claude's own 127 does not carry the exec-failure line.
+      const silent = await run(127);
+      expect(silent.code).toBe(EXIT_FAILURE);
+      expect(silent.err).toContain("unexpected CLI exit status 127");
+      // Wrapped with the line, but claude ran far enough to write a result.
+      const ran = await run(127, "claude: No such file or directory\n", {
+        onCli: (args) => ({ ...okCli()(args), spawn: spawned({ status: 127, stderr: "claude: No such file or directory\n" }) }),
+      });
+      expect(ran.code).not.toBe(EXIT_DEPENDENCY);
+      expect(ran.err).toContain("unexpected CLI exit status 127");
+      // caffeinate execs claude in place, so claude's own status is not an artifact.
+      const plain = await run(3);
+      expect(plain.code).toBe(EXIT_FAILURE);
+      expect(plain.err).toContain("unexpected CLI exit status 3");
+    });
+
+    it("keeps the reason to stderr's first line, capped at 200 characters, with the home directory masked", async () => {
+      const home = homedir();
+      // Spaced filler: an unbroken 32+ character run would itself be redacted as token-like.
+      const first = `${home}/bin/claude: No such file or directory ${"x ".repeat(150)}`;
+      const r = await run(127, `\n${first}\nsecond-line-marker ${home}\n`);
+      expect(r.code).toBe(EXIT_DEPENDENCY);
+      expect(r.summary).toContain("caffeinate exit 127: ~/bin/claude: No such file or directory");
+      expect(r.summary).not.toContain(home);
+      expect(r.summary).not.toContain("second-line-marker");
+      expect(r.summary).not.toContain("x ".repeat(100));
+      const reason = /caffeinate exit 127: [^"\n]*/.exec(r.summary)?.[0] ?? "";
+      expect(reason.length).toBe("caffeinate exit 127: ".length + 200);
+    });
+
+    it("masks the home directory only on a path boundary", async () => {
+      const home = homedir();
+      const r = await run(127, `${home}2/bin/claude: No such file or directory ${home}/x\n`);
+      expect(r.code).toBe(EXIT_DEPENDENCY);
+      expect(r.summary).toContain(`${home}2/bin/claude`);
+      expect(r.summary).toContain(" ~/x");
+    });
+
+    it("redacts a token-shaped stderr line before it reaches the summary", async () => {
+      const r = await run(127, "claude: No such file or directory Bearer abcdefghij1234567890\n");
+      expect(r.code).toBe(EXIT_DEPENDENCY);
+      expect(r.summary).not.toContain("abcdefghij1234567890");
+    });
   });
 
   it("does not pass --trust-plugin for a plugin outside the repo's plugins directory", async () => {

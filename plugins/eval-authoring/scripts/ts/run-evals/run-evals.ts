@@ -5,6 +5,7 @@
  *
  * Usage: see USAGE below, or run with --help.
  */
+import { homedir } from "node:os";
 import { basename, dirname, join, resolve } from "node:path";
 import { readGrantsFile, readSuite } from "../parser/index.ts";
 import { buildCliArgs, type Reporting, type RunSpec } from "./command.ts";
@@ -18,7 +19,7 @@ import {
   worstExit,
   type ExitCode,
 } from "./exit-codes.ts";
-import { nodeIo, type Io } from "./io.ts";
+import { nodeIo, type Io, type SpawnResult } from "./io.ts";
 import {
   AGGREGATE_FILE,
   candidateResultDirs,
@@ -36,7 +37,7 @@ import {
   type Invocation,
 } from "./plan.ts";
 import { runPreflight } from "./preflight.ts";
-import { caseRow, renderBlock, renderSummary, withBlock } from "./summary.ts";
+import { caseRow, redact, renderBlock, renderSummary, withBlock } from "./summary.ts";
 import {
   DEFAULT_JUDGE_MODEL,
   DEFAULT_MODEL,
@@ -55,6 +56,8 @@ export const USAGE = `Usage: run-evals.ts [options] <plugin-path>
 Run a plugin's eval cases at a cost tier. The CLI's --case takes one glob, so
 the wrapper makes one CLI invocation per case, each under exactly that case's
 grants (<eval-dir>/grants.yaml). Never passes --scaffold, --json or --report.
+On macOS each invocation runs under caffeinate -i so the machine stays awake;
+the recorded rerun command omits that prefix on purpose, so it pastes anywhere.
 
 Options:
   --tier <name>        quick | standard | thorough (default: ${DEFAULT_TIER})
@@ -356,6 +359,39 @@ const locateResult = (
       return text === undefined ? [] : [{ dir: d, text }];
     })[0];
 
+/** What a shell or caffeinate prints when the exec itself fails. */
+const EXEC_FAILURE = /No such file or directory|Permission denied|command not found/;
+
+/**
+ * caffeinate "execs" the utility (man caffeinate, EXAMPLES), and on macOS it
+ * does so in place: the utility runs in the pid Node spawned (verified: the
+ * child's $$ equals the spawn's pid). So claude's exit status and a signal
+ * death ({status: null, signal}) arrive exactly as a bare spawn sees them. The
+ * wrapping artifact is caffeinate's own exec failure, 127 (not found) or 126
+ * (not executable), with "<cmd>: <reason>" on stderr. claude itself can exit
+ * 126/127 too, so the remap also needs that stderr shape and no result file;
+ * anything else passes through to the usual exit-status judgement.
+ */
+export const unwrapExit = (
+  r: SpawnResult,
+  hasResult: boolean,
+  home: string,
+): SpawnResult => {
+  const line = r.stderr.split("\n").map((l) => l.trim()).find((l) => l !== "") ?? "";
+  if ((r.status !== 127 && r.status !== 126) || hasResult || !EXEC_FAILURE.test(line)) return r;
+  // The reason lands in run-evals-summary.json: one line, home masked on a path boundary
+  // (so /Users/x does not eat /Users/xavier), redacted before the cap so a cut secret is never
+  // left half-visible. redact's long-run catch-all can also shorten a path segment; that is
+  // the conservative direction for a diagnostic string.
+  const bare = home.replace(/\/+$/, "");
+  const masked =
+    bare === ""
+      ? line
+      : line.replace(new RegExp(`${bare.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}(?=/|$)`, "g"), "~");
+  const detail = redact(masked).slice(0, 200);
+  return { ...r, status: null, error: `caffeinate exit ${String(r.status)}: ${detail}` };
+};
+
 const runInvocation = async (
   io: Io,
   options: Options,
@@ -386,10 +422,18 @@ const runInvocation = async (
     command: ["claude", ...args],
     allottedUsd: budgetUsd,
   };
-  const ran = await io.spawn("claude", args, {
+  // macOS: keep the machine awake for the invocation. caffeinate execs claude
+  // in place, so only its own 126/127 exec failure needs unwrapping.
+  const [cmd, argv]: readonly [string, readonly string[]] =
+    io.platform === "darwin" && io.findOnPath("caffeinate").length > 0
+      ? ["caffeinate", ["-i", "--", "claude", ...args]]
+      : ["claude", args];
+  const raw = await io.spawn(cmd, argv, {
     onStdout: io.out,
     onStderr: io.err,
   });
+  const located = locateResult(io, outputDir);
+  const ran = cmd === "caffeinate" ? unwrapExit(raw, located !== undefined, homedir()) : raw;
   if (ran.error !== undefined) {
     return {
       summary: {
@@ -404,7 +448,6 @@ const runInvocation = async (
       resultText: undefined,
     };
   }
-  const located = locateResult(io, outputDir);
   const read = findingsFromText(located?.text, outputDir);
   const facts = rawResultFacts(located?.text);
   const verdict: Judgement = judgeRun({
