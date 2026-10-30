@@ -94,8 +94,19 @@ describe("eval job: cost ceiling", () => {
     );
   });
 
-  it("gives the eval job 90 minutes so a full run is not cut off (#648)", () => {
-    expect(workflow).toMatch(/\n {2}eval:[\s\S]*?\n {4}timeout-minutes: 90\n/);
+  it("ends the wrapper on its own deadline, before the eval job is cancelled (#648)", () => {
+    const job = Number(
+      /\n {2}eval:[\s\S]*?\n {4}timeout-minutes: (\d+)\n/.exec(workflow)?.[1],
+    );
+    const deadline = Number(
+      /timeout --signal=INT --kill-after=(\d+)m (\d+)m \\\n\s+node plugins\/eval-authoring\/scripts\/ts\/run-evals\/run-evals\.ts/.exec(
+        workflow,
+      )?.[2],
+    );
+    expect(job).toBe(180);
+    expect(deadline).toBeGreaterThanOrEqual(120);
+    // Room left after the deadline and kill grace for the Check and Upload steps.
+    expect(deadline + 2 + 5).toBeLessThanOrEqual(job);
   });
 });
 
