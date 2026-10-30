@@ -1,0 +1,18 @@
+{
+  "schemaVersion": 1,
+  "partial": false,
+  "cases": [
+    {
+      "name": "fallback",
+      "aggregates": { "score": 0.5 },
+      "arms": {
+        "with": [
+          { "score": 0, "error": null, "graders": [{ "name": "text_only", "type": "llm", "score": 0, "scored": true, "weight": 1, "explanation": "PASS if it asks. FAIL if it acts. judge votes: PASS FAIL FAIL" }, { "name": "quiet", "type": "llm", "score": 0, "scored": true, "weight": 1 }] }
+        ],
+        "without": [
+          { "score": 0, "error": null, "graders": [{ "name": "text_only", "type": "llm", "passed": false, "score": 0, "scored": true, "weight": 1, "explanation": "judge votes: FAIL" }] }
+        ]
+      }
+    }
+  ]
+}

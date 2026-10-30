@@ -1,7 +1,7 @@
 ---
 name: diagnose-scores
 description: ALWAYS invoke this skill first when scores already exist and you are asked where to start on an eval case with a negative Delta or a low score on replies that look correct, even when nothing is to hand to run, because it sets the order of suspects (judge first). Explain why an eval case scored low - "my eval fails", "score 0.4", negative or zero Δ, 0.00 on output that looks correct, exit 1 or 2 with fine-looking results. Free, read-only. Not for running evals (run-evals) or writing cases (author-cases).
-allowed-tools: Bash(node ${CLAUDE_SKILL_DIR}/../../scripts/ts/diagnose/diagnose.ts *)
+allowed-tools: Bash(node ${CLAUDE_SKILL_DIR}/../../scripts/ts/diagnose/diagnose.ts *), Bash(node ${CLAUDE_SKILL_DIR}/../../scripts/ts/judge-agreement.ts *)
 argument-hint: "[results-dir | aggregate-result.json | plugin-path]"
 ---
 
@@ -59,7 +59,10 @@ interprets the verdict.
   this by default: reword the case around what the skill adds, or drop it. Only a
   should-not-fire case is a regression guard (delta 0 by design; say so in `expected_outcome`).
 - **`split-judge-votes`, `high-variance`:** an unstable criterion. Name the grader, the
-  condition two judges could read differently, and the rewording.
+  condition two judges could read differently, and the rewording. To size the noise, run
+  `node ${CLAUDE_SKILL_DIR}/../../scripts/ts/judge-agreement.ts RESULTS` (free; `--labels FILE` of
+  human PASS/FAIL adds agreement, kappa, TPR and TNR). It cannot re-run the judge: only a direct
+  model call can, which is the owner's decision.
 - **`no-scored-graders`, `no-delta-signal`:** every grader is excluded from scoring
   (`arm: with-only`, `tool_used: Skill` without `arm: both`, mock-calls on plugin mocks) or
   only one arm ran. Name which, and the change (`arm: both`, a free grader that counts, or

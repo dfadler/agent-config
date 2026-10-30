@@ -201,7 +201,7 @@ export const judgeVotes = (explanation: string): readonly string[] =>
     ?.match(/\b(?:PASS|FAIL)\b/g) ?? [];
 
 /** A grader's votes: the structured array when present, else the explanation text. */
-const graderVotes = (g: GraderResult): readonly string[] =>
+export const graderVotes = (g: GraderResult): readonly string[] =>
   g.judgeVotes !== undefined
     ? g.judgeVotes.map((v) => (v ? "PASS" : "FAIL"))
     : judgeVotes(g.explanation ?? "");

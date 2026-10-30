@@ -1,0 +1,16 @@
+{
+  "schemaVersion": 1,
+  "partial": false,
+  "cases": [
+    {
+      "name": "plain",
+      "aggregates": { "score": 1 },
+      "arms": {
+        "with": [
+          { "score": 1, "error": null, "graders": [{ "name": "r", "type": "regex", "passed": true, "score": 1, "scored": true, "weight": 1 }] }
+        ],
+        "without": []
+      }
+    }
+  ]
+}
