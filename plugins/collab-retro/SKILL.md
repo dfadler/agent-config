@@ -22,7 +22,7 @@ description: |
   `gh issue create` without going through `gh-publish-guide` first: it drafts
   and shows the issue body, then asks.
 metadata:
-  version: "1.3.0"
+  version: "1.4.0"
 ---
 
 # Collaboration retrospective
