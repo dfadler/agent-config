@@ -1,0 +1,8 @@
+# good-reply: It is in main.ts.
+schema_version: "1.1"
+name: good-only
+execution:
+  prompt: Do the thing.
+graders:
+  - type: "llm"
+    criteria: "PASS if the reply names the file. FAIL if it names none or a different file."

@@ -1,0 +1,7 @@
+schema_version: "1.1"
+name: look-after
+execution:
+  prompt: Do the thing.
+graders:
+  - type: "llm"
+    criteria: "PASS if the reply says it will look after the cache, and says X after reading the file. FAIL if it says nothing about the cache."

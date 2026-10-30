@@ -1,12 +1,9 @@
 import type { Grader, ToolUsedGrader } from "../../parser/index.ts";
+import { isQuietSkillCheck } from "../helpers.ts";
 import type { Rule } from "../types.ts";
 
 const isSkillCheck = (g: Grader): g is ToolUsedGrader =>
   g.type === "tool_used" && g.tool.value === "Skill";
-
-/** "Must not invoke the skill": `max: 0`, scored in both arms (docs, two-arm scoring). */
-const isNegative = (g: ToolUsedGrader): boolean =>
-  g.max.value === 0 && g.arm.value === "both";
 
 /**
  * EVAL020: a suite that checks the skill fires should also check it stays
@@ -25,7 +22,7 @@ export const rule: Rule = {
   checkSuite: ({ suite }) => {
     const checks = suite.cases.flatMap((c) => c.graders).filter(isSkillCheck);
     const firstPositive = checks.find((g) => g.min.value >= 1);
-    if (firstPositive === undefined || checks.some(isNegative)) return [];
+    if (firstPositive === undefined || checks.some(isQuietSkillCheck)) return [];
     return [
       {
         message: `The suite checks that the skill fires and no case checks that it stays quiet. A suite with only positive prompts cannot show the skill over-triggers (from #472).`,
