@@ -90,27 +90,38 @@ export interface Diagnosis {
 }
 
 export interface Thresholds {
-  /** A delta within this distance of zero is "no discrimination" (a delta below the negative of it is "negative-delta"). */
+  /**
+   * Opt-in dead zone: a delta within this distance of zero is "no discrimination"
+   * and a drop at least this deep may be "negative-delta". 0 (the default) turns it
+   * off, leaving the SE floor and the t cutoff to call noise.
+   */
   readonly neutralBand: number;
   /** Floor on the standard error of the difference, so two arms with SD 0 are not treated as noise-free. */
   readonly seFloor: number;
   /** Arm means at or above this count as the ceiling for the both-arms-pass-all finding. */
   readonly nearCeiling: number;
-  /** An arm whose run scores have a standard deviation above this is flagged as unstable. */
+  /** An arm of more than `SMALL_ARM_RUNS` usable runs whose scores have a standard deviation above this is flagged as unstable. */
   readonly highVariance: number;
+  /** The same flag for an arm of `SMALL_ARM_RUNS` or fewer usable runs, whose SD is itself noisy. */
+  readonly highVarianceSmallArm: number;
 }
 
+/** Arms of this many usable runs or fewer use `highVarianceSmallArm`. */
+export const SMALL_ARM_RUNS = 5;
+
 /**
- * Defaults. Scores run 0 to 1 and a three-run arm moves in steps of about
- * 0.08, so 0.05 treats a one-step wobble as zero; "not noise" means beyond
- * the two-sided 95% t quantile for the run count (`tQuantile`); a 0.25
- * standard deviation means the runs disagree by about a quarter of the range.
+ * Defaults. Scores run 0 to 1. There is no fixed neutral band: "not noise"
+ * means beyond the two-sided 95% t quantile for the run count (`tQuantile`)
+ * times an SE of at least 0.05. A standard deviation above 0.25 (0.35 for an
+ * arm of 5 runs or fewer, where the SD is itself noisy) means the runs
+ * disagree by a quarter of the range or more.
  */
 export const DEFAULT_THRESHOLDS: Thresholds = {
-  neutralBand: 0.05,
+  neutralBand: 0,
   seFloor: 0.05,
   nearCeiling: 0.95,
   highVariance: 0.25,
+  highVarianceSmallArm: 0.35,
 };
 
 /** Two-sided 95% t quantiles for 1 to 30 degrees of freedom. */
@@ -443,11 +454,17 @@ const judgeDelta = (
         ] as const)
       : [];
   const extra = [...ceiling, ...floor];
-  if (delta < 0 && delta <= -t.neutralBand && noiseKnown && -delta <= bar) {
+  const singleRun = {
+    kind: "single-run",
+    severity: "info",
+    message:
+      "an arm has under two usable runs, so run-to-run noise is unknown and the verdict is capped at weak-signal; rerun with more runs to confirm",
+  } as const;
+  if (delta < 0 && delta <= -t.neutralBand && -delta <= bar) {
     return {
       verdict: "weak-signal",
       reason: `delta ${d} is negative but within ${fmt(mult)} standard errors (${fmt(se)}) of zero, so it may be noise`,
-      findings: extra,
+      findings: noiseKnown ? extra : [singleRun, ...extra],
     };
   }
   if (delta < 0 && delta <= -t.neutralBand) {
@@ -464,10 +481,13 @@ const judgeDelta = (
       ],
     };
   }
-  if (delta < t.neutralBand) {
+  if (delta === 0 || delta < t.neutralBand) {
     return {
       verdict: "no-discrimination",
-      reason: `delta ${d} is within ${fmt(t.neutralBand)} of zero: the plugin and no plugin score alike`,
+      reason:
+        delta === 0
+          ? "delta is 0: the plugin and no plugin score alike"
+          : `delta ${d} is within ${fmt(t.neutralBand)} of zero: the plugin and no plugin score alike`,
       findings: extra,
     };
   }
@@ -476,12 +496,7 @@ const judgeDelta = (
       verdict: "weak-signal",
       reason: `delta ${d} is above zero but an arm has under two usable runs, so noise is unknown`,
       findings: [
-        {
-          kind: "single-run",
-          severity: "info",
-          message:
-            "an arm has under two usable runs, so run-to-run noise is unknown and the verdict is capped at weak-signal; rerun with more runs to confirm",
-        },
+        singleRun,
         ...extra,
       ],
     };
@@ -511,7 +526,9 @@ const varianceFindings = (
       ["without", wo],
     ] as const
   ).flatMap(([arm, s]) =>
-    s.stdDev !== undefined && s.stdDev > t.highVariance
+    s.stdDev !== undefined &&
+    s.stdDev >
+      (s.usedRuns <= SMALL_ARM_RUNS ? t.highVarianceSmallArm : t.highVariance)
       ? [
           {
             kind: "high-variance" as const,
