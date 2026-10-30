@@ -332,7 +332,7 @@ export interface EvalCase {
   readonly historyFile: Field<string | undefined>;
   readonly addDirs: Field<readonly string[]>;
 
-  /** Merged graders, in order. Empty means EVAL001. */
+  /** Merged graders, in order. Empty is not a lint finding: the CLI rejects a case with no grader at load. */
   readonly graders: readonly Grader[];
   /** Every key seen, classified (EVAL002). */
   readonly keys: readonly CaseKey[];

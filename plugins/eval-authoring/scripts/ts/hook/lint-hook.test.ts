@@ -55,12 +55,17 @@ const GOOD_CASE = [
   "",
 ].join("\n");
 
-/** No grader: EVAL001 fires. */
+/** `max: 0` with no `min: 0`: EVAL019 fires. */
 const BAD_CASE = [
   'schema_version: "1.1"',
   "name: bad",
   "execution:",
   "  prompt: Do the thing.",
+  "graders:",
+  "  - name: never-reads",
+  "    type: tool_used",
+  "    tool: Read",
+  "    max: 0",
   "",
 ].join("\n");
 
@@ -130,7 +135,7 @@ describe("runHook: in scope", () => {
     const out = await runHook(event(join(root, "evals/bad/case.yaml")));
     const ctx = contextOf(out);
     expect(ctx.hookEventName).toBe("PostToolUse");
-    expect(ctx.additionalContext).toContain("EVAL001");
+    expect(ctx.additionalContext).toContain("EVAL019");
     expect(ctx.additionalContext).toContain("Fix:");
     expect(ctx.additionalContext).toContain("Source:");
     expect(ctx.additionalContext).toContain("nothing was blocked");
@@ -145,14 +150,14 @@ describe("runHook: in scope", () => {
   it("reports every case when a file directly under the eval directory is edited", async () => {
     const root = makePlugin();
     const out = await runHook(event(join(root, "evals/grants.yaml")));
-    expect(contextOf(out).additionalContext).toContain("EVAL001");
+    expect(contextOf(out).additionalContext).toContain("EVAL019");
   });
 
   it("follows the manifest's experimental.evals", async () => {
     const root = makePlugin('{"experimental":{"evals":"checks"}}');
     const file = write(root, "checks/bad/case.yaml", BAD_CASE);
     const out = await runHook(event(file));
-    expect(contextOf(out).additionalContext).toContain("EVAL001");
+    expect(contextOf(out).additionalContext).toContain("EVAL019");
     expect(await runHook(event(join(root, "evals/bad/case.yaml")))).toBe("");
   });
 });
@@ -258,7 +263,7 @@ describe("runHook: failure containment", () => {
   it("returns real findings through the default worker lint", async () => {
     const root = makePlugin();
     const out = await runHook(event(join(root, "evals/bad/case.yaml")));
-    expect(out).toContain("EVAL001");
+    expect(out).toContain("EVAL019");
   });
 
   it("returns nothing when the lint refuses the plugin", async () => {
@@ -341,7 +346,7 @@ describe("lint-on-edit.sh (the shipped entry point)", () => {
     const root = makePlugin();
     const r = run(event(join(root, "evals/bad/case.yaml")));
     expect(r.status).toBe(0);
-    expect(contextOf(r.stdout).additionalContext).toContain("EVAL001");
+    expect(contextOf(r.stdout).additionalContext).toContain("EVAL019");
   });
 
   it("is silent and exits 0 for an out-of-scope path", () => {
@@ -385,7 +390,7 @@ describe("lint-on-edit.sh (the shipped entry point)", () => {
     symlinkSync(root, link);
     const r = run(event(join(link, "evals/bad/case.yaml")));
     expect(r.status).toBe(0);
-    expect(contextOf(r.stdout).additionalContext).toContain("EVAL001");
+    expect(contextOf(r.stdout).additionalContext).toContain("EVAL019");
   });
 
   it("prints usage for --help", () => {
