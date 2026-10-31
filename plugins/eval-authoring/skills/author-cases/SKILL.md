@@ -27,12 +27,21 @@ cannot decide.
 Cases written in the same session as the skill share its blind spots: a wrong fact or
 trigger boundary in the skill reappears in the cases, so they score self-agreement, not
 quality. If asked to write cases in the session that wrote or edited the skill, do not
-draft them there: tell the user to commit the skill and start a fresh session, then stop.
+draft them there: tell the user to commit the skill and start a fresh session (or to use the
+blind-case-writer agent, second bullet), then stop.
 
 - Commit the skill, then write cases in a fresh session that works from the committed
   files (step 1: skill, manifest, existing cases, `grants.yaml`) and not from the
   session that wrote the skill; take the trigger description and output contract from
-  the committed skill. If that is impossible, wait and return to it later.
+  the committed skill. If that is impossible, use the next bullet, or wait and return to it later.
+- When a fresh session is not possible, dispatch the
+  [blind-case-writer agent](../../agents/blind-case-writer.md) instead of drafting the
+  cases yourself. Pass it only the path of the committed skill or agent file (it finds the
+  manifest; paste the text only if no file is committed), not existing cases, your notes or a
+  summary of what the skill should do: whatever you put in the prompt it can copy. Its drafts
+  are text to review and edit before committing. If you already have cases from a fresh
+  session, diff them against its drafts; a gap is a question about the skill, not an error
+  in either.
 - Check domain facts in graders against primary docs or source, not the skill text.
 - Same-session cases that all pass first try, or take under a minute each, probably do
   not test the boundary. A few independent cases beat many co-authored ones.
@@ -70,7 +79,8 @@ draft them there: tell the user to commit the skill and start a fresh session, t
    in [graders](references/graders.md). Pair a grader on the result with one on the steps.
    A reply-only skill case has no scored steps grader: `tool_used: Skill` is an unscored
    indicator in a two-arm run, and there is no other step to check. Keep the Skill check,
-   grade the reply with free `regex` graders, and accept the EVAL009 finding. Do not
+   grade the reply with free `regex` graders. (The lint rule that asks for the pair, EVAL009, is
+   off by default; `--enable EVAL009` turns it on.) Do not
    set `arm: both` on a should-fire Skill check to clear it: the no-plugin arm can never
    pass it, so it manufactures a delta that says nothing about the skill
    ([docs](https://code.claude.com/docs/en/plugin-evals#compare-against-a-no-plugin-baseline)).

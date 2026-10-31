@@ -1,6 +1,6 @@
 # Run: node plugins/eval-authoring/scripts/ts/run-evals/run-evals.ts --tier thorough --case run-evals-fires-natural-ci-setup plugins/eval-authoring
 # Should-fire CI-setup case (#766): the user asks how to run their evals in CI and does not name
-# the skill. Reply-only; skill_fired is an unscored indicator (EVAL009 info is intentional).
+# the skill. Reply-only; skill_fired is an unscored indicator.
 # Can fail: skill_fired fails on any run where the description does not match CI-setup phrasing;
 # the result regex fails if the reply never names the workflow secret or the wrapper.
 schema_version: "1.1"

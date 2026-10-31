@@ -84,5 +84,5 @@ graders:
     arm: both
 ```
 
-Neither case needs a grant: `allowed_tools` lists only `Skill`. The lint reports EVAL009 (info) on
-both: a reply-only skill has no scored steps grader, which is expected (see step 4).
+Neither case needs a grant: `allowed_tools` lists only `Skill`. The lint's opt-in EVAL009 (`--enable EVAL009`) would report both: a reply-only skill has no
+scored steps grader, which is expected (see step 4).

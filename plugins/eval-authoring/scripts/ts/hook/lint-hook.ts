@@ -16,8 +16,9 @@
  * this imports only from the plugin's own scripts.
  */
 import { existsSync, writeSync } from "node:fs";
-import { Worker } from "node:worker_threads";
+import { spawn } from "node:child_process";
 import { dirname, isAbsolute, join, relative, resolve, sep } from "node:path";
+import { fileURLToPath } from "node:url";
 import { resolveEvalDir } from "../parser/index.ts";
 import type { Finding } from "../lint/types.ts";
 import type { LintOutcome, LintReport } from "../lint/runner.ts";
@@ -154,46 +155,55 @@ export const hookOutput = (context: string): string =>
     },
   })}\n`;
 
+const isOutcome = (v: unknown): v is LintOutcome =>
+  isRecord(v) && typeof v["ok"] === "boolean";
+
 /**
- * Run the lint in a worker thread so synchronous lint work cannot block the
- * parent's deadline timer. Aborting `signal` terminates the worker. The worker
- * (and the rules) load only when this is called, so a no-op edit never pays.
+ * Run the lint in a child process so synchronous lint work cannot block the
+ * parent's deadline timer. Aborting `signal` SIGKILLs the child. A process, not
+ * a worker thread: terminating a blocked worker thread crashed the vitest soak
+ * with SIGSEGV/SIGTRAP (#830, #871), and Node documents that execution "may
+ * stop at any point" on `worker.terminate()`
+ * (https://nodejs.org/api/worker_threads.html). The child (and the rules) load
+ * only when this is called, so a no-op edit never pays.
  */
-export const workerLint = (
+export const childLint = (
   pluginRoot: string,
   signal?: AbortSignal,
-  workerUrl: URL = new URL("./lint-worker.ts", import.meta.url),
+  childUrl: URL = new URL("./lint-child.ts", import.meta.url),
 ): Promise<LintOutcome> =>
   new Promise((resolveOutcome, reject) => {
-    const worker = new Worker(workerUrl, { workerData: pluginRoot });
+    const child = spawn(process.execPath, [fileURLToPath(childUrl), pluginRoot], {
+      stdio: ["ignore", "pipe", "ignore"],
+    });
+    const out: Buffer[] = [];
+    child.stdout.on("data", (c: Buffer) => out.push(c));
     const stop = (): void => {
-      void worker.terminate();
+      child.kill("SIGKILL");
     };
-    signal?.addEventListener("abort", stop, { once: true });    const done = (settle: () => void): void => {
+    signal?.addEventListener("abort", stop, { once: true });
+    child.once("error", (e) => {
       signal?.removeEventListener("abort", stop);
-      stop();
-      settle();
-    };
-    worker.once("message", (m: LintOutcome) => {
-      done(() => {
-        resolveOutcome(m);
-      });
+      reject(e);
     });
-    worker.once("error", (e) => {
-      done(() => {
-        reject(e);
-      });
+    child.once("close", (code) => {
+      signal?.removeEventListener("abort", stop);
+      try {
+        if (code !== 0) throw new Error("nonzero exit");
+        const outcome: unknown = JSON.parse(Buffer.concat(out).toString("utf8"));
+        if (!isOutcome(outcome)) throw new Error("not a lint outcome");
+        resolveOutcome(outcome);
+      } catch {
+        reject(new Error("lint process exited without a result"));
+      }
     });
-    worker.once("exit", () => {
-      done(() => {
-        reject(new Error("lint worker exited without a result"));
-      });
-    });
+    // Already aborted before the listener existed: kill straight away.
+    if (signal?.aborted === true) stop();
   });
 
-/** The default lint: runs in a worker so the parent can enforce the deadline. */
+/** The default lint: runs in a child process so the parent can enforce the deadline. */
 export const defaultLint: LintFn = (pluginRoot, signal) =>
-  workerLint(pluginRoot, signal);
+  childLint(pluginRoot, signal);
 
 const truncate = (text: string): string =>
   text.length <= MAX_CONTEXT_CHARS

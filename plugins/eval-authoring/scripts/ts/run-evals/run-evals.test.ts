@@ -184,6 +184,21 @@ describe("--changed", () => {
   });
 });
 
+describe("--jobs", () => {
+  it("parses a positive integer and defaults to undefined", () => {
+    const p = parseArgs(["p", "--jobs", "6"]);
+    expect(p.kind === "options" && p.options.jobs).toBe(6);
+    const q = parseArgs(["p"]);
+    expect(q.kind === "options" && q.options.jobs).toBeUndefined();
+  });
+  it("rejects zero, negatives, decimals and text", () => {
+    for (const bad of ["0", "-1", "1.5", "abc", "06"]) {
+      const p = parseArgs(["p", "--jobs", bad]);
+      expect(p.kind === "error" && p.message).toContain("positive integer");
+    }
+  });
+});
+
 describe("--max-cost-usd", () => {
   const err = (v: string[]): string => {
     const p = parseArgs(["p", ...v]);

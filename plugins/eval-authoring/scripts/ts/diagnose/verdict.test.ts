@@ -69,15 +69,30 @@ describe("verdict categories", () => {
     expect(kinds(v)).toContain("negative-delta");
   });
 
-  it("treats a delta at the neutral band edge as signal, not zero", () => {
-    const edge = DEFAULT_THRESHOLDS.neutralBand;
-    // One run per arm: noise unknown, so a positive delta is capped at weak-signal.
-    expect(diagnoseCase(caseOf([1], [1 - edge], edge)).verdict).toBe(
-      "weak-signal",
-    );
-    expect(diagnoseCase(caseOf([1], [1 + edge], -edge)).verdict).toBe(
-      "negative-delta",
-    );
+  it("has no neutral band by default, so a small delta is left to the t test", () => {
+    expect(DEFAULT_THRESHOLDS.neutralBand).toBe(0);
+    // SD-0 arms: the 0.05 SE floor x t(2) 4.303 = 0.215 is the bar, so +-0.02 is noise.
+    expect(diagnoseCase(caseOf([0.52, 0.52, 0.52], [0.5, 0.5, 0.5], 0.02)).verdict).toBe("weak-signal");
+    expect(diagnoseCase(caseOf([0.5, 0.5, 0.5], [0.52, 0.52, 0.52], -0.02)).verdict).toBe("weak-signal");
+    // One run per arm: noise unknown, the floor still sets the bar (2 x 0.05 = 0.10).
+    const small = diagnoseCase(caseOf([0.5], [0.52], -0.02));
+    expect(small.verdict).toBe("weak-signal");
+    expect(kinds(small)).toContain("single-run");
+    // A drop past the floor bar is still negative-delta with unknown noise.
+    expect(diagnoseCase(caseOf([0.5], [0.7], -0.2)).verdict).toBe("negative-delta");
+    // Only an exact zero is no-discrimination.
+    expect(diagnoseCase(caseOf([0.5, 0.5, 0.5], [0.5, 0.5, 0.5], 0)).verdict).toBe("no-discrimination");
+  });
+
+  it("applies an opt-in neutral band at its edge", () => {
+    const t = { ...DEFAULT_THRESHOLDS, neutralBand: 0.05 };
+    const three = (a: number, b: number, delta: number) =>
+      caseOf([a, a, a], [b, b, b], delta);
+    expect(diagnoseCase(three(0.54, 0.5, 0.04), false, t).verdict).toBe("no-discrimination");
+    expect(diagnoseCase(three(0.5, 0.54, -0.04), false, t).verdict).toBe("no-discrimination");
+    expect(diagnoseCase(three(0.55, 0.5, 0.05), false, t).verdict).toBe("weak-signal");
+    expect(diagnoseCase(three(0.5, 0.55, -0.05), false, t).verdict).toBe("weak-signal");
+    expect(diagnoseCase(three(0.54, 0.5, 0.04)).verdict).toBe("weak-signal");
   });
 
   it("calls a negative delta within noise a weak signal, not negative-delta", () => {
@@ -95,15 +110,17 @@ describe("verdict categories", () => {
     expect(v.verdict).toBe("negative-delta");
   });
 
-  it("applies the neutral band to a delta that is exactly 0.05 after float error", () => {
+  it("applies an opt-in neutral band to a delta that is exactly 0.05 after float error", () => {
+    const t = { ...DEFAULT_THRESHOLDS, neutralBand: 0.05 };
     // 0.35 - 0.3 is 0.04999999999999999 in floating point.
     const dropped = (a: number, b: number): CaseResult =>
       caseOf([], [], 0.5, {
         withRuns: [run(a), run(0, { error: "rate limit" })],
         withoutRuns: [run(b)],
       });
-    expect(diagnoseCase(dropped(0.35, 0.3)).verdict).toBe("weak-signal");
-    expect(diagnoseCase(dropped(0.3, 0.35)).verdict).toBe("negative-delta");
+    // Both sit at the band edge, so neither is no-discrimination (unrounded, -0.0499... would be).
+    expect(diagnoseCase(dropped(0.35, 0.3), false, t).verdict).toBe("weak-signal");
+    expect(diagnoseCase(dropped(0.3, 0.35), false, t).verdict).toBe("weak-signal");
   });
 
   it("caps a single run per arm at weak-signal and says noise is unknown", () => {
@@ -634,6 +651,16 @@ describe("mechanical findings", () => {
     expect(kinds(v)).toContain("high-variance");
   });
 
+  it("flags high variance above 0.35 at 5 runs or fewer and above 0.25 beyond", () => {
+    // sd 0.329 either way: [1, 0.4, 1, 0.4, 1] has 5 runs, adding 0.4 makes 6.
+    const five = [1, 0.4, 1, 0.4, 1];
+    const six = [...five, 0.4];
+    expect(kinds(diagnoseCase(caseOf(five, [0, 0, 0, 0, 0], 0.7)))).not.toContain("high-variance");
+    expect(kinds(diagnoseCase(caseOf(six, [0, 0, 0, 0, 0, 0], 0.7)))).toContain("high-variance");
+    // sd 0.548 clears 0.35 at 5 runs.
+    expect(kinds(diagnoseCase(caseOf([1, 0, 1, 0, 1], [0, 0, 0, 0, 0], 0.6)))).toContain("high-variance");
+  });
+
   it("flags a partial document on every case", () => {
     const d = diagnose({
       schemaVersion: 1,
@@ -674,6 +701,12 @@ describe("thresholds", () => {
       expect(kinds(v)).not.toContain("negative-delta");
       expect(v.reason).not.toMatch(/negative/);
     }
+  });
+
+  it("a custom highVariance applies to arms of every size when both fields are set", () => {
+    const t = { ...DEFAULT_THRESHOLDS, highVariance: 0.2, highVarianceSmallArm: 0.2 };
+    const v = diagnoseCase(caseOf([1, 0.4, 1, 0.4, 1], [0, 0, 0, 0, 0], 0.7), false, t);
+    expect(kinds(v)).toContain("high-variance");
   });
 
   it("honors a custom neutral band", () => {
