@@ -95,6 +95,12 @@ export interface FakeIo {
   readonly out: string[];
   readonly err: string[];
   readonly written: Map<string, string>;
+  /** `copyDir` calls: the source, the destination, and which of `skipProbe`'s paths it would leave out. */
+  readonly copies: { readonly src: string; readonly dest: string; readonly skipped: readonly string[] }[];
+  /** Paths `remove` was called on. */
+  readonly removed: string[];
+  /** Cleanups registered with `onInterrupt` and not yet unregistered; call one to simulate Ctrl-C. */
+  readonly interrupts: (() => void)[];
   readonly questions: string[];
 }
 
@@ -103,6 +109,9 @@ export const fakeIo = (o: FakeIoOptions = {}): FakeIo => {
   const out: string[] = [];
   const err: string[] = [];
   const written = new Map<string, string>();
+  const copies: FakeIo["copies"] = [];
+  const removed: string[] = [];
+  const interrupts: (() => void)[] = [];
   const questions: string[] = [];
   const files = new Map<string, string>(Object.entries(o.files ?? {}));
   let cliCount = 0;
@@ -156,14 +165,42 @@ export const fakeIo = (o: FakeIoOptions = {}): FakeIo => {
       o.onWrite?.(p);
       written.set(p, t);
     },
+    mkTemp: (prefix) => `/tmp/${prefix}X1`,
+    copyDir: (src, dest, skip) => {
+      copies.push({
+        src,
+        dest,
+        skipped: SKIP_PROBES.filter((p) => skip(p)),
+      });
+    },
+    remove: (p) => {
+      removed.push(p);
+    },
+    onInterrupt: (cleanup) => {
+      interrupts.push(cleanup);
+      return () => {
+        interrupts.splice(interrupts.indexOf(cleanup), 1);
+      };
+    },
     home: "/home/u",
     confirm: (q) => {
       questions.push(q);
       return Promise.resolve(o.confirm ?? false);
     },
   };
-  return { io, calls, out, err, written, questions };
+  return { io, calls, out, err, written, copies, removed, interrupts, questions };
 };
+
+/** Relative paths the fake `copyDir` asks each `skip` filter about. */
+export const SKIP_PROBES: readonly string[] = [
+  "skills/a/SKILL.md",
+  ".git",
+  "node_modules/x",
+  "evals/results",
+  "evals/results/run-1",
+  "evals/c/case.yaml",
+  "evals",
+];
 
 /** Minimal valid `aggregate-result.json` text. */
 export const resultJson = (over: Record<string, unknown> = {}): string =>
