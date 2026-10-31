@@ -79,7 +79,7 @@ ${Object.values(TIERS).map((t) => `                         ${t.name}: ${t.descr
                        costUsd is charged its per-case share (ceiling divided
                        by cases), capped at what is left
   --jobs <n>           runs to execute in parallel inside each invocation
-                       (the CLI's -j, a positive integer). Default: the CLI's.
+                       (the CLI's -j, 1 to 8). Default: the CLI's, 1.
                        The wrapper runs cases one after another, so this is
                        the only concurrency. All runs share your rate limit
   --model <id>         pin the model (default: pinned in the wrapper)
