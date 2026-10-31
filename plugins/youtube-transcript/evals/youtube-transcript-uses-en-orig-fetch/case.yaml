@@ -1,0 +1,61 @@
+# Run: claude plugin eval plugins/youtube-transcript --case youtube-transcript-uses-en-orig-fetch --runs 3 --trust-plugin --no-publish
+# Shared run/grant facts: docs/contributing.md, "Plugin evals". No grant: Skill only; the
+# commands are listed in the reply and never run, so nothing touches the network.
+# Should-fire case for youtube-transcript "Run it" and "Why it works this way": the skill
+# points at its fetch script, which asks yt-dlp for the `en-orig` track, not `en` (the
+# translated copy YouTube rate-limits with HTTP 429). The prompt names neither the skill,
+# the script nor the track. This case was written in the session that wrote the skill, so it
+# shares that session's view of the boundary; treat a first-run pass with care.
+# Can fail: skill_fired fails if the description stops matching "get the transcript for this
+# video"; uses_en_orig_track fails if the commands neither call the script nor ask for
+# en-orig; no_cookie_access fails on --cookies-from-browser; no_transcript_api fails when the
+# reply reaches for the youtube-transcript-api package. A no-skill model tends to ask for
+# `--sub-langs en` or install youtube-transcript-api, which is where the Delta should come from.
+# good-reply: ${CLAUDE_PLUGIN_ROOT}/scripts/fetch-transcript.sh "https://youtu.be/wQ0duoTeAAU" "$TMPDIR/yt"
+# bad-reply: pip install youtube-transcript-api && yt-dlp --skip-download --write-auto-subs --sub-langs en -o "%(id)s" "https://youtu.be/wQ0duoTeAAU"
+schema_version: "1.1"
+name: youtube-transcript-uses-en-orig-fetch
+description: >
+  Asked for the transcript and description of a YouTube video on a Mac with yt-dlp and jq
+  installed, the model invokes youtube-transcript and lists either its fetch script or a
+  yt-dlp call for the en-orig track, with no cookie access and no youtube-transcript-api.
+  expected_outcome: PASS when the skill fires and the commands satisfy those checks; FAIL
+  otherwise.
+tags: [youtube-transcript, trigger, quick]
+
+execution:
+  prompt: |
+    Can you grab the transcript and the description for https://youtu.be/wQ0duoTeAAU?si=NbOAuAaYn_ofEV-9
+    and save them to files? I'm on a Mac, and yt-dlp and jq are already installed. Do not run
+    anything. Reply with the exact shell commands you would run, in order, in one bash code
+    block and no other text.
+  max_turns: 6
+  allowed_tools:
+    - Skill
+
+graders:
+  - name: skill_fired
+    type: tool_used
+    tool: Skill
+    input_match: '"skill"\s*:\s*"(?:[\w-]+:)?youtube-transcript"'
+    min: 1
+    arm: with-only
+
+  - name: uses_en_orig_track
+    type: regex
+    target: last_message
+    pattern: 'fetch-transcript\.sh|--sub-langs[ =]+["'']?en-orig'
+    match: contains
+
+  - name: no_cookie_access
+    type: regex
+    target: last_message
+    pattern: 'cookies-from-browser'
+    match: not_contains
+
+  - name: no_transcript_api
+    type: regex
+    target: last_message
+    pattern: 'youtube[-_]transcript[-_]api'
+    flags: i
+    match: not_contains
