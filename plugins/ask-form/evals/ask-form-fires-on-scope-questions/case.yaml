@@ -1,29 +1,29 @@
 # Run: claude plugin eval plugins/ask-form --case ask-form-fires-on-scope-questions --runs 3 --trust-plugin --no-publish
-# No grant: Skill only, so this case is reply-only on purpose. The sibling case grants Write and
-# grades the file; this one checks the reply wording when no tool can create the form.
+# No grant: Skill only. The sandbox denies the write and has no browser, so the form is never
+# built; the case grades the attempt (a Write call on .claude/ask-form/questions.json in the trace)
+# and the reply wording. File creation, the browser and cleanup are untested by evals.
 # Should-fire, second domain (a migration with scope choices and free-text detail), so the fire
 # rate is not tied to the "build a tool" phrasing of the sibling case.
-# Expected arms: with the plugin the agent loads ask-form and, unable to write files, still says
-# it is giving the user a form to fill in rather than listing questions (a reply that says it
-# cannot write files and then lists the questions would fail no_chat_question_list). Without it
-# the agent lists the questions in chat.
-# Delta comes from no_chat_question_list and points_at_form; skill_fired is unscored in a two-arm run.
-# good-reply: Several of these block the plan, so I am putting them in a form with choices and a notes box. Fill it in, click Copy answers and bring the block back here; I will not start until I have it.
+# Expected arms: with the plugin the agent loads ask-form, tries to write questions.json, and says it
+# could not build the form (often listing the questions in chat as a fallback). Without it the agent
+# lists the questions in chat and never mentions a form.
+# Delta comes from attempted_questions_file and points_at_form; skill_fired is unscored in a
+# two-arm run. The first paid run showed the earlier chat-list regex missed long fallback lists
+# (it only matched terse "1. x? 2. y? 3. z?"), so it was replaced by the trace check.
+# good-reply: Several of these block the plan, so I put them in a form (questions.json) with choices and a notes box. Fill it in, click Copy answers and bring the block back here.
 # bad-reply: Quick questions: 1) Which environments should be migrated first? 2) Can you take downtime or must it be a rolling cutover? 3) Which teams must be notified? 4) Any other constraints?
 # Sabotage map: delete "two or more open questions" from the description and the skill stops
-# firing, so the agent lists questions in chat and both reply graders fail; delete step 4 ("Tell the
-# user ... Copy answers, paste here") and points_at_form loses its wording.
-# Weak by nature: with Skill-only grants the reply is the only evidence, so a with-arm run that
-# says "I cannot write files" and lists questions anyway scores low; treat a low with-arm score as
-# a sandbox effect before blaming the skill (see diagnose-scores).
+# firing (run 2 of the first paid run did not fire), failing both graders.
+# Weak by nature: with Skill-only grants the reply is the only other evidence, and the skill fires
+# in about 2 of 3 runs, so expect a with-arm score near 0.67 to 1.00.
 schema_version: "1.1"
 name: ask-form-fires-on-scope-questions
 description: >
   A migration request with several unanswered scope choices should fire ask-form.
-  expected_outcome: PASS when the reply sends the user to a form and does not list 3 or more
-  questions in chat; FAIL when the questions are listed in chat. The Delta comes from the two
-  reply graders; skill_fired is unscored.
-tags: [ask-form, trigger]
+  expected_outcome: PASS when the agent tries to write .claude/ask-form/questions.json and the
+  reply refers to a form; FAIL when it only lists questions in chat. The Delta comes from the two
+  scored graders; skill_fired is unscored.
+tags: [ask-form, trigger, quick]
 
 execution:
   prompt: |
@@ -43,11 +43,12 @@ graders:
     input_match: '"skill"\s*:\s*"(?:[\w-]+:)?ask-form"'
     min: 1
 
-  - name: no_chat_question_list
+  # "file_path" does not occur in SKILL.md, so loading the skill alone does not match.
+  - name: attempted_questions_file
     type: regex
-    target: last_message
-    pattern: '(?:(?:\d+[.)]|[-*])\s+[^?]{5,200}\?\s*){3}'
-    match: not_contains
+    target: trace
+    pattern: 'file_path[^,]{0,200}ask-form/questions\.json'
+    match: contains
 
   - name: points_at_form
     type: regex

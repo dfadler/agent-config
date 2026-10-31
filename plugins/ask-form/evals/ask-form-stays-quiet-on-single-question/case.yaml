@@ -1,13 +1,14 @@
 # Run: claude plugin eval plugins/ask-form --case ask-form-stays-quiet-on-single-question --runs 3 --trust-plugin --no-publish
 # No grant: Skill only.
-# Should-not-fire near-miss: exactly one yes/no is open. The prompt does not tell the model how
-# to ask, so the model decides on its own whether a form is worth it.
-# good-reply: Before I drop the unused indexes, is it okay to run the drop on production during business hours?
+# Should-not-fire near-miss: exactly one yes/no is open. Every input is inline (the first paid run
+# showed replies asking for an "earlier request" the empty sandbox never had), and the prompt does
+# not say how to ask, so the model decides whether a form is worth it.
+# good-reply: The two indexes look safe to drop, but is it okay to run the drop on production during business hours?
 # bad-reply: I will put the question in a form; click Copy answers and paste it back.
 # Regression guard: the no-plugin arm passes too, so Delta is about 0 by design.
-# Can fail: ask_form_not_fired fails if the skill fires for one question; asks_in_chat fails a
-# reply with no question mark (it only passes on a "?"), so a form hand-off with no question
-# fails it too.
+# Can fail: ask_form_not_fired fails if the skill fires; handles_the_open_item fails a reply with
+# neither a question mark nor a stated decision about timing (off-hours, wait, confirm), so a form
+# hand-off with no question fails it too.
 # Sabotage map: delete "Not for a single yes/no question, which stays in chat" from the
 # description and a run should fire the skill and fail ask_form_not_fired. Smoke case: its only
 # live signal is the Skill check, which is noisy at 3 runs.
@@ -15,15 +16,20 @@ schema_version: "1.1"
 name: ask-form-stays-quiet-on-single-question
 description: >
   When the only open item is one yes/no question, ask-form must not fire and the question is
-  asked in chat. expected_outcome: regression guard, Delta about 0 by design. PASS when the
-  skill does not fire and the reply asks a question with a question mark; FAIL when it fires.
+  handled in chat. expected_outcome: regression guard, Delta about 0 by design. PASS when the
+  skill does not fire and the reply asks the question or decides it in chat; FAIL when it fires.
 tags: [ask-form, trigger, smoke]
 
 execution:
   prompt: |
-    I asked you to clean up the unused database indexes. You have everything you need except
-    one thing: whether it is okay to run the drop on production during business hours. That is
-    the only thing you need from me.
+    I am about to run these two statements on our production Postgres database:
+
+    DROP INDEX idx_orders_legacy_status;
+    DROP INDEX idx_users_tmp_email;
+
+    Both show zero scans in pg_stat_user_indexes over the last 90 days, so I am happy that
+    they are unused. The only thing I have not decided is whether it is okay to run them on
+    production during business hours. That is the only open item. Give me your answer.
   max_turns: 4
   allowed_tools:
     - Skill
@@ -37,9 +43,11 @@ graders:
     max: 0
     arm: both
 
-  - name: asks_in_chat
+  # A reply may ask back or answer outright; either is handling it in chat.
+  - name: handles_the_open_item
     type: regex
     target: last_message
-    pattern: '\?'
+    pattern: '\?|off[- ]?hours|after[- ]hours|outside (?:of )?(?:business|working)|CONCURRENTLY|low[- ]traffic|safe to run'
+    flags: i
     match: contains
     arm: both
