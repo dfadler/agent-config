@@ -1,25 +1,29 @@
 # Run: claude plugin eval plugins/ask-form --case ask-form-stays-quiet-on-single-question --runs 3 --trust-plugin --no-publish
 # No grant: Skill only.
-# Should-not-fire near-miss: the user states that exactly one thing is open, a yes/no. The
-# skill says a single yes/no question stays in chat.
-# good-reply: Before I drop the old index, is it safe to do that on production now?
-# bad-reply: I'll open a form for you with the question; click Copy answers and paste it back.
+# Should-not-fire near-miss: exactly one yes/no is open. The prompt does not tell the model how
+# to ask, so the model decides on its own whether a form is worth it.
+# good-reply: Before I drop the unused indexes, is it okay to run the drop on production during business hours?
+# bad-reply: I will put the question in a form; click Copy answers and paste it back.
 # Regression guard: the no-plugin arm passes too, so Delta is about 0 by design.
 # Can fail: ask_form_not_fired fails if the skill fires for one question; asks_in_chat fails a
-# reply that does not ask a question at all (it only passes on a "?").
+# reply with no question mark (it only passes on a "?"), so a form hand-off with no question
+# fails it too.
+# Sabotage map: delete "Not for a single yes/no question, which stays in chat" from the
+# description and a run should fire the skill and fail ask_form_not_fired. Smoke case: its only
+# live signal is the Skill check, which is noisy at 3 runs.
 schema_version: "1.1"
 name: ask-form-stays-quiet-on-single-question
 description: >
   When the only open item is one yes/no question, ask-form must not fire and the question is
   asked in chat. expected_outcome: regression guard, Delta about 0 by design. PASS when the
-  skill does not fire and the reply asks one question with a question mark; FAIL when it fires.
-tags: [ask-form, trigger, quick]
+  skill does not fire and the reply asks a question with a question mark; FAIL when it fires.
+tags: [ask-form, trigger, smoke]
 
 execution:
   prompt: |
     I asked you to clean up the unused database indexes. You have everything you need except
     one thing: whether it is okay to run the drop on production during business hours. That is
-    the only thing you need from me. Ask it in one sentence.
+    the only thing you need from me.
   max_turns: 4
   allowed_tools:
     - Skill

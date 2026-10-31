@@ -1,20 +1,30 @@
 # Run: claude plugin eval plugins/ask-form --case ask-form-fires-on-open-design-decisions --runs 3 --trust-plugin --no-publish
-# No grant: Skill only. The sandbox has no Write/Bash/browser, so the reply is what is graded.
-# Should-fire: the user leaves several design decisions open and asks to be asked, in natural
-# phrasing that never names a form, HTML or the skill.
-# good-reply: I have a few questions that block the build, so I put them in a form (questions.json, built into form.html and opened in the browser). Fill it in, click Copy answers, and paste the block here. I'll wait for your answers.
-# bad-reply: Sure! First, which database do you want? Second, what auth method? Third, where will it be hosted? Fourth, do you want a dashboard?
-# Can fail: the bad reply lists the questions in chat and never mentions a form, Copy answers or
-# the paste step, so both regexes fail it. A bare model asks in chat, so the with-plugin arm
-# should score higher. skill_fired is an unscored indicator in a two-arm run.
+# Grant: Write(.claude/ask-form/*) only, recorded in evals/grants.yaml. No Bash, so the fill script
+# cannot run and the browser is not available; the case grades steps 1 and 4 of SKILL.md.
+# Should-fire: the user leaves five design decisions open and asks to be asked, in natural
+# phrasing that never names a form, HTML, a file or the skill.
+# Expected arms: with the plugin the agent loads ask-form, writes .claude/ask-form/questions.json
+# (Write is the only way to follow step 1) and tells the user to fill the form in and bring the
+# answers back. Without it the agent lists the questions in chat and writes no file.
+# Delta comes from three scored graders (skill_fired is an unscored indicator in a two-arm run):
+# questions_file_written (file_exists), questions_file_is_a_form_schema (regex on the file) and
+# no_chat_question_list (negative regex on the reply), plus points_at_form on the reply.
+# good-reply: I put the questions in a form at .claude/ask-form/questions.json. Open the form, fill it in and click Copy answers, then paste the block back here. I will wait for it.
+# bad-reply: Sure! 1. Which database do you want? 2. What sign-in method should it use? 3. Where will it be hosted? 4. Do you want a dashboard? 5. How long should loans last?
+# Sabotage map: delete "two or more open questions" from the description and the skill stops
+# firing, failing the file and reply graders; delete step 4 ("Tell the user ... Copy answers, paste
+# here") and points_at_form loses its hand-off wording.
+# Not covered by any eval: opening the form in the integrated browser and deleting
+# .claude/ask-form/ afterwards (steps 3 and 5) need a browser and a second turn. The fill script is
+# covered by scripts/ts/fill-form.test.ts.
 schema_version: "1.1"
 name: ask-form-fires-on-open-design-decisions
 description: >
-  Four undecided design choices plus "ask me" should fire ask-form and lead to a form plus a
-  copy-and-paste hand-off instead of a chat list. expected_outcome: PASS when the skill fires
-  and the reply points the user at a form, Copy answers and pasting back; FAIL when the
-  questions are listed in chat.
-tags: [ask-form, trigger, quick]
+  Five undecided design choices plus "ask me" should fire ask-form. expected_outcome: PASS when
+  the questions are written to .claude/ask-form/questions.json as a typed question array and the
+  reply sends the user to a form instead of listing the questions in chat; FAIL when they are
+  listed in chat. The Delta comes from the file and reply graders; skill_fired is unscored.
+tags: [ask-form, trigger]
 
 execution:
   prompt: |
@@ -22,27 +32,46 @@ execution:
     I haven't decided anything yet: the database, how people sign in, where it runs, whether
     it needs a reporting dashboard, and how long loans last by default. You need my decisions
     on all of those before you start, so ask me.
-  max_turns: 6
+  max_turns: 8
   allowed_tools:
     - Skill
+    - Write
 
 graders:
+  # Indicator only (unscored in a two-arm run).
   - name: skill_fired
     type: tool_used
     tool: Skill
     input_match: '"skill"\s*:\s*"(?:[\w-]+:)?ask-form"'
     min: 1
 
+  # Steps: step 1 of the skill. A bare model has no reason to create this path.
+  - name: questions_file_written
+    type: file_exists
+    path: ".claude/ask-form/questions.json"
+    exists: true
+
+  # Result in the file: a typed question array (schema in SKILL.md), not any JSON.
+  - name: questions_file_is_a_form_schema
+    type: regex
+    target:
+      source: file
+      path: ".claude/ask-form/questions.json"
+    pattern: '"type"\s*:\s*"(?:single|multi|select|text|textarea)"'
+    match: contains
+
+  # Reply: the questions are not dumped into chat as a list of 3 or more.
+  - name: no_chat_question_list
+    type: regex
+    target: last_message
+    pattern: '(?:(?:\d+[.)]|[-*])\s+[^?]{5,200}\?\s*){3}'
+    match: not_contains
+
+  # Reply: behavior-describing alternatives (a form, a browser page, the Copy button, the file).
   - name: points_at_form
     type: regex
     target: last_message
-    pattern: 'Copy answers|questions\.json|form\.html|fill[- ]form'
+    pattern: '\bforms?\b|Copy answers|questions\.json|\bHTML\b|\bbrowser\b'
     flags: i
     match: contains
-
-  - name: asks_for_paste_back
-    type: regex
-    target: last_message
-    pattern: 'paste'
-    flags: i
-    match: contains
+    weight: 0.5

@@ -1,18 +1,29 @@
 # Run: claude plugin eval plugins/ask-form --case ask-form-fires-on-scope-questions --runs 3 --trust-plugin --no-publish
-# No grant: Skill only.
-# Should-fire, second domain (a migration with scope choices, a multi-select and free-text
-# detail), so the fire rate is not tied to the "build a tool" phrasing of the sibling case.
-# good-reply: Several of these block the migration, so I wrote them as a form. Open form.html, answer, click Copy answers and paste the block back here; I won't start until I have it.
-# bad-reply: Quick questions: 1) Which environments should be migrated? 2) Do you want downtime or a rolling cutover? 3) Which teams need notice? Reply with your answers.
-# Can fail: the bad reply has none of the form tokens. The prompt contains neither "form"
-# tokens nor "paste".
+# No grant: Skill only, so this case is reply-only on purpose. The sibling case grants Write and
+# grades the file; this one checks the reply wording when no tool can create the form.
+# Should-fire, second domain (a migration with scope choices and free-text detail), so the fire
+# rate is not tied to the "build a tool" phrasing of the sibling case.
+# Expected arms: with the plugin the agent loads ask-form and, unable to write files, still says
+# it is giving the user a form to fill in rather than listing questions (a reply that says it
+# cannot write files and then lists the questions would fail no_chat_question_list). Without it
+# the agent lists the questions in chat.
+# Delta comes from no_chat_question_list and points_at_form; skill_fired is unscored in a two-arm run.
+# good-reply: Several of these block the plan, so I am putting them in a form with choices and a notes box. Fill it in, click Copy answers and bring the block back here; I will not start until I have it.
+# bad-reply: Quick questions: 1) Which environments should be migrated first? 2) Can you take downtime or must it be a rolling cutover? 3) Which teams must be notified? 4) Any other constraints?
+# Sabotage map: delete "two or more open questions" from the description and the skill stops
+# firing, so the agent lists questions in chat and both reply graders fail; delete step 4 ("Tell the
+# user ... Copy answers, paste here") and points_at_form loses its wording.
+# Weak by nature: with Skill-only grants the reply is the only evidence, so a with-arm run that
+# says "I cannot write files" and lists questions anyway scores low; treat a low with-arm score as
+# a sandbox effect before blaming the skill (see diagnose-scores).
 schema_version: "1.1"
 name: ask-form-fires-on-scope-questions
 description: >
-  A migration request with several unanswered scope choices (including a pick-many and a
-  free-text one) should fire ask-form. expected_outcome: PASS when the skill fires and the
-  reply hands off via a form and Copy answers; FAIL when the reply asks in chat.
-tags: [ask-form, trigger, quick]
+  A migration request with several unanswered scope choices should fire ask-form.
+  expected_outcome: PASS when the reply sends the user to a form and does not list 3 or more
+  questions in chat; FAIL when the questions are listed in chat. The Delta comes from the two
+  reply graders; skill_fired is unscored.
+tags: [ask-form, trigger]
 
 execution:
   prompt: |
@@ -32,16 +43,16 @@ graders:
     input_match: '"skill"\s*:\s*"(?:[\w-]+:)?ask-form"'
     min: 1
 
+  - name: no_chat_question_list
+    type: regex
+    target: last_message
+    pattern: '(?:(?:\d+[.)]|[-*])\s+[^?]{5,200}\?\s*){3}'
+    match: not_contains
+
   - name: points_at_form
     type: regex
     target: last_message
-    pattern: 'Copy answers|questions\.json|form\.html|fill[- ]form'
+    pattern: '\bforms?\b|Copy answers|questions\.json|\bHTML\b|\bbrowser\b'
     flags: i
     match: contains
-
-  - name: asks_for_paste_back
-    type: regex
-    target: last_message
-    pattern: 'paste'
-    flags: i
-    match: contains
+    weight: 0.5
