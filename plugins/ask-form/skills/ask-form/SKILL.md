@@ -14,8 +14,8 @@ metadata:
 
 1. Write the questions as a JSON array (schema below) to
    `<project>/.claude/ask-form/questions.json`. It must be inside the project
-   folder: the integrated browser renders files outside it as static snapshots, so
-   the form would not respond.
+   folder: the integrated browser renders files outside it as static snapshots (the
+   app's own message; observed, not documented), so the form would not respond.
 2. Build the page with the fill script (Node 22.18+), which validates the
    questions and exits non-zero with a readable error if one is malformed:
    `node <skill base dir>/../../scripts/ts/fill-form.ts <project>/.claude/ask-form/questions.json <project>/.claude/ask-form/form.html`
