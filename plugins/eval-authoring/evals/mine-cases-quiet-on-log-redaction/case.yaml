@@ -1,0 +1,54 @@
+# Run: node plugins/eval-authoring/scripts/ts/run-evals/run-evals.ts --tier quick --case mine-cases-quiet-on-log-redaction plugins/eval-authoring
+# CO-AUTHORED with the mine-cases skill in one session (#862): a cheap smoke guard, not independent
+# evidence the skill works. A should-not-fire case: delta 0 by design, so it is a regression guard
+# and only the with-arm result carries signal. No grant: Skill only. Unmeasured until run.
+# Near-miss: shares "transcript" and "redact" but wants a log scrubbed for a bug report, not eval cases.
+# First standard run: 1.00 with and without the plugin, so this case cannot tell the plugin from none;
+# it only guards against the skill firing on a log-scrubbing request (a smoke check, nothing more).
+# Can fail: skill_not_fired scores 0 if the description over-triggers on this vocabulary.
+# EVAL024 warnings are intended: details_removed catches an echo of the prompt's invented values and
+# keeps_failure_line checks the non-personal line survives, so both match prompt text.
+# good-reply: deploy by <email> started in <path>. step 3 failed: connection refused
+# bad-reply: I cannot help with that.
+schema_version: "1.1"
+name: mine-cases-quiet-on-log-redaction
+description: >
+  A request to scrub a pasted log before sharing it shares vocabulary with mine-cases but is not
+  about eval cases, so it must not invoke the skill. expected_outcome: PASS when mine-cases is not
+  invoked and the reply scrubs the log; FAIL when it is invoked.
+tags: [eval-authoring, mine-cases, trigger, quick, smoke]
+
+execution:
+  prompt: |
+    Redact the personal details from this transcript of a failed deploy before I attach it to a
+    bug report. Reply with the cleaned text only; do not run anything.
+
+    deploy by jdoe@example.com started in /Users/jdoe/code/widget
+    step 3 failed: connection refused
+  max_turns: 4
+  allowed_tools:
+    - Skill
+
+graders:
+  - name: skill_not_fired
+    type: tool_used
+    tool: Skill
+    input_match: '"skill"\s*:\s*"(?:[\w-]+:)?mine-cases"'
+    min: 0
+    max: 0
+    arm: both
+
+  - name: details_removed
+    type: regex
+    target: last_message
+    pattern: 'jdoe@example\.com|/Users/jdoe'
+    match: not_contains
+    arm: both
+
+  - name: keeps_failure_line
+    type: regex
+    target: last_message
+    pattern: 'connection refused'
+    flags: i
+    match: contains
+    arm: both
