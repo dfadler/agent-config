@@ -141,7 +141,9 @@ blind-case-writer agent, second bullet), then stop.
 8. **Lint.** `node ${CLAUDE_SKILL_DIR}/../../scripts/ts/lint/cli.ts <plugin-path>` (Node 22
    or later). Fix every error. Fix each warning or write down why it is intended.
 9. **Review and hand off.** Ask the [case-reviewer agent](../../agents/case-reviewer.md)
-   for the judgment pass, if available (invocation recipe in the agent file). Then use the
+   for the judgment pass, if available (invocation recipe in the agent file), and optionally the
+   [grader-red-team agent](../../agents/grader-red-team.md) to try wrong replies on the free
+   graders. Then use the
    [run-evals](../run-evals/SKILL.md) skill: check `claude auth status`; if you are
    logged in and the user asked for a run, run it; otherwise hand them the run command (a
    hand-off is correct only when that check fails or nobody asked for a run). `--scaffold`
