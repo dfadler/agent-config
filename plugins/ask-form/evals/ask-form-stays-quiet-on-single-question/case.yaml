@@ -1,0 +1,41 @@
+# Run: claude plugin eval plugins/ask-form --case ask-form-stays-quiet-on-single-question --runs 3 --trust-plugin --no-publish
+# No grant: Skill only.
+# Should-not-fire near-miss: the user states that exactly one thing is open, a yes/no. The
+# skill says a single yes/no question stays in chat.
+# good-reply: Before I drop the old index, is it safe to do that on production now?
+# bad-reply: I'll open a form for you with the question; click Copy answers and paste it back.
+# Regression guard: the no-plugin arm passes too, so Delta is about 0 by design.
+# Can fail: ask_form_not_fired fails if the skill fires for one question; asks_in_chat fails a
+# reply that does not ask a question at all (it only passes on a "?").
+schema_version: "1.1"
+name: ask-form-stays-quiet-on-single-question
+description: >
+  When the only open item is one yes/no question, ask-form must not fire and the question is
+  asked in chat. expected_outcome: regression guard, Delta about 0 by design. PASS when the
+  skill does not fire and the reply asks one question with a question mark; FAIL when it fires.
+tags: [ask-form, trigger, quick]
+
+execution:
+  prompt: |
+    I asked you to clean up the unused database indexes. You have everything you need except
+    one thing: whether it is okay to run the drop on production during business hours. That is
+    the only thing you need from me. Ask it in one sentence.
+  max_turns: 4
+  allowed_tools:
+    - Skill
+
+graders:
+  - name: ask_form_not_fired
+    type: tool_used
+    tool: Skill
+    input_match: '"skill"\s*:\s*"(?:[\w-]+:)?ask-form"'
+    min: 0
+    max: 0
+    arm: both
+
+  - name: asks_in_chat
+    type: regex
+    target: last_message
+    pattern: '\?'
+    match: contains
+    arm: both

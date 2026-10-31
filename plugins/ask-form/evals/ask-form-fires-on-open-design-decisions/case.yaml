@@ -1,0 +1,48 @@
+# Run: claude plugin eval plugins/ask-form --case ask-form-fires-on-open-design-decisions --runs 3 --trust-plugin --no-publish
+# No grant: Skill only. The sandbox has no Write/Bash/browser, so the reply is what is graded.
+# Should-fire: the user leaves several design decisions open and asks to be asked, in natural
+# phrasing that never names a form, HTML or the skill.
+# good-reply: I have a few questions that block the build, so I put them in a form (questions.json, built into form.html and opened in the browser). Fill it in, click Copy answers, and paste the block here. I'll wait for your answers.
+# bad-reply: Sure! First, which database do you want? Second, what auth method? Third, where will it be hosted? Fourth, do you want a dashboard?
+# Can fail: the bad reply lists the questions in chat and never mentions a form, Copy answers or
+# the paste step, so both regexes fail it. A bare model asks in chat, so the with-plugin arm
+# should score higher. skill_fired is an unscored indicator in a two-arm run.
+schema_version: "1.1"
+name: ask-form-fires-on-open-design-decisions
+description: >
+  Four undecided design choices plus "ask me" should fire ask-form and lead to a form plus a
+  copy-and-paste hand-off instead of a chat list. expected_outcome: PASS when the skill fires
+  and the reply points the user at a form, Copy answers and pasting back; FAIL when the
+  questions are listed in chat.
+tags: [ask-form, trigger, quick]
+
+execution:
+  prompt: |
+    I want you to build a small internal tool that tracks equipment loans for our team.
+    I haven't decided anything yet: the database, how people sign in, where it runs, whether
+    it needs a reporting dashboard, and how long loans last by default. You need my decisions
+    on all of those before you start, so ask me.
+  max_turns: 6
+  allowed_tools:
+    - Skill
+
+graders:
+  - name: skill_fired
+    type: tool_used
+    tool: Skill
+    input_match: '"skill"\s*:\s*"(?:[\w-]+:)?ask-form"'
+    min: 1
+
+  - name: points_at_form
+    type: regex
+    target: last_message
+    pattern: 'Copy answers|questions\.json|form\.html|fill[- ]form'
+    flags: i
+    match: contains
+
+  - name: asks_for_paste_back
+    type: regex
+    target: last_message
+    pattern: 'paste'
+    flags: i
+    match: contains

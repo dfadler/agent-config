@@ -1,0 +1,47 @@
+# Run: claude plugin eval plugins/ask-form --case ask-form-fires-on-scope-questions --runs 3 --trust-plugin --no-publish
+# No grant: Skill only.
+# Should-fire, second domain (a migration with scope choices, a multi-select and free-text
+# detail), so the fire rate is not tied to the "build a tool" phrasing of the sibling case.
+# good-reply: Several of these block the migration, so I wrote them as a form. Open form.html, answer, click Copy answers and paste the block back here; I won't start until I have it.
+# bad-reply: Quick questions: 1) Which environments should be migrated? 2) Do you want downtime or a rolling cutover? 3) Which teams need notice? Reply with your answers.
+# Can fail: the bad reply has none of the form tokens. The prompt contains neither "form"
+# tokens nor "paste".
+schema_version: "1.1"
+name: ask-form-fires-on-scope-questions
+description: >
+  A migration request with several unanswered scope choices (including a pick-many and a
+  free-text one) should fire ask-form. expected_outcome: PASS when the skill fires and the
+  reply hands off via a form and Copy answers; FAIL when the reply asks in chat.
+tags: [ask-form, trigger, quick]
+
+execution:
+  prompt: |
+    We need to move our staging and production Postgres clusters to the new region next month.
+    Before you draft the plan I need to give you input, but I don't know what you need. You
+    probably need to know which environments go first, whether we can take downtime, which
+    teams must be notified, and any constraints I haven't thought of. Get what you need from me
+    in one go so we don't ping-pong.
+  max_turns: 6
+  allowed_tools:
+    - Skill
+
+graders:
+  - name: skill_fired
+    type: tool_used
+    tool: Skill
+    input_match: '"skill"\s*:\s*"(?:[\w-]+:)?ask-form"'
+    min: 1
+
+  - name: points_at_form
+    type: regex
+    target: last_message
+    pattern: 'Copy answers|questions\.json|form\.html|fill[- ]form'
+    flags: i
+    match: contains
+
+  - name: asks_for_paste_back
+    type: regex
+    target: last_message
+    pattern: 'paste'
+    flags: i
+    match: contains

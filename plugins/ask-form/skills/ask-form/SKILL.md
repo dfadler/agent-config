@@ -1,9 +1,8 @@
 ---
 name: ask-form
 description: |
-  Use when you have two or more open questions for the user, or one question with
-  several options, that would get buried in a chat reply: design decisions, scope
-  choices, missing details. Writes the questions as a local HTML form (radio,
+  Use when you have two or more open questions for the user that would get buried
+  in a chat reply: design decisions, scope choices, missing details. Writes the questions as a local HTML form (radio,
   checkboxes, dropdown, text, textarea) with a Copy button and opens it in the integrated
   browser; the user pastes the answers back into chat. Not for a single yes/no
   question, which stays in chat.
