@@ -92,6 +92,17 @@ it, do not rebuild any of that.
    a baseline arm that honours it would load the plugin: no without or delta column.
    Neighbour hooks run inside the eval under the copy's trust, and `node_modules` is
    not copied.
+   To measure the should-not-fire side of routing, run `--trigger-boundary`: the cases
+   tagged `trigger-boundary` plus the should-fire twin each names with a `pair:<case>`
+   tag, one run each, plugin arm only, fixed tier (a ceiling scaled like `quick`; not
+   combined with `--tier`, `--neighbours` or `--changed`). The summary counts how many
+   negative prompts fired and gives a Wilson 95% upper bound on the over-trigger rate,
+   withheld (and exit 7) unless at least one twin fired in the same run; a fire alone does
+   not change the exit code. Report the count and the bound, not a delta, and list the
+   firing prompts so one can become a `smoke` guard. `standard` and `thorough` skip these
+   cases: a must-not-fire check passes the no-plugin arm by construction. It does not
+   measure competition from other installed skills: the sandbox loads only the plugin
+   under test.
    To put the results in a PR, add `--pr <n>`: it prints the exact
    marked block, asks, then replaces the `run-evals` block in the PR body with `gh pr
    edit`. It is off by default, refuses `--dry-run`, and `--yes` skips only the question.

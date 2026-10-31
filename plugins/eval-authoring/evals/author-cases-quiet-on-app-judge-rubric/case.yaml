@@ -1,5 +1,7 @@
-# Run: node plugins/eval-authoring/scripts/ts/run-evals/run-evals.ts --tier quick plugins/eval-authoring
-# (quick tier: one run, plugin arm only, `--ablation none`; no grant needed.)
+# Run: node plugins/eval-authoring/scripts/ts/run-evals/run-evals.ts --trigger-boundary plugins/eval-authoring
+# Trigger-boundary negative, paired with author-cases-fires-on-authoring-request: read as a fire count over many distinct prompts
+# (one run, plugin arm only, no delta), not as a score.
+# (trigger-boundary run: one run, plugin arm only; no grant needed.)
 # Should-not-fire near-miss, distinct from the unit-test, CI, hooks, playwright and skill-wording
 # quiet cases: it shares "eval", "grader", "rubric", "PASS/FAIL" and "judge" with author-cases but
 # wants a rubric for an application's own LLM outputs, not a `claude plugin eval` case. Chosen
@@ -15,7 +17,7 @@ description: >
   author-cases, which is for `claude plugin eval` cases. expected_outcome: PASS when the model
   does not call author-cases and replies with a rubric; FAIL when it invokes author-cases or
   gives no rubric. Regression guard: no delta by design.
-tags: [eval-authoring, author-cases, trigger, quick]
+tags: [eval-authoring, author-cases, trigger, trigger-boundary, pair:author-cases-fires-on-authoring-request]
 
 execution:
   prompt: |
@@ -34,7 +36,6 @@ graders:
     input_match: '"skill"\s*:\s*"(?:[\w-]+:)?author-cases"'
     min: 0
     max: 0
-    arm: both
 
   - name: writes_rubric
     type: regex
@@ -42,4 +43,3 @@ graders:
     pattern: '(?:PASS|FAIL)(?:\W{0,6}(?:if|when|only|means|the|an?|every|all|each|answer|response|reply|it)\b|\W{0,3}:)[\s\S]{0,800}(?:PASS|FAIL)(?:\W{0,6}(?:if|when|only|means|the|an?|every|all|each|answer|response|reply|it)\b|\W{0,3}:)'
     flags: i
     match: contains
-    arm: both

@@ -74,6 +74,18 @@ blind-case-writer agent, second bullet), then stop.
    naming the skill: some that should fire it, and some that should not, including
    near-misses that share its vocabulary but want something else. Every should-fire case
    needs a grader on whether the skill fired (see [graders](references/graders.md)).
+   Put the should-not-fire prompts in the **trigger-boundary suite**, not the two-arm run:
+   tag each `trigger-boundary`, add one `pair:<should-fire case>` tag naming the case it
+   was derived from (a minimal edit of that prompt, or the same vocabulary for a task that
+   belongs elsewhere; several negatives may share a twin), and grade it with a named
+   `tool_used` on `Skill` or `Agent` with `min: 0`, `max: 0` and no `arm:` (it runs
+   plugin-arm only). `run-evals --trigger-boundary` runs these once each and reports the
+   fire count with a Wilson 95% upper bound, only if a twin fired in the same run; 0 fires
+   in 3 runs bounds the rate only below 63%, and about 29 distinct clean prompts are
+   needed to bound it below 10%, so write 20 to 30 distinct near-misses rather than
+   rerunning a few (EVAL028 checks the tags). Re-read each negative: if a reasonable user
+   would want the skill to fire, it is a positive. A negative that does fire is promoted to
+   a `smoke` guard (below) or its skill's description is tightened.
 4. **Pick graders, free first** (a complete pair of cases: [worked example](references/worked-example.md)). Name what must be true, map it to something observable,
    and reach for `llm` or `baseline` only when the property is semantic. The procedure is
    in [graders](references/graders.md). Pair a grader on the result with one on the steps.
@@ -84,7 +96,8 @@ blind-case-writer agent, second bullet), then stop.
    set `arm: both` on a should-fire Skill check to clear it: the no-plugin arm can never
    pass it, so it manufactures a delta that says nothing about the skill
    ([docs](https://code.claude.com/docs/en/plugin-evals#compare-against-a-no-plugin-baseline)).
-   `arm: both` is for "must not fire" checks (`min: 0`, `max: 0`).
+   `arm: both` is for "must not fire" checks (`min: 0`, `max: 0`) that stay in the two-arm
+   run as `smoke` guards; a trigger-boundary negative omits it.
    The prompt must carry its inputs inline: the workspace is empty and a case has no
    `Write` grant by default, so a check that the reply names a file or line number is
    cheap for a no-plugin baseline to pass.
@@ -98,14 +111,18 @@ blind-case-writer agent, second bullet), then stop.
      `max: 0`, `arm: both`) or is cued by the prompt (a regex on a word the prompt contains,
      e.g. "run the tests with npm test" graded on `npm test`);
    - a should-not-fire case whose only live signal is that Skill check: the fire rate is
-     noise at 3 runs;
+     noise at 3 runs. Move it to the trigger-boundary suite (`trigger-boundary` and
+     `pair:` tags, no `arm: both`), where its fire count is read across many distinct
+     prompts instead of three runs of one;
    - a reply-only prompt where nothing observable separates the arms: a sandbox that gives
      the model no reason to volunteer the behavior scores near 0 for both arms, and a prompt
      that cues the behavior scores 1.00 for both (PR 789: 0.17 vs 0.00, and 1.00 vs 1.00).
    Instead, grade a trace action (`tool_used` on `Bash`, a `file_exists`) in a fixture
-   workspace whose state makes the behavior necessary without naming it; or keep the case but
-   tag it `smoke` and say it is a cheap trigger-boundary guard with no expected delta (EVAL025
-   skips tagged cases); or drop it.
+   workspace whose state makes the behavior necessary without naming it; or move a
+   should-not-fire case to the trigger-boundary suite; or keep two or three of them as
+   `smoke` guards (`arm: both`, no `trigger-boundary` tag) and say they are cheap
+   regression alarms with no expected delta and no evidence about the over-trigger rate
+   (EVAL025 skips tagged cases); or drop it.
 5. **Write PASS and FAIL conditions** for any `llm` grader: `PASS if <observable thing>.`
    `FAIL if <observable thing>.` Concrete enough that two judges agree. Also put a
    reference-good and a known-bad reply in the case header (`# good-reply: ...` and

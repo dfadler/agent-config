@@ -1,4 +1,6 @@
-# Run: node plugins/eval-authoring/scripts/ts/run-evals/run-evals.ts --tier quick plugins/eval-authoring
+# Run: node plugins/eval-authoring/scripts/ts/run-evals/run-evals.ts --trigger-boundary plugins/eval-authoring
+# Trigger-boundary negative, paired with case-reviewer-flags-planted-weak-case: read as a fire count over many distinct prompts
+# (one run, plugin arm only, no delta), not as a score.
 # No grant (Agent, Read only). Near-miss for eval-authoring:case-reviewer: a code review of a
 # diff that shares the word "review" but contains no eval case. Pairs with
 # case-reviewer-fires-natural-review.
@@ -11,7 +13,7 @@ name: agent-dispatch-case-reviewer-quiet-on-pr-diff
 description: >
   Reviewing a code diff must not dispatch eval-authoring:case-reviewer. expected_outcome: PASS
   when the agent is not dispatched and the reply names the off-by-one; FAIL otherwise.
-tags: [eval-authoring, case-reviewer, agent, trigger, quick]
+tags: [eval-authoring, case-reviewer, agent, trigger, trigger-boundary, pair:case-reviewer-flags-planted-weak-case]
 
 execution:
   prompt: |
@@ -37,7 +39,6 @@ graders:
     input_match: '"subagent_type"\s*:\s*"(?:[\w-]+:)?case-reviewer"'
     min: 0
     max: 0
-    arm: both
 
   - name: names_the_bug
     type: regex
@@ -45,4 +46,3 @@ graders:
     pattern: 'off[- ]by[- ]one|one (too many|extra|more)|extra (item|element)|size ?\+ ?1|\bbugs?\b|do(n.t| not) merge|not safe|unsafe|incorrect|wrong'
     flags: i
     match: contains
-    arm: both

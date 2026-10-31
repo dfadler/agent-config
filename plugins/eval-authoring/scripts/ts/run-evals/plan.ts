@@ -54,7 +54,8 @@ export const caseMatcher = (pattern: string): RegExp =>
 /**
  * Group the suite's cases by grant set. `tag` keeps only cases carrying it;
  * `only` (the wrapper's --case) keeps only cases whose name matches the glob;
- * `pick` (the wrapper's --changed) keeps only the cases listed.
+ * `pick` (the wrapper's --changed) keeps only the cases listed; `skipTag` drops
+ * cases carrying it.
  * Fails (rather than guessing) on parser issues, a stale grants entry, a case
  * name that would be read as a glob, or no case left to run.
  */
@@ -65,6 +66,7 @@ export const planGroups = (
   only?: string,
   pick?: readonly string[],
   pickSource = "--changed",
+  skipTag?: string,
 ): Plan => {
   const names = suite.cases.map((c) => c.name.value);
   const checked = checkGrantCaseNames(grants, names);
@@ -77,7 +79,8 @@ export const planGroups = (
     (c) =>
       (tag === undefined || c.tags.value.includes(tag)) &&
       (matcher === undefined || matcher.test(c.name.value)) &&
-      (pick === undefined || pick.includes(c.name.value)),
+      (pick === undefined || pick.includes(c.name.value)) &&
+      (skipTag === undefined || !c.tags.value.includes(skipTag)),
   );
   if (selected.length === 0) {
     return {

@@ -1,0 +1,27 @@
+# Run: node plugins/eval-authoring/scripts/ts/run-evals/run-evals.ts --trigger-boundary plugins/eval-authoring
+# Trigger-boundary negative, paired with diagnose-scores-fires-on-negative-delta: read as a fire count over many distinct prompts
+# (one run, plugin arm only, no delta), not as a score.
+# Near-miss for diagnose-scores: shares "delta" with diagnose-scores but asks for a TypeScript helper.
+# Can fail: skill_not_fired fails on a run where diagnose-scores is invoked.
+schema_version: "1.1"
+name: diagnose-scores-quiet-on-delta-function
+description: >
+  A request that shares vocabulary with diagnose-scores but is not its job must not invoke it.
+  expected_outcome: PASS when diagnose-scores is not invoked; FAIL when it is invoked.
+tags: [eval-authoring, diagnose-scores, trigger, trigger-boundary, pair:diagnose-scores-fires-on-negative-delta]
+
+execution:
+  prompt: |
+    Write a TypeScript function `delta(before: number, after: number)` that returns the change as a
+    signed percentage rounded to one decimal. Show the function in your reply; do not run anything.
+  max_turns: 4
+  allowed_tools:
+    - Skill
+
+graders:
+  - name: skill_not_fired
+    type: tool_used
+    tool: Skill
+    input_match: '"skill"\s*:\s*"(?:[\w-]+:)?diagnose-scores"'
+    min: 0
+    max: 0
