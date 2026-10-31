@@ -63,6 +63,8 @@ export interface RunSpec {
   readonly judgeModel: string | undefined;
   /** `--max-cost-usd` for this invocation (the wrapper passes the remaining budget); undefined keeps the tier's. */
   readonly maxCostUsd: number | undefined;
+  /** `-j`: runs the CLI executes in parallel within this invocation; undefined keeps the CLI's default. */
+  readonly jobs?: number | undefined;
   /** `--eval-dir`, when the caller overrides the plugin's own eval directory. */
   readonly evalDir: string | undefined;
   /** Pass `--trust-plugin`: only for this repo's plugins (see `isRepoPlugin`). */
@@ -102,6 +104,7 @@ export const buildCliArgs = (
     spec.model ?? DEFAULT_MODEL,
     "--judge-model",
     spec.judgeModel ?? DEFAULT_JUDGE_MODEL,
+    ...(spec.jobs === undefined ? [] : ["-j", String(spec.jobs)]),
     ...(tier.ablation === "none" ? ["--ablation", "none"] : []),
     ...(spec.evalDir === undefined ? [] : ["--eval-dir", spec.evalDir]),
     ...(spec.trustPlugin ? ["--trust-plugin"] : []),

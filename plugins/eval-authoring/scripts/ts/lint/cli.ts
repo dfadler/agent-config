@@ -24,7 +24,7 @@ import {
 } from "./runner.ts";
 import type { Rule } from "./types.ts";
 
-export const USAGE = `Usage: cli.ts [-h|--help] [--eval-dir DIR] [--grants FILE] [--format text|json] [--list-rules] [PLUGIN_ROOT]
+export const USAGE = `Usage: cli.ts [-h|--help] [--eval-dir DIR] [--grants FILE] [--format text|json] [--enable ID[,ID...]] [--list-rules] [PLUGIN_ROOT]
 
 Lint the eval cases of a plugin against the grader-stability rules. Free: no
 model calls, no network. PLUGIN_ROOT defaults to the current directory.
@@ -34,7 +34,10 @@ Options:
                    manifest's experimental.evals, else evals.
   --grants FILE    Grants file. Default: <eval dir>/grants.yaml.
   --format FORMAT  text (default) or json.
-  --list-rules     Print every rule's ID, severity and title, then exit.
+  --enable IDS     Also run these opt-in rules (comma-separated, or repeat the
+                   flag), e.g. --enable EVAL009. Opt-in rules are off by default.
+  --list-rules     Print every rule's ID, severity and title, then exit. Opt-in
+                   rules are marked.
   -h, --help       Print this help.
 
 Output (text): a header naming the Claude Code version the schema was written
@@ -76,10 +79,11 @@ interface Args {
   readonly grants: string | undefined;
   readonly format: string;
   readonly listRules: boolean;
+  readonly enable: readonly string[];
   readonly positionals: readonly string[];
 }
 
-const VALUED = new Set(["--eval-dir", "--grants", "--format"]);
+const VALUED = new Set(["--eval-dir", "--grants", "--format", "--enable"]);
 
 /** Parse argv. `help` wins over everything else; a bad flag is a usage error. */
 const parse = (
@@ -90,6 +94,7 @@ const parse = (
   if (flagArgs.some((a) => a === "-h" || a === "--help")) return "help";
   const values = new Map<string, string>();
   const positionals: string[] = [];
+  const enable: string[] = [];
   let listRules = false;
   for (let i = 0; i < argv.length; i += 1) {
     const arg = argv[i] ?? "";
@@ -105,7 +110,12 @@ const parse = (
       const inline = key === arg ? undefined : arg.slice(eq + 1);
       const value = inline ?? argv[i + 1];
       if (value === undefined) return { error: `option ${key} requires a value` };
-      values.set(key, value);
+      if (key === "--enable") {
+        const ids = value.split(",");
+        if (ids.includes("")) return { error: `option --enable needs rule IDs, got "${value}"` };
+        enable.push(...ids);
+      }
+      else values.set(key, value);
       if (inline === undefined) i += 1;
     } else if (arg.startsWith("-") && arg !== "-") {
       return { error: `unknown option: ${key}` };
@@ -121,12 +131,18 @@ const parse = (
     grants: values.get("--grants"),
     format: values.get("--format") ?? "text",
     listRules,
+    enable,
     positionals,
   };
 };
 
 const listRulesText = (rules: readonly Rule[]): string =>
-  `${rules.map((r) => `${r.id}  ${r.severity.padEnd(5)}  ${r.title}`).join("\n")}\n`;
+  `${rules
+    .map(
+      (r) =>
+        `${r.id}  ${r.severity.padEnd(5)}  ${r.title}${r.optIn === true ? `  (opt-in: --enable ${r.id})` : ""}`,
+    )
+    .join("\n")}\n`;
 
 const isDirectory = (p: string): boolean => {
   try {
@@ -144,6 +160,13 @@ export const main = (
   const args = parse(argv);
   if (args === "help") return done(EXIT_OK, USAGE);
   if ("error" in args) return usageError(args.error);
+  const optIn = new Set(rules.filter((r) => r.optIn === true).map((r) => r.id));
+  const unknown = args.enable.filter((id) => !rules.some((r) => r.id === id));
+  if (unknown.length > 0) {
+    return usageError(
+      `--enable: unknown rule ${unknown.join(", ")} (opt-in rules: ${[...optIn].join(", ") || "none"})`,
+    );
+  }
   if (args.listRules) return done(EXIT_OK, listRulesText(rules));
   if (args.format !== "text" && args.format !== "json") {
     return usageError("--format must be text or json");
@@ -155,6 +178,7 @@ export const main = (
   const options: LintOptions = {
     ...(args.evalDir === undefined ? {} : { evalDir: args.evalDir }),
     ...(args.grants === undefined ? {} : { grantsFile: args.grants }),
+    enable: args.enable,
   };
   const outcome = lintPlugin(pluginRoot, rules, options);
   if (!outcome.ok) {
