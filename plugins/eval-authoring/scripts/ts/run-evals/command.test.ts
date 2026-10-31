@@ -53,6 +53,12 @@ describe("allowToolsArgs", () => {
 });
 
 describe("buildCliArgs", () => {
+  it("passes -j only when jobs is set", () => {
+    const args = buildCliArgs(spec({ jobs: 6 }));
+    expect(args[args.indexOf("-j") + 1]).toBe("6");
+    expect(buildCliArgs(spec())).not.toContain("-j");
+  });
+
   it("puts the target first, before every option", () => {
     const args = buildCliArgs(
       spec({ grants: ["Bash(npx *)"], tier: TIERS.quick }),

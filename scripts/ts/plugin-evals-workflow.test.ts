@@ -90,7 +90,7 @@ const notify = (existing: string) => {
 describe("eval job: cost ceiling", () => {
   it("passes the wrapper a $25 ceiling on the standard tier (#648)", () => {
     expect(workflow).toMatch(
-      /--tier standard \\\n\s+--max-cost-usd 25 \\\n\s+--output-dir/,
+      /--tier standard \\\n\s+--max-cost-usd 25 \\\n\s+--jobs 6 \\\n\s+--output-dir/,
     );
   });
 
@@ -109,8 +109,8 @@ describe("eval job: cost ceiling", () => {
     }
     const grace = Number(wrapped[1]);
     const deadline = Number(wrapped[2]);
-    expect(job).toBe(180);
-    expect(deadline).toBeGreaterThanOrEqual(120);
+    expect(job).toBe(30);
+    expect(deadline).toBeGreaterThanOrEqual(20);
     // Room left after the deadline and kill grace for the Check and Upload steps.
     expect(deadline + grace + 5).toBeLessThanOrEqual(job);
   });

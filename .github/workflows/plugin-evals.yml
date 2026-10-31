@@ -85,11 +85,11 @@ jobs:
     name: eval (${{ matrix.plugin }})
     needs: plan
     runs-on: ubuntu-latest
-    # 180 (#648): the $25 ceiling lets big suites run to the end. eval-authoring
-    # ran 23.8 min for at most 13 of 21 cases on 2026-10-19 and now has 42, so at
-    # least ~76 min; 90 would stop it at about $19, before the ceiling. The wrapper
-    # call below has its own shorter deadline so the Check and Upload steps still run.
-    timeout-minutes: 180
+    # 30 is the cap (#648). A suite too big to finish inside it is configured to
+    # fit (fewer cases, more concurrency, a split matrix entry), not given more
+    # time. The wrapper call below has its own shorter deadline so the Check and
+    # Upload steps still run.
+    timeout-minutes: 30
     # Protected environment holds CLAUDE_CODE_OAUTH_TOKEN, a one-year token from
     # `claude setup-token` (Pro/Max/Team/Enterprise). Runs count against that
     # plan's usage limits; --max-cost-usd below is a list-price ceiling, not a
@@ -126,15 +126,16 @@ jobs:
           mkdir -p "$OUT_DIR"
           # Standard tier: every case, 3 runs, with and without the plugin. The tier's
           # flat $5 ceiling stopped the big suites part way (#648), so CI raises it to
-          # $25; a ceiling, not a spend (small suites cost $0.7 to $2). The 165 minute
-          # deadline (INT, then KILL after 2 more) is shorter than the job timeout, so a
+          # $25; a ceiling, not a spend (small suites cost $0.7 to $2). The 24 minute
+          # deadline (INT, then KILL after 1 more) is shorter than the job timeout, so a
           # slow suite ends here with exit 124 or 137: the Check step maps that to
           # inconclusive and the results of finished cases still upload.
-          timeout --signal=INT --kill-after=2m 165m \
+          timeout --signal=INT --kill-after=1m 24m \
             node plugins/eval-authoring/scripts/ts/run-evals/run-evals.ts \
             "plugins/$PLUGIN" \
             --tier standard \
             --max-cost-usd 25 \
+            --jobs 6 \
             --output-dir "$OUT_DIR" 2>&1 | tee "$OUT_DIR/eval.log"
           echo "${PIPESTATUS[0]}" > "$OUT_DIR/cli-exit"
 

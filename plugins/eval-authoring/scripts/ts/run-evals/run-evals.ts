@@ -78,6 +78,10 @@ ${Object.values(TIERS).map((t) => `                         ${t.name}: ${t.descr
                        unstarted cases (exit 7). A result with no readable
                        costUsd is charged its per-case share (ceiling divided
                        by cases), capped at what is left
+  --jobs <n>           runs to execute in parallel inside each invocation
+                       (the CLI's -j, a positive integer). Default: the CLI's.
+                       The wrapper runs cases one after another, so this is
+                       the only concurrency. All runs share your rate limit
   --model <id>         pin the model (default: pinned in the wrapper)
   --judge-model <id>   pin the judge model (default: pinned in the wrapper)
   --eval-dir <dir>     eval directory relative to the plugin
@@ -157,6 +161,7 @@ interface Options {
   readonly model: string | undefined;
   readonly judgeModel: string | undefined;
   readonly maxCostUsd: number | undefined;
+  readonly jobs: number | undefined;
   readonly evalDir: string | undefined;
   readonly reporting: Reporting;
   readonly skipUnavailable: boolean;
@@ -177,6 +182,7 @@ type Parsed =
 const VALUE_FLAGS: readonly string[] = [
   "--tier",
   "--max-cost-usd",
+  "--jobs",
   "--model",
   "--judge-model",
   "--eval-dir",
@@ -242,6 +248,11 @@ export const parseArgs = (argv: readonly string[]): Parsed => {
       message: `--max-cost-usd must be a positive finite number of US dollars, got '${costText}'`,
     };
   }
+  const jobsText = values.get("--jobs");
+  const jobs = jobsText === undefined ? undefined : Number(jobsText);
+  if (jobsText !== undefined && !/^[1-9]\d*$/.test(jobsText)) {
+    return { kind: "error", message: `--jobs must be a positive integer, got '${jobsText}'` };
+  }
   const pr = values.get("--pr");
   if (pr !== undefined && !/^[1-9]\d*$/.test(pr)) {
     return { kind: "error", message: `--pr must be a PR number, got '${pr}'` };
@@ -276,6 +287,7 @@ export const parseArgs = (argv: readonly string[]): Parsed => {
       model: values.get("--model"),
       judgeModel: values.get("--judge-model"),
       maxCostUsd,
+      jobs,
       evalDir: values.get("--eval-dir"),
       reporting: {
         outputDir: values.get("--output-dir"),
@@ -380,6 +392,7 @@ const invocationSpec = (
   model: options.model,
   judgeModel: options.judgeModel,
   maxCostUsd: budgetUsd,
+  jobs: options.jobs,
   evalDir: options.evalDir,
   trustPlugin: trust,
   reporting: { ...options.reporting, outputDir },
