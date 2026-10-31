@@ -26,10 +26,10 @@ fake_ytdlp() {
 echo "\$*" >>"$CALLS"
 n=\$(wc -l <"$CALLS")
 if [ "\$n" -ge $1 ]; then
-  printf '{"events":[{"segs":[{"utf8":"Hello  "},{"utf8":"there\\\\n"}]},{"segs":[{"utf8":"world"}]}]}' >"abc123.$2.json3"
+  printf '{"events":[{"segs":[{"utf8":"Hello  "},{"utf8":"there\\\\n"}]},{"segs":[{"utf8":"world"}]}]}' >"\${FAKE_ID:-abc123}.$2.json3"
 fi
-echo "line from description" >abc123.description
-echo "abc123|A Title|A Channel|1:23"
+echo "line from description" >"\${FAKE_ID:-abc123}.description"
+printf '%s\\037%s\\037%s\\037%s\\n' "\${FAKE_ID:-abc123}" "\${FAKE_TITLE:-A Title}" "A Channel" "1:23"
 EOF
   chmod +x "$BIN/yt-dlp"
 }
@@ -95,4 +95,61 @@ run_script() {
   grep -qF "no captions saved" <<<"$stderr"
   [ "$(wc -l <"$CALLS")" -eq 6 ]
   [ ! -f "$OUT/abc123.txt" ]
+}
+
+@test "a -x style url is rejected before yt-dlp runs" {
+  fake_ytdlp 1 en-orig
+  run_script "--exec=touch $BATS_TEST_TMPDIR/pwned" "$OUT"
+  assert_status 2
+  [ ! -s "$CALLS" ]
+  [ ! -e "$BATS_TEST_TMPDIR/pwned" ]
+}
+
+@test "url reaches yt-dlp only after a -- separator" {
+  fake_ytdlp 1 en-orig
+  run_script "https://youtu.be/abc123" "$OUT"
+  assert_success
+  grep -qF -- " -- https://youtu.be/abc123" "$CALLS"
+}
+
+@test "a non-http url is rejected with exit 2" {
+  fake_ytdlp 1 en-orig
+  run_script "file:///etc/passwd" "$OUT"
+  assert_status 2
+  grep -qF "http" <<<"$stderr"
+  [ ! -s "$CALLS" ]
+}
+
+@test "missing yt-dlp exits 127 at once, without retry pauses" {
+  mkdir -p "$BATS_TEST_TMPDIR/nobin"
+  printf '#!/bin/sh\n' >"$BATS_TEST_TMPDIR/nobin/jq"
+  chmod +x "$BATS_TEST_TMPDIR/nobin/jq"
+  run --separate-stderr env PATH="$BATS_TEST_TMPDIR/nobin" RETRY_PAUSE=30 /bin/bash "$SCRIPT" "https://youtu.be/abc123" "$OUT"
+  assert_status 127
+  grep -qF "yt-dlp not found" <<<"$stderr"
+}
+
+@test "a json3 left by an earlier run is not accepted" {
+  fake_ytdlp 99 en-orig
+  mkdir -p "$OUT"
+  echo '{"events":[{"segs":[{"utf8":"stale"}]}]}' >"$OUT/abc123.en-orig.json3"
+  run_script "https://youtu.be/abc123" "$OUT"
+  assert_status 1
+  [ ! -f "$OUT/abc123.txt" ]
+}
+
+@test "a title with | and a newline still yields one four-field line" {
+  fake_ytdlp 1 en-orig
+  FAKE_TITLE=$'Pipes | and\nnewline' run_script "https://youtu.be/abc123" "$OUT"
+  assert_success
+  [ "$(wc -l <<<"$output")" -eq 1 ]
+  [ "$output" = "$OUT/abc123.txt|Pipes / and newline|A Channel|1:23" ]
+}
+
+@test "a video id that is not filename-safe is refused" {
+  fake_ytdlp 1 en-orig
+  FAKE_ID='../evil' run_script "https://youtu.be/abc123" "$OUT"
+  assert_status 1
+  [ ! -e "$BATS_TEST_TMPDIR/evil.txt" ]
+  [ ! -e "$OUT/../evil.txt" ]
 }
