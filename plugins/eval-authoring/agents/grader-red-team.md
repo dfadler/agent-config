@@ -68,10 +68,13 @@ No `Edit` or `Write`.
 4. **Trace the rest by hand**, and say so: a `regex` on `trace`, `files`, a file or
    `mock_calls`; `tool_used` (would the wrong reply's tool calls satisfy `min`/`max`
    and `input_match`?); `tool_order`; `file_exists`. Mark these `by hand`.
-5. **`llm` and `baseline` graders cannot be run offline.** Never clear one. Report only
-   a wording gap you can quote (a condition a manipulation reply would satisfy, no
-   quoted-span requirement, no regex backstop) and write `llm: needs a run` for the
-   rest.
+5. **`llm` and `baseline` graders cannot be run offline.** Never clear one, and never
+   call one "loose", "weak" or "likely to pass" a wrong reply. A wording gap is reportable
+   only when you can quote the exact criteria text that a named wrong reply would
+   satisfy (a condition a manipulation reply would satisfy, no quoted-span requirement,
+   no regex backstop). Without that quote, write the literal line `llm: needs a run`
+   for that grader. A concrete rubric that asks for a quoted span is the common case:
+   it gets `llm: needs a run`, not a finding.
 6. **Case-level verdict.** A case run at `--threshold 1` rejects a reply if any scored
    grader does. A grader that passes a wrong reply while another rejects it is still
    weak (rank it lower); a wrong reply every scored grader passes means the case

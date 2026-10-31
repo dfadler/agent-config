@@ -41,9 +41,12 @@ execution:
       - name: cites_file_line
         type: llm
         criteria: |
-          PASS if the reply names src/cart.ts and line 42, quoting the span where it does.
-          FAIL if the reply names no file or no line number, or names a different line;
-          quote the span that shows it. Do not fail for style, length or formatting.
+          PASS only if the reply asserts that the bug is on line 42 of src/cart.ts, quoting
+          the span that asserts it.
+          FAIL if the reply names no file or no line number, names a different line, denies
+          or hedges that line 42 is the bug, or only repeats the stack trace without
+          committing to a line; quote the span that shows it. Do not fail for style, length
+          or formatting.
     ```
   max_turns: 12
   allowed_tools:
@@ -56,11 +59,12 @@ graders:
     input_match: '"subagent_type"\s*:\s*"(?:[\w-]+:)?grader-red-team"'
     min: 1
 
-  # Verdict: the agent's own marker for a grader it cannot run.
+  # Verdict: the agent's marker `llm: needs a run`, or the relay's paraphrase of it. A reply that
+  # calls the grader loose or weak without saying it needs a run still fails (agent fault, #859).
   - name: says_needs_run
     type: regex
     target: last_message
-    pattern: "llm:\\s*needs a run"
+    pattern: "llm:\\s*needs a run|needs a (?:paid |real )?run|only a (?:paid |real )?run (?:can|would|will)|can(?:no|')?t (?:be )?run (?:that one )?offline|cannot (?:be )?run (?:that one )?offline"
     flags: i
     match: contains
 

@@ -56,11 +56,13 @@ graders:
     input_match: '"subagent_type"\s*:\s*"(?:[\w-]+:)?grader-red-team"'
     min: 1
 
-  # Verdict: the all-clear, in the agent's own words.
+  # Verdict: the all-clear. The main model relays the agent's output in its own words ("found no
+  # wrong reply that would pass", "no confirmed weakness"), so key on the no-defect meaning, not
+  # the literal word Clean.
   - name: says_clean
     type: regex
     target: last_message
-    pattern: "\\bclean\\b|no (?:blocking |significant |real )?(?:findings|issues|problems|weak)|nothing to (?:flag|fix)|looks (?:good|fine|sound)"
+    pattern: "\\bclean\\b|\\bno\\b[^.\\n]{0,40}(?:wrong repl|weakness|weak grader|hole|flaw|gap|defect|findings|issues|problems)|nothing to (?:flag|fix)|looks (?:good|fine|sound)"
     flags: i
     match: contains
 

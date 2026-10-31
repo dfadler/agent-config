@@ -65,13 +65,13 @@ graders:
     min: 1
 
   # Result: the finding is in the agent's output shape, the grader name followed within 400
-  # characters by "wrong reply" (`<case>:<grader> | <probe or by hand> | wrong reply: ...`),
+  # characters by wrong-reply language ("wrong reply", "fooled", "passes") (`<case>:<grader> | <probe or by hand> | wrong reply: ...`),
   # so a wrong verdict that merely mentions the name ("Clean. names_breaking_change rejects
   # every weak reply") does not pass. Wording regex: a reformatted relay can miss it.
   - name: names_weak_grader
     type: regex
     target: last_message
-    pattern: "names_breaking_change[\\s\\S]{0,400}wrong reply"
+    pattern: "names_breaking_change[\\s\\S]{0,600}(?:wrong repl|fooled|would pass|passes|accepts)"
     flags: i
     match: contains
 
