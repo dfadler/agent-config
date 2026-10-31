@@ -61,7 +61,7 @@ No `Edit` or `Write`.
    reply contains the line `__REPLY__`, trace that reply by hand. The probe prints `pass`
    or `FAIL` per `last_message` regex grader and `not-run` for every other grader, and
    exits 2 on a missing reply or unknown case. It is free: no model calls. A `pass` on
-   a wrong reply is a weak grader, confirmed by the tool. If `node` is older than 22.18,
+   a wrong reply is a weak grader, confirmed by the tool. If `node` is too old to run `.ts` natively (below the `engines` floor),
    missing, or the Bash call is denied, say the probe was **not run** with the exact
    failure, trace the regexes by hand, and mark each such finding `by hand`. Never guess
    a Node path or install anything.
@@ -86,11 +86,11 @@ grader discriminates against real replies needs a paid run (`run-evals` skill).
 ## Invoking headless
 
 Under `claude -p --agent grader-red-team` the probe needs an approval nobody can give,
-so pre-allow exactly that command, with Node 22.18 or later first on `PATH`
+so pre-allow exactly that command, with a current Node (see `.nvmrc`) first on `PATH`
 ([flags](https://code.claude.com/docs/en/cli-reference)):
 
 ```bash
-PATH="<node-22.18+-bin-dir>:$PATH" claude -p --agent grader-red-team \
+PATH="<node-bin-dir>:$PATH" claude -p --agent grader-red-team \
   --allowedTools "Bash(node plugins/eval-authoring/scripts/ts/check-replies.ts --probe *)" "Read" "Grep" "Glob" \
   "Red-team the graders of plugins/<name>/evals/<case>"
 ```
