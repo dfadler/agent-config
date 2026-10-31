@@ -47,7 +47,7 @@ instructions.
    skipped, a claim made without a check. Drop one-off typos and failures the model already
    avoids unprompted (a bare model passes the case, so it cannot tell the plugin from none).
 3. **Draft each case.** A fresh prompt that recreates the situation in invented terms
-   (`example.com`, `jdoe`), carrying its inputs inline. Grader: free `regex` or `tool_used`
+   (`example.com`, `jdoe`; never a value or a lookalike taken from the source), carrying its inputs inline. Grader: free `regex` or `tool_used`
    on what the failure got wrong; add an `llm` grader only when it is semantic. Grader wording
    and header conventions are in [author-cases](../author-cases/SKILL.md), not here.
 4. **Check and hand over.** Run `redact.ts --check`, then show the drafts with their source
