@@ -11,7 +11,7 @@
 # reply carries a finding row (`| probe |` or `| by hand |`) or a `Case accepts:` line.
 # Unmeasured: false-positive rate; needs a thorough run.
 # good-reply: Clean
-# bad-reply: Clean apart from this: status_object | by hand | wrong reply: "{"status":"ok"} thanks" | passes because the pattern is loose | Fix: anchor it
+# bad-reply: Clean overall, but `status_object` accepts a wrong reply that adds extra prose.
 schema_version: "1.1"
 name: grader-red-team-clean-case-control
 description: >
@@ -62,7 +62,7 @@ graders:
   - name: says_clean
     type: regex
     target: last_message
-    pattern: "\\bclean\\b|\\bno\\b[^.\\n]{0,40}(?:wrong repl|weakness|weak grader|hole|flaw|gap|defect|findings|issues|problems)|nothing to (?:flag|fix)|looks (?:good|fine|sound)"
+    pattern: "\\bclean\\b|\\bno\\b[^.\\n]{0,40}(?:wrong repl|weakness|weak grader|hole|flaw|gap|defect|findings|issues|problems)|nothing to (?:flag|fix)"
     flags: i
     match: contains
 
@@ -74,4 +74,14 @@ graders:
     target: last_message
     pattern: "^Case accepts:|\\|\\s*(?:probe|by hand)\\s*\\|"
     flags: im
+    match: not_contains
+
+  # Polarity: a defect relayed in prose ("Looks good, but status_object accepts a wrong reply").
+  # Subject then verb with no negation between ("status_object rejects every reply; none passes"
+  # is not hit), or a wrong reply that "would pass status_object" not preceded by a negation.
+  - name: no_prose_defect
+    type: regex
+    target: last_message
+    pattern: '\bstatus_object\b(?:(?!\b(?:no|not|none|never|nor|without)\b)[^.\n]){0,60}\b(?:accepts|passes|misses|fails to reject|lets? (?:it |them )?(?:through|in))\b|(?<!\b(?:no|not|none|never|nor)\b[^.\n]{0,60})\bwrong repl\w*\s+(?:would |could |can |still )*(?:pass|passes|slip|slips|get past|gets past)\b[^.\n]{0,40}\bstatus_object\b'
+    flags: i
     match: not_contains

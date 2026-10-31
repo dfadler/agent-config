@@ -24,6 +24,10 @@ it("passes the reply on stdin in a quoted heredoc, never as a shell argument", (
   expect(body).toMatch(/--reply - <PLUGIN_ROOT> <<'__REPLY__'/);
   expect(body).not.toMatch(/--reply '/);
 });
+it("says it is unverified that the allowlist rule matches the multi-line heredoc form", () => {
+  expect(body).toMatch(/Unverified: whether that rule matches the heredoc form/);
+  expect(body).toMatch(/not established/);
+});
 it("headless allowlist has a fixed prefix with no wildcard before the script", () => {
   const rule = /"(Bash\(node [^"]*check-replies\.ts[^"]*\))"/.exec(body)?.[1];
   expect(rule).toBeDefined();

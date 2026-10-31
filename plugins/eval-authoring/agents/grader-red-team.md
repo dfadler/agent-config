@@ -95,6 +95,19 @@ PATH="<node-22.18+-bin-dir>:$PATH" claude -p --agent grader-red-team \
   "Red-team the graders of plugins/<name>/evals/<case>"
 ```
 
+**Unverified: whether that rule matches the heredoc form.** The
+[permissions docs](https://code.claude.com/docs/en/permissions) say Bash rules "match the
+whole command text, with `*` standing in for any text", list newlines among the command
+separators ("Every subcommand must be allowed for a compound command to run without a
+prompt"), and say here-docs and here-strings are not checked as redirect targets. They do
+not say whether the lines of a heredoc body are treated as separate subcommands, so
+whether the rule above covers a multi-line probe is not established. The failure is safe:
+a refused or unapproved probe is the "Bash call is denied" case in step 3, where you trace
+the regexes by hand and mark each finding `by hand`. Passing the reply as a one-line
+shell argument or a here-string is not a fix, because a quote or `$(...)` in the reply
+breaks it or runs. Test once headless, and if it prompts, approve the probe interactively
+or accept `by hand` findings.
+
 ## Output
 
 One line per finding, ranked by whether the whole case accepts the wrong reply first:
