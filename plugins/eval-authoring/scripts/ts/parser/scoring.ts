@@ -62,7 +62,7 @@ export const isScored = (
   context?: ScoringContext,
 ): boolean => !twoArm || exclusionReason(grader, context) === undefined;
 
-/** `isScored` for every grader of a case, with reasons and the all-excluded fallback. Used by EVAL008, EVAL010. */
+/** `isScored` for every grader of a case, with reasons and the all-excluded fallback. Used by EVAL008, EVAL009, EVAL010. */
 export const scoreCase = (
   evalCase: EvalCase,
   twoArm: boolean,

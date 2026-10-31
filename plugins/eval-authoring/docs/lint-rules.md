@@ -25,13 +25,13 @@ the authority; the severity is the default.
 | ID | Sev | Why it matters | Fix |
 |---|---|---|---|
 | EVAL002 | error | The CLI ignores or rejects keys it does not know, so a typo silently drops a check. | Use only documented keys, put run fields (`max_turns`, `allowed_tools`...) under `execution:`, and start `case.yaml` with `schema_version` and `name`. |
-| EVAL003 | error | A value outside the schema (bad `runs`, `weight`, `arm`, grader `type`, an `env` key not starting `EVAL_`) fails to load or changes scoring. | Set the field to a value the message's range allows. |
+| EVAL003 | error | A value outside the schema (bad `runs`, `max_turns`, `timeout_seconds`, `weight`, `arm`, grader `type`, an `env` key not starting `EVAL_`) fails to load or changes scoring. | Set the field to a value the message's range allows. |
 | EVAL004 | error | A case cannot grant itself `Bash`, `Write`, `Edit`, `WebFetch` or `WebSearch`; without a recorded grant the tool is denied and the case cannot pass. | Add the exact entry to `grants.yaml`, or drop the tool from `allowed_tools`. |
 | EVAL005 | error | A `max: 0` `tool_used` grader on a tool the case never gets can never fail. (The CLI's preflight warns, without aborting, when a `min >= 1` one, explicit or the default, has no grant; probed on 2.1.300, see the audit below.) | Grant the tool, or grade something observable. |
 | EVAL006 | warn | A judge given no explicit pass and fail conditions guesses, and split votes make the score noise. | Write `PASS if ...` and `FAIL if ...` with observable conditions. |
-| EVAL007 | error | `tool_used: Skill` needs `Skill` in `allowed_tools`, or the check can never see a call; a `max: 0` Skill check on one arm only tests the arm that cannot fire it. | Add `Skill`; give a "must not fire" check `arm: both`. |
-| EVAL008 | warn | If every grader is excluded from scoring, both arms score alike and there is no delta. | Add a grader that counts (see EVAL010). |
-| EVAL009 | info, opt-in | A result check alone can pass with the wrong steps and a steps check alone with the wrong answer. Off by default (#811): it fired on about half of all cases, mostly reply-only skills with no step to check. Run it with `--enable EVAL009`. | Pair them, or skip it for a reply-only skill. |
+| EVAL007 | error | `tool_used: Skill` needs `Skill` in `allowed_tools`, or the check can never see a call; a `max: 0` Skill check without `arm: both` is treated as with-only and left out of the score in a two-arm run. | Add `Skill`; give a "must not fire" check `arm: both`. |
+| EVAL008 | warn | If every grader is excluded from scoring, both arms score alike and there is no delta. | Add a grader that is scored in both arms, set `arm: both`, or run with `--ablation none`. |
+| EVAL009 | info, opt-in | A case with no scored grader on the result (the reply or a file) cannot show the plugin changed the outcome: grade the final state, not the path (Eval Research doc, decision 7). Off by default (#811), when it also asked for a steps grader and fired on about half of all cases. Run it with `--enable EVAL009`. | Add a scored `regex` on `last_message` or a file, `file_exists` or `llm` grader; not `arm: with-only`. |
 | EVAL010 | info | `mock_calls` on a mock the plugin declares is an indicator only (the no-plugin arm has no mock). | Add `arm: both`, or use a grader that counts. |
 | EVAL011 | warn | A judge reading the reply cannot see what was passed to a tool. | Use `focus: mock_calls` when the criteria are about tool inputs. |
 | EVAL012 | error | Inline regex flags, a pattern matched against a file path instead of its content, or an unescaped quote inside a traced value make a regex match nothing, or everything. | Use the `flags` key, `target: { source: file, path }`, and `\\"` for a quote in a trace. |
@@ -41,13 +41,15 @@ the authority; the severity is the default.
 | EVAL016 | warn | A case graded only by a judge is the most expensive and noisiest kind. | Add a free grader (`regex`, `tool_used`, `file_exists`). |
 | EVAL017 | error | `quick` runs must be free; an `llm` or `baseline` grader is a paid call. | Remove the `quick` tag or the paid grader. |
 | EVAL018 | error | A declared dependency with no matching `plugins:` entry silently drops the plugin under test; a `plugins:` entry outside the plugin root stops the case from loading. | Vendor each dependency inside the plugin, list it under `plugins:`, and keep every entry inside the plugin root. |
-| EVAL019 | error | `min` defaults to 1, so `tool_used` with `max: 0` alone can never pass. | Add `min: 0`. |
+| EVAL019 | error | `min` defaults to 1, so a `tool_used` whose `max` is below `min` (`max: 0` alone is the common case) can never pass. | Add `min: 0`, or raise `max`. |
 | EVAL020 | info | A suite that checks the skill fires but never that it stays quiet cannot catch an over-broad description. | Add a near-miss prompt that must not fire the skill. |
 | EVAL021 | warn | A grant the case never lists in `allowed_tools` widens permissions for nothing. | Remove the grant, or add the tool to `allowed_tools`. |
 | EVAL022 | warn | Installed plugins are called as `plugin:name`; an `input_match` without an optional prefix misses them. | Allow an optional `plugin:` prefix in the pattern. |
 | EVAL023 | warn (info for the `last_message` problem) | A judge on `last_message` with no `regex` backstop may be steered by the reply (unproven: #743 cites a research doc that is not public), and an `llm` judge on `trace` sees only the first and last 12 messages (documented). | Add a `regex` backstop, or lower `max_turns` to 12 or less. |
 | EVAL024 | warn | A `last_message` regex that already matches the case prompt passes (or trips) on a reply that echoes the prompt. | Match wording only the skill or a correct answer would add, or grade behavior with `tool_used`. |
-| EVAL025 | warn | A case whose graders are all "must not fire" Skill checks (the no-plugin arm passes them by construction) or regexes whose literal text is in the prompt has only the with-arm fire rate to fail on. | Grade a trace action in a fixture workspace, or tag the case `smoke` to label it a cheap trigger guard, or drop it. |
+| EVAL025 | warn | A case whose graders are all "must not fire" Skill checks (the no-plugin arm passes them by construction) or `contains` regexes that already match the prompt (the EVAL024 test) has only the with-arm fire rate to fail on. | Grade a trace action in a fixture workspace, or tag the case `smoke` to label it a cheap trigger guard, or drop it. |
+| EVAL026 | info | A judge cannot be run offline, so a case with an `llm` grader and no `# good-reply:` and `# bad-reply:` header has no labeled replies to check its criteria against. `check-replies.ts` reports the gap as "missing", an error only under `--require`, which nothing runs. Info for now; meant to become warn once the existing cases carry headers. | Add the two header comments (format in `scripts/ts/check-replies.ts`). |
+| EVAL027 | info | An `llm` judge reading the reply cannot see the order tools ran in; criteria such as "before running" or "prior to" need a `tool_order` or `tool_used` grader. A keyword heuristic, so it can misfire. | Add a `tool_order` grader or a `tool_used` grader with `min` and `max`; ignore it if the criteria are not about tool order. |
 
 The Sev column is the rule's default; "opt-in" means the rule runs only with `--enable`. EVAL007, EVAL012, EVAL014 and EVAL023 override it for some problems (a finding's own severity wins); run `--list-rules` or read the finding for the one you got.
 
@@ -55,7 +57,7 @@ The Sev column is the rule's default; "opt-in" means the rule runs only with `--
 
 Hits from running the lint over every plugin with evals (30 plugins, 269 cases), 2026-10-28. Details and rule origins: [#811](https://github.com/dfadler/agent-config/issues/811). CLI overlap for 001, 003 and 005 was checked with free `--max-cost-usd 0` probes on CLI 2.1.300, 2026-10-29; the rest was not.
 
-- 009: 143 info. Made opt-in (`--enable EVAL009`); the rule and its fixtures stay. It fired on over half of cases, mostly reply-only skills, and its fix now says a reply-only skill keeps the Skill check and leaves the rule off.
+- 009: 143 info. Made opt-in (`--enable EVAL009`), then narrowed to the result half (no scored grader on the result: 3 hits). The 140 "no steps grader" hits went with the steps half, which the research doc's "grade the final state, not the path" speaks against.
 - 024: 56 warn. Keep: real prompt-echo findings; the fixes are case edits.
 - 023: 12 info. Keep; the `last_message` half is unproven.
 - 025: 6 warn. Keep.

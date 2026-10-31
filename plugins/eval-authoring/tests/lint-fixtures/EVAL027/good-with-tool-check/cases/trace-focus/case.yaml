@@ -1,0 +1,8 @@
+schema_version: "1.1"
+name: trace-focus
+execution:
+  prompt: Do the thing.
+graders:
+  - type: "llm"
+    focus: "trace"
+    criteria: "PASS if the agent asks before running the script. FAIL otherwise."
