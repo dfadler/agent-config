@@ -54,7 +54,8 @@ export const caseMatcher = (pattern: string): RegExp =>
 /**
  * Group the suite's cases by grant set. `tag` keeps only cases carrying it;
  * `only` (the wrapper's --case) keeps only cases whose name matches the glob;
- * `pick` (the wrapper's --changed) keeps only the cases listed.
+ * `pick` (the wrapper's --changed) keeps only the cases listed; `skipTag` drops
+ * cases carrying it.
  * Fails (rather than guessing) on parser issues, a stale grants entry, a case
  * name that would be read as a glob, or no case left to run.
  */
@@ -64,6 +65,8 @@ export const planGroups = (
   tag: string | undefined,
   only?: string,
   pick?: readonly string[],
+  pickSource = "--changed",
+  skipTag?: string,
 ): Plan => {
   const names = suite.cases.map((c) => c.name.value);
   const checked = checkGrantCaseNames(grants, names);
@@ -76,7 +79,8 @@ export const planGroups = (
     (c) =>
       (tag === undefined || c.tags.value.includes(tag)) &&
       (matcher === undefined || matcher.test(c.name.value)) &&
-      (pick === undefined || pick.includes(c.name.value)),
+      (pick === undefined || pick.includes(c.name.value)) &&
+      (skipTag === undefined || !c.tags.value.includes(skipTag)),
   );
   if (selected.length === 0) {
     return {
@@ -84,7 +88,7 @@ export const planGroups = (
       reason:
         tag === undefined && only === undefined && pick === undefined
           ? `no cases found under ${suite.evalDir}`
-          : `no cases${tag === undefined ? "" : ` tagged '${tag}'`}${only === undefined ? "" : ` matching --case '${only}'`}${pick === undefined ? "" : ` among the --changed cases (${pick.join(", ")})`} under ${suite.evalDir}`,
+          : `no cases${tag === undefined ? "" : ` tagged '${tag}'`}${only === undefined ? "" : ` matching --case '${only}'`}${pick === undefined ? "" : ` among the ${pickSource} cases (${pick.join(", ")})`} under ${suite.evalDir}`,
     };
   }
   const globby = selected.map((c) => c.name.value).filter(hasGlobMeta);
@@ -153,7 +157,7 @@ const hasBash = (grants: readonly string[]): boolean =>
  * call naming `name`, bare or plugin-prefixed (`<plugin>:<name>`, the form
  * agents are addressed by).
  */
-const matchesCall = (pattern: string | undefined, name: string, plugin: string): boolean => {
+export const matchesCall = (pattern: string | undefined, name: string, plugin: string): boolean => {
   if (pattern === undefined) return false;
   try {
     const re = new RegExp(pattern);
@@ -171,7 +175,7 @@ const exercises = (c: EvalCase, name: string, plugin: string): boolean =>
   c.graders.some((g) => g.type === "tool_used" && matchesCall(g.inputMatch.value, name, plugin));
 
 /** The manifest's name (else the plugin dir's basename) and its inline `hooks` field as text. */
-const manifestOf = (pluginRoot: string): { readonly name: string; readonly hooks: string } => {
+export const manifestOf = (pluginRoot: string): { readonly name: string; readonly hooks: string } => {
   try {
     const m: unknown = JSON.parse(readFileSync(join(pluginRoot, ".claude-plugin", "plugin.json"), "utf8"));
     const obj = typeof m === "object" && m !== null ? m : {};

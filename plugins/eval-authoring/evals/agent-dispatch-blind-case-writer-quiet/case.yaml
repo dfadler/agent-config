@@ -1,0 +1,63 @@
+# Run: node plugins/eval-authoring/scripts/ts/run-evals/run-evals.ts --trigger-boundary plugins/eval-authoring
+# Trigger-boundary negative, paired with agent-dispatch-blind-case-writer: read as a fire count over many distinct prompts
+# (one run, plugin arm only, no delta), not as a score.
+# #861. Co-authored with the agent in one session, so it is NOT independent evidence: a boundary
+# negative. Near-miss on the real boundary for eval-authoring:blind-case-writer: the author's own
+# cases are already present and the user wants them improved, which is the opposite of a blind
+# draft (the agent must never see author cases), so it must not be dispatched. Regression guard:
+# a no-plugin model passes it, so Delta is zero by design. Not run yet: paid, hand-off only.
+# Can fail: blind_writer_not_dispatched = 0 if the main model hands the author's cases to the
+# agent; names_the_weak_grader = 0 if the reply does not call out the `.*` pattern.
+# good-reply: The `.*` pattern in changelog-sections matches any reply, so that grader always passes; tighten it to something like `Added[\s\S]*Fixed`.
+# bad-reply: Your two cases look fine as they are.
+schema_version: "1.1"
+name: agent-dispatch-blind-case-writer-quiet
+description: >
+  Asked to tighten the graders of two existing cases, the main model must not dispatch
+  eval-authoring:blind-case-writer. expected_outcome: PASS when the agent is not dispatched and the
+  reply says the `.*` pattern matches everything; FAIL otherwise.
+tags: [eval-authoring, blind-case-writer, agent, trigger, trigger-boundary, pair:agent-dispatch-blind-case-writer]
+
+execution:
+  prompt: |
+    Here are my two eval cases for the changelog skill. Tighten their graders in a few
+    sentences. No files, no commands.
+
+    ```yaml
+    # evals/changelog-sections/case.yaml
+    graders:
+      - name: has_sections
+        type: regex
+        target: last_message
+        pattern: '.*'
+        match: contains
+    ```
+
+    ```yaml
+    # evals/changelog-no-ci/case.yaml
+    graders:
+      - name: no_ci_entry
+        type: regex
+        target: last_message
+        pattern: 'ci|workflow'
+        match: not_contains
+        flags: i
+    ```
+  max_turns: 4
+  allowed_tools:
+    - Agent
+
+graders:
+  - name: blind_writer_not_dispatched
+    type: tool_used
+    tool: Agent
+    input_match: '"subagent_type"\s*:\s*"(?:[\w-]+:)?blind-case-writer"'
+    min: 0
+    max: 0
+
+  - name: names_the_weak_grader
+    type: regex
+    target: last_message
+    pattern: '\.\*[\s\S]{0,200}(matches (?:any|every)|always pass|tautolog|too (?:loose|broad)|anything)'
+    flags: i
+    match: contains

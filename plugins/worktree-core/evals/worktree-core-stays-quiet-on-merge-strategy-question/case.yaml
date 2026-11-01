@@ -1,0 +1,32 @@
+# Run: claude plugin eval plugins/worktree-core --case worktree-core-stays-quiet-on-merge-strategy-question --runs 3 --trust-plugin --no-publish
+# Shared run/grant facts: docs/contributing.md, "Plugin evals". No grant; reply-only.
+# Smoke guard, delta 0 by design: a team-policy question about squash vs merge commits shares the
+# vocabulary of the dead-branch rule (squash, merged, branch) but wants a tradeoff discussion,
+# so the skill must not fire. The Skill check is the only signal; the fire rate is noisy at 3 runs.
+# good-reply: "Squash keeps main linear with one commit per PR but loses per-commit history; merge commits keep history but add noise. Pick squash if PRs are small and titles are good."
+# bad-reply: "Never push to a branch whose PR has merged; run gh pr list --head <branch> --state merged first."
+# Drafted by the blind-case-writer agent from the committed skill text.
+schema_version: "1.1"
+name: worktree-core-stays-quiet-on-merge-strategy-question
+description: >
+  A policy question about GitHub's squash versus merge-commit button for a six-person team
+  does not invoke git-worktree-usage. expected_outcome: PASS when the skill is not invoked;
+  FAIL when it is. Smoke guard, delta 0 by design.
+tags: [worktree-core, trigger, quick, smoke]
+
+execution:
+  prompt: |
+    Our team of six is debating GitHub's default merge button: squash and merge, or a regular
+    merge commit. What are the tradeoffs for history readability and for reverting a bad PR?
+  max_turns: 4
+  allowed_tools:
+    - Skill
+
+graders:
+  - name: git_worktree_usage_not_invoked
+    type: tool_used
+    tool: Skill
+    input_match: '"skill"\s*:\s*"(?:[\w-]+:)?git-worktree-usage"'
+    min: 0
+    max: 0
+    arm: both

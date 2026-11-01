@@ -15,7 +15,7 @@ description: >
   tests; FAIL when author-cases is invoked or the reply holds no tests. This
   is a regression guard: a no-plugin arm is expected to pass it too, so it
   shows no delta by design.
-tags: [eval-authoring, author-cases, trigger, quick]
+tags: [eval-authoring, author-cases, trigger, quick, smoke]
 
 execution:
   prompt: |

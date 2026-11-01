@@ -1,0 +1,27 @@
+# Run: node plugins/eval-authoring/scripts/ts/run-evals/run-evals.ts --trigger-boundary plugins/eval-authoring
+# Trigger-boundary negative, paired with run-evals-fires-natural-with-without: read as a fire count over many distinct prompts
+# (one run, plugin arm only, no delta), not as a score.
+# Near-miss for run-evals: shares "exit codes" with run-evals but is about ESLint.
+# Can fail: skill_not_fired fails on a run where run-evals is invoked.
+schema_version: "1.1"
+name: run-evals-quiet-on-eslint-exit-codes
+description: >
+  A request that shares vocabulary with run-evals but is not its job must not invoke it.
+  expected_outcome: PASS when run-evals is not invoked; FAIL when it is invoked.
+tags: [eval-authoring, run-evals, trigger, trigger-boundary, pair:run-evals-fires-natural-with-without]
+
+execution:
+  prompt: |
+    What do the exit codes of `eslint` mean? My CI step failed with exit code 2 and I'm not sure why.
+    Don't create files or run any commands.
+  max_turns: 4
+  allowed_tools:
+    - Skill
+
+graders:
+  - name: skill_not_fired
+    type: tool_used
+    tool: Skill
+    input_match: '"skill"\s*:\s*"(?:[\w-]+:)?run-evals"'
+    min: 0
+    max: 0

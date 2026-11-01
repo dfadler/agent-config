@@ -24,6 +24,7 @@ describe("EVAL014", () => {
   it("does not report an existing script or a fixtures/bin directory", () => {
     expect(messages("good-case-yaml")).toEqual([]);
     expect(messages("good-prompt-md")).toEqual([]);
+    // Guards against re-adding the fixtures/bin check that a #450 probe refuted.
     expect(messages("good-bin-ignored")).toEqual([]);
   });
 });

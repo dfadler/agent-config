@@ -70,8 +70,12 @@ A case runs with and without the plugin; Δ is the difference. In a two-arm run 
 graders are excluded from the score and reported as indicators (`scored: false`):
 `tool_used: Skill`, `regex`/`llm` on `mock_calls` when the mocked server is one the plugin
 declares, and anything marked `arm: with-only`. Set `arm: both` to score one in both arms,
-for example "must not invoke the skill" (`min: 0`, `max: 0`). If every grader would be
-excluded they score normally, and `--ablation none` excludes nothing. A Δ near zero with
+for example "must not invoke the skill" (`min: 0`, `max: 0`), which passes the no-plugin
+arm by construction: keep such a case to two or three `smoke` guards. A should-not-fire
+case that measures the boundary is tagged `trigger-boundary` plus `pair:<should-fire
+case>`, carries no `arm:`, and runs under `run-evals --trigger-boundary` (plugin arm only,
+one run per prompt, scored as a fire count with a Wilson bound, not a delta). If every
+grader would be excluded they score normally, and `--ablation none` excludes nothing. A Δ near zero with
 the Skill grader failing means the skill's `description` is not triggering on that phrasing.
 
 ## Sequence claims
@@ -138,7 +142,8 @@ Did the skill fire: `input_match` is a regex over the JSON-encoded tool input, s
 ```
 
 For a near-miss that must fire none of the plugin's skills, alternate over all of them and
-cap the calls (the `arm: both` here is correct: it is a "must not fire" check):
+cap the calls (the `arm: both` here is correct for a two-arm `smoke` guard; in a
+`trigger-boundary` case, drop it and add the tags):
 
 ```yaml
   - name: no_plugin_skill_fired

@@ -1,4 +1,6 @@
-# Run: claude plugin eval plugins/eval-authoring --case agent-dispatch-case-reviewer-quiet
+# Run: node plugins/eval-authoring/scripts/ts/run-evals/run-evals.ts --trigger-boundary plugins/eval-authoring
+# Trigger-boundary negative, paired with case-reviewer-flags-planted-weak-case: read as a fire count over many distinct prompts
+# (one run, plugin arm only, no delta), not as a score.
 # Not run yet: paid, hand-off only (#646). No grant needed (Agent and Read only).
 # Quiet case for eval-authoring:case-reviewer: shares "eval case" vocabulary but asks what one
 # field means, with no case file to review. The dispatch case already exists
@@ -13,7 +15,7 @@ description: >
   A question about what max_turns means in an eval case must not dispatch
   eval-authoring:case-reviewer. expected_outcome: PASS when the agent is not dispatched and the
   reply says max_turns limits the number of turns; FAIL otherwise.
-tags: [eval-authoring, case-reviewer, agent, trigger, quick]
+tags: [eval-authoring, case-reviewer, agent, trigger, trigger-boundary, pair:case-reviewer-flags-planted-weak-case]
 
 execution:
   prompt: |
@@ -32,7 +34,6 @@ graders:
     input_match: '"subagent_type"\s*:\s*"(?:[\w-]+:)?case-reviewer"'
     min: 0
     max: 0
-    arm: both
 
   - name: explains_max_turns
     type: regex
@@ -40,4 +41,3 @@ graders:
     pattern: '(limit|cap|bound|maximum)[\s\S]{0,80}turns?|turns?[\s\S]{0,80}(limit|cap|bound|maximum)'
     flags: i
     match: contains
-    arm: both

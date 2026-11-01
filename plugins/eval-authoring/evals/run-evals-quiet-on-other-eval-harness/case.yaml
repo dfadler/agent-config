@@ -1,6 +1,8 @@
-# Run: node plugins/eval-authoring/scripts/ts/run-evals/run-evals.ts --tier quick plugins/eval-authoring
+# Run: node plugins/eval-authoring/scripts/ts/run-evals/run-evals.ts --trigger-boundary plugins/eval-authoring
+# Trigger-boundary negative, paired with run-evals-fires-natural-with-without: read as a fire count over many distinct prompts
+# (one run, plugin arm only, no delta), not as a score.
 # Near-miss for run-evals (#745): shares "run" and "evals" but is a different harness. Regression guard: a no-plugin arm passes it
-# by design (no delta), hence --ablation none via the quick tier.
+# by design (no delta), hence the single-arm trigger-boundary run.
 # Can fail: skill_not_fired fails if the description over-triggers on this vocabulary.
 schema_version: "1.1"
 name: run-evals-quiet-on-other-eval-harness
@@ -8,7 +10,7 @@ description: >
   A request that shares vocabulary with run-evals but is not about `claude plugin eval` cases must
   not invoke it. expected_outcome: PASS when run-evals is not invoked and the reply addresses the
   request; FAIL when it is invoked.
-tags: [eval-authoring, run-evals, trigger, quick]
+tags: [eval-authoring, run-evals, trigger, trigger-boundary, pair:run-evals-fires-natural-with-without]
 
 execution:
   prompt: |
@@ -27,7 +29,6 @@ graders:
     input_match: '"skill"\s*:\s*"(?:[\w-]+:)?run-evals"'
     min: 0
     max: 0
-    arm: both
 
   - name: addresses_request
     type: regex
@@ -35,4 +36,3 @@ graders:
     pattern: 'oaieval|pip install|git clone|completion[ _-]?fn|registry|yaml|api[_ ]?base|ollama|vllm|endpoint'
     flags: i
     match: contains
-    arm: both

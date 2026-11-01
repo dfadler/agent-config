@@ -1,37 +1,31 @@
 import { scoreCase, graderCategory } from "../../parser/index.ts";
 import { scoringContextFor } from "../scoring-context.ts";
-import { fromDocs } from "../sources.ts";
 import type { Rule } from "../types.ts";
 
 /**
- * EVAL009: a stable signal wants one grader on the result and one on the steps
- * taken, at least one of them scored. `tool_used: Skill` is an indicator, not
- * a signal (it is unscored in a two-arm run), so it does not satisfy the pair
- * on its own.
+ * EVAL009: a case needs at least one scored grader on the result (the reply or
+ * a file). Grade the final state, not the path: without an outcome grader the
+ * case cannot show the plugin changed the result. `tool_used: Skill` is an
+ * indicator, unscored in a two-arm run, so it never counts as one.
  */
 export const rule: Rule = {
   id: "EVAL009",
   severity: "info",
-  optIn: true, // #811: fired on about half of all cases, and its own fix excuses reply-only skills // #811: fired on about half of all cases, and its own fix excuses reply-only skills
-  title: "Case pairs a result grader with a steps grader",
-  source: fromDocs("graders that give a stable signal"),
+  optIn: true, // #811: off by default because it fired on half of all cases before it was narrowed to the result half.
+  title: "Case has no scored grader on the result",
+  source:
+    'from the Eval Research doc: "grade the final state, not the path", and decision 7 (every should-fire case needs a real outcome grader)',
   checkCase: (c, context) => {
     if (c.graders.length === 0) return [];
     const scoring = scoreCase(c, true, scoringContextFor(c, context));
-    const scored = scoring.graders.filter((g) => g.scored);
-    const result = scored.filter(
-      (g) => graderCategory(g.grader) === "result",
+    const hasResult = scoring.graders.some(
+      (g) => g.scored && graderCategory(g.grader) === "result",
     );
-    const steps = scored.filter((g) => graderCategory(g.grader) === "steps");
-    if (result.length > 0 && steps.length > 0) return [];
-    const missing = [
-      ...(result.length === 0 ? ["scored grader on the result"] : []),
-      ...(steps.length === 0 ? ["scored grader on the steps taken"] : []),
-    ];
+    if (hasResult) return [];
     return [
       {
-        message: `Case '${c.name.value}' has no ${missing.join(" and no ")}, so it lacks the result plus steps pair that gives a stable signal.`,
-        fix: "Add one grader on the outcome (regex on last_message or a file, file_exists) and one on the steps (tool_used other than Skill, tool_order, or a trace or mock_calls target). Use `arm: both` where a negative check must count in both arms. A reply-only skill has no step to check: keep its unscored Skill check and grade the reply, and leave this rule off.",
+        message: `Case '${c.name.value}' has no scored grader on the result, so it cannot show the plugin changed the outcome (from the Eval Research doc: grade the final state, not the path).`,
+        fix: "Add a grader on the outcome (a regex on last_message or a file, file_exists, or an llm judge) that counts in both arms: not `arm: with-only`, and not a Skill, trace or mock_calls check.",
         loc: c.graders[0]?.origin.loc ?? c.name.loc,
       },
     ];

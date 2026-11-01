@@ -3,14 +3,14 @@ import { fromDocs } from "../sources.ts";
 import type { Rule } from "../types.ts";
 
 /**
- * EVAL019: `tool_used` with `max` below 1 and no explicit `min: 0`. `min`
- * defaults to 1, so the grader needs at least one call and at most none, and
- * can never pass (seen as `expected 1..0` in the #450 run).
+ * EVAL019: `tool_used` with `max` below `min`. `min` defaults to 1, so
+ * `max: 0` alone needs at least one call and at most none, and can never pass
+ * (seen as `expected 1..0` in the #450 run).
  */
 export const rule: Rule = {
   id: "EVAL019",
   severity: "error",
-  title: "tool_used with max below 1 needs an explicit min: 0",
+  title: "tool_used with max below min (min defaults to 1)",
   source: `observed in a logged-in run on #450, not in the docs; the default of min comes from ${fromDocs("tool_used min and max")}`,
   checkCase: (c, { schema }) => {
     const spec = schema.graderTypes

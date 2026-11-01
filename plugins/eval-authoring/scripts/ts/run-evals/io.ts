@@ -6,14 +6,17 @@ import { spawn } from "node:child_process";
 import {
   accessSync,
   constants,
+  cpSync,
   mkdirSync,
+  mkdtempSync,
   readFileSync,
   readdirSync,
   realpathSync,
+  rmSync,
   writeFileSync,
 } from "node:fs";
-import { homedir } from "node:os";
-import { delimiter, dirname, join } from "node:path";
+import { homedir, tmpdir } from "node:os";
+import { delimiter, dirname, join, relative } from "node:path";
 import { createInterface } from "node:readline/promises";
 
 export interface SpawnOptions {
@@ -57,6 +60,17 @@ export interface Io {
   readonly readFile: (path: string) => string | undefined;
   /** Writes a file, creating parent directories. */
   readonly writeFile: (path: string, text: string) => void;
+  /** A fresh empty directory under the system temp dir; returns its path. */
+  readonly mkTemp: (prefix: string) => string;
+  /** Copies directory `src` to `dest`, leaving out each path (relative to `src`) that `skip` accepts. */
+  readonly copyDir: (src: string, dest: string, skip: (relPath: string) => boolean) => void;
+  /** Removes exactly `path` (a directory `mkTemp` returned) and everything under it. */
+  readonly remove: (path: string) => void;
+  /**
+   * Runs `cleanup` once if the process gets SIGINT or SIGTERM, then lets that
+   * signal take its course. Returns a function that unregisters the handler.
+   */
+  readonly onInterrupt: (cleanup: () => void) => () => void;
   /** The user's home directory, shown as `~` in the replies files. */
   readonly home: string;
   /** Asks a yes/no question on the terminal. False (never a guess) when there is no one to ask. */
@@ -160,6 +174,29 @@ export const nodeIo = (env: Readonly<Record<string, string | undefined>>): Io =>
   writeFile: (path, text) => {
     mkdirSync(dirname(path), { recursive: true });
     writeFileSync(path, text);
+  },
+  mkTemp: (prefix) => mkdtempSync(join(tmpdir(), prefix)),
+  copyDir: (src, dest, skip) => {
+    cpSync(src, dest, { recursive: true, filter: (p) => !skip(relative(src, p)) });
+  },
+  remove: (path) => {
+    rmSync(path, { recursive: true, force: true });
+  },
+  onInterrupt: (cleanup) => {
+    const off = (): void => {
+      handlers.forEach(({ sig, fn }) => process.off(sig, fn));
+    };
+    const handlers = (["SIGINT", "SIGTERM"] as const).map((sig) => ({
+      sig,
+      fn: (): void => {
+        off();
+        cleanup();
+        // With our handlers gone, the default action for the signal now applies.
+        process.kill(process.pid, sig);
+      },
+    }));
+    handlers.forEach(({ sig, fn }) => process.on(sig, fn));
+    return off;
   },
   home: homedir(),
   confirm: async (question) => {

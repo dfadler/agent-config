@@ -1,4 +1,6 @@
-# Run: claude plugin eval plugins/eval-authoring --case diagnose-scores-stays-quiet-on-new-grader
+# Run: node plugins/eval-authoring/scripts/ts/run-evals/run-evals.ts --trigger-boundary plugins/eval-authoring
+# Trigger-boundary negative, paired with diagnose-scores-fires-on-zero-on-correct-output: read as a fire count over many distinct prompts
+# (one run, plugin arm only, no delta), not as a score.
 # Not run yet: paid, hand-off only (#646). No grant: Skill only.
 # Should-not-fire case for diagnose-scores: a near-miss that shares "eval" and "grader" vocabulary
 # but wants a grader written for a case that has not run, not a low score explained. The
@@ -12,7 +14,7 @@ description: >
   A request for which grader type checks exact reply text must not invoke diagnose-scores.
   expected_outcome: PASS when the skill is not invoked and the reply names the regex grader; FAIL
   otherwise.
-tags: [eval-authoring, diagnose-scores, trigger, quick]
+tags: [eval-authoring, diagnose-scores, trigger, trigger-boundary, pair:diagnose-scores-fires-on-zero-on-correct-output]
 
 execution:
   prompt: |
@@ -29,7 +31,6 @@ graders:
     input_match: '"skill"\s*:\s*"(?:[\w-]+:)?diagnose-scores"'
     min: 0
     max: 0
-    arm: both
 
   - name: gives_regex_type
     type: regex
@@ -37,4 +38,3 @@ graders:
     pattern: '\bregex\b'
     flags: i
     match: contains
-    arm: both
