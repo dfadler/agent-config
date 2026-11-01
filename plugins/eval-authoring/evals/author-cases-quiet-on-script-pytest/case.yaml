@@ -1,7 +1,9 @@
-# Run: node plugins/eval-authoring/scripts/ts/run-evals/run-evals.ts --tier quick plugins/eval-authoring
+# Run: node plugins/eval-authoring/scripts/ts/run-evals/run-evals.ts --trigger-boundary plugins/eval-authoring
+# Trigger-boundary negative, paired with author-cases-fires-natural-edit-check: read as a fire count over many distinct prompts
+# (one run, plugin arm only, no delta), not as a score.
 # Near-miss for author-cases (#745): tests a plugin's script, not a skill or agent, so it shares plugin vocabulary but needs no eval case.
-# Regression guard: a no-plugin arm passes it by design (no delta), hence --ablation none via the
-# quick tier.
+# Regression guard: a no-plugin arm passes it by design (no delta), hence the single-arm
+# trigger-boundary run.
 # Can fail: skill_not_fired fails if the description over-triggers on this vocabulary.
 # good-reply: def test_render_notes_names_breaking(tmp_path): out = render_notes(tmp_path / 'CHANGELOG.md'); assert 'BREAKING' in out
 # bad-reply: Write a pytest that calls render_notes with a sample changelog and checks the output has the breaking change.
@@ -11,7 +13,7 @@ description: >
   A request that shares vocabulary with author-cases but is not about `claude plugin eval` cases must
   not invoke it. expected_outcome: PASS when author-cases is not invoked and the reply addresses the
   request; FAIL when it is invoked.
-tags: [eval-authoring, author-cases, trigger, quick]
+tags: [eval-authoring, author-cases, trigger, trigger-boundary, pair:author-cases-fires-natural-edit-check]
 
 execution:
   prompt: |
@@ -31,7 +33,6 @@ graders:
     input_match: '"skill"\s*:\s*"(?:[\w-]+:)?author-cases"'
     min: 0
     max: 0
-    arm: both
 
   - name: addresses_request
     type: regex
@@ -39,4 +40,3 @@ graders:
     pattern: '(?=[\s\S]*\bdef test_\w+)(?=[\s\S]*\brender_notes\b)(?=[\s\S]*\bassert\b)(?=[\s\S]*(?:tmp_path|tmpdir|tmp_file|NamedTemporaryFile|subprocess|capsys|capfd|StringIO|redirect_stdout|monkeypatch))'
     flags: i
     match: contains
-    arm: both

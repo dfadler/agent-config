@@ -131,9 +131,31 @@ const T95 = [
   2.056, 2.052, 2.048, 2.045, 2.042,
 ];
 
-/** t quantile at the smaller arm's df (conservative); 2 from 31 df up. */
+/** Two-sided 95% t quantile at `df` degrees of freedom; 2 from 31 up; undefined below 1 df (no estimate). */
+export const tCutoff = (df: number): number | undefined =>
+  df < 1 ? undefined : (T95[df - 1] ?? 2);
+
+/** t quantile at the smaller arm's df (conservative); 2 when an arm has under two usable runs (the SE floor applies there). */
 const tQuantile = (w: ArmStats, wo: ArmStats): number =>
-  T95[Math.min(w.usedRuns, wo.usedRuns) - 2] ?? 2;
+  tCutoff(Math.min(w.usedRuns, wo.usedRuns) - 1) ?? 2;
+
+/**
+ * The 95% bar a delta must clear to count as more than noise: the t quantile
+ * times the standard error of the difference, the SE floored (default
+ * `DEFAULT_THRESHOLDS.seFloor`) so two arms with SD 0 are not noise-free.
+ * `se`/`mult` are returned so a caller can print them.
+ */
+export const deltaBar = (
+  w: ArmStats,
+  wo: ArmStats,
+  seFloor: number = DEFAULT_THRESHOLDS.seFloor,
+): { readonly se: number; readonly mult: number; readonly bar: number } => {
+  const seW = (w.stdDev ?? 0) ** 2 / Math.max(w.usedRuns, 1);
+  const seWo = (wo.stdDev ?? 0) ** 2 / Math.max(wo.usedRuns, 1);
+  const se = Math.max(Math.sqrt(seW + seWo), seFloor);
+  const mult = tQuantile(w, wo);
+  return { se, mult, bar: mult * se };
+};
 
 const mean = (xs: readonly number[]): number | undefined =>
   xs.length === 0
@@ -151,7 +173,7 @@ const round = (n: number): number => Math.round(n * 1000) / 1000;
 const fmt = (n: number): string => String(round(n));
 
 /** A run that can be compared: no error, no silent 0, judges not skipped. */
-const comparable = (r: RunResult): boolean =>
+export const comparable = (r: RunResult): boolean =>
   !isErrored(r) && !isSilentZero(r) && r.skippedPaidGraders !== true;
 
 /** Scores of the comparable runs that have one. */
@@ -201,7 +223,7 @@ export const judgeVotes = (explanation: string): readonly string[] =>
     ?.match(/\b(?:PASS|FAIL)\b/g) ?? [];
 
 /** A grader's votes: the structured array when present, else the explanation text. */
-const graderVotes = (g: GraderResult): readonly string[] =>
+export const graderVotes = (g: GraderResult): readonly string[] =>
   g.judgeVotes !== undefined
     ? g.judgeVotes.map((v) => (v ? "PASS" : "FAIL"))
     : judgeVotes(g.explanation ?? "");
@@ -425,11 +447,7 @@ const judgeDelta = (
   // Float noise: 0.35 - 0.30 is 0.04999999999999999, which must count as 0.05.
   const delta = round(rawDelta);
   const d = fmt(delta);
-  const seW = (w.stdDev ?? 0) ** 2 / Math.max(w.usedRuns, 1);
-  const seWo = (wo.stdDev ?? 0) ** 2 / Math.max(wo.usedRuns, 1);
-  const se = Math.max(Math.sqrt(seW + seWo), t.seFloor);
-  const mult = tQuantile(w, wo);
-  const bar = mult * se;
+  const { se, mult, bar } = deltaBar(w, wo, t.seFloor);
   const noiseKnown = w.stdDev !== undefined && wo.stdDev !== undefined;
   const ceiling =
     (w.mean ?? 0) >= t.nearCeiling && (wo.mean ?? 0) >= t.nearCeiling

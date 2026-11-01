@@ -33,6 +33,7 @@ import {
 import { scanOutput } from "./output.ts";
 import { BLOCK_END, BLOCK_START } from "./summary.ts";
 import {
+  TRIGGER_TAG,
   needsBash,
   planGroups,
   planInvocations,
@@ -40,6 +41,7 @@ import {
   type Invocation,
 } from "./plan.ts";
 import { runPreflight } from "./preflight.ts";
+import { boundaryPlan, boundaryReport, type BoundaryReport } from "./boundary.ts";
 import { caseRow, redact, renderBlock, renderSummary, withBlock } from "./summary.ts";
 import {
   DEFAULT_JUDGE_MODEL,
@@ -49,11 +51,15 @@ import {
   ceilingFor,
   QUICK_FLOOR_USD,
   QUICK_PER_CASE_USD,
+  TRIGGER_BOUNDARY_TIER,
   isTierName,
   type AblationMode,
   type Tier,
 } from "./tiers.ts";
 import { replyFiles, runCount, safeName } from "./traces.ts";
+import { manifestOf } from "./plan.ts";
+import { checkNeighbours, checkStageable, parseNeighbours, stageNeighbours } from "./stage.ts";
+import { routablesOf, triggerRows } from "./trigger.ts";
 
 export const USAGE = `Usage: run-evals.ts [options] <plugin-path>
 
@@ -78,6 +84,10 @@ ${Object.values(TIERS).map((t) => `                         ${t.name}: ${t.descr
                        unstarted cases (exit 7). A result with no readable
                        costUsd is charged its per-case share (ceiling divided
                        by cases), capped at what is left
+  --jobs <n>           runs to execute in parallel inside each invocation
+                       (the CLI's -j, 1 to 8). Default: the CLI's, 1.
+                       The wrapper runs cases one after another, so this is
+                       the only concurrency. All runs share your rate limit
   --model <id>         pin the model (default: pinned in the wrapper)
   --judge-model <id>   pin the judge model (default: pinned in the wrapper)
   --eval-dir <dir>     eval directory relative to the plugin
@@ -112,6 +122,43 @@ ${Object.values(TIERS).map((t) => `                         ${t.name}: ${t.descr
                        with --changed: run the mapped cases (exit 0 when
                        there are none) instead of exiting 1 over the
                        changed files that map to no case
+  --neighbours <a,b>   trigger-set mode: run only the cases tagged 'trigger',
+                       with the named sibling plugins (directly under plugins/)
+                       loaded beside the plugin under test, as other skills
+                       compete for the same prompts in real use. The CLI has no
+                       flag for this, so the wrapper stages a temp copy of the
+                       plugin, copies each neighbour to <copy>/neighbours/<name>
+                       and adds plugins: [<copy>, <copy>/neighbours/<name>, ...]
+                       to the copy of each case (committed cases are never
+                       edited). A case that already has a plugins: list is
+                       refused. The plugin under test must itself be under
+                       plugins/ (the copy is passed --trust-plugin only then).
+                       The summary gains a Trigger set section with fire rate,
+                       false-fire rate and description length per skill.
+                       Combines with --tier and --changed; --keep-temp keeps
+                       the copy. Not combined with --trigger-boundary. Always plugin arm only (--ablation none,
+                       whatever the tier): the injected plugins: list names
+                       the plugin under test, so a baseline arm that honours
+                       it would load the plugin and any delta would mean
+                       nothing; the summary has no without or delta column.
+                       Neighbour hooks run inside the eval as you, under the
+                       copy's trust; node_modules is not copied
+  --trigger-boundary   trigger-boundary suite: run the cases tagged
+                       'trigger-boundary' (should-not-fire prompts) and the
+                       should-fire twin each names with a 'pair:<case>' tag,
+                       one run each, plugin arm only (--ablation none,
+                       --threshold 0). The summary counts the negatives that
+                       fired, with a Wilson 95% upper bound on the over-trigger
+                       rate, and lists the firing prompts so one can be kept as
+                       a 'smoke' guard. The bound is withheld, and the run
+                       exits 7, unless at least one twin fired in the same run
+                       (otherwise clean negatives could mean the harness never
+                       sees an invocation). A fire alone does not change the
+                       exit code: near-boundary prompts fire now and then.
+                       Fixed tier and ceiling (scaled like quick); not
+                       combined with --tier, --neighbours, --changed or --case.
+                       Standard and thorough skip these cases: a must-not-fire
+                       check passes the no-plugin arm by construction
   --output-dir <dir>   base results directory (default: <eval-dir>/results).
                        Each wrapper run writes <dir>/run-<time>/<NN>-<case>
   --publish-report     publish the report (default: --no-publish)
@@ -157,6 +204,7 @@ interface Options {
   readonly model: string | undefined;
   readonly judgeModel: string | undefined;
   readonly maxCostUsd: number | undefined;
+  readonly jobs: number | undefined;
   readonly evalDir: string | undefined;
   readonly reporting: Reporting;
   readonly skipUnavailable: boolean;
@@ -167,6 +215,10 @@ interface Options {
   readonly changedAllowEmpty: boolean;
   readonly pr: string | undefined;
   readonly yes: boolean;
+  /** `--neighbours`: sibling plugins to load beside the plugin under test; undefined when off. */
+  readonly neighbours: readonly string[] | undefined;
+  /** `--trigger-boundary`: the paired should-not-fire suite, single arm. */
+  readonly triggerBoundary: boolean;
 }
 
 type Parsed =
@@ -177,12 +229,14 @@ type Parsed =
 const VALUE_FLAGS: readonly string[] = [
   "--tier",
   "--max-cost-usd",
+  "--jobs",
   "--model",
   "--judge-model",
   "--eval-dir",
   "--output-dir",
   "--case",
   "--pr",
+  "--neighbours",
 ];
 const BOOL_FLAGS: readonly string[] = [
   "--publish-report",
@@ -191,6 +245,7 @@ const BOOL_FLAGS: readonly string[] = [
   "--dry-run",
   "--yes",
   "--changed-allow-empty",
+  "--trigger-boundary",
 ];
 
 /** A plain decimal greater than zero ("0.5", "2", ".5"); anything else (empty, "abc", "-1", "NaN", "1e3", "0x10", "0") is undefined. */
@@ -242,6 +297,11 @@ export const parseArgs = (argv: readonly string[]): Parsed => {
       message: `--max-cost-usd must be a positive finite number of US dollars, got '${costText}'`,
     };
   }
+  const jobsText = values.get("--jobs");
+  const jobs = jobsText === undefined ? undefined : Number(jobsText);
+  if (jobsText !== undefined && !/^[1-9]\d*$/.test(jobsText)) {
+    return { kind: "error", message: `--jobs must be a positive integer, got '${jobsText}'` };
+  }
   const pr = values.get("--pr");
   if (pr !== undefined && !/^[1-9]\d*$/.test(pr)) {
     return { kind: "error", message: `--pr must be a PR number, got '${pr}'` };
@@ -258,6 +318,20 @@ export const parseArgs = (argv: readonly string[]): Parsed => {
   if (!values.has("--changed") && bools.has("--changed-allow-empty")) {
     return { kind: "error", message: "--changed-allow-empty only applies with --changed" };
   }
+  const neighboursText = values.get("--neighbours");
+  const neighbours = neighboursText === undefined ? undefined : parseNeighbours(neighboursText);
+  if (neighboursText !== undefined && neighbours === undefined) {
+    return {
+      kind: "error",
+      message: `--neighbours takes comma-separated plugin names (letters, digits, . _ -; no repeats), got '${neighboursText}'`,
+    };
+  }
+  if (bools.has("--trigger-boundary")) {
+    const clash = ["--tier", "--neighbours", "--changed", "--case"].find((f) => values.has(f));
+    if (clash !== undefined) {
+      return { kind: "error", message: `--trigger-boundary fixes its own tier and case set; it is not combined with ${clash}` };
+    }
+  }
   const [plugin, ...extra] = positionals;
   if (plugin === undefined) {
     return { kind: "error", message: "missing <plugin-path>" };
@@ -272,10 +346,16 @@ export const parseArgs = (argv: readonly string[]): Parsed => {
     kind: "options",
     options: {
       plugin,
-      tier: TIERS[tierName],
+      // Trigger-set mode reads the plugin arm only, whatever the tier (see --neighbours in USAGE).
+      tier: bools.has("--trigger-boundary")
+        ? TRIGGER_BOUNDARY_TIER
+        : neighbours === undefined
+          ? TIERS[tierName]
+          : { ...TIERS[tierName], ablation: "none" },
       model: values.get("--model"),
       judgeModel: values.get("--judge-model"),
       maxCostUsd,
+      jobs,
       evalDir: values.get("--eval-dir"),
       reporting: {
         outputDir: values.get("--output-dir"),
@@ -289,6 +369,8 @@ export const parseArgs = (argv: readonly string[]): Parsed => {
       changedAllowEmpty: bools.has("--changed-allow-empty"),
       pr,
       yes: bools.has("--yes"),
+      neighbours,
+      triggerBoundary: bools.has("--trigger-boundary"),
     },
   };
 };
@@ -323,6 +405,10 @@ export interface RunSummary {
   readonly changedSince: string | null;
   /** "subset: N of M cases, --changed since <ref>" when `--changed` narrowed the run; null otherwise. */
   readonly subset: string | null;
+  /** The `--neighbours` plugins loaded beside the plugin under test; null when the flag was off. */
+  readonly neighbours: readonly string[] | null;
+  /** The `--trigger-boundary` fire count, bound and per-prompt rows; null when the flag was off. */
+  readonly triggerBoundary: BoundaryReport | null;
 }
 
 export interface InvocationSummary {
@@ -380,6 +466,7 @@ const invocationSpec = (
   model: options.model,
   judgeModel: options.judgeModel,
   maxCostUsd: budgetUsd,
+  jobs: options.jobs,
   evalDir: options.evalDir,
   trustPlugin: trust,
   reporting: { ...options.reporting, outputDir },
@@ -593,10 +680,26 @@ interface Progress {
   readonly outOfBudget: boolean;
 }
 
-/** Run the wrapper. Returns the process exit code; writes only through `deps.io`. */
-export const main = async (
+/**
+ * Run the wrapper. Returns the process exit code; writes only through `deps.io`.
+ * Whatever `run` registers in `cleanups` (the staged copy of `--neighbours`)
+ * runs on every way out, a throw included.
+ */
+export const main = async (argv: readonly string[], deps: Deps): Promise<ExitCode> => {
+  const cleanups: (() => void)[] = [];
+  try {
+    return await run(argv, deps, cleanups);
+  } finally {
+    cleanups.forEach((c) => {
+      c();
+    });
+  }
+};
+
+const run = async (
   argv: readonly string[],
   deps: Deps,
+  cleanups: (() => void)[],
 ): Promise<ExitCode> => {
   const { io } = deps;
   const parsed = parseArgs(argv);
@@ -620,9 +723,15 @@ export const main = async (
       : await selectChanged(io, target, suite, grants, options.changed);
   if (changed !== undefined && !changed.ok) return fail(io, EXIT_USAGE, changed.reason);
   const tag = options.tier.tag;
+  // Boundary negatives pass the no-plugin arm by construction, so a two-arm tier leaves them out.
+  const skip = options.tier.ablation === "cli-default" ? options.tier.skipTag : undefined;
   const inTier = (n: string): boolean =>
-    tag === undefined ||
-    suite.cases.some((c) => c.name.value === n && c.tags.value.includes(tag));
+    suite.cases.some(
+      (c) =>
+        c.name.value === n &&
+        (tag === undefined || c.tags.value.includes(tag)) &&
+        (skip === undefined || !c.tags.value.includes(skip)),
+    );
   const picked = changed === undefined ? undefined : changed.names.filter(inTier);
   if (changed !== undefined && picked !== undefined) {
     if (changed.paths.length === 0) {
@@ -656,10 +765,68 @@ export const main = async (
     }
     io.err(`run-evals: --changed since ${changed.ref}: ${picked.join(", ")}\n`);
   }
-  const plan = planGroups(suite, grants, tag, options.only, picked);
+  // Trigger-set mode runs the trigger cases only (those still inside --changed, when given).
+  const triggerNames = suite.cases
+    .filter((c) => c.tags.value.includes(TRIGGER_TAG))
+    .map((c) => c.name.value);
+  const boundary = options.triggerBoundary ? boundaryPlan(suite) : undefined;
+  if (boundary?.ok === false) return fail(io, EXIT_CONFIG, boundary.reason);
+  const pickedNames =
+    boundary?.ok === true
+      ? boundary.names
+      : options.neighbours === undefined
+        ? picked
+        : (picked ?? triggerNames).filter((n) => triggerNames.includes(n));
+  if (options.neighbours !== undefined) {
+    const bad = checkNeighbours(io, deps.pluginsDir, target, options.neighbours);
+    if (bad !== undefined) return fail(io, EXIT_USAGE, bad);
+    if (triggerNames.length === 0) {
+      return fail(io, EXIT_CONFIG, `--neighbours: no case tagged '${TRIGGER_TAG}' to run under ${suite.evalDir}`);
+    }
+    if (pickedNames?.length === 0) {
+      // --changed alone exits 0 when nothing it selected applies; so does --changed with --neighbours.
+      io.out(`run-evals: no trigger case among the changed cases (${(picked ?? []).join(", ")}); no case to run\n`);
+      return EXIT_OK;
+    }
+  }
+  const plan = planGroups(
+    suite,
+    grants,
+    tag,
+    options.only,
+    pickedNames,
+    boundary !== undefined
+      ? "--trigger-boundary"
+      : changed === undefined
+        ? "trigger"
+        : options.neighbours === undefined
+          ? "--changed"
+          : "--changed trigger",
+    skip,
+  );
   if (!plan.ok) return fail(io, EXIT_CONFIG, plan.reason);
 
   const trust = isRepoPlugin(target, deps.pluginsDir, io.realpath);
+  const stageInput =
+    options.neighbours === undefined
+      ? undefined
+      : {
+          target,
+          pluginsDir: deps.pluginsDir,
+          evalDir: suite.evalDir,
+          neighbours: options.neighbours,
+          cases: suite.cases.filter((c) => plan.groups.some((g) => g.cases.includes(c.name.value))),
+        };
+  if (stageInput !== undefined) {
+    if (!trust) {
+      // The staged copy lives in a temp dir, so the CLI would ask for trust. Skipping that is safe only
+      // when the copy is built entirely from plugins/ content, so a plugin outside plugins/ is refused.
+      return fail(io, EXIT_USAGE, `--neighbours: ${target} is not directly under ${deps.pluginsDir}; only this repo's plugins can be staged and trusted`);
+    }
+    // What staging would refuse is reported here, before --dry-run returns, not only on a real run.
+    const unstageable = checkStageable(io, stageInput);
+    if (unstageable !== undefined) return fail(io, EXIT_CONFIG, unstageable);
+  }
   const base =
     options.reporting.outputDir === undefined
       ? join(suite.evalDir, "results")
@@ -693,6 +860,16 @@ export const main = async (
     io.out(
       `note: each invocation shows the full ceiling; a real run gives later invocations only the budget left after earlier results\n`,
     );
+    if (boundary !== undefined) {
+      io.out(
+        `note: --trigger-boundary: one run per prompt, plugin arm only, --threshold 0; the bound is reported only if a should-fire twin fires in the same run\n`,
+      );
+    }
+    if (options.neighbours !== undefined) {
+      io.out(
+        `note: --neighbours ${options.neighbours.join(",")}: a real run runs these cases against a temp copy of the plugin (shown above as the plugin path), with ${options.neighbours.join(", ")} under neighbours/ and a plugins: list added to the copy of each case\n`,
+      );
+    }
     return EXIT_OK;
   }
 
@@ -708,6 +885,22 @@ export const main = async (
     return blocking.reduce<ExitCode>((c, f) => worstExit(c, f.code), EXIT_OK);
   }
 
+  const staged = stageInput === undefined ? undefined : stageNeighbours(io, stageInput);
+  if (staged?.ok === false) return fail(io, EXIT_CONFIG, staged.reason);
+  if (staged !== undefined) {
+    // From here the staged copy is removed on every way out: return, throw, or SIGINT/SIGTERM.
+    cleanups.push(
+      io.onInterrupt(() => {
+        io.remove(staged.tempDir);
+      }),
+      () => {
+        if (options.reporting.keepTemp) io.err(`run-evals: kept the staged copy at ${staged.root}\n`);
+        else io.remove(staged.tempDir);
+      },
+    );
+    io.err(`run-evals: --neighbours ${(options.neighbours ?? []).join(",")}: running against the staged copy ${staged.root}\n`);
+  }
+  const runTarget = staged?.root ?? target;
   const progress = await invocations.reduce<Promise<Progress>>(
     async (accP, inv, i) => {
       const acc = await accP;
@@ -718,7 +911,7 @@ export const main = async (
       const r = await runInvocation(
         io,
         options,
-        target,
+        runTarget,
         trust,
         i + 1,
         total,
@@ -757,10 +950,17 @@ export const main = async (
       `run-evals: cost ceiling $${String(ceilingUsd)} spent ($${String(progress.spentUsd)}); not run: ${unstarted.join(", ")}\n`,
     );
   }
+  const results = done.map((d, i) => ({ caseName: d.caseName, text: progress.texts[i] }));
+  const boundaryResult = boundary === undefined ? undefined : boundaryReport(suite, results);
+  if (boundaryResult?.withheld !== undefined) {
+    io.err(`run-evals: --trigger-boundary: over-trigger bound withheld: ${boundaryResult.withheld}\n`);
+  }
   // The last case can overspend without any later case to notice, so check the total too.
   const exit = progress.done.reduce<ExitCode>(
     (c, g) => worstExit(c, g.exit),
-    progress.outOfBudget || progress.spentUsd > ceilingUsd ? EXIT_PARTIAL : EXIT_OK,
+    progress.outOfBudget || progress.spentUsd > ceilingUsd || boundaryResult?.withheld !== undefined
+      ? EXIT_PARTIAL
+      : EXIT_OK,
   );
   // N is what finished, M what the same command would plan without --changed: the tier's cases.
   const subset =
@@ -780,6 +980,8 @@ export const main = async (
     exit,
     changedSince: changed?.ok === true ? changed.ref : null,
     subset,
+    neighbours: options.neighbours ?? null,
+    triggerBoundary: boundaryResult ?? null,
   };
   io.writeFile(
     join(runDir, SUMMARY_FILE),
@@ -798,6 +1000,9 @@ export const main = async (
     exit,
     command: `node plugins/eval-authoring/scripts/ts/run-evals/run-evals.ts ${argv.map(shellWord).join(" ")}`,
     unstarted,
+    neighbours: options.neighbours,
+    boundary: boundaryResult,
+    trigger: triggerRows(suite, routablesOf(io, target), manifestOf(target).name, results),
     cases: done.map((d, i) => ({
       caseName: d.caseName,
       exit: d.exit,

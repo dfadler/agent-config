@@ -1,8 +1,11 @@
+import { spawnSync } from "node:child_process";
 import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
+import { fileURLToPath } from "node:url";
+import { readSuite } from "./parser/index.ts";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
-import { checkPlugin, exitCode, headerReplies } from "./check-replies.ts";
+import { checkPlugin, exitCode, headerReplies, probeCase } from "./check-replies.ts";
 
 let root = "";
 beforeEach(() => {
@@ -71,5 +74,42 @@ describe("checkPlugin", () => {
     writeFileSync(join(dir, "graders", "g.md"), "---\nname: says_hi\ntype: regex\npattern: 'hi'\n---\n");
     const r = checkPlugin(root);
     expect(r[0]?.status).toBe("ok");
+  });
+});
+
+describe("probeCase", () => {
+  it("reports pass or FAIL per last_message regex and not-run for the rest", () => {
+    addCase("p", "", REGEX + LLM);
+    const c = readSuite(root).cases[0];
+    if (c === undefined) throw new Error("no case");
+    expect(probeCase(c, "hi")).toEqual(["pass says_hi", "not-run judge (llm)"]);
+    expect(probeCase(c, "nope")).toEqual(["FAIL says_hi", "not-run judge (llm)"]);
+  });
+});
+
+describe("--probe command line", () => {
+  const script = fileURLToPath(new URL("./check-replies.ts", import.meta.url));
+  const run = (args: readonly string[], input?: string) =>
+    spawnSync(process.execPath, [script, ...args], { input, encoding: "utf8" });
+
+  it.each([
+    ["starts with a dash", "- hi there\n"],
+    ["starts with two dashes", "-- hi there\n"],
+    ["has an apostrophe and shell syntax", "don't say '$(touch pwned)' hi\n"],
+  ])("probes a reply that %s, read from stdin", (_n, reply) => {
+    addCase("p", "", REGEX);
+    const r = run(["--probe", "p", "--reply", "-", root], reply);
+    expect(r.stdout).toBe("pass says_hi\n");
+    expect(r.status).toBe(0);
+  });
+  it("reads stdin when --reply is absent", () => {
+    addCase("p", "", REGEX);
+    expect(run(["--probe", "p", root], "nope").stdout).toBe("FAIL says_hi\n");
+  });
+  it("exits 2 on a missing reply, an unknown case and an unknown flag", () => {
+    addCase("p", "", REGEX);
+    expect(run(["--probe", "p", "--reply", "-", root], "").status).toBe(2);
+    expect(run(["--probe", "nope", "--reply", "-", root], "hi").status).toBe(2);
+    expect(run(["--foo", root]).status).toBe(2);
   });
 });

@@ -1,6 +1,8 @@
-# Run: node plugins/eval-authoring/scripts/ts/run-evals/run-evals.ts --tier quick plugins/eval-authoring
+# Run: node plugins/eval-authoring/scripts/ts/run-evals/run-evals.ts --trigger-boundary plugins/eval-authoring
+# Trigger-boundary negative, paired with author-cases-fires-natural-trigger-check: read as a fire count over many distinct prompts
+# (one run, plugin arm only, no delta), not as a score.
 # Near-miss for author-cases (#745): shares the skill name but wants prose editing, not cases. Regression guard: a no-plugin arm passes it
-# by design (no delta), hence --ablation none via the quick tier.
+# by design (no delta), hence the single-arm trigger-boundary run.
 # Can fail: skill_not_fired fails if the description over-triggers on this vocabulary.
 # good-reply: Tighter: Converts a changelog into release notes that name every breaking change.
 # bad-reply: Here is a more concise version with the redundancy and filler removed.
@@ -10,7 +12,7 @@ description: >
   A request that shares vocabulary with author-cases but is not about `claude plugin eval` cases must
   not invoke it. expected_outcome: PASS when author-cases is not invoked and the reply addresses the
   request; FAIL when it is invoked.
-tags: [eval-authoring, author-cases, trigger, quick]
+tags: [eval-authoring, author-cases, trigger, trigger-boundary, pair:author-cases-fires-natural-trigger-check]
 
 execution:
   prompt: |
@@ -29,7 +31,6 @@ graders:
     input_match: '"skill"\s*:\s*"(?:[\w-]+:)?author-cases"'
     min: 0
     max: 0
-    arm: both
 
   - name: addresses_request
     type: regex
@@ -37,4 +38,3 @@ graders:
     pattern: '(?<!able to )\b(?:turns?|converts?|transforms?|generates?|drafts?|produces?|writes?|rewrites?)\b[^.\n]{0,40}\bchangelogs?\b[^.\n]{0,30}\brelease notes\b|\brelease notes\b[^.\n]{0,40}\bchangelogs?\b'
     flags: i
     match: contains
-    arm: both

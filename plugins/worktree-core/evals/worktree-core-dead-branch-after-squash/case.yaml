@@ -1,0 +1,61 @@
+# Run: claude plugin eval plugins/worktree-core --case worktree-core-dead-branch-after-squash --runs 3 --trust-plugin --no-publish
+# Shared run/grant facts: docs/contributing.md, "Plugin evals". No grant; reply-only. All free, quick.
+# Should-fire case for "A branch whose PR has merged is dead": a follow-up commit on a branch
+# whose PR was already squash-merged must go on a fresh branch from origin/main (cherry-pick),
+# with a history check before gh pr create, not be pushed from the old branch.
+# Can fail: skill_fired fails if a "push my follow-up from the merged branch" question does not
+# match the description (without the sentence that names this situation it fired 0 of 3);
+# fresh_branch_from_main, cherry_picks_new_commit and checks_diff_before_pr fail on a reply that
+# says "just push and open the PR". checks_diff_before_pr is the skill's own check and a bare
+# reply rarely names it.
+# deleted-sentence: "A branch whose PR has merged is dead: never push to it or open a PR from it."
+# good-reply: "Don't reuse that branch. A squash merge leaves its old commits off main by SHA, so a new PR from it would carry them all again. Cut a fresh branch from origin/main, git cherry-pick 4f2a9c1, and run git log --oneline origin/main..HEAD before gh pr create."
+# bad-reply: "Sure, just git push and run gh pr create. If main moved, rebase first."
+# Drafted by the blind-case-writer agent from the committed skill text; regexes edited by hand.
+schema_version: "1.1"
+name: worktree-core-dead-branch-after-squash
+description: >
+  A user with a typo-fix commit on a branch whose PR was already squash-merged should be told not
+  to push or open a PR from that branch, but to cut a fresh branch from origin/main, cherry-pick
+  the commit and check the history first. expected_outcome: PASS when the skill is invoked and the
+  reply names a fresh branch from main, cherry-pick and a git log or diff check against
+  origin/main; FAIL when it says to push and open the PR from the old branch.
+tags: [worktree-core, trigger, quick]
+
+execution:
+  prompt: |
+    My PR for the branch fix-login-timeout got squash-merged into main yesterday. After that I
+    noticed a typo in the error message and committed the fix locally on the same branch
+    (commit 4f2a9c1). Can I just push it and open a small PR for the typo?
+  max_turns: 6
+  allowed_tools:
+    - Skill
+
+graders:
+  - name: skill_fired
+    type: tool_used
+    tool: Skill
+    input_match: '"skill"\s*:\s*"(?:[\w-]+:)?git-worktree-usage"'
+    min: 1
+    arm: with-only
+
+  - name: fresh_branch_from_main
+    type: regex
+    target: last_message
+    pattern: '(fresh|new)\s+branch[^\n]{0,80}\bmain\b|\bmain\b[^\n]{0,80}(fresh|new)\s+branch'
+    flags: i
+    match: contains
+
+  - name: cherry_picks_new_commit
+    type: regex
+    target: last_message
+    pattern: 'cherry-pick'
+    flags: i
+    match: contains
+
+  - name: checks_diff_before_pr
+    type: regex
+    target: last_message
+    pattern: 'git\s+(?:log|diff)[^\n]{0,30}origin/main'
+    flags: i
+    match: contains

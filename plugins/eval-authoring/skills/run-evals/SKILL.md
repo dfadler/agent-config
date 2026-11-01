@@ -82,6 +82,27 @@ it, do not rebuild any of that.
    `subset:` line names the tier and the finished count; with `--pr` it warns when the
    block it replaces held a full run. The mapping is a heuristic and can miss cases, so
    run the full tier before a release.
+   To measure routing against competing skills, add `--neighbours <plugin,...>` (siblings
+   under `plugins/`): it runs only the `trigger` cases against a temp copy of the plugin
+   with those plugins loaded beside it through each case's `plugins:` (the CLI has no flag
+   for this; committed cases are not edited, and a case with its own `plugins:` is
+   refused). The summary then has a Trigger set table: fire rate, false-fire rate and
+   description length per skill. It always runs the plugin arm only (`--ablation none`
+   whatever the tier), because the injected `plugins:` list names the plugin itself and
+   a baseline arm that honours it would load the plugin: no without or delta column.
+   Neighbour hooks run inside the eval under the copy's trust, and `node_modules` is
+   not copied.
+   To measure the should-not-fire side of routing, run `--trigger-boundary`: the cases
+   tagged `trigger-boundary` plus the should-fire twin each names with a `pair:<case>`
+   tag, one run each, plugin arm only, fixed tier (a ceiling scaled like `quick`; not
+   combined with `--tier`, `--neighbours`, `--changed` or `--case`). The summary counts how many
+   negative prompts fired and gives a Wilson 95% upper bound on the over-trigger rate,
+   withheld (and exit 7) unless at least one twin fired in the same run; a fire alone does
+   not change the exit code. Report the count and the bound, not a delta, and list the
+   firing prompts so one can become a `smoke` guard. `standard` and `thorough` skip these
+   cases: a must-not-fire check passes the no-plugin arm by construction. It does not
+   measure competition from other installed skills: the sandbox loads only the plugin
+   under test.
    To put the results in a PR, add `--pr <n>`: it prints the exact
    marked block, asks, then replaces the `run-evals` block in the PR body with `gh pr
    edit`. It is off by default, refuses `--dry-run`, and `--yes` skips only the question.
@@ -117,7 +138,19 @@ give the arm scores and write "delta not measured": no delta number, even marked
 preliminary or with a caveat beside it. More runs per arm do not fix this, because runs
 shrink within-case noise but only more cases shrink the standard error of a delta. A delta
 needs a with-and-without comparison at `thorough` on a suite of about 20 cases or more. The
-wrapper's summary says the same under its table.
+wrapper's summary says the same under its table. The `± band (n runs/arm)` it prints beside a
+`thorough` case delta is that one case's 95% noise bar (t quantile x standard error of the
+difference): a delta inside it is noise-level. It does not lift the suite-size rule above.
+
+**Before paying: what can this plan detect?** `node scripts/ts/run-evals/power.ts --runs 5
+--sd 0.25` (or `--from-result <aggregate-result.json>` for the SD pooled over an earlier
+run's arms) prints the smallest per-case delta that clears the same 95% bar, so "5 runs
+cannot see a delta under 0.44" is known before the run. There is no default SD (none is
+recorded for this repo), so the figure is only as good as the SD you give it (a result full
+of ceiling or floor cases pools in SD 0 and gives an optimistic cutoff). It is a
+cutoff, not a power calculation: a true delta of that size clears the bar about half the
+time. It cannot say how many cases a suite needs or whether a suite-level delta is
+detectable, and it is not wired into `--dry-run`.
 
 ## What the tier values mean
 

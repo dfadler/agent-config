@@ -3,6 +3,9 @@
  * it in a PR body. Pure: no I/O, so it is tested from recorded result text.
  */
 import { isAbsolute } from "node:path";
+import { readAggregateResult } from "../parser/index.ts";
+import { deltaBar, diagnose } from "../diagnose/verdict.ts";
+import type { BoundaryReport } from "./boundary.ts";
 
 export const BLOCK_START = "<!-- run-evals:start -->";
 export const BLOCK_END = "<!-- run-evals:end -->";
@@ -133,6 +136,13 @@ export interface CaseRow {
   readonly with: number | undefined;
   readonly without: number | undefined;
   readonly delta: number | undefined;
+  /** Usable runs in the plugin arm and in the no-plugin arm; omitted when the result could not be diagnosed. */
+  readonly runs?: number;
+  readonly runsWithout?: number;
+  /** The delta diagnose() judges, recomputed from usable runs; the file's `delta` counts errored and skipped runs as 0. */
+  readonly usableDelta?: number;
+  /** 95% bar for the delta (t quantile x SE of the difference); omitted when an arm has under two usable runs. */
+  readonly band?: number;
   /** Graders that failed in the plugin arm. */
   readonly failed: readonly FailedGrader[];
   /** Plugin-arm runs where skill_fired failed, and how many runs had that grader. */
@@ -156,7 +166,13 @@ export const caseRow = (
   const skillGraders = runs.flatMap((r) =>
     isRec(r) ? list(r["graders"]).filter((g) => isRec(g) && g["name"] === "skill_fired") : [],
   );
+  const parsed = text === undefined ? undefined : readAggregateResult(text);
+  const v = parsed?.ok === true ? diagnose(parsed.result).cases.find((x) => x.name === caseName) : undefined;
+  const noiseKnown = v !== undefined && v.with.stdDev !== undefined && v.without.stdDev !== undefined;
   return {
+    ...(v === undefined ? {} : { runs: v.with.usedRuns, runsWithout: v.without.usedRuns }),
+    ...(v?.delta === undefined ? {} : { usableDelta: v.delta }),
+    ...(v !== undefined && noiseKnown ? { band: deltaBar(v.with, v.without).bar } : {}),
     skillRuns: skillGraders.length,
     skillMissed: skillGraders.filter((g) => isRec(g) && g["passed"] === false).length,
     caseName,
@@ -183,6 +199,21 @@ export const caseRow = (
   };
 };
 
+/** Runs that hit (fired, for a fire rate; fired anyway, for a false-fire rate) out of the runs graded. */
+export interface Tally {
+  readonly hit: number;
+  readonly runs: number;
+}
+
+/** One skill (or set of skills one pattern accepts) in the trigger table; a side with no grader is undefined. */
+export interface TriggerRow {
+  readonly skill: string;
+  readonly fires: Tally | undefined;
+  readonly falseFires: Tally | undefined;
+  /** Characters of the SKILL.md or agent description; "-" when unreadable. */
+  readonly descriptionChars: string;
+}
+
 export interface SummaryInput {
   readonly plugin: string;
   readonly tier: string;
@@ -193,6 +224,12 @@ export interface SummaryInput {
   readonly exit: number;
   readonly command: string;
   readonly unstarted: readonly string[];
+  /** The `--neighbours` plugins loaded beside the plugin under test; undefined when the flag was off. */
+  readonly neighbours?: readonly string[] | undefined;
+  /** The trigger table rows; empty or undefined leaves the table out. */
+  readonly trigger?: readonly TriggerRow[] | undefined;
+  /** The `--trigger-boundary` result; undefined when the flag was off. */
+  readonly boundary?: BoundaryReport | undefined;
   /** One per invocation, in run order; `row` undefined when no result could be read. */
   readonly cases: readonly {
     readonly caseName: string;
@@ -207,32 +244,129 @@ export const DELTA_CASE_FLOOR = 20;
 const fmt = (n: number | undefined): string => (n === undefined ? "-" : n.toFixed(2));
 const cell = (s: string): string => s.replace(/\|/g, "\\|");
 
+const rate =(t: Tally | undefined): string =>
+  t === undefined || t.runs === 0
+    ? "-"
+    : `${String(t.hit)}/${String(t.runs)} (${(t.hit / t.runs).toFixed(2)})`;
+
+/** The trigger section: the neighbours line (when the flag was on) and the table; empty when there is neither. */
+const triggerLines = (s: SummaryInput): readonly string[] => {
+  const rows = s.trigger ?? [];
+  return s.neighbours === undefined && rows.length === 0
+    ? []
+    : [
+        "",
+        "### Trigger set",
+        "",
+        ...(s.neighbours === undefined
+          ? []
+          : [
+              `Neighbours loaded beside \`${s.plugin}\` through each case's \`plugins:\` (a staged copy; committed cases untouched): ${s.neighbours.map((n) => `\`${n}\``).join(", ")}. Plugin arm only (\`--neighbours\` forces \`--ablation none\` whatever the tier), so there is no without arm and no delta.`,
+              "",
+            ]),
+        ...(rows.length === 0
+          ? ["No tool_used grader on Skill or Agent in the cases that ran, so there is nothing to tabulate."]
+          : [
+              "Plugin arm only. Fire rate: runs that fired over runs of cases that must fire. False-fire rate: runs that fired over runs of must-not-fire cases. Roles come from each grader's min and max, not its name.",
+              "",
+              "| skill | fire rate | false-fire rate | description chars |",
+              "| --- | --- | --- | --- |",
+              ...rows.map(
+                (r) =>
+                  `| ${cell(r.skill)} | ${rate(r.fires)} | ${rate(r.falseFires)} | ${cell(r.descriptionChars)} |`,
+              ),
+            ]),
+      ];
+};
+
+const pct = (n: number): string => `${(n * 100).toFixed(1)}%`;
+
+/** The trigger-boundary section: the fire count with its bound (or why there is none), then one row per negative. */
+const boundaryLines = (b: BoundaryReport | undefined): readonly string[] => {
+  if (b === undefined) return [];
+  const fired = b.rows.filter((r) => r.fired === true);
+  const word = (v: boolean | undefined, yes: string, no: string): string => (v === undefined ? "no verdict" : v ? yes : no);
+  return [
+    "",
+    "### Trigger boundary",
+    "",
+    "One run per prompt, plugin arm only: the exit code is diagnostic and the fire count is the result. A negative scores `fired` when its must-not-fire check failed.",
+    "",
+    `Fires: ${String(b.fires)} of ${String(b.negatives)} negative prompts. ${
+      b.upper === undefined
+        ? `Over-trigger bound withheld: ${b.withheld ?? "no verdict"}.`
+        : `Wilson 95% upper bound on the over-trigger rate: ${pct(b.upper)}.`
+    }`,
+    `Vacuity control: ${String(b.twinsFired)} of ${String(b.twinsRun)} should-fire twins fired in this run.`,
+    "",
+    "| negative | result | twin | twin result |",
+    "| --- | --- | --- | --- |",
+    ...b.rows.map(
+      (r) =>
+        `| ${cell(r.caseName)} | ${word(r.fired, "fired", "quiet")} | ${r.twin === undefined ? "-" : cell(r.twin)} | ${word(r.twinFired, "fired", "quiet")} |`,
+    ),
+    ...(fired.length === 0
+      ? []
+      : [
+          "",
+          `Fired: ${fired.map((r) => `\`${cell(r.caseName)}\``).join(", ")}. To keep one as a regression alarm, remove its \`trigger-boundary\` and \`pair:\` tags, add \`arm: both\` to its must-not-fire grader and tag it \`smoke\`; or tighten the skill's description and rerun.`,
+        ]),
+  ];
+};
+
+/** The delta with its 95% band and run count, or the bare delta when the result carries no run detail. */
+const deltaCell = (row: CaseRow | undefined): string => {
+  const fileDelta = fmt(row?.delta);
+  if (row?.delta === undefined || row.runs === undefined) return fileDelta;
+  // The band is built from usable runs, so judge "inside" against the delta diagnose() judges, not the file's.
+  const judged = row.usableDelta ?? row.delta;
+  const base = fmt(judged) === fileDelta ? fileDelta : `${fileDelta} (${fmt(judged)} from usable runs)`;
+  const without = row.runsWithout ?? row.runs;
+  const runs =
+    without === row.runs
+      ? `${String(row.runs)} run${row.runs === 1 ? "" : "s"}/arm`
+      : `${String(row.runs)}/${String(without)} runs`;
+  if (row.band === undefined) return `${base} (${runs}, noise unknown)`;
+  const inside = Math.abs(judged) <= row.band ? "; inside band" : "";
+  return `${base} ± ${fmt(row.band)} (${runs}${inside})`;
+};
+
 /** The paste-ready Markdown. Heading "Eval results" is what the PR convention looks for. */
 export const renderSummary = (s: SummaryInput): string => {
   const failures = s.cases.flatMap((c) => c.row?.failed.map((f) => ({ c: c.caseName, f })) ?? []);
   const unfired = s.cases.flatMap((c) =>
     c.row !== undefined && c.row.skillMissed > 0 ? [{ caseName: c.caseName, row: c.row }] : [],
   );
-  const showDelta = s.tier === "thorough";
+  // --neighbours and --trigger-boundary run the plugin arm only: no without or delta column to show.
+  const oneArm = s.neighbours !== undefined || s.boundary !== undefined;
+  const showDelta = s.tier === "thorough" && !oneArm;
   const hasDelta = showDelta && s.cases.some((c) => c.row?.delta !== undefined);
   return [
     "## Eval results",
     "",
     `Tool-generated by run-evals.ts (AI-assisted session); not hand-written. Plugin \`${s.plugin}\`, tier \`${s.tier}\`, model \`${s.model}\`, judge \`${s.judgeModel}\`. Cost $${s.spentUsd.toFixed(4)} of $${String(s.ceilingUsd)} ceiling (list price). Exit ${String(s.exit)}.`,
     "",
-    "| case | with | without | delta | exit |",
-    "| --- | --- | --- | --- | --- |",
+    ...(oneArm
+      ? ["| case | score | exit |", "| --- | --- | --- |"]
+      : ["| case | with | without | delta | exit |", "| --- | --- | --- | --- | --- |"]),
     ...s.cases.map(
       (c) =>
-        `| ${cell(c.caseName)} | ${fmt(c.row?.with)} | ${fmt(c.row?.without)} | ${showDelta ? fmt(c.row?.delta) : "-"} | ${String(c.exit)}${c.row === undefined ? " (no readable result)" : ""} |`,
+        oneArm
+          ? `| ${cell(c.caseName)} | ${fmt(c.row?.with)} | ${String(c.exit)}${c.row === undefined ? " (no readable result)" : ""} |`
+          : `| ${cell(c.caseName)} | ${fmt(c.row?.with)} | ${fmt(c.row?.without)} | ${showDelta ? deltaCell(c.row) : "-"} | ${String(c.exit)}${c.row === undefined ? " (no readable result)" : ""} |`,
     ),
-    ...s.unstarted.map((n) => `| ${cell(n)} | not run | | | |`),
+    ...s.unstarted.map((n) => (oneArm ? `| ${cell(n)} | not run | |` : `| ${cell(n)} | not run | | | |`)),
+    ...(hasDelta
+      ? ["", "Delta ± band: the 95% bar from the per-run scores (t quantile x standard error of the difference, SE floored at 0.05). A delta inside its band cannot be told from noise. Errored and skipped runs are left out of the band and the judged delta (shown as \"from usable runs\" when it differs from the file's); \"a/b runs\" is usable runs with and without the plugin."]
+      : []),
     ...(hasDelta && s.cases.length + s.unstarted.length < DELTA_CASE_FLOOR
       ? ["", `Delta not significant below ${String(DELTA_CASE_FLOOR)} cases (this suite has ${String(s.cases.length + s.unstarted.length)}).`]
       : []),
-    ...(s.tier === "thorough"
+    ...(s.tier === "thorough" || oneArm
       ? []
       : ["", `Delta not measured at tier \`${s.tier}\`: report arm scores only, not a delta, in a PR (even marked preliminary). Re-run at \`thorough\` for a delta.`]),
+    ...triggerLines(s),
+    ...boundaryLines(s.boundary),
     ...(unfired.length === 0
       ? []
       : [

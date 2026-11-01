@@ -167,6 +167,12 @@ a CI failure here.
   cached artifact's *shape* changes, e.g. `kcov-bin-v1-...`) and the pinned
   version/commit being cached — so a version bump can't silently keep serving
   the old cached binary.
+- **A cached binary that links a system library must key on that library's
+  version.** The cached kcov binary links the runner's libopcodes (binutils);
+  when the runner image moved binutils on, the cache still hit and `kcov
+  --version` failed with `libopcodes-2.42-system.so: cannot open shared object
+  file` (exit 127). `sh-coverage.yml` now installs its build dependencies first
+  and puts the `binutils-dev` version in the key (`kcov-bin-v2-...`).
 
 ## Debugging a failing run
 

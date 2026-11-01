@@ -1,0 +1,73 @@
+# Run: node plugins/eval-authoring/scripts/ts/run-evals/run-evals.ts --tier quick --case mine-cases-fires-on-failing-session plugins/eval-authoring
+# CO-AUTHORED with the mine-cases skill in one session (#862): a cheap smoke guard, not independent
+# evidence the skill works. No delta is expected or claimed; unmeasured since the rewrite below.
+# No grant: Skill only; the prompt forbids running anything. Every value in the prompt is invented.
+# First standard run (before the rewrite): with the plugin no_email_copied failed in 3 of 3 runs,
+# without it in 1 of 3 (mean 0.67 both arms). The prompt's email was jdoe@example.com, the very
+# placeholder the skill's step 3 tells the model to invent, so following the skill matched the
+# grader: the grader was wrong, not the draft. (Inferred: the run kept no reply text.) The prompt
+# now uses a real-looking invented email and home (jroe@widgetco-mail.com, /Users/jroe), which the
+# skill's --check flags and its placeholders (jdoe, example.com) do not match.
+# Can fail: skill_fired scores 0 if the description stops matching this phrasing (an unscored
+# indicator in a two-arm run); no_email_copied / no_home_path_copied fail when the draft quotes the
+# excerpt's address or path, which the skill's redaction rule forbids; handles_leaks fails when the
+# reply never says it paraphrased or redacted. A bare model may pass all three by default.
+# EVAL024 warnings on no_email_copied and no_home_path_copied are intended: the grader exists to
+# catch an echo of the excerpt's invented values, so it must match text the prompt contains.
+# good-reply: schema_version: "1.1". Draft case: a prompt asking for a changelog entry for a retry
+#   fix, with the contact address replaced by a placeholder and the path dropped; I paraphrased the
+#   session rather than quoting it. Grader: the reply must state the PR number.
+# bad-reply: schema_version: "1.1". prompt: add a changelog entry; my email is jroe@widgetco-mail.com.
+#   The agent wrote /Users/jroe/code/widget/CHANGELOG.md and the grader checks that path.
+schema_version: "1.1"
+name: mine-cases-fires-on-failing-session
+description: >
+  Asked to turn a failing session excerpt into an eval case, the model invokes mine-cases and the
+  draft carries no copied address or path. expected_outcome: PASS when the skill fires and the
+  reply neither quotes the excerpt's email or path nor skips saying it was paraphrased or
+  redacted; FAIL otherwise.
+tags: [eval-authoring, mine-cases, trigger, quick, smoke]
+
+execution:
+  prompt: |
+    A session of mine ignored the rule in my changelog-writer skill that every entry names its PR
+    number. Here is the excerpt:
+
+    user: add a changelog entry for the retry fix. my email is jroe@widgetco-mail.com if you need it
+    assistant: Added "- Fix retry backoff" to /Users/jroe/code/widget/CHANGELOG.md
+    user: no PR number?
+
+    Turn that failure into a draft eval case for the skill (case.yaml, schema_version 1.1).
+    Answer in your reply; do not run anything.
+  max_turns: 6
+  allowed_tools:
+    - Skill
+
+graders:
+  - name: skill_fired
+    type: tool_used
+    tool: Skill
+    input_match: '"skill"\s*:\s*"(?:[\w-]+:)?mine-cases"'
+    min: 1
+    arm: with-only
+
+  - name: no_email_copied
+    type: regex
+    target: last_message
+    pattern: 'jroe@widgetco-mail\.com'
+    match: not_contains
+    arm: both
+
+  - name: no_home_path_copied
+    type: regex
+    target: last_message
+    pattern: '/Users/jroe'
+    match: not_contains
+    arm: both
+
+  - name: handles_leaks
+    type: regex
+    target: last_message
+    pattern: 'paraphras|redact|placeholder|scrub|anonymi'
+    flags: i
+    match: contains

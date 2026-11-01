@@ -1,0 +1,13 @@
+schema_version: "1.1"
+name: no-matcher
+tags: [trigger-boundary, pair:matcherless-twin]
+execution:
+  prompt: Run the test suite with npm test.
+  allowed_tools:
+    - Skill
+graders:
+  - name: quiet
+    type: tool_used
+    tool: Skill
+    min: 0
+    max: 0

@@ -1,0 +1,44 @@
+# Run: claude plugin eval plugins/youtube-transcript --case youtube-transcript-fires-on-summarize-link --runs 3 --trust-plugin --no-publish
+# Shared run/grant facts: docs/contributing.md, "Plugin evals". No grant: Skill only; nothing runs.
+# Natural-phrasing should-fire case: the user pastes a YouTube link and asks for a summary,
+# never saying "transcript" or "captions". The skill's description lists "summarize this
+# YouTube video" for exactly this. The fire rate is the primary signal here. The result
+# grader matches wording the prompt does not contain: the skill's script name or its
+# `en-orig` track, which a no-skill model rarely volunteers (it tends to say `--write-auto-subs`
+# alone or `en`).
+# Written in the session that wrote the skill: shares that session's view of the boundary.
+# Can fail: skill_fired fails if the description stops matching a bare "summarize this video"
+# request; plans_to_read_captions fails if the reply names neither the script nor en-orig.
+# good-reply: I would run fetch-transcript.sh on the link, then read the saved .txt and .description files and summarize them.
+# bad-reply: I would use yt-dlp with --write-auto-subs, then read the .vtt subtitle file and summarize it.
+schema_version: "1.1"
+name: youtube-transcript-fires-on-summarize-link
+description: >
+  A bare "summarize this YouTube video" request with a link makes the model invoke
+  youtube-transcript and plan to fetch the captions as text. expected_outcome: PASS when the
+  skill fires and the reply plans a caption fetch; FAIL otherwise.
+tags: [youtube-transcript, trigger]
+
+execution:
+  prompt: |
+    Summarize this video for me: https://www.youtube.com/watch?v=wQ0duoTeAAU
+    I'm on a Mac with yt-dlp and jq installed. Do not run anything yet; tell me in two or
+    three sentences how you would get its content, naming the tool and the files you would
+    read.
+  max_turns: 6
+  allowed_tools:
+    - Skill
+
+graders:
+  - name: skill_fired
+    type: tool_used
+    tool: Skill
+    input_match: '"skill"\s*:\s*"(?:[\w-]+:)?youtube-transcript"'
+    min: 1
+    arm: with-only
+
+  - name: plans_to_read_captions
+    type: regex
+    target: last_message
+    pattern: 'en-orig|fetch-transcript\.sh'
+    match: contains

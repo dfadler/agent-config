@@ -1,0 +1,77 @@
+# Run: node plugins/eval-authoring/scripts/ts/run-evals/run-evals.ts --tier quick plugins/eval-authoring
+# (quick tier: one run, plugin arm only, `--ablation none`; the no-plugin arm cannot dispatch a
+# plugin agent.) No grant (case text is in the prompt).
+# SMOKE, NOT INDEPENDENT EVIDENCE (#859): written in the same session as the grader-red-team
+# agent, so it shares the agent's blind spots. Rule under test: the agent cannot run an llm
+# grader, so a case whose only grader is an llm with a tight rubric gets "llm: needs a run",
+# never a bare Clean.
+# Can fail: reviewer_dispatched fails if the model red-teams the case itself; says_needs_run
+# fails if the agent gives a bare Clean or any other verdict; not_bare_clean fails on a
+# Clean line.
+# Sabotage note: deleting the "never gets a bare `Clean`" sentence from the agent's Output
+# section should let it answer Clean here.
+# good-reply: llm: needs a run
+# bad-reply: Clean
+schema_version: "1.1"
+name: grader-red-team-llm-only-never-clean
+description: >
+  The grader-red-team agent, given a case with a single llm grader whose rubric is concrete,
+  does not clear it. expected_outcome: PASS when the agent is dispatched and the reply says the
+  llm grader needs a run; FAIL when it is not dispatched or the reply is a bare Clean.
+tags: [eval-authoring, grader-red-team, agent, smoke, quick]
+
+execution:
+  prompt: |
+    Before I pay for a run, please use the eval-authoring grader-red-team agent on this
+    case and tell me what it found. The case, as one file:
+
+    ```
+    schema_version: "1.1"
+    name: bug-report-cites-line
+    description: >
+      The reply points at the file and line of the bug.
+      expected_outcome: PASS when the reply names the file and line; FAIL otherwise.
+    tags: [review]
+    execution:
+      prompt: |
+        Here is a stack trace: TypeError at src/cart.ts:42. Which line is the bug on?
+      max_turns: 3
+      allowed_tools: [Read]
+    graders:
+      - name: cites_file_line
+        type: llm
+        criteria: |
+          PASS only if the reply asserts that the bug is on line 42 of src/cart.ts, quoting
+          the span that asserts it.
+          FAIL if the reply names no file or no line number, names a different line, denies
+          or hedges that line 42 is the bug, or only repeats the stack trace without
+          committing to a line; quote the span that shows it. Do not fail for style, length
+          or formatting.
+    ```
+  max_turns: 12
+  allowed_tools:
+    - Agent
+
+graders:
+  - name: reviewer_dispatched
+    type: tool_used
+    tool: Agent
+    input_match: '"subagent_type"\s*:\s*"(?:[\w-]+:)?grader-red-team"'
+    min: 1
+
+  # Verdict: the agent's marker `llm: needs a run`, or the relay's paraphrase of it. A reply that
+  # calls the grader loose or weak without saying it needs a run still fails (agent fault, #859).
+  - name: says_needs_run
+    type: regex
+    target: last_message
+    pattern: "llm:\\s*needs a run|needs a (?:paid |real )?run|only a (?:paid |real )?run (?:can|would|will)|can(?:no|')?t (?:be )?run (?:that one )?offline|cannot (?:be )?run (?:that one )?offline"
+    flags: i
+    match: contains
+
+  # Polarity: a bare Clean is the wrong answer here.
+  - name: not_bare_clean
+    type: regex
+    target: last_message
+    pattern: "^\\s*Clean\\s*$"
+    flags: im
+    match: not_contains
