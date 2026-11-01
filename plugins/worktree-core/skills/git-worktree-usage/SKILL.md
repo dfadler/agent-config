@@ -274,12 +274,14 @@ project wiring its own automation around them instead of the shipped hook.
   and a new PR from that branch carries every pre-squash commit again
   (a one-line follow-up showed as a 22-file diff). Pushing to the deleted
   remote branch also re-creates it, so a final commit can *look* merged
-  without being on the default branch. Verify against the PR's own state
-  (`gh pr list --head <branch> --state merged`), not the branch name. For a
-  follow-up change, cut a fresh branch from `origin/main` and cherry-pick
-  only the new commit. Before `gh pr create`, run
-  `git diff --stat origin/main...HEAD`: more files than you changed means
-  stale history.
+  without being on the default branch. Verify against the PR's own state,
+  not the branch name: `gh pr list --head <branch> --state merged` (it
+  matches the branch name only, so add `--json headRepositoryOwner` when
+  forks are involved). For a follow-up change, `git fetch origin main`, cut a fresh
+  branch from `origin/main` and cherry-pick only the new commit. Before
+  `gh pr create`, fetch again and run `git log --oneline origin/main..HEAD`:
+  it must list only your new commit. `git diff --stat origin/main...HEAD`
+  shows scope only; it misses stale commits that touch the same files.
 
 ## Catching up a branch that already has an open PR
 
