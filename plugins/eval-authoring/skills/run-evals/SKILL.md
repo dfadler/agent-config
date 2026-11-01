@@ -95,7 +95,7 @@ it, do not rebuild any of that.
    To measure the should-not-fire side of routing, run `--trigger-boundary`: the cases
    tagged `trigger-boundary` plus the should-fire twin each names with a `pair:<case>`
    tag, one run each, plugin arm only, fixed tier (a ceiling scaled like `quick`; not
-   combined with `--tier`, `--neighbours` or `--changed`). The summary counts how many
+   combined with `--tier`, `--neighbours`, `--changed` or `--case`). The summary counts how many
    negative prompts fired and gives a Wilson 95% upper bound on the over-trigger rate,
    withheld (and exit 7) unless at least one twin fired in the same run; a fire alone does
    not change the exit code. Report the count and the bound, not a delta, and list the

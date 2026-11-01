@@ -23,16 +23,19 @@ describe("EVAL028", () => {
   it.each([
     ["no-pair", /has no pair:<case> tag/],
     ["ghost-pair", /names pair 'ghost', which is not a case in this suite/],
-    ["wrong-twin", /no must-fire check .* same tool and input_match/],
+    ["wrong-twin", /no named must-fire check .* same tool/],
     ["two-arm", /sets `arm: both`/],
     ["unnamed", /has no name; run-evals reads the fire count by grader name/],
+    ["no-matcher", /no named must-fire check .* present, equal input_match/],
+    ["unnamed-twin-grader", /no named must-fire check/],
     ["no-quiet-check", /has no must-not-fire check/],
   ])("explains %s", (caseDir, message) => {
     expect(messageFor("bad-case-yaml", caseDir)).toMatch(message);
   });
 
   it("is quiet for the twin, the other twin and a plain smoke guard", () => {
-    expect(lint("bad-case-yaml").filter((f) => f.ruleId === "EVAL028" && ["twin", "other-twin"].includes(f.caseDirName ?? ""))).toEqual([]);
+    const twins = ["twin", "other-twin", "matcherless-twin", "unnamed-twin"];
+    expect(lint("bad-case-yaml").filter((f) => f.ruleId === "EVAL028" && twins.includes(f.caseDirName ?? ""))).toEqual([]);
     expect(lint("good-case-yaml").filter((f) => f.ruleId === "EVAL028")).toEqual([]);
   });
 

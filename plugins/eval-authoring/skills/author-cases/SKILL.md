@@ -81,9 +81,9 @@ blind-case-writer agent, second bullet), then stop.
    `tool_used` on `Skill` or `Agent` with `min: 0`, `max: 0` and no `arm:` (it runs
    plugin-arm only). `run-evals --trigger-boundary` runs these once each and reports the
    fire count with a Wilson 95% upper bound, only if a twin fired in the same run; 0 fires
-   in 3 runs bounds the rate only below 63%, and about 29 distinct clean prompts are
-   needed to bound it below 10%, so write 20 to 30 distinct near-misses rather than
-   rerunning a few (EVAL028 checks the tags). Re-read each negative: if a reasonable user
+   in 3 runs bounds the rate only below 57%, and at least 35 distinct clean prompts are
+   needed to bound it below 10% (26 give 12.9%), so write as many distinct near-misses
+   as you can rather than rerunning a few (EVAL028 checks the tags). Re-read each negative: if a reasonable user
    would want the skill to fire, it is a positive. A negative that does fire is promoted to
    a `smoke` guard (below) or its skill's description is tightened.
 4. **Pick graders, free first** (a complete pair of cases: [worked example](references/worked-example.md)). Name what must be true, map it to something observable,

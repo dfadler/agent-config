@@ -12,9 +12,9 @@
  */
 import {
   isBoundaryCase,
-  isMustFire,
   isMustNotFire,
   pairTags,
+  twinFireGraders,
   type EvalCase,
   type EvalSuite,
 } from "../parser/index.ts";
@@ -49,12 +49,26 @@ export const boundaryPlan = (suite: EvalSuite): BoundaryPlan => {
   if (negatives.length === 0) {
     return { ok: false, reason: `--trigger-boundary: no case tagged 'trigger-boundary' under ${suite.evalDir}` };
   }
-  const known = new Set(suite.cases.map((c) => c.name.value));
+
   const problems = negatives.flatMap((c) => {
     const twins = pairTags(c);
-    return twins.length === 0
-      ? [`case '${c.name.value}' has no 'pair:<case>' tag`]
-      : twins.filter((t) => !known.has(t)).map((t) => `case '${c.name.value}' names pair '${t}', which is not a case in the suite`);
+    const quiet = c.graders.filter(isMustNotFire);
+    const own = [
+      ...(quiet.length === 0 ? [`case '${c.name.value}' has no must-not-fire check`] : []),
+      ...(quiet.some((g) => g.name.value === undefined) ? [`case '${c.name.value}' has an unnamed must-not-fire check`] : []),
+    ];
+    const paired =
+      twins.length === 0
+        ? [`case '${c.name.value}' has no 'pair:<case>' tag`]
+        : twins.flatMap((t) => {
+            const twin = suite.cases.find((x) => x.name.value === t);
+            if (twin === undefined) return [`case '${c.name.value}' names pair '${t}', which is not a case in the suite`];
+            const fires = twinFireGraders(c, twin);
+            return quiet.every((q) => fires.some((f) => f.tool.value === q.tool.value && f.inputMatch.value === q.inputMatch.value))
+              ? []
+              : [`case '${c.name.value}' pairs with '${t}', which has no named must-fire check on the same tool and input_match`];
+          });
+    return [...own, ...paired];
   });
   if (problems.length > 0) return { ok: false, reason: `--trigger-boundary: ${problems.join("; ")}` };
   const wanted = new Set([...negatives.map((c) => c.name.value), ...negatives.flatMap(pairTags)]);
@@ -107,8 +121,11 @@ const verdict = (
  */
 export const boundaryReport = (suite: EvalSuite, results: readonly Result[]): BoundaryReport => {
   const byName = (n: string | undefined): EvalCase | undefined => suite.cases.find((c) => c.name.value === n);
-  const twinVerdict = (n: string): boolean | undefined => {
-    const v = verdict(byName(n), results, isMustFire);
+  // Only the twin's checks about the paired negative's own target count: a passing check on another skill must not release the bound.
+  const twinVerdict = (n: string, negative: EvalCase): boolean | undefined => {
+    const twin = byName(n);
+    const mine = twin === undefined ? [] : twinFireGraders(negative, twin);
+    const v = verdict(twin, results, (g) => mine.some((m) => m === g));
     return v.runs === 0 ? undefined : v.passed > 0;
   };
   const rows = suite.cases.filter(isBoundaryCase).map((c): BoundaryRow => {
@@ -118,14 +135,14 @@ export const boundaryReport = (suite: EvalSuite, results: readonly Result[]): Bo
       caseName: c.name.value,
       twin,
       fired: v.runs === 0 ? undefined : v.passed < v.runs,
-      twinFired: twin === undefined ? undefined : twinVerdict(twin),
+      twinFired: twin === undefined ? undefined : twinVerdict(twin, c),
     };
   });
   const negatives = rows.filter((r) => r.fired !== undefined).length;
   const fires = rows.filter((r) => r.fired === true).length;
   const twins = [...new Set(rows.flatMap((r) => (r.twin === undefined ? [] : [r.twin])))];
-  const twinsRun = twins.filter((t) => twinVerdict(t) !== undefined).length;
-  const twinsFired = twins.filter((t) => twinVerdict(t) === true).length;
+  const twinsRun = twins.filter((t) => rows.some((r) => r.twin === t && r.twinFired !== undefined)).length;
+  const twinsFired = twins.filter((t) => rows.some((r) => r.twin === t && r.twinFired === true)).length;
   const withheld =
     negatives === 0
       ? "no negative gave a usable run (errored or skipped runs are not counted)"

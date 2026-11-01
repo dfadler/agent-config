@@ -25,3 +25,13 @@ export const isMustNotFire = (g: Grader): g is ToolUsedGrader => isRouteCheck(g)
 /** "Must fire": a `tool_used` on Skill or Agent with `min >= 1`. */
 export const isMustFire = (g: Grader): g is ToolUsedGrader =>
   isRouteCheck(g) && g.min.value >= 1 && g.max.value !== 0;
+
+/** Same tool and a present, equal `input_match`: two checks about the same skill or agent. An absent matcher matches nothing, so two unscoped checks never pair. */
+export const sameTarget = (a: ToolUsedGrader, b: ToolUsedGrader): boolean =>
+  a.tool.value === b.tool.value && a.inputMatch.value !== undefined && a.inputMatch.value === b.inputMatch.value;
+
+/** The twin's named must-fire checks about a target the negative must not fire (run-evals reads results by grader name). */
+export const twinFireGraders = (negative: EvalCase, twin: EvalCase): readonly ToolUsedGrader[] => {
+  const quiet = negative.graders.filter(isMustNotFire);
+  return twin.graders.filter(isMustFire).filter((g) => g.name.value !== undefined && quiet.some((q) => sameTarget(q, g)));
+};

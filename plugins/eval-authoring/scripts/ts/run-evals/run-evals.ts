@@ -156,7 +156,7 @@ ${Object.values(TIERS).map((t) => `                         ${t.name}: ${t.descr
                        sees an invocation). A fire alone does not change the
                        exit code: near-boundary prompts fire now and then.
                        Fixed tier and ceiling (scaled like quick); not
-                       combined with --tier, --neighbours or --changed.
+                       combined with --tier, --neighbours, --changed or --case.
                        Standard and thorough skip these cases: a must-not-fire
                        check passes the no-plugin arm by construction
   --output-dir <dir>   base results directory (default: <eval-dir>/results).
@@ -327,7 +327,7 @@ export const parseArgs = (argv: readonly string[]): Parsed => {
     };
   }
   if (bools.has("--trigger-boundary")) {
-    const clash = ["--tier", "--neighbours", "--changed"].find((f) => values.has(f));
+    const clash = ["--tier", "--neighbours", "--changed", "--case"].find((f) => values.has(f));
     if (clash !== undefined) {
       return { kind: "error", message: `--trigger-boundary fixes its own tier and case set; it is not combined with ${clash}` };
     }

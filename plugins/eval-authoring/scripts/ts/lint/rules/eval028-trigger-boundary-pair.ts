@@ -1,8 +1,8 @@
 import {
   isBoundaryCase,
-  isMustFire,
   isMustNotFire,
   pairTags,
+  twinFireGraders,
   TRIGGER_BOUNDARY_TAG,
   type EvalCase,
 } from "../../parser/index.ts";
@@ -89,16 +89,16 @@ const pairProblems = (c: EvalCase, cases: readonly EvalCase[]): readonly Problem
       },
     ];
   }
-  const fires = twin.graders.filter(isMustFire);
-  const sameTarget = c.graders
+  const fires = twinFireGraders(c, twin);
+  const covered = c.graders
     .filter(isMustNotFire)
     .every((g) => fires.some((t) => t.tool.value === g.tool.value && t.inputMatch.value === g.inputMatch.value));
-  return sameTarget
+  return covered
     ? []
     : [
         {
-          message: `Boundary case '${name}' pairs with '${twinName}', which has no must-fire check (tool_used, min >= 1) with the same tool and input_match as its must-not-fire check, so it cannot show the harness sees that skill fire.`,
-          fix: `Pair it with a case that has a tool_used grader with the same tool and input_match and min: 1, or add one to '${twinName}'.`,
+          message: `Boundary case '${name}' pairs with '${twinName}', which has no named must-fire check (tool_used, min >= 1) with the same tool and a present, equal input_match as the must-not-fire check, so it cannot show the harness sees that skill fire.`,
+          fix: `Pair it with a case that has a named tool_used grader with the same tool and input_match and min: 1, or add one to '${twinName}'. Both checks need an input_match naming the skill or agent.`,
           loc: at,
         },
       ];

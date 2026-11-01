@@ -90,6 +90,9 @@ describe("boundaryPlan", () => {
     const reason = (p: ReturnType<typeof boundaryPlan>): string => (p.ok ? "" : p.reason);
     expect(reason(boundaryPlan(readSuite(plugin({ n2: [] }))))).toContain("case 'n2' has no 'pair:<case>' tag");
     expect(reason(boundaryPlan(readSuite(plugin({ n3: ["pair:ghost"] }))))).toContain("pair 'ghost'");
+    const noMatcher = plugin();
+    write(join(noMatcher, "evals", "tw", "case.yaml"), caseYaml("tw", ["trigger"], "fired", "min: 1").replace(/ {4}input_match.*\n/, ""));
+    expect(reason(boundaryPlan(readSuite(noMatcher)))).toContain("pairs with 'tw', which has no named must-fire check");
     const none = mkdtempSync(join(tmpdir(), "boundary-none-"));
     write(join(none, "evals", "tw", "case.yaml"), caseYaml("tw", ["trigger"], "fired", "min: 1"));
     expect(boundaryPlan(readSuite(none))).toMatchObject({ ok: false });
@@ -122,6 +125,31 @@ describe("boundaryReport", () => {
     const r = boundaryReport(suite, results([], true, ["n3"]));
     expect(r.negatives).toBe(2);
     expect(r.rows.find((x) => x.caseName === "n3")?.fired).toBeUndefined();
+  });
+
+  it("counts a twin's fire only on the paired negative's own target", () => {
+    const root = plugin();
+    // tw also checks a different skill; that check passing must not release the bound.
+    write(
+      join(root, "evals", "tw", "case.yaml"),
+      caseYaml("tw", ["trigger"], "fired", "min: 1") +
+        [
+          "  - name: other_fired",
+          "    type: tool_used",
+          "    tool: Skill",
+          `    input_match: '"skill"\\s*:\\s*"(?:[\\w-]+:)?beta"'`,
+          "    min: 1",
+          "",
+        ].join("\n"),
+    );
+    const text = JSON.stringify({
+      schemaVersion: 1,
+      partial: false,
+      cases: [{ name: "tw", arms: { with: [{ graders: [{ name: "fired", passed: false }, { name: "other_fired", passed: true }] }], without: [] } }],
+    });
+    const r = boundaryReport(readSuite(root), [...results([], false).filter((x) => x.caseName !== "tw"), { caseName: "tw", text }]);
+    expect(r.twinsFired).toBe(0);
+    expect(r.withheld).toMatch(/no should-fire twin fired/);
   });
 
   it("withholds the bound when no negative has a usable run", () => {
@@ -207,7 +235,7 @@ describe("--trigger-boundary", () => {
   });
 
   it("is a fixed tier: refuses --tier, --neighbours and --changed", () => {
-    for (const extra of [["--tier", "quick"], ["--neighbours", "x"], ["--changed"]]) {
+    for (const extra of [["--tier", "quick"], ["--neighbours", "x"], ["--changed"], ["--case", "n1"]]) {
       expect(parseArgs(["p", "--trigger-boundary", ...extra])).toMatchObject({ kind: "error" });
     }
   });
