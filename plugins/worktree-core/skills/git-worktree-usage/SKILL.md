@@ -1,6 +1,10 @@
 ---
 name: git-worktree-usage
 description: |
+  Load this before pushing to, or opening a PR from, a branch whose earlier PR
+  already merged (a squash merge leaves its commits off the default branch, so
+  a new PR from it shows stale history), even when only advising: it defines
+  the fresh-branch and cherry-pick fix.
   Create worktrees with the `EnterWorktree` tool, never raw `git worktree add`.
   Git worktree and branch mechanics for isolating non-trivial work: locking and
   the stale-worktree sweep, picking what to parallelize by file surface, the
