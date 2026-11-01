@@ -4,6 +4,8 @@
 # Near-miss for author-cases (#745): shares "plugin" and "tests" but wants CI config. Regression guard: a no-plugin arm passes it
 # by design (no delta), hence the single-arm trigger-boundary run.
 # Can fail: skill_not_fired fails if the description over-triggers on this vocabulary.
+# good-reply: name: CI / on: pull_request / jobs: test: runs-on: ubuntu-latest / steps: uses actions/checkout@v4, then run: pnpm test
+# bad-reply: Add a GitHub Actions workflow that checks out the repo and runs the test suite on every pull request.
 schema_version: "1.1"
 name: author-cases-quiet-on-ci-workflow
 description: >
@@ -33,6 +35,6 @@ graders:
   - name: addresses_request
     type: regex
     target: last_message
-    pattern: 'runs-on|actions/checkout|pull_request|steps:|uses:'
+    pattern: '(?=[\s\S]*\bruns-on:)(?=[\s\S]*\bpull_request\b)(?=[\s\S]*\brun:[\s\S]{0,120}?\b(?:vitest|(?:npm|pnpm|yarn|bun)(?: \S+){0,2} test)\b)'
     flags: i
     match: contains

@@ -4,6 +4,8 @@
 # Near-miss for run-evals (#745): shares "run" and "evals" but is a different harness. Regression guard: a no-plugin arm passes it
 # by design (no delta), hence the single-arm trigger-boundary run.
 # Can fail: skill_not_fired fails if the description over-triggers on this vocabulary.
+# good-reply: Register a custom completion function under evals/registry/completion_fns that calls your local ollama server, then run oaieval <your_fn> <eval>.
+# bad-reply: Clone the repo, pip install -e ., and edit the registry yaml so the endpoint points at your model.
 schema_version: "1.1"
 name: run-evals-quiet-on-other-eval-harness
 description: >
@@ -33,6 +35,6 @@ graders:
   - name: addresses_request
     type: regex
     target: last_message
-    pattern: 'oaieval|pip install|git clone|completion[ _-]?fn|registry|yaml|api[_ ]?base|ollama|vllm|endpoint'
+    pattern: '(?=[\s\S]*\boaieval\b)(?=[\s\S]*(?:completion[ _-]?f(?:unction|n)s?|CompletionFn|registry_path|localhost|127\.0\.0\.1|ollama|vllm|self-hosted|local (?:endpoint|model|server)|openai[- ]compatible|llama\.cpp|lm ?studio|base[_ ]?url))'
     flags: i
     match: contains
