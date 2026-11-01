@@ -1,0 +1,14 @@
+# Per-case --allow-tools grants (format: plugins/eval-authoring/docs/grants-format.md).
+# Write is granted bare: path-scoped Write(...) rules do not match (only Edit(path)/Read(path) do).
+# The skill's working dir is <project>/ask-form/, outside the protected .claude/ where Write is
+# denied in dontAsk mode (docs, unverified). Bash is scoped to the fill script only.
+# scripts/ts/package.json exists so Node stops its package.json lookup inside the plugin: under the
+# eval's OS sandbox the home directory is unreadable, and Node 24 aborts when the lookup reaches it.
+schema_version: "1"
+grants:
+  ask-form-fires-on-open-design-decisions:
+    - "Write"
+    - "Bash(node *fill-form.ts*)"
+  ask-form-fires-on-scope-questions:
+    - "Write"
+    - "Bash(node *fill-form.ts*)"

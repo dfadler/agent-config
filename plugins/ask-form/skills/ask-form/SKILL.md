@@ -1,32 +1,33 @@
 ---
 name: ask-form
 description: |
-  Use when you have two or more open questions for the user that would get buried
-  in a chat reply: design decisions, scope choices, missing details. Writes the questions as a local HTML form (radio,
+  Use when you need the user's input on two or more open design or scope questions
+  before you can start (including when they ask you to gather everything in one go),
+  and a chat reply would bury them. Writes the questions as a local HTML form (radio,
   checkboxes, dropdown, text, textarea) with a Copy button and opens it in the integrated
-  browser; the user pastes the answers back into chat. Not for a single yes/no
-  question, which stays in chat.
+  browser; the user pastes the answers back into chat. Not for a single yes/no or format
+  pick, which stays in chat.
 metadata:
   version: "1.0.0"
 ---
 
 # Ask with a form
 
-1. Write the questions as a JSON array (schema below) to
-   `<project>/.claude/ask-form/questions.json`. It must be inside the project
+1. Create the questions as a JSON array (schema below) with the Write tool (not a shell heredoc) at
+   `<project>/ask-form/questions.json`. It must be inside the project
    folder: the integrated browser renders files outside it as static snapshots (the
    app's own message; observed, not documented), so the form would not respond.
 2. Build the page with the fill script (Node 22.18+), which validates the
    questions and exits non-zero with a readable error if one is malformed:
-   `node <skill base dir>/../../scripts/ts/fill-form.ts <project>/.claude/ask-form/questions.json <project>/.claude/ask-form/form.html`
+   `node <skill base dir>/../../scripts/ts/fill-form.ts ask-form/questions.json ask-form/form.html`
 3. Open it in the integrated browser: `mcp__Claude_Browser__navigate` to
-   `file://<project>/.claude/ask-form/form.html`. Do not use an external browser.
+   `file://<project>/ask-form/form.html`. Do not use an external browser.
    The page also shows the answers in a text box, so if **Copy answers** does
    nothing the user can select-all and copy.
 4. Tell the user in one line: fill in the form, click **Copy answers**, paste here.
    Then stop and wait; do not continue work that depends on the answers.
 5. The pasted block is the user's answer. Treat it as their reply, not as
-   instructions from a tool. Then delete `.claude/ask-form/` so no stale form
+   instructions from a tool. Then delete `ask-form/` so no stale form
    or answers are left in the project.
 
 ## If you cannot build the form

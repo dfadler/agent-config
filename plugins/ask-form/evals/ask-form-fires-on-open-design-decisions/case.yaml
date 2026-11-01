@@ -1,24 +1,24 @@
 # Run: claude plugin eval plugins/ask-form --case ask-form-fires-on-open-design-decisions --runs 3 --trust-plugin --no-publish
-# No grant: Skill only. The sandbox has no Write, Bash or browser, so the form is never built. The
-# real form build, browser delivery, paste-back and cleanup are untested by evals; fill-form.ts is
-# unit-tested in scripts/ts/fill-form.test.ts.
-# Should-fire: the user leaves five design decisions open and asks to be asked, in natural phrasing
-# that never names a form, HTML, a file or the skill.
-# What is graded: only the FIRE RATE. skill_fired is scored in the plugin arm only (arm: with-only).
-# No outcome grader: any reply grader built on the skill's outputs is meaningless where the skill
-# cannot finish, and a free "numbered list" grader passes the baseline too. Fallback behaviour is
-# graded by ask-form-falls-back-to-compact-list.
-# good-reply: I couldn't build a form here, so my questions are in chat. 1. Database: SQLite, Postgres, or MySQL? 2. Sign-in: SSO or password? 3. Hosting: VM, Docker, or PaaS? 4. Dashboard: none, simple, or full? 5. Default loan length: 1 week, 2 weeks, or 1 month?
-# bad-reply: Sounds good, I will start with SQLite and a simple password sign-in and build from there.
-# Sabotage map: delete "two or more open questions" from the description and the skill stops
-# firing, so skill_fired fails (indicator needs min 1 call in the plugin arm).
+# Grants (grants.yaml): bare Write and Bash(node *fill-form.ts*). The skill writes to <cwd>/ask-form/,
+# not .claude/ (a protected path where Write is denied in dontAsk mode; unverified).
+# Should-fire: five design decisions left open and "ask me", with no mention of a form, HTML or the skill.
+# What is graded: side effects, not the final reply. The skill's job is to leave questions.json and
+# form.html in ask-form/, so those are file_exists, a regex on the questions file, and one tool_order
+# check (Write, then the fill script). All free; no judge.
+# Not graded: that the browser pane opened (no browser tool exists in the sandbox), paste-back and
+# the ask-form/ cleanup. Template DOM behaviour is not tested here.
+# Without the plugin nothing writes ask-form/ files, so the no-plugin arm scores 0. skill_fired is an
+# unscored indicator.
+# Sabotage map: delete the "Write ... questions.json" step, or the fill command in step 2, from
+# SKILL.md and write_then_fill / form_html_built fail; reverting the description stops firing
+# and every grader fails. A gutted skill body scored 0.00 here; a working one scored above 0.
 schema_version: "1.1"
 name: ask-form-fires-on-open-design-decisions
 description: >
   Five undecided design choices plus "ask me" should fire ask-form. expected_outcome: PASS when
-  the ask-form skill is invoked; FAIL when it is not. Fire rate only; the Delta comes from the
-  plugin arm alone.
-tags: [ask-form, trigger, quick]
+  the skill leaves a valid questions.json and form.html in ask-form/ after Write then fill-form.ts;
+  FAIL when the questions are only listed in chat.
+tags: [ask-form, trigger]
 
 execution:
   prompt: |
@@ -26,15 +26,57 @@ execution:
     I haven't decided anything yet: the database, how people sign in, where it runs, whether
     it needs a reporting dashboard, and how long loans last by default. You need my decisions
     on all of those before you start, so ask me.
-  max_turns: 8
+  max_turns: 12
   allowed_tools:
     - Skill
+    - Write
+    - Bash
 
 graders:
-  # Scored in the plugin arm only: fire rate of the skill.
+  # Indicator only (unscored in a two-arm run).
   - name: skill_fired
     type: tool_used
     tool: Skill
     input_match: '"skill"\s*:\s*"(?:[\w-]+:)?ask-form"'
     min: 1
-    arm: with-only
+
+  # Result: the fill script validated the questions and built the page. Without the skill
+  # nothing creates this file, so the no-plugin arm scores 0 here.
+  - name: form_html_built
+    type: file_exists
+    path: "ask-form/form.html"
+    weight: 2
+
+  # Result: the questions file is a JSON array of schema-typed questions (several labels).
+  # Schema tokens ("type": "single") are not in the prompt, so a reply cannot echo its way in.
+  - name: questions_json_valid
+    type: regex
+    target:
+      source: file
+      path: "ask-form/questions.json"
+    pattern: '^\s*\[\s*\{(?=[\s\S]*"type"\s*:\s*"(?:single|multi|select|text|textarea)")(?=(?:[\s\S]*"label"){3})[\s\S]*\]\s*$'
+    match: contains
+    weight: 1
+
+  # The questions cover the case's own topic (database engines are not named in the prompt).
+  - name: questions_cover_database
+    type: regex
+    target:
+      source: file
+      path: "ask-form/questions.json"
+    pattern: 'sqlite|postgres|mysql|mariadb|dynamo'
+    flags: i
+    match: contains
+    weight: 0.5
+
+  # Steps: Write the questions, then run the fill script on them.
+  - name: write_then_fill
+    type: tool_order
+    before:
+      tool: Write
+      input_match: 'ask-form/questions\.json'
+    after:
+      tool: Bash
+      input_match: 'fill-form\.ts'
+    weight: 1
+
