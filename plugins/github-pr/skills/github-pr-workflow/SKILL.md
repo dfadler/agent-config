@@ -43,6 +43,9 @@ reply terse.
   unreviewed PR from landing in someone's review queue before it's been
   looked at. To mark one ready: `gh pr ready <number>` — but only do so
   with explicit user confirmation, not autonomously after CI passes.
+- Before `gh pr create`, run `git diff --stat origin/main...HEAD` and confirm it
+  lists only your files. If the branch's earlier PR already merged, don't open a
+  PR from it: see the dead-branch bullet in `git-worktree-usage`.
 - Size a PR by whether it would be mergeable and valuable standing alone, not by
   line count. Split when a piece is independently useful on its own; keep pieces
   together when they only make sense as one concern.
