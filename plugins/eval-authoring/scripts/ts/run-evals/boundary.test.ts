@@ -90,6 +90,7 @@ describe("boundaryPlan", () => {
     const reason = (p: ReturnType<typeof boundaryPlan>): string => (p.ok ? "" : p.reason);
     expect(reason(boundaryPlan(readSuite(plugin({ n2: [] }))))).toContain("case 'n2' has no 'pair:<case>' tag");
     expect(reason(boundaryPlan(readSuite(plugin({ n3: ["pair:ghost"] }))))).toContain("pair 'ghost'");
+    expect(reason(boundaryPlan(readSuite(plugin({ n1: ["pair:tw", "pair:n2"] }))))).toContain("has 2 pair: tags");
     const noMatcher = plugin();
     write(join(noMatcher, "evals", "tw", "case.yaml"), caseYaml("tw", ["trigger"], "fired", "min: 1").replace(/ {4}input_match.*\n/, ""));
     expect(reason(boundaryPlan(readSuite(noMatcher)))).toContain("pairs with 'tw', which has no named must-fire check");
@@ -150,6 +151,27 @@ describe("boundaryReport", () => {
     const r = boundaryReport(readSuite(root), [...results([], false).filter((x) => x.caseName !== "tw"), { caseName: "tw", text }]);
     expect(r.twinsFired).toBe(0);
     expect(r.withheld).toMatch(/no should-fire twin fired/);
+  });
+
+  it("gives no verdict on a prompt when one of its must-not-fire checks has none", () => {
+    const root = plugin();
+    write(
+      join(root, "evals", "n1", "case.yaml"),
+      caseYaml("n1", ["trigger-boundary", "pair:tw"], "quiet", "min: 0\n    max: 0") +
+        [
+          "  - name: quiet_two",
+          "    type: tool_used",
+          "    tool: Skill",
+          `    input_match: '"skill"\\s*:\\s*"(?:[\\w-]+:)?alpha"'`,
+          "    min: 0",
+          "    max: 0",
+          "",
+        ].join("\n"),
+    );
+    // quiet passes but quiet_two never reports: n1 must not count as a clean prompt.
+    const r = boundaryReport(readSuite(root), results([], true));
+    expect(r.rows.find((x) => x.caseName === "n1")?.fired).toBeUndefined();
+    expect(r.negatives).toBe(2);
   });
 
   it("withholds the bound when no negative has a usable run", () => {

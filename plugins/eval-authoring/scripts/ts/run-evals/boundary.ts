@@ -58,8 +58,8 @@ export const boundaryPlan = (suite: EvalSuite): BoundaryPlan => {
       ...(quiet.some((g) => g.name.value === undefined) ? [`case '${c.name.value}' has an unnamed must-not-fire check`] : []),
     ];
     const paired =
-      twins.length === 0
-        ? [`case '${c.name.value}' has no 'pair:<case>' tag`]
+      twins.length !== 1
+        ? [`case '${c.name.value}' ${twins.length === 0 ? "has no 'pair:<case>' tag" : `has ${String(twins.length)} pair: tags; exactly one is read`}`]
         : twins.flatMap((t) => {
             const twin = suite.cases.find((x) => x.name.value === t);
             if (twin === undefined) return [`case '${c.name.value}' names pair '${t}', which is not a case in the suite`];
@@ -128,13 +128,20 @@ export const boundaryReport = (suite: EvalSuite, results: readonly Result[]): Bo
     const v = verdict(twin, results, (g) => mine.some((m) => m === g));
     return v.runs === 0 ? undefined : v.passed > 0;
   };
+  // A prompt fired if any must-not-fire check failed; it is quiet only when every named check gave a verdict and passed.
+  const firedVerdict = (c: EvalCase): boolean | undefined => {
+    const text = results.find((r) => r.caseName === c.name.value)?.text;
+    const per = c.graders
+      .filter(isMustNotFire)
+      .flatMap((g) => (g.name.value === undefined ? [] : [armTally(text, c.name.value, g.name.value)]));
+    return per.some((t) => t.passed < t.runs) ? true : per.length === 0 || per.some((t) => t.runs === 0) ? undefined : false;
+  };
   const rows = suite.cases.filter(isBoundaryCase).map((c): BoundaryRow => {
-    const v = verdict(c, results, isMustNotFire);
     const twin = pairTags(c)[0];
     return {
       caseName: c.name.value,
       twin,
-      fired: v.runs === 0 ? undefined : v.passed < v.runs,
+      fired: firedVerdict(c),
       twinFired: twin === undefined ? undefined : twinVerdict(twin, c),
     };
   });
