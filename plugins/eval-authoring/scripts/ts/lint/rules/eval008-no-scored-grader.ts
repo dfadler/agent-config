@@ -1,4 +1,4 @@
-import { scoreCase } from "../../parser/index.ts";
+import { isBoundaryCase, scoreCase } from "../../parser/index.ts";
 import { graderLabel } from "../helpers.ts";
 import { scoringContextFor } from "../scoring-context.ts";
 import { fromDocs } from "../sources.ts";
@@ -12,6 +12,8 @@ export const rule: Rule = {
     "Every grader is excluded from scoring, so the case gives no delta signal",
   source: fromDocs("baseline scoring"),
   checkCase: (c, context) => {
+    // A trigger-boundary case runs plugin-arm only, where nothing is excluded from scoring.
+    if (isBoundaryCase(c)) return [];
     const scoring = scoreCase(c, true, scoringContextFor(c, context));
     if (!scoring.allExcludedFallback) return [];
     const names = c.graders.map(graderLabel).join(", ");

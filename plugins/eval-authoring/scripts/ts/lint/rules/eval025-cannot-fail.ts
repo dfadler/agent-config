@@ -1,4 +1,4 @@
-import type { Grader } from "../../parser/index.ts";
+import { isBoundaryCase, type Grader } from "../../parser/index.ts";
 import { echoesPrompt, isQuietSkillCheck } from "../helpers.ts";
 import type { Rule } from "../types.ts";
 
@@ -19,11 +19,12 @@ export const rule: Rule = {
   checkCase: (c) => {
     const prompt = c.prompt.value ?? "";
     const dead = c.graders.length > 0 && c.graders.every((g) => isQuietSkillCheck(g) || isCued(g, prompt));
-    if (!dead || c.tags.value.includes("smoke")) return [];
+    // `smoke` labels a two-arm guard; a trigger-boundary case is read as a fire count, not a score (EVAL028).
+    if (!dead || c.tags.value.includes("smoke") || isBoundaryCase(c)) return [];
     return [
       {
         message: `Case '${c.name.value}': every grader is a "must not fire" Skill check (the no-plugin arm passes it by construction) or a regex whose text is in the prompt, so only the with-arm skill fire rate can fail, and it is noise at a few runs.`,
-        fix: "Grade a trace action in a fixture workspace, or tag the case `smoke` to label it a cheap trigger-boundary guard with no expected delta, or drop it.",
+        fix: "Grade a trace action in a fixture workspace, or move it to the trigger-boundary suite (tag `trigger-boundary` and `pair:<should-fire case>`, drop `arm: both`), or tag the case `smoke` to label it a cheap two-arm guard with no expected delta, or drop it.",
         loc: c.graders[0]?.origin.loc ?? c.name.loc,
       },
     ];

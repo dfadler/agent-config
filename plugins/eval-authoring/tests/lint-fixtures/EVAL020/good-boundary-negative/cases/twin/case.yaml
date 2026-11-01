@@ -1,0 +1,13 @@
+schema_version: "1.1"
+name: twin
+tags: [trigger]
+execution:
+  prompt: Run the test suite with npm test.
+  allowed_tools:
+    - Skill
+graders:
+  - name: fired
+    type: tool_used
+    tool: Skill
+    input_match: '"skill"\s*:\s*"(?:[\w-]+:)?alpha"'
+min: 1

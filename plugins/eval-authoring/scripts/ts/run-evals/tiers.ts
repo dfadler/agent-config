@@ -2,6 +2,7 @@
  * Cost tiers: the wrapper's whole interface for "how much to spend". A caller
  * picks a tier; the flags behind it live here.
  */
+import { TRIGGER_BOUNDARY_TAG } from "../parser/index.ts";
 
 /**
  * The quick tier's ceiling scales with the cases selected:
@@ -26,11 +27,13 @@ export const QUICK_FLOOR_USD = 1;
 
 export type TierName = "quick" | "standard" | "thorough";
 
+
 /** How a tier treats the plugin-less arm. Recorded with every run (see the run summary). */
 export type AblationMode = "none" | "cli-default";
 
 export interface Tier {
-  readonly name: TierName;
+  /** A `TierName`, or `trigger-boundary` for that mode's own tier. */
+  readonly name: string;
   readonly description: string;
   readonly runs: number;
   /** The whole run's ceiling; for a tier with `perCaseUsd`, the floor of the scaled ceiling. */
@@ -43,6 +46,8 @@ export interface Tier {
   readonly ablation: AblationMode;
   /** Only cases with this tag run (#473: all graders free, so no judge calls). */
   readonly tag: string | undefined;
+  /** Cases with this tag are left out of the run (they run under `--trigger-boundary`: in a two-arm run a must-not-fire case passes the no-plugin arm by construction). Applies only to a two-arm tier. */
+  readonly skipTag?: string | undefined;
 }
 
 export const TIERS: Readonly<Record<TierName, Tier>> = {
@@ -67,6 +72,7 @@ export const TIERS: Readonly<Record<TierName, Tier>> = {
     threshold: 1,
     ablation: "cli-default",
     tag: undefined,
+    skipTag: TRIGGER_BOUNDARY_TAG,
   },
   thorough: {
     name: "thorough",
@@ -77,7 +83,27 @@ export const TIERS: Readonly<Record<TierName, Tier>> = {
     threshold: 1,
     ablation: "cli-default",
     tag: undefined,
+    skipTag: TRIGGER_BOUNDARY_TAG,
   },
+};
+
+/**
+ * The `--trigger-boundary` tier: one run per prompt, plugin arm only, scaled
+ * like `quick`. `threshold: 0` because a boundary prompt is expected to fire now
+ * and then: the CLI must not exit 1 on a fire, and the fire count (with its
+ * Wilson bound) is the result, not the exit code. Selection is by `pair:` tags
+ * in run-evals.ts, so no `tag` here.
+ */
+export const TRIGGER_BOUNDARY_TIER: Tier = {
+  name: "trigger-boundary",
+  description:
+    "the trigger-boundary negatives and their should-fire twins, one run each, plugin arm only, exit code diagnostic",
+  runs: 1,
+  maxCostUsd: QUICK_FLOOR_USD,
+  perCaseUsd: QUICK_PER_CASE_USD,
+  threshold: 0,
+  ablation: "none",
+  tag: undefined,
 };
 
 /** The whole-run ceiling and how it was derived, for the run log and `--dry-run`. */

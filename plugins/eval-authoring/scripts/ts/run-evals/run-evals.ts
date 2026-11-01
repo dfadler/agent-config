@@ -41,6 +41,7 @@ import {
   type Invocation,
 } from "./plan.ts";
 import { runPreflight } from "./preflight.ts";
+import { boundaryPlan, boundaryReport, type BoundaryReport } from "./boundary.ts";
 import { caseRow, redact, renderBlock, renderSummary, withBlock } from "./summary.ts";
 import {
   DEFAULT_JUDGE_MODEL,
@@ -50,6 +51,7 @@ import {
   ceilingFor,
   QUICK_FLOOR_USD,
   QUICK_PER_CASE_USD,
+  TRIGGER_BOUNDARY_TIER,
   isTierName,
   type AblationMode,
   type Tier,
@@ -134,13 +136,29 @@ ${Object.values(TIERS).map((t) => `                         ${t.name}: ${t.descr
                        The summary gains a Trigger set section with fire rate,
                        false-fire rate and description length per skill.
                        Combines with --tier and --changed; --keep-temp keeps
-                       the copy. Always plugin arm only (--ablation none,
+                       the copy. Not combined with --trigger-boundary. Always plugin arm only (--ablation none,
                        whatever the tier): the injected plugins: list names
                        the plugin under test, so a baseline arm that honours
                        it would load the plugin and any delta would mean
                        nothing; the summary has no without or delta column.
                        Neighbour hooks run inside the eval as you, under the
                        copy's trust; node_modules is not copied
+  --trigger-boundary   trigger-boundary suite: run the cases tagged
+                       'trigger-boundary' (should-not-fire prompts) and the
+                       should-fire twin each names with a 'pair:<case>' tag,
+                       one run each, plugin arm only (--ablation none,
+                       --threshold 0). The summary counts the negatives that
+                       fired, with a Wilson 95% upper bound on the over-trigger
+                       rate, and lists the firing prompts so one can be kept as
+                       a 'smoke' guard. The bound is withheld, and the run
+                       exits 7, unless at least one twin fired in the same run
+                       (otherwise clean negatives could mean the harness never
+                       sees an invocation). A fire alone does not change the
+                       exit code: near-boundary prompts fire now and then.
+                       Fixed tier and ceiling (scaled like quick); not
+                       combined with --tier, --neighbours, --changed or --case.
+                       Standard and thorough skip these cases: a must-not-fire
+                       check passes the no-plugin arm by construction
   --output-dir <dir>   base results directory (default: <eval-dir>/results).
                        Each wrapper run writes <dir>/run-<time>/<NN>-<case>
   --publish-report     publish the report (default: --no-publish)
@@ -199,6 +217,8 @@ interface Options {
   readonly yes: boolean;
   /** `--neighbours`: sibling plugins to load beside the plugin under test; undefined when off. */
   readonly neighbours: readonly string[] | undefined;
+  /** `--trigger-boundary`: the paired should-not-fire suite, single arm. */
+  readonly triggerBoundary: boolean;
 }
 
 type Parsed =
@@ -225,6 +245,7 @@ const BOOL_FLAGS: readonly string[] = [
   "--dry-run",
   "--yes",
   "--changed-allow-empty",
+  "--trigger-boundary",
 ];
 
 /** A plain decimal greater than zero ("0.5", "2", ".5"); anything else (empty, "abc", "-1", "NaN", "1e3", "0x10", "0") is undefined. */
@@ -305,6 +326,12 @@ export const parseArgs = (argv: readonly string[]): Parsed => {
       message: `--neighbours takes comma-separated plugin names (letters, digits, . _ -; no repeats), got '${neighboursText}'`,
     };
   }
+  if (bools.has("--trigger-boundary")) {
+    const clash = ["--tier", "--neighbours", "--changed", "--case"].find((f) => values.has(f));
+    if (clash !== undefined) {
+      return { kind: "error", message: `--trigger-boundary fixes its own tier and case set; it is not combined with ${clash}` };
+    }
+  }
   const [plugin, ...extra] = positionals;
   if (plugin === undefined) {
     return { kind: "error", message: "missing <plugin-path>" };
@@ -320,7 +347,11 @@ export const parseArgs = (argv: readonly string[]): Parsed => {
     options: {
       plugin,
       // Trigger-set mode reads the plugin arm only, whatever the tier (see --neighbours in USAGE).
-      tier: neighbours === undefined ? TIERS[tierName] : { ...TIERS[tierName], ablation: "none" },
+      tier: bools.has("--trigger-boundary")
+        ? TRIGGER_BOUNDARY_TIER
+        : neighbours === undefined
+          ? TIERS[tierName]
+          : { ...TIERS[tierName], ablation: "none" },
       model: values.get("--model"),
       judgeModel: values.get("--judge-model"),
       maxCostUsd,
@@ -339,6 +370,7 @@ export const parseArgs = (argv: readonly string[]): Parsed => {
       pr,
       yes: bools.has("--yes"),
       neighbours,
+      triggerBoundary: bools.has("--trigger-boundary"),
     },
   };
 };
@@ -375,6 +407,8 @@ export interface RunSummary {
   readonly subset: string | null;
   /** The `--neighbours` plugins loaded beside the plugin under test; null when the flag was off. */
   readonly neighbours: readonly string[] | null;
+  /** The `--trigger-boundary` fire count, bound and per-prompt rows; null when the flag was off. */
+  readonly triggerBoundary: BoundaryReport | null;
 }
 
 export interface InvocationSummary {
@@ -689,9 +723,15 @@ const run = async (
       : await selectChanged(io, target, suite, grants, options.changed);
   if (changed !== undefined && !changed.ok) return fail(io, EXIT_USAGE, changed.reason);
   const tag = options.tier.tag;
+  // Boundary negatives pass the no-plugin arm by construction, so a two-arm tier leaves them out.
+  const skip = options.tier.ablation === "cli-default" ? options.tier.skipTag : undefined;
   const inTier = (n: string): boolean =>
-    tag === undefined ||
-    suite.cases.some((c) => c.name.value === n && c.tags.value.includes(tag));
+    suite.cases.some(
+      (c) =>
+        c.name.value === n &&
+        (tag === undefined || c.tags.value.includes(tag)) &&
+        (skip === undefined || !c.tags.value.includes(skip)),
+    );
   const picked = changed === undefined ? undefined : changed.names.filter(inTier);
   if (changed !== undefined && picked !== undefined) {
     if (changed.paths.length === 0) {
@@ -729,10 +769,14 @@ const run = async (
   const triggerNames = suite.cases
     .filter((c) => c.tags.value.includes(TRIGGER_TAG))
     .map((c) => c.name.value);
+  const boundary = options.triggerBoundary ? boundaryPlan(suite) : undefined;
+  if (boundary?.ok === false) return fail(io, EXIT_CONFIG, boundary.reason);
   const pickedNames =
-    options.neighbours === undefined
-      ? picked
-      : (picked ?? triggerNames).filter((n) => triggerNames.includes(n));
+    boundary?.ok === true
+      ? boundary.names
+      : options.neighbours === undefined
+        ? picked
+        : (picked ?? triggerNames).filter((n) => triggerNames.includes(n));
   if (options.neighbours !== undefined) {
     const bad = checkNeighbours(io, deps.pluginsDir, target, options.neighbours);
     if (bad !== undefined) return fail(io, EXIT_USAGE, bad);
@@ -751,7 +795,14 @@ const run = async (
     tag,
     options.only,
     pickedNames,
-    changed === undefined ? "trigger" : options.neighbours === undefined ? "--changed" : "--changed trigger",
+    boundary !== undefined
+      ? "--trigger-boundary"
+      : changed === undefined
+        ? "trigger"
+        : options.neighbours === undefined
+          ? "--changed"
+          : "--changed trigger",
+    skip,
   );
   if (!plan.ok) return fail(io, EXIT_CONFIG, plan.reason);
 
@@ -809,6 +860,11 @@ const run = async (
     io.out(
       `note: each invocation shows the full ceiling; a real run gives later invocations only the budget left after earlier results\n`,
     );
+    if (boundary !== undefined) {
+      io.out(
+        `note: --trigger-boundary: one run per prompt, plugin arm only, --threshold 0; the bound is reported only if a should-fire twin fires in the same run\n`,
+      );
+    }
     if (options.neighbours !== undefined) {
       io.out(
         `note: --neighbours ${options.neighbours.join(",")}: a real run runs these cases against a temp copy of the plugin (shown above as the plugin path), with ${options.neighbours.join(", ")} under neighbours/ and a plugins: list added to the copy of each case\n`,
@@ -894,10 +950,17 @@ const run = async (
       `run-evals: cost ceiling $${String(ceilingUsd)} spent ($${String(progress.spentUsd)}); not run: ${unstarted.join(", ")}\n`,
     );
   }
+  const results = done.map((d, i) => ({ caseName: d.caseName, text: progress.texts[i] }));
+  const boundaryResult = boundary === undefined ? undefined : boundaryReport(suite, results);
+  if (boundaryResult?.withheld !== undefined) {
+    io.err(`run-evals: --trigger-boundary: over-trigger bound withheld: ${boundaryResult.withheld}\n`);
+  }
   // The last case can overspend without any later case to notice, so check the total too.
   const exit = progress.done.reduce<ExitCode>(
     (c, g) => worstExit(c, g.exit),
-    progress.outOfBudget || progress.spentUsd > ceilingUsd ? EXIT_PARTIAL : EXIT_OK,
+    progress.outOfBudget || progress.spentUsd > ceilingUsd || boundaryResult?.withheld !== undefined
+      ? EXIT_PARTIAL
+      : EXIT_OK,
   );
   // N is what finished, M what the same command would plan without --changed: the tier's cases.
   const subset =
@@ -918,6 +981,7 @@ const run = async (
     changedSince: changed?.ok === true ? changed.ref : null,
     subset,
     neighbours: options.neighbours ?? null,
+    triggerBoundary: boundaryResult ?? null,
   };
   io.writeFile(
     join(runDir, SUMMARY_FILE),
@@ -937,12 +1001,8 @@ const run = async (
     command: `node plugins/eval-authoring/scripts/ts/run-evals/run-evals.ts ${argv.map(shellWord).join(" ")}`,
     unstarted,
     neighbours: options.neighbours,
-    trigger: triggerRows(
-      suite,
-      routablesOf(io, target),
-      manifestOf(target).name,
-      done.map((d, i) => ({ caseName: d.caseName, text: progress.texts[i] })),
-    ),
+    boundary: boundaryResult,
+    trigger: triggerRows(suite, routablesOf(io, target), manifestOf(target).name, results),
     cases: done.map((d, i) => ({
       caseName: d.caseName,
       exit: d.exit,

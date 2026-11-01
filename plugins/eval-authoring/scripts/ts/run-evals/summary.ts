@@ -5,6 +5,7 @@
 import { isAbsolute } from "node:path";
 import { readAggregateResult } from "../parser/index.ts";
 import { deltaBar, diagnose } from "../diagnose/verdict.ts";
+import type { BoundaryReport } from "./boundary.ts";
 
 export const BLOCK_START = "<!-- run-evals:start -->";
 export const BLOCK_END = "<!-- run-evals:end -->";
@@ -227,6 +228,8 @@ export interface SummaryInput {
   readonly neighbours?: readonly string[] | undefined;
   /** The trigger table rows; empty or undefined leaves the table out. */
   readonly trigger?: readonly TriggerRow[] | undefined;
+  /** The `--trigger-boundary` result; undefined when the flag was off. */
+  readonly boundary?: BoundaryReport | undefined;
   /** One per invocation, in run order; `row` undefined when no result could be read. */
   readonly cases: readonly {
     readonly caseName: string;
@@ -276,6 +279,41 @@ const triggerLines = (s: SummaryInput): readonly string[] => {
       ];
 };
 
+const pct = (n: number): string => `${(n * 100).toFixed(1)}%`;
+
+/** The trigger-boundary section: the fire count with its bound (or why there is none), then one row per negative. */
+const boundaryLines = (b: BoundaryReport | undefined): readonly string[] => {
+  if (b === undefined) return [];
+  const fired = b.rows.filter((r) => r.fired === true);
+  const word = (v: boolean | undefined, yes: string, no: string): string => (v === undefined ? "no verdict" : v ? yes : no);
+  return [
+    "",
+    "### Trigger boundary",
+    "",
+    "One run per prompt, plugin arm only: the exit code is diagnostic and the fire count is the result. A negative scores `fired` when its must-not-fire check failed.",
+    "",
+    `Fires: ${String(b.fires)} of ${String(b.negatives)} negative prompts. ${
+      b.upper === undefined
+        ? `Over-trigger bound withheld: ${b.withheld ?? "no verdict"}.`
+        : `Wilson 95% upper bound on the over-trigger rate: ${pct(b.upper)}.`
+    }`,
+    `Vacuity control: ${String(b.twinsFired)} of ${String(b.twinsRun)} should-fire twins fired in this run.`,
+    "",
+    "| negative | result | twin | twin result |",
+    "| --- | --- | --- | --- |",
+    ...b.rows.map(
+      (r) =>
+        `| ${cell(r.caseName)} | ${word(r.fired, "fired", "quiet")} | ${r.twin === undefined ? "-" : cell(r.twin)} | ${word(r.twinFired, "fired", "quiet")} |`,
+    ),
+    ...(fired.length === 0
+      ? []
+      : [
+          "",
+          `Fired: ${fired.map((r) => `\`${cell(r.caseName)}\``).join(", ")}. To keep one as a regression alarm, remove its \`trigger-boundary\` and \`pair:\` tags, add \`arm: both\` to its must-not-fire grader and tag it \`smoke\`; or tighten the skill's description and rerun.`,
+        ]),
+  ];
+};
+
 /** The delta with its 95% band and run count, or the bare delta when the result carries no run detail. */
 const deltaCell = (row: CaseRow | undefined): string => {
   const fileDelta = fmt(row?.delta);
@@ -299,8 +337,8 @@ export const renderSummary = (s: SummaryInput): string => {
   const unfired = s.cases.flatMap((c) =>
     c.row !== undefined && c.row.skillMissed > 0 ? [{ caseName: c.caseName, row: c.row }] : [],
   );
-  // --neighbours runs the plugin arm only: no without or delta column to show.
-  const oneArm = s.neighbours !== undefined;
+  // --neighbours and --trigger-boundary run the plugin arm only: no without or delta column to show.
+  const oneArm = s.neighbours !== undefined || s.boundary !== undefined;
   const showDelta = s.tier === "thorough" && !oneArm;
   const hasDelta = showDelta && s.cases.some((c) => c.row?.delta !== undefined);
   return [
@@ -328,6 +366,7 @@ export const renderSummary = (s: SummaryInput): string => {
       ? []
       : ["", `Delta not measured at tier \`${s.tier}\`: report arm scores only, not a delta, in a PR (even marked preliminary). Re-run at \`thorough\` for a delta.`]),
     ...triggerLines(s),
+    ...boundaryLines(s.boundary),
     ...(unfired.length === 0
       ? []
       : [

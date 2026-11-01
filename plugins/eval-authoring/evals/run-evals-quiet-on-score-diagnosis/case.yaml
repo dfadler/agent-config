@@ -1,0 +1,28 @@
+# Run: node plugins/eval-authoring/scripts/ts/run-evals/run-evals.ts --trigger-boundary plugins/eval-authoring
+# Trigger-boundary negative, paired with run-evals-fires-natural-with-without: read as a fire count over many distinct prompts
+# (one run, plugin arm only, no delta), not as a score.
+# Near-miss for run-evals: is a sibling skill's job: explaining a low score belongs to diagnose-scores, not to running evals.
+# Can fail: skill_not_fired fails on a run where run-evals is invoked.
+schema_version: "1.1"
+name: run-evals-quiet-on-score-diagnosis
+description: >
+  A request that shares vocabulary with run-evals but is not its job must not invoke it.
+  expected_outcome: PASS when run-evals is not invoked; FAIL when it is invoked.
+tags: [eval-authoring, run-evals, trigger, trigger-boundary, pair:run-evals-fires-natural-with-without]
+
+execution:
+  prompt: |
+    One of my plugin eval cases scores 0.00 in every run, but the replies look right to me. Why would
+    that be?
+    Answer in your reply; do not run anything.
+  max_turns: 4
+  allowed_tools:
+    - Skill
+
+graders:
+  - name: skill_not_fired
+    type: tool_used
+    tool: Skill
+    input_match: '"skill"\s*:\s*"(?:[\w-]+:)?run-evals"'
+    min: 0
+    max: 0

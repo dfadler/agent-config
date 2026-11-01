@@ -1,5 +1,7 @@
-# Run: node plugins/eval-authoring/scripts/ts/run-evals/run-evals.ts --tier quick --case mine-cases-quiet-on-log-redaction plugins/eval-authoring
-# CO-AUTHORED with the mine-cases skill in one session (#862): a cheap smoke guard, not independent
+# Run: node plugins/eval-authoring/scripts/ts/run-evals/run-evals.ts --trigger-boundary plugins/eval-authoring
+# Trigger-boundary negative, paired with mine-cases-fires-on-failing-session: read as a fire count over many distinct prompts
+# (one run, plugin arm only, no delta), not as a score.
+# CO-AUTHORED with the mine-cases skill in one session (#862): a cheap boundary negative, not independent
 # evidence the skill works. A should-not-fire case: delta 0 by design, so it is a regression guard
 # and only the with-arm result carries signal. No grant: Skill only. Unmeasured until run.
 # Near-miss: shares "transcript" and "redact" but wants a log scrubbed for a bug report, not eval cases.
@@ -16,7 +18,7 @@ description: >
   A request to scrub a pasted log before sharing it shares vocabulary with mine-cases but is not
   about eval cases, so it must not invoke the skill. expected_outcome: PASS when mine-cases is not
   invoked and the reply scrubs the log; FAIL when it is invoked.
-tags: [eval-authoring, mine-cases, trigger, quick, smoke]
+tags: [eval-authoring, mine-cases, trigger, trigger-boundary, pair:mine-cases-fires-on-failing-session]
 
 execution:
   prompt: |
@@ -36,14 +38,12 @@ graders:
     input_match: '"skill"\s*:\s*"(?:[\w-]+:)?mine-cases"'
     min: 0
     max: 0
-    arm: both
 
   - name: details_removed
     type: regex
     target: last_message
     pattern: 'jdoe@example\.com|/Users/jdoe'
     match: not_contains
-    arm: both
 
   - name: keeps_failure_line
     type: regex
@@ -51,4 +51,3 @@ graders:
     pattern: 'connection refused'
     flags: i
     match: contains
-    arm: both

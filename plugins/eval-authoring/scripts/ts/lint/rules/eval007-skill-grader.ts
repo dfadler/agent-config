@@ -1,3 +1,4 @@
+import { isBoundaryCase } from "../../parser/index.ts";
 import { graderLabel } from "../helpers.ts";
 import { fromDocs } from "../sources.ts";
 import type { Problem, Rule } from "../types.ts";
@@ -25,7 +26,8 @@ export const rule: Rule = {
           ];
       const max = g.max.value;
       const unscored: readonly Problem[] =
-        max !== undefined && max < 1 && g.arm.value !== "both"
+        // A trigger-boundary case runs plugin-arm only (run-evals --trigger-boundary), where nothing is excluded.
+        max !== undefined && max < 1 && g.arm.value !== "both" && !isBoundaryCase(c)
           ? [
               {
                 message: `${graderLabel(g)} is a max 0 Skill check without 'arm: both'; a Skill grader is treated as with-only and left out of the score in a two-arm run.`,
