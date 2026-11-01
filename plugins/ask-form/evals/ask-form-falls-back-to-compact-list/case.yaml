@@ -1,0 +1,61 @@
+# Run: claude plugin eval plugins/ask-form --case ask-form-falls-back-to-compact-list --runs 3 --trust-plugin --no-publish
+# HONEST SCOPE: this case measures INSTRUCTION COMPLIANCE, not value to the user. It checks that the
+# agent follows the "If you cannot build the form" rule in SKILL.md (say it could not, then ask in
+# one compact numbered list). Whether the user is better off is not measured here.
+# No grant: Skill only, on purpose. This is the sandbox the skill cannot finish in (no Write, no
+# Bash, no browser). The real form build, browser delivery, paste-back and cleanup are untested by
+# evals; fill-form.ts is unit-tested in scripts/ts/fill-form.test.ts.
+# Should-fire: three open choices plus "ask me", same shape as the fire cases.
+# Free graders only (hence quick). Disclosure wording is accepted broadly (can't / couldn't /
+# unable / no way to, near form / page / browser / file / tool ...), not one literal phrase.
+# Baseline leak closed: a plain numbered list of questions passes in the no-plugin arm, so no
+# list grader scores unless a disclosure also appears. The disclosure grader carries the weight.
+# good-reply: I can't open a form or write files in this session, so here are my questions in chat. 1. Database: SQLite or Postgres? 2. Sign-in: SSO or password? 3. Hosting: VM or Docker?
+# bad-reply: Great project! Here are my questions. 1. Which spreadsheet service? 2. How often should it sync? 3. Should it delete entries that disappear?
+# Sabotage map: delete the "If you cannot build the form" section from SKILL.md and the plugin
+# reply stops disclosing, so both disclosure graders fail.
+schema_version: "1.1"
+name: ask-form-falls-back-to-compact-list
+description: >
+  With no way to write files or run scripts, ask-form must say it could not build the form and
+  ask in one compact numbered list. Measures instruction compliance, not user value.
+  expected_outcome: PASS when the reply states it cannot or could not build or open a form and
+  has one numbered list of at least two lines with no nested bullets; FAIL when it dumps
+  questions without saying so, or uses prose or bullets.
+tags: [ask-form, trigger, fallback, quick]
+
+execution:
+  prompt: |
+    I want a small script that syncs our team calendar to a spreadsheet. I haven't decided
+    anything: which spreadsheet service, how often it syncs, and whether it should delete
+    entries that disappear from the calendar. You need my decisions on all three before you
+    start, so ask me.
+  max_turns: 6
+  allowed_tools:
+    - Skill
+
+graders:
+  # Scored in the plugin arm only: fire rate of the skill.
+  - name: skill_fired
+    type: tool_used
+    tool: Skill
+    input_match: '"skill"\s*:\s*"(?:[\w-]+:)?ask-form"'
+    min: 1
+    arm: with-only
+
+  # The reply tells the user a form/page/browser/file/tool was not possible. Any wording.
+  - name: discloses_no_form
+    type: regex
+    target: last_message
+    pattern: "(?:can.t|cannot|couldn.t|could not|unable to|not able to|no way to|don.t have a way to|isn.t possible)[^.\\n]{0,100}(?:form|page|browser|file|tool|write|build|open)"
+    flags: i
+    weight: 3
+
+  # Disclosure first, then ONE compact numbered list: at least two lines, no second list
+  # restarting at 1, no bullets. Anchored on the disclosure so a bare numbered list scores 0.
+  - name: disclosure_then_one_compact_list
+    type: regex
+    target: last_message
+    pattern: '^(?![\s\S]*\n\s*1[.)]\s[\s\S]*\n\s*1[.)]\s)(?![\s\S]*\n\s+[-*]\s)[\s\S]*(?:can.t|cannot|couldn.t|could not|unable to|not able to|no way to|don.t have a way to|isn.t possible)[^.\n]{0,100}(?:form|page|browser|file|tool|write|build|open)[\s\S]*\b1[.)]\s[\s\S]*\b2[.)]\s'
+    flags: i
+    weight: 2

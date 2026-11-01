@@ -1,34 +1,24 @@
 # Run: claude plugin eval plugins/ask-form --case ask-form-fires-on-open-design-decisions --runs 3 --trust-plugin --no-publish
-# No grant: Skill only. Why: the sandbox denied the write even with Write(.claude/ask-form/*)
-# granted (run 1), and a granted bare Write would still leave no Bash (the fill script) and no
-# browser, so the reply could not honestly say a form is open. File creation, the browser and
-# cleanup are untested by evals. The fill script is covered by scripts/ts/fill-form.test.ts.
-# Should-fire: the user leaves five design decisions open and asks to be asked, in natural
-# phrasing that never names a form, HTML, a file or the skill.
-# What is graded: the user-visible outcome, not the skill's own tokens. The skill exists so the
-# questions do NOT end up in a chat reply; the reply should say a form is ready and to paste the
-# answers back. form_delivered_not_dumped is an llm grader because no free grader can decide it:
-# a regex for a chat question list scored 1.00 on an 11-question dump, and a "form" word regex
-# matched "I can't write the form file". check-replies cannot run llm graders offline, so the
-# good/bad replies below are only checked by the llm judge at run time.
-# Expected arms: in this sandbox the with arm cannot build the form, so it will often fall back to
-# a chat dump and FAIL the llm grader, like the without arm. A with-arm pass needs the agent to
-# tell the user to fill in a form. Treat a low with-arm score as the sandbox ceiling, not proof the
-# skill is broken. The Delta can only come from form_delivered_not_dumped; skill_fired is an
-# unscored indicator and attempted_questions_file is a low-weight secondary signal.
-# good-reply: I put your five questions in a form and opened it in the browser. Fill it in, click Copy answers, and paste the block back here; I will wait for it before starting.
-# bad-reply: I can't write the form file in this session, so here are the questions in chat. 1. Database: SQLite, Postgres, or MySQL? 2. Sign-in: SSO, Google, or password? 3. Where it runs: a VM, Docker, or a PaaS? 4. Reporting dashboard: none, simple, or full? 5. Default loan length: 1 week, 2 weeks, or 1 month?
-# Sabotage map: delete "two or more open questions" from the description (the skill stops firing
-# and the agent dumps questions in chat) or delete step 4 ("Tell the user ... Copy answers, paste
-# here") and the llm grader should fail.
+# No grant: Skill only. The sandbox has no Write, Bash or browser, so the form is never built. The
+# real form build, browser delivery, paste-back and cleanup are untested by evals; fill-form.ts is
+# unit-tested in scripts/ts/fill-form.test.ts.
+# Should-fire: the user leaves five design decisions open and asks to be asked, in natural phrasing
+# that never names a form, HTML, a file or the skill.
+# What is graded: only the FIRE RATE. skill_fired is scored in the plugin arm only (arm: with-only).
+# No outcome grader: any reply grader built on the skill's outputs is meaningless where the skill
+# cannot finish, and a free "numbered list" grader passes the baseline too. Fallback behaviour is
+# graded by ask-form-falls-back-to-compact-list.
+# good-reply: I couldn't build a form here, so my questions are in chat. 1. Database: SQLite, Postgres, or MySQL? 2. Sign-in: SSO or password? 3. Hosting: VM, Docker, or PaaS? 4. Dashboard: none, simple, or full? 5. Default loan length: 1 week, 2 weeks, or 1 month?
+# bad-reply: Sounds good, I will start with SQLite and a simple password sign-in and build from there.
+# Sabotage map: delete "two or more open questions" from the description and the skill stops
+# firing, so skill_fired fails (indicator needs min 1 call in the plugin arm).
 schema_version: "1.1"
 name: ask-form-fires-on-open-design-decisions
 description: >
   Five undecided design choices plus "ask me" should fire ask-form. expected_outcome: PASS when
-  the reply tells the user a form is ready and to bring the answers back, without listing the
-  questions itself; FAIL when the questions are listed in chat. The Delta comes from the llm
-  grader; skill_fired is unscored.
-tags: [ask-form, trigger]
+  the ask-form skill is invoked; FAIL when it is not. Fire rate only; the Delta comes from the
+  plugin arm alone.
+tags: [ask-form, trigger, quick]
 
 execution:
   prompt: |
@@ -41,33 +31,10 @@ execution:
     - Skill
 
 graders:
-  # Indicator only (unscored in a two-arm run).
+  # Scored in the plugin arm only: fire rate of the skill.
   - name: skill_fired
     type: tool_used
     tool: Skill
     input_match: '"skill"\s*:\s*"(?:[\w-]+:)?ask-form"'
     min: 1
-
-  # Paid judge: the one outcome grader. Weighted so a chat dump cannot pass on the others.
-  - name: form_delivered_not_dumped
-    type: llm
-    weight: 4
-    criteria: >
-      PASS if the reply tells the user that a form (a page they fill in) has been built or
-      opened, or is at a named path, and tells them to fill it in and paste or bring the
-      answers back here, and it does not itself ask the individual questions.
-      FAIL if the reply asks or lists two or more of the open questions (database, sign-in,
-      hosting, dashboard, loan length) in chat, even after saying it could not build a form,
-      or if it never tells the user to fill in a form and paste the answers back. Quote the
-      span of the reply that asks a question as evidence for any FAIL; no quote, no FAIL for
-      that reason. Do not fail for style, length or formatting.
-
-  # Secondary, low weight: the Write call on the questions file appears in the trace even when
-  # denied; "file_path" does not occur in SKILL.md, so loading the skill alone does not match.
-  # It is a footprint of the skill, not the outcome, which is why it carries little weight.
-  - name: attempted_questions_file
-    type: regex
-    target: trace
-    pattern: 'file_path[^,]{0,200}ask-form/questions\.json'
-    match: contains
-    weight: 0.25
+    arm: with-only

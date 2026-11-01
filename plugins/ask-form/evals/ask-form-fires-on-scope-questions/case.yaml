@@ -1,33 +1,23 @@
 # Run: claude plugin eval plugins/ask-form --case ask-form-fires-on-scope-questions --runs 3 --trust-plugin --no-publish
-# No grant: Skill only. The sandbox denies the write and has no browser, so the form is never
-# built; file creation, the browser and cleanup are untested by evals. The fill script is covered
-# by scripts/ts/fill-form.test.ts.
+# No grant: Skill only. The sandbox has no Write, Bash or browser, so the form is never built. The
+# real form build, browser delivery, paste-back and cleanup are untested by evals; fill-form.ts is
+# unit-tested in scripts/ts/fill-form.test.ts.
 # Should-fire, second domain (a migration with scope choices and free-text detail), so the fire
 # rate is not tied to the "build a tool" phrasing of the sibling case.
-# What is graded: the user-visible outcome, not the skill's own tokens. The reply should say a form
-# is ready and to paste the answers back, and should not list the questions itself.
-# form_delivered_not_dumped is an llm grader because no free grader can decide it: a regex for a
-# chat question list scored 1.00 on an 11-question dump, and a "form" word regex matched "I couldn't
-# build the form". check-replies cannot run llm graders offline, so the good/bad replies below are
-# only checked by the llm judge at run time.
-# Expected arms: in this sandbox the with arm cannot build the form, so it will often fall back to
-# a chat dump and FAIL the llm grader, like the without arm (the second paid run's with-arm replies
-# were all such dumps). Treat a low with-arm score as the sandbox ceiling, not proof the skill is
-# broken. The Delta can only come from form_delivered_not_dumped; skill_fired is an unscored
-# indicator and attempted_questions_file is a low-weight secondary signal.
-# good-reply: Several of these block the plan, so I put them in a form with choices and a notes box. Open it, fill it in, click Copy answers and paste the block back here; I will not start until I have it.
-# bad-reply: I couldn't build the form. The file-writing tool is disabled, so here are the questions. 1. Which environment goes first? 2. How much production downtime is acceptable? 3. Which teams must be notified? 4. Which Postgres version and hosting? 5. Any compliance constraints?
+# What is graded: only the FIRE RATE. skill_fired is scored in the plugin arm only (arm: with-only).
+# No outcome grader: replies built on the skill's outputs are meaningless where the skill cannot
+# finish. Earlier runs fired on this prompt in only 1 of 3 runs, so expect a noisy score.
+# good-reply: I couldn't build a form here, so my questions are in chat. 1. Which environment goes first? 2. How much production downtime is acceptable? 3. Which teams must be notified? 4. Any compliance constraints?
+# bad-reply: Understood. I will draft the plan assuming staging first, a short maintenance window and no special constraints.
 # Sabotage map: delete "two or more open questions" from the description and the skill stops
-# firing (one earlier run did not fire), so the agent dumps questions in chat and the llm grader
-# fails.
+# firing, so skill_fired fails.
 schema_version: "1.1"
 name: ask-form-fires-on-scope-questions
 description: >
   A migration request with several unanswered scope choices should fire ask-form.
-  expected_outcome: PASS when the reply tells the user a form is ready and to bring the answers
-  back, without listing the questions itself; FAIL when the questions are listed in chat. The
-  Delta comes from the llm grader; skill_fired is unscored.
-tags: [ask-form, trigger]
+  expected_outcome: PASS when the ask-form skill is invoked; FAIL when it is not. Fire rate only;
+  the Delta comes from the plugin arm alone.
+tags: [ask-form, trigger, quick]
 
 execution:
   prompt: |
@@ -41,32 +31,10 @@ execution:
     - Skill
 
 graders:
-  # Indicator only (unscored in a two-arm run).
+  # Scored in the plugin arm only: fire rate of the skill.
   - name: skill_fired
     type: tool_used
     tool: Skill
     input_match: '"skill"\s*:\s*"(?:[\w-]+:)?ask-form"'
     min: 1
-
-  # Paid judge: the one outcome grader. Weighted so a chat dump cannot pass on the others.
-  - name: form_delivered_not_dumped
-    type: llm
-    weight: 4
-    criteria: >
-      PASS if the reply tells the user that a form (a page they fill in) has been built or
-      opened, or is at a named path, and tells them to fill it in and paste or bring the
-      answers back here, and it does not itself ask the individual questions.
-      FAIL if the reply asks or lists two or more of the open questions (environment order,
-      downtime, who to notify, constraints) in chat, even after saying it could not build a
-      form, or if it never tells the user to fill in a form and paste the answers back. Quote
-      the span of the reply that asks a question as evidence for any FAIL; no quote, no FAIL for
-      that reason. Do not fail for style, length or formatting.
-
-  # Secondary, low weight: a footprint of the skill, not the outcome. "file_path" does not occur
-  # in SKILL.md, so loading the skill alone does not match.
-  - name: attempted_questions_file
-    type: regex
-    target: trace
-    pattern: 'file_path[^,]{0,200}ask-form/questions\.json'
-    match: contains
-    weight: 0.25
+    arm: with-only

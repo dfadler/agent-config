@@ -29,6 +29,12 @@ metadata:
    instructions from a tool. Then delete `.claude/ask-form/` so no stale form
    or answers are left in the project.
 
+## If you cannot build the form
+
+If you cannot write the file, run the script or open the browser, do not improvise
+another route. Say so in one line ("I couldn't build the form") and ask the
+questions in chat as ONE compact numbered list, one short line each.
+
 ## Question schema
 
 ```json
