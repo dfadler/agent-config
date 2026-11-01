@@ -1,6 +1,10 @@
 ---
 name: git-worktree-usage
 description: |
+  Load this before pushing to, or opening a PR from, a branch whose earlier PR
+  already merged (a squash merge leaves its commits off the default branch, so
+  a new PR from it shows stale history), even when only advising: it defines
+  the fresh-branch and cherry-pick fix.
   Create worktrees with the `EnterWorktree` tool, never raw `git worktree add`.
   Git worktree and branch mechanics for isolating non-trivial work: locking and
   the stale-worktree sweep, picking what to parallelize by file surface, the
@@ -255,11 +259,7 @@ project wiring its own automation around them instead of the shipped hook.
   default branch and sweep any stragglers in a follow-up — branches cut
   *before* the rule-adding PR merged carry violations their own (pre-rule)
   CI never saw, so the default branch can go red on merge despite every
-  individual PR having been green. Watch the merge-timing race too:
-  pushing a new commit to a just-merged (and deleted) branch re-creates it,
-  so a final commit can *look* merged without actually being on the
-  default branch — verify against the merge commit's parent, or the PR's
-  own state, not the branch name.
+  individual PR having been green.
 - **A coverage gate can fail a PR that only adds tests, never removes
   any**, the first time it measures a file the coverage run had never
   executed before. A trace-based coverage tool (kcov, and others like it)
@@ -272,10 +272,20 @@ project wiring its own automation around them instead of the shipped hook.
   aggregate percentage down, and the floor can fail even though coverage
   strictly improved (dfadler/agent-config#106 is a real instance). The fix
   is to finish covering the newly-visible file, not to lower the threshold.
-- **Squash merges mean a merged branch's commits aren't reachable by SHA on
-  the local default branch** — cleanup tooling that checks reachability
-  may warn a branch is "unmerged" when it's actually merged. Verify against
-  the PR itself (state: merged), not a local branch-reachability check.
+- **A branch whose PR has merged is dead: never push to it or open a PR
+  from it.** A squash merge leaves the branch's commits unreachable by SHA
+  on the default branch, so a reachability check wrongly says "unmerged",
+  and a new PR from that branch carries every pre-squash commit again
+  (a one-line follow-up showed as a 22-file diff). Pushing to the deleted
+  remote branch also re-creates it, so a final commit can *look* merged
+  without being on the default branch. Verify against the PR's own state,
+  not the branch name: `gh pr list --head <branch> --state merged` (it
+  matches the branch name only, so add `--json headRepositoryOwner` when
+  forks are involved). For a follow-up change, `git fetch origin main`, cut a fresh
+  branch from `origin/main` and cherry-pick only the new commit. Before
+  `gh pr create`, fetch again and run `git log --oneline origin/main..HEAD`:
+  it must list only your new commit. `git diff --stat origin/main...HEAD`
+  shows scope only; it misses stale commits that touch the same files.
 
 ## Catching up a branch that already has an open PR
 
