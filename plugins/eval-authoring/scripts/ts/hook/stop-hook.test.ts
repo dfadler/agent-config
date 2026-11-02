@@ -54,12 +54,14 @@ describe("findGaps", () => {
     const baseline = (top: string): string | undefined =>
       findGaps(top, ["plugins/p/skills/s/SKILL.md"])[0]?.baseline;
 
-    it("skips a newer subset, neighbours or trigger-boundary run and names the case count", () => {
+    it("skips a newer subset, plugin-arm-only (quick, neighbours, trigger-boundary) or unfinished run and names the case count", () => {
       const top = repoWithPlugin();
-      summary(top, "run-2", { subset: null, neighbours: null, triggerBoundary: null, invocations: [{}, {}, {}] });
-      summary(top, "run-3", { subset: "subset: 1 of 3 standard cases, --changed since base", invocations: [{}] });
-      summary(top, "run-4", { neighbours: ["n"], invocations: [{}] });
-      summary(top, "run-5", { triggerBoundary: { fires: 0 }, invocations: [{}] });
+      summary(top, "run-2", { ablation: "cli-default", subset: null, unstarted: [], invocations: [{}, {}, {}] });
+      summary(top, "run-3", { ablation: "cli-default", subset: "subset: 1 of 3 standard cases, --changed since base", invocations: [{}] });
+      summary(top, "run-4", { ablation: "none", neighbours: ["n"], invocations: [{}] });
+      summary(top, "run-5", { ablation: "none", triggerBoundary: { fires: 0 }, invocations: [{}] });
+      summary(top, "run-6", { ablation: "none", subset: null, invocations: [{}] });
+      summary(top, "run-7", { ablation: "cli-default", subset: null, unstarted: ["c3"], invocations: [{}, {}] });
       expect(baseline(top)).toBe("run-2 (3 cases)");
     });
 

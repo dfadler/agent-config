@@ -67,9 +67,20 @@ export const markerPath = (sessionId: unknown): string | undefined =>
     ? join(tmpdir(), `eval-authoring-stop-${sessionId}`)
     : undefined;
 
-/** A `--changed` subset, a `--neighbours` run or a `--trigger-boundary` run is no baseline: the first covers part of the suite, the other two have no without arm. */
-const isBaselineRun = (summary: Readonly<Record<string, unknown>>): boolean =>
-  !["subset", "neighbours", "triggerBoundary"].some((k) => summary[k] != null);
+/**
+ * A run that cannot give a before-and-after delta is no baseline: a `--changed` subset
+ * or a run that stopped with cases `unstarted` covers part of the suite, and an
+ * `ablation: "none"` run (quick, `--neighbours`, `--trigger-boundary`) has no without arm.
+ * A `--case` run is not recorded as a subset; the case count printed beside the name shows it.
+ */
+const isBaselineRun = (summary: Readonly<Record<string, unknown>>): boolean => {
+  const unstarted = summary["unstarted"];
+  return (
+    summary["subset"] == null &&
+    summary["ablation"] !== "none" &&
+    !(Array.isArray(unstarted) && unstarted.length > 0)
+  );
+};
 
 const asRecord = (v: unknown): Readonly<Record<string, unknown>> =>
   typeof v === "object" && v !== null ? Object.fromEntries(Object.entries(v)) : {};
