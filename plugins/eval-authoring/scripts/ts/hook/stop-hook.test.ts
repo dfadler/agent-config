@@ -54,9 +54,13 @@ describe("findGaps", () => {
     const baseline = (top: string): string | undefined =>
       findGaps(top, ["plugins/p/skills/s/SKILL.md"])[0]?.baseline;
 
-    it("skips a newer subset, plugin-arm-only (quick, neighbours, trigger-boundary) or unfinished run and names the case count", () => {
+    it("skips a newer subset, plugin-arm-only (quick, neighbours, trigger-boundary), unfinished or untrustworthy (exit 7, missing result) run and names the case count", () => {
       const top = repoWithPlugin();
-      summary(top, "run-2", { ablation: "cli-default", subset: null, unstarted: [], invocations: [{}, {}, {}] });
+      const ran = { resultDir: "r" };
+      // Exit 1 is a below-threshold result: a valid before score, so it stays eligible.
+      summary(top, "run-2", { ablation: "cli-default", subset: null, unstarted: [], exit: 1, invocations: [ran, ran, ran] });
+      summary(top, "run-8", { ablation: "cli-default", subset: null, unstarted: [], exit: 7, invocations: [ran, ran] });
+      summary(top, "run-9", { ablation: "cli-default", subset: null, unstarted: [], exit: 1, invocations: [ran, {}] });
       summary(top, "run-3", { ablation: "cli-default", subset: "subset: 1 of 3 standard cases, --changed since base", invocations: [{}] });
       summary(top, "run-4", { ablation: "none", neighbours: ["n"], invocations: [{}] });
       summary(top, "run-5", { ablation: "none", triggerBoundary: { fires: 0 }, invocations: [{}] });

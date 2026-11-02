@@ -15,6 +15,7 @@ import { existsSync, readFileSync, readdirSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join, relative, resolve, sep } from "node:path";
 import { resolveEvalDir } from "../parser/index.ts";
+import { EXIT_FAILURE, EXIT_OK } from "../run-evals/exit-codes.ts";
 import { findPluginRoot } from "./lint-hook.ts";
 
 /** A hung git must not hold the Stop hook open; a timeout throws and the hook no-ops. Worst case 8 calls (rev-parse, symbolic-ref, 4 merge-base candidates, diff, ls-files) x 3s = 24s, under the 30s hook timeout. */
@@ -71,14 +72,21 @@ export const markerPath = (sessionId: unknown): string | undefined =>
  * A run that cannot give a before-and-after delta is no baseline: a `--changed` subset
  * or a run that stopped with cases `unstarted` covers part of the suite, and an
  * `ablation: "none"` run (quick, `--neighbours`, `--trigger-boundary`) has no without arm.
+ * A run whose exit is neither ok nor below-threshold (partial, rate-limited, paid graders
+ * skipped, load failure) or whose invocation left no result is untrustworthy; a below-threshold
+ * run is a valid before score and stays eligible.
  * A `--case` run is not recorded as a subset; the case count printed beside the name shows it.
  */
 const isBaselineRun = (summary: Readonly<Record<string, unknown>>): boolean => {
   const unstarted = summary["unstarted"];
+  const invocations = summary["invocations"];
+  const exit = summary["exit"];
   return (
     summary["subset"] == null &&
     summary["ablation"] !== "none" &&
-    !(Array.isArray(unstarted) && unstarted.length > 0)
+    !(Array.isArray(unstarted) && unstarted.length > 0) &&
+    (exit === undefined || exit === EXIT_OK || exit === EXIT_FAILURE) &&
+    (!Array.isArray(invocations) || invocations.every((i) => asRecord(i)["resultDir"] != null))
   );
 };
 

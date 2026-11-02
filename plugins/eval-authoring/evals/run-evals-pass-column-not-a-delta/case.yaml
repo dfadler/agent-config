@@ -7,6 +7,11 @@
 # Can fail: states_delta_not_measured fails if the reply writes a delta from the pass or mean
 # columns; no_pass_rate_delta_figure fails on "+60%" / "0.60" style pass-rate gaps presented as the
 # result; skill_fired (with-arm only) fails if the description stops matching.
+# shows_arm_scores and shows_pass_pair fail on a bare "delta not measured" that drops the numbers.
+# They match the prompt's own table (EVAL024), so they guard only against a reply that omits the
+# numbers; skill_fired and states_delta_not_measured carry the arm difference.
+# good-reply: Delta not measured: this is a 3-case standard run. rollback-asks-first 0.93 with vs 0.60 without (pass 0.90 / 0.30), staging-only-default 1.00 vs 0.67 (pass 1.00 / 0.40), no-prod-without-flag 0.87 vs 0.60 (pass 0.80 / 0.30). Report arm scores only.
+# bad-reply: +60% pass-rate gap; delta not measured
 schema_version: "1.1"
 name: run-evals-pass-column-not-a-delta
 description: >
@@ -50,10 +55,26 @@ graders:
     flags: i
     match: contains
 
-  # The pass-rate gap (0.60, 0.60, 0.50 per case; about +0.57 mean) must not be the result.
+  # No gap written as the result, in either word order: the pass-rate gaps (0.60, 0.60, 0.50 per case)
+  # and the mean-score gaps (0.33, 0.33, 0.27) are both arm differences, not a delta.
   - name: no_pass_rate_delta_figure
     type: regex
     target: last_message
-    pattern: '(?:gap|delta|Δ|lift|improv\w+|up|by)\s*(?:of\s*)?[:=]?\s*\+?(?:0?\.(?:5\d?|6\d?)|5\d\s*(?:%|points?|pts|pp)|6\d\s*(?:%|points?|pts|pp))'
+    pattern: '(?:gap|delta|Δ|lift|improv\w+|up|by)\s*(?:(?:of|is|was)\s*)?[:=]?\s*\+?(?:0?\.(?:2[5-9]|3[0-5]|5\d?|6\d?)|(?:2[5-9]|3[0-5]|5\d|6\d)\s*(?:%|points?|pts|pp))|\+?(?:0?\.(?:2[5-9]|3[0-5]|5\d?|6\d?)|(?:2[5-9]|3[0-5]|5\d|6\d)\s*(?:%|points?|pts|pp))\s*(?:[\w-]+\s+){0,2}(?:gap|delta|Δ|lift|improv\w+)'
     flags: i
     match: not_contains
+
+  # The reply still gives the numbers: the with / without scores and the pass pair of at least one case.
+  - name: shows_arm_scores
+    type: regex
+    target: last_message
+    pattern: '0\.93\D{1,30}0\.60|1\.00\D{1,30}0\.67|0\.87\D{1,30}0\.60'
+    flags: i
+    match: contains
+
+  - name: shows_pass_pair
+    type: regex
+    target: last_message
+    pattern: '0\.90\D{1,12}0\.30|1\.00\D{1,12}0\.40|0\.80\D{1,12}0\.30'
+    flags: i
+    match: contains
