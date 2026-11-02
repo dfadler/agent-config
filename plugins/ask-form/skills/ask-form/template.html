@@ -1,0 +1,85 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Questions</title>
+<style>
+:root{--bg:#fafaf9;--fg:#1c1917;--muted:#78716c;--card:#fff;--line:#d6d3d1;--accent:#2563eb;--accent-fg:#fff}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]){--bg:#1c1917;--fg:#f5f5f4;--muted:#a8a29e;--card:#292524;--line:#44403c;--accent:#60a5fa;--accent-fg:#0c0a09}}
+:root[data-theme="dark"]{--bg:#1c1917;--fg:#f5f5f4;--muted:#a8a29e;--card:#292524;--line:#44403c;--accent:#60a5fa;--accent-fg:#0c0a09}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--fg);font:16px/1.5 system-ui,sans-serif}
+main{max-width:42rem;margin:0 auto;padding:24px 16px 64px}
+h1{font-size:1.4rem;margin:0 0 16px}
+fieldset{background:var(--card);border:1px solid var(--line);border-radius:8px;margin:0 0 16px;padding:16px}
+legend{font-weight:600;padding:0 4px}
+.help{color:var(--muted);font-size:.9rem;margin:0 0 8px}
+label.opt{display:flex;gap:8px;align-items:center;padding:4px 0}
+input[type=text],textarea,select{width:100%;font:inherit;color:inherit;background:var(--bg);border:1px solid var(--line);border-radius:6px;padding:8px}
+textarea{min-height:6rem}
+.other{margin-top:8px}
+button{font:inherit;background:var(--accent);color:var(--accent-fg);border:0;border-radius:6px;padding:10px 20px;cursor:pointer}
+:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+#out{margin-top:16px;font:.85rem/1.4 ui-monospace,monospace;min-height:8rem}
+#msg{margin-left:12px;color:var(--muted)}
+</style>
+</head>
+<body>
+<main>
+<h1>Questions</h1>
+<form id="f" onsubmit="return false"></form>
+<button id="copy" type="button">Copy answers</button><span id="msg" role="status"></span>
+<textarea id="out" readonly aria-label="Answers to paste into chat"></textarea>
+</main>
+<script>
+const Q = /*QUESTIONS*/[];
+const f = document.getElementById('f'), out = document.getElementById('out');
+function mk(tag, props, ...kids) { const e = Object.assign(document.createElement(tag), props); e.append(...kids); return e; }
+
+Q.forEach((q, i) => {
+  const fs = mk('fieldset', {}, mk('legend', { textContent: q.label }));
+  if (q.help) fs.append(mk('p', { className: 'help', textContent: q.help }));
+  const name = 'q' + i, dflt = [].concat(q.default ?? []);
+  if (q.type === 'single' || q.type === 'multi') {
+    const kind = q.type === 'single' ? 'radio' : 'checkbox';
+    q.options.forEach(o => fs.append(mk('label', { className: 'opt' },
+      mk('input', { type: kind, name, value: o, checked: dflt.includes(o) }), o)));
+  } else if (q.type === 'select') {
+    const s = mk('select', { name }, mk('option', { value: '', textContent: '— choose —' }),
+      ...q.options.map(o => mk('option', { value: o, textContent: o, selected: dflt.includes(o) })));
+    fs.append(s);
+  } else {
+    fs.append(mk(q.type === 'textarea' ? 'textarea' : 'input',
+      q.type === 'textarea' ? { name, value: dflt[0] ?? '' } : { type: 'text', name, value: dflt[0] ?? '' }));
+  }
+  if (q.options) fs.append(mk('input', { type: 'text', name: name + '_other', className: 'other', placeholder: 'Other (optional)' }));
+  f.append(fs);
+});
+
+function answers(q, i) {
+  const name = 'q' + i, v = [];
+  if (q.type === 'single') v.push(f.querySelector(`input[name=${name}]:checked`)?.value);
+  else if (q.type === 'multi') f.querySelectorAll(`input[name=${name}]:checked`).forEach(c => v.push(c.value));
+  else v.push(f.elements[name].value);
+  if (q.options) v.push(f.elements[name + '_other'].value.trim() && 'Other: ' + f.elements[name + '_other'].value.trim());
+  return v.filter(Boolean);
+}
+
+function render() {
+  out.value = '## Answers\n' + Q.map((q, i) => {
+    const a = answers(q, i);
+    const body = !a.length ? '(no answer)' : q.type === 'multi' ? a.map(x => '- ' + x).join('\n') : a.join('\n');
+    return `### ${q.id}: ${q.label}\n${body}`;
+  }).join('\n');
+}
+f.addEventListener('input', render); render();
+
+document.getElementById('copy').onclick = async () => {
+  const msg = document.getElementById('msg');
+  try { await navigator.clipboard.writeText(out.value); msg.textContent = 'Copied. Paste it into the chat.'; }
+  catch { out.select(); msg.textContent = 'Select-all done; press Ctrl/Cmd+C.'; }
+};
+</script>
+</body>
+</html>

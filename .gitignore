@@ -22,3 +22,6 @@ node_modules/
 # machine-specific paths before a global gitignore is even in place.
 .claude/settings.local.json
 .claude/worktrees/
+
+# ask-form skill scratch (questions.json / form.html); the skill deletes it after the answers come back
+/ask-form/

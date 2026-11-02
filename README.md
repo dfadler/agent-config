@@ -22,6 +22,9 @@ automatically, with no per-project copy to keep in sync.
   manifest `name`, which is what makes skills resolve as `<plugin-name>:<skill>`.
   - `accessibility-skills/` — WCAG 2.2 code review for web markup and CSS, graded
     with an evidence-basis/severity system.
+  - `ask-form/` — ask several questions at once as a local HTML form (radio,
+    checkboxes, dropdown, text, textarea); a Copy button returns the answers as one
+    block to paste into chat.
   - `detached-terminal/` — run and drive an interactive terminal (TUI, REPL,
     alternate-screen app) on a headless PTY without stealing focus. Requires `pyte`.
   - `eval-authoring/` — author, lint, run and diagnose `claude plugin eval` cases: a
