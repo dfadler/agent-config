@@ -1,0 +1,40 @@
+# Run: claude plugin eval plugins/ask-form --case ask-form-stays-quiet-on-interview-questions --runs 3 --trust-plugin --no-publish
+# No grant: Skill only.
+# Should-not-fire near-miss: "questions" and "options" vocabulary, but the questions are the
+# deliverable (for someone else to answer), not open questions the assistant needs answered.
+# good-reply: 1. How would you design a token bucket? 2. How do you share limits across nodes? 3. What happens when Redis is down? 4. How do you pick limits per client? 5. How would you test it?
+# bad-reply: I need some details first; I'll open a form for you to fill in.
+# Regression guard: the no-plugin arm passes too, so Delta is about 0 by design.
+# Can fail: ask_form_not_fired fails on over-triggering; five_numbered_questions fails a reply
+# that asks the user back instead of delivering questions.
+schema_version: "1.1"
+name: ask-form-stays-quiet-on-interview-questions
+description: >
+  A request to draft interview questions for a candidate must not invoke ask-form.
+  expected_outcome: regression guard, Delta about 0 by design. PASS when the skill does not
+  fire and five numbered questions are returned; FAIL when it fires.
+tags: [ask-form, trigger, quick]
+
+execution:
+  prompt: |
+    Give me five questions to ask a senior backend engineer candidate about designing a rate
+    limiter. Number them 1 to 5 and add nothing else.
+  max_turns: 4
+  allowed_tools:
+    - Skill
+
+graders:
+  - name: ask_form_not_fired
+    type: tool_used
+    tool: Skill
+    input_match: '"skill"\s*:\s*"(?:[\w-]+:)?ask-form"'
+    min: 0
+    max: 0
+    arm: both
+
+  - name: five_numbered_questions
+    type: regex
+    target: last_message
+    pattern: '(?:^|\s)5[.)]\s+\S'
+    match: contains
+    arm: both

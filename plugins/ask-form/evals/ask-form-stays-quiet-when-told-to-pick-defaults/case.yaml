@@ -1,0 +1,56 @@
+# Run: claude plugin eval plugins/ask-form --case ask-form-stays-quiet-when-told-to-pick-defaults --runs 3 --trust-plugin --no-publish
+# No grant: Skill only.
+# Should-not-fire near-miss: many open decisions, but the user says not to ask. The skill is for
+# questions the agent has to put to the user; an explicit "don't ask" removes them.
+# The first paid run showed replies word their choices as "plan (defaults, easy to change)" and
+# just name a database, so the grader checks for a concrete database name (the prompt names none)
+# and for no pile of questions, instead of "I chose"-style phrasing.
+# good-reply: Plan (defaults chosen): SQLite for the database, password sign-in, one small VM, no dashboard, 14-day loans.
+# bad-reply: Before I start, I put your open decisions in a form; fill it in, click Copy answers and paste it back.
+# Regression guard: the no-plugin arm passes too, so Delta is about 0 by design.
+# Can fail: ask_form_not_fired fails on a fire; names_a_database fails a reply that asks or hands
+# off instead of committing; no_question_pile fails a reply that asks 4 or more questions.
+# Sabotage map: this case checks no sentence in the skill; a failure means the trigger is too eager
+# (the description would need an "unless the user said not to ask" clause). Smoke case: the Skill
+# check is the only live signal and is noisy at 3 runs.
+schema_version: "1.1"
+name: ask-form-stays-quiet-when-told-to-pick-defaults
+description: >
+  Several undecided choices with an explicit "pick sensible defaults, don't ask me" must not
+  fire ask-form. expected_outcome: regression guard, Delta about 0 by design. PASS when the skill
+  does not fire and the reply commits to choices; FAIL when it fires.
+tags: [ask-form, trigger, smoke]
+
+execution:
+  prompt: |
+    Plan a small internal tool that tracks equipment loans for our team. I haven't decided the
+    database, how people sign in, where it runs, a dashboard, or default loan length. Use
+    sensible defaults for all of it and don't ask me anything; I will correct you afterwards.
+    Keep the plan under ten lines.
+  max_turns: 4
+  allowed_tools:
+    - Skill
+
+graders:
+  - name: ask_form_not_fired
+    type: tool_used
+    tool: Skill
+    input_match: '"skill"\s*:\s*"(?:[\w-]+:)?ask-form"'
+    min: 0
+    max: 0
+    arm: both
+
+  - name: names_a_database
+    type: regex
+    target: last_message
+    pattern: 'SQLite|Postgres|MySQL|MariaDB|MongoDB|DynamoDB'
+    flags: i
+    match: contains
+    arm: both
+
+  - name: no_question_pile
+    type: regex
+    target: last_message
+    pattern: '(?:[^?]*\?){4}'
+    match: not_contains
+    arm: both
