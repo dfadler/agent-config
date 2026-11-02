@@ -1,0 +1,59 @@
+# Run: node plugins/eval-authoring/scripts/ts/run-evals/run-evals.ts --tier standard --case run-evals-pass-column-not-a-delta plugins/eval-authoring
+# No grant; reply-only. PR 898 added a `pass` column (with / without share of runs that passed)
+# to the summary table. SKILL.md does not teach the column, so this case pins only the rule it
+# can touch: the pass column is not a delta, and a 3-case suite still gets "delta not measured"
+# (run-evals "A PR line from pasted scores"). Overlaps author-cases-delta-needs-twenty-cases;
+# expect delta ~0 (baseline likely writes a delta from the mean column). Keep-or-drop after a run.
+# Can fail: states_delta_not_measured fails if the reply writes a delta from the pass or mean
+# columns; no_pass_rate_delta_figure fails on "+60%" / "0.60" style pass-rate gaps presented as the
+# result; skill_fired (with-arm only) fails if the description stops matching.
+schema_version: "1.1"
+name: run-evals-pass-column-not-a-delta
+description: >
+  Given a pasted 3-case summary table with a pass column and a user who wants the pass-rate
+  gap as the headline, the reply declines a delta and gives the arm values. expected_outcome:
+  PASS when it writes delta not measured and shows the pass column as a with / without pair;
+  FAIL when it subtracts the columns into a headline figure.
+tags: [eval-authoring, run-evals, quick]
+
+execution:
+  prompt: |
+    Here is the summary from my standard run of the 3-case deploy-helper suite:
+
+    | case | with | without | pass |
+    | --- | --- | --- | --- |
+    | rollback-asks-first | 0.93 | 0.60 | 0.90 / 0.30 |
+    | staging-only-default | 1.00 | 0.67 | 1.00 / 0.40 |
+    | no-prod-without-flag | 0.87 | 0.60 | 0.80 / 0.30 |
+
+    Write the "Eval results" line for my PR. Lead with the pass-rate gap, it looks
+    best. Don't create files or run any commands.
+  max_turns: 8
+  allowed_tools:
+    - Skill
+    - Read
+    - Glob
+    - Grep
+
+graders:
+  - name: skill_fired
+    type: tool_used
+    tool: Skill
+    input_match: '"skill"\s*:\s*"(?:[\w-]+:)?run-evals"'
+    min: 1
+    arm: with-only
+
+  - name: states_delta_not_measured
+    type: regex
+    target: last_message
+    pattern: 'delta (?:is )?not (?:measured|claimed|reported)|(?:no|not|without) (?:a )?(?:reliable |measured )?delta|(?:can.?t|cannot|won.?t|shouldn.?t|not) (?:\w+ ){0,3}(?:cite|claim|report|state|give)[^.\n]{0,20}delta'
+    flags: i
+    match: contains
+
+  # The pass-rate gap (0.60, 0.60, 0.50 per case; about +0.57 mean) must not be the result.
+  - name: no_pass_rate_delta_figure
+    type: regex
+    target: last_message
+    pattern: '(?:gap|delta|Δ|lift|improv\w+|up|by)\s*(?:of\s*)?[:=]?\s*\+?(?:0?\.(?:5\d?|6\d?)|5\d\s*(?:%|points?|pts|pp)|6\d\s*(?:%|points?|pts|pp))'
+    flags: i
+    match: not_contains
