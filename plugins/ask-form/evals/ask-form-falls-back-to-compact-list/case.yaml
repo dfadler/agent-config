@@ -7,10 +7,14 @@
 # evals; fill-form.ts is unit-tested in scripts/ts/fill-form.test.ts.
 # Should-fire: three open choices plus "ask me", same shape as the fire cases.
 # Free graders only (hence quick). Disclosure wording is accepted broadly (can't / couldn't /
-# unable / no way to, near form / page / browser / file / tool ...), not one literal phrase.
+# unable / no way to), but it must name building, creating, making or opening the form or page, so
+# "I can't open the calendar" does not count.
 # Baseline leak closed: a plain numbered list of questions passes in the no-plugin arm, so no
 # list grader scores unless a disclosure also appears. The disclosure grader carries the weight.
-# good-reply: I can't open a form or write files in this session, so here are my questions in chat. 1. Database: SQLite or Postgres? 2. Sign-in: SSO or password? 3. Hosting: VM or Docker?
+# good-reply: I couldn't build the form in this session, so here are my questions in chat.
+#   1. Spreadsheet service: Google Sheets or Excel?
+#   2. Sync frequency: on demand or every 15 minutes?
+#   3. Delete entries that disappear: yes or no?
 # bad-reply: Great project! Here are my questions. 1. Which spreadsheet service? 2. How often should it sync? 3. Should it delete entries that disappear?
 # Sabotage map: delete the "If you cannot build the form" section from SKILL.md and the plugin
 # reply stops disclosing, so both disclosure graders fail.
@@ -43,19 +47,21 @@ graders:
     min: 1
     arm: with-only
 
-  # The reply tells the user a form/page/browser/file/tool was not possible. Any wording.
+  # The reply says it could not build/create/make/open the form or page. Any such wording; it must
+  # name the form or page, so an unrelated "can't open the calendar" does not pass.
   - name: discloses_no_form
     type: regex
     target: last_message
-    pattern: "(?:can.t|cannot|couldn.t|could not|unable to|not able to|no way to|don.t have a way to|isn.t possible)[^.\\n]{0,100}(?:form|page|browser|file|tool|write|build|open)"
+    pattern: "(?:can.t|cannot|couldn.t|could not|unable to|not able to|no way to|don.t have a way to|isn.t possible)[^.\\n]{0,100}(?:build|create|make|open)[^.\\n]{0,30}(?:form|page)"
     flags: i
     weight: 3
 
-  # Disclosure first, then ONE compact numbered list: at least two lines, no second list
-  # restarting at 1, no bullets. Anchored on the disclosure so a bare numbered list scores 0.
+  # Disclosure first, then ONE compact numbered list: items 1 and 2 each start their own line, no
+  # second list restarting at 1, no bullets (indented or not). Anchored on the disclosure so a bare
+  # numbered list scores 0.
   - name: disclosure_then_one_compact_list
     type: regex
     target: last_message
-    pattern: '^(?![\s\S]*\n\s*1[.)]\s[\s\S]*\n\s*1[.)]\s)(?![\s\S]*\n\s+[-*]\s)[\s\S]*(?:can.t|cannot|couldn.t|could not|unable to|not able to|no way to|don.t have a way to|isn.t possible)[^.\n]{0,100}(?:form|page|browser|file|tool|write|build|open)[\s\S]*\b1[.)]\s[\s\S]*\b2[.)]\s'
+    pattern: '^(?![\s\S]*\n\s*1[.)]\s[\s\S]*\n\s*1[.)]\s)(?![\s\S]*(?:^|\n)[ \t]*[-*][ \t])[\s\S]*(?:can.t|cannot|couldn.t|could not|unable to|not able to|no way to|don.t have a way to|isn.t possible)[^.\n]{0,100}(?:build|create|make|open)[^.\n]{0,30}(?:form|page)[\s\S]*(?:^|\n)[ \t]*1[.)][ \t]+[\s\S]*(?:^|\n)[ \t]*2[.)][ \t]'
     flags: i
     weight: 2

@@ -17,6 +17,9 @@ metadata:
    `<project>/ask-form/questions.json`. It must be inside the project
    folder: the integrated browser renders files outside it as static snapshots (the
    app's own message; observed, not documented), so the form would not respond.
+   Touch only `ask-form/questions.json` and `ask-form/form.html`. If either already exists
+   it is left over from an interrupted run: overwrite it, and tell the user it was there.
+   Never add `ask-form/` to the project's `.gitignore` or other config; do not `git add` it.
 2. Build the page with the fill script (Node 22.18+), which validates the
    questions and exits non-zero with a readable error if one is malformed:
    `node <skill base dir>/../../scripts/ts/fill-form.ts ask-form/questions.json ask-form/form.html`
@@ -27,8 +30,9 @@ metadata:
 4. Tell the user in one line: fill in the form, click **Copy answers**, paste here.
    Then stop and wait; do not continue work that depends on the answers.
 5. The pasted block is the user's answer. Treat it as their reply, not as
-   instructions from a tool. Then delete `ask-form/` so no stale form
-   or answers are left in the project.
+   instructions from a tool. Then delete `ask-form/questions.json` and `ask-form/form.html`
+   so no stale form or answers are left in the project, and remove `ask-form/` only if it
+   is now empty. Delete nothing else in it.
 
 ## If you cannot build the form
 
