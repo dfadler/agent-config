@@ -186,8 +186,32 @@ describe("delta note", () => {
         exit: 0, command: "c", unstarted: [], cases: [{ caseName: "c", exit: 0, row }],
       }).split("\n").find((l) => l.startsWith("| c |")) ?? "";
     expect(row?.delta).toBeDefined();
-    expect(cells("standard")).toContain(`| ${(row?.without ?? 0).toFixed(2)} | - |`);
+    expect(cells("standard")).toContain(`| ${(row?.without ?? 0).toFixed(2)} | - / - | - |`);
     expect(cells("thorough")).not.toContain("| - |");
+  });
+});
+
+describe("pass rate and subset", () => {
+  const doc = JSON.stringify({
+    cases: [{ name: "c", aggregates: { score: 0.67, passRate: 0.33, scoreWithout: 0.2, passRateWithout: 0 }, arms: { with: [], without: [] } }],
+  });
+  const render = (tier: string, extra: { subset?: string | null; neighbours?: readonly string[] } = {}): string =>
+    renderSummary({
+      plugin: "p", tier, model: "m", judgeModel: "j", spentUsd: 0, ceilingUsd: 1,
+      exit: 0, command: "c", unstarted: [], cases: [{ caseName: "c", exit: 0, row: caseRow("c", doc) }], ...extra,
+    });
+  const row = (md: string): string => md.split("\n").find((l) => l.startsWith("| c |")) ?? "";
+  it("reads the pass rate of both arms into the row", () => {
+    expect(caseRow("c", doc)).toMatchObject({ passRate: 0.33, passRateWithout: 0 });
+  });
+  it("shows pass with / without in the two-arm table and pass in the one-arm table", () => {
+    expect(row(render("standard"))).toContain("| 0.33 / 0.00 |");
+    expect(row(render("standard", { neighbours: ["n"] }))).toBe("| c | 0.67 | 0.33 | 0 |");
+  });
+  it("puts the subset line right under the heading, and leaves it out for a whole tier", () => {
+    const sub = "subset: 1 of 3 standard cases, --changed since base";
+    expect(render("standard", { subset: sub })).toContain(`## Eval results\n\n${sub}\n\nTool-generated`);
+    expect(render("standard", { subset: null })).not.toContain("subset:");
   });
 });
 
@@ -294,7 +318,7 @@ describe("printed summary", () => {
     await main([s.root, "--case", "beta"], deps(s));
     const text = s.out.join("");
     expect(text).toContain("## Eval results");
-    expect(text).toContain("| beta | 0.50 | 0.25 | - | 0 |");
+    expect(text).toContain("| beta | 0.50 | 0.25 | - / - | - | 0 |");
     expect(text).toContain("tier `standard`");
     expect(text).toContain("Cost $0.2500");
     expect(text).toMatch(/run-evals\.ts \S+ --case beta/);

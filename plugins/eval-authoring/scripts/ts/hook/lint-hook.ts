@@ -23,8 +23,8 @@ import { resolveEvalDir } from "../parser/index.ts";
 import type { Finding } from "../lint/types.ts";
 import type { LintOutcome, LintReport } from "../lint/runner.ts";
 
-/** Tools whose edits we lint. `MultiEdit` is not in the hook matcher but is the same shape. */
-const EDIT_TOOLS: readonly string[] = ["Write", "Edit", "MultiEdit"];
+/** Tools whose edits we lint (the hook matcher is `Write|Edit`). */
+const EDIT_TOOLS: readonly string[] = ["Write", "Edit"];
 
 /** Keep the injected context small; the full report is one lint run away. */
 const MAX_CONTEXT_CHARS = 8000;

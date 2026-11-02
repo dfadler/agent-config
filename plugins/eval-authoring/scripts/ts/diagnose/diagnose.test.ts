@@ -1,6 +1,7 @@
 import { readFileSync } from "node:fs";
 import { describe, expect, it } from "vitest";
 import { EXIT_FAILURE, EXIT_OK, EXIT_USAGE, main, USAGE } from "./diagnose.ts";
+import { DEFAULT_THRESHOLDS, SMALL_ARM_RUNS } from "./verdict.ts";
 
 const fixture = (name: string): string =>
   readFileSync(new URL(`./fixtures/${name}`, import.meta.url), "utf8");
@@ -19,6 +20,13 @@ describe("main", () => {
         stderr: "",
       });
     }
+  });
+
+  it("states the default cutoffs from DEFAULT_THRESHOLDS", () => {
+    const t = DEFAULT_THRESHOLDS;
+    expect(USAGE).toContain(
+      `${String(t.seFloor)}, ${String(t.nearCeiling)}, ${String(t.highVariance)} or ${String(t.highVarianceSmallArm)} for an arm of ${String(SMALL_ARM_RUNS)}`,
+    );
   });
 
   it("prints text verdicts for a recorded one-run result", () => {

@@ -11,14 +11,14 @@
  * temp-dir marker so it also nags at most once per session. Failures no-op.
  */
 import { execFileSync } from "node:child_process";
-import { existsSync, readdirSync, writeFileSync } from "node:fs";
+import { existsSync, readFileSync, readdirSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join, relative, resolve, sep } from "node:path";
 import { resolveEvalDir } from "../parser/index.ts";
 import { findPluginRoot } from "./lint-hook.ts";
 
-/** A hung git must not hold the Stop hook open; a timeout throws and the hook no-ops. Worst case 6 calls (rev-parse, 3 merge-base candidates, diff, ls-files) x 4s = 24s, under the 30s hook timeout. */
-const GIT_TIMEOUT_MS = 4_000;
+/** A hung git must not hold the Stop hook open; a timeout throws and the hook no-ops. Worst case 8 calls (rev-parse, symbolic-ref, 4 merge-base candidates, diff, ls-files) x 3s = 24s, under the 30s hook timeout. */
+const GIT_TIMEOUT_MS = 3_000;
 
 const git = (cwd: string, args: readonly string[]): string =>
   execFileSync("git", [...args], {
@@ -30,9 +30,19 @@ const git = (cwd: string, args: readonly string[]): string =>
 
 const lines = (s: string): string[] => s.split("\n").filter((l) => l !== "");
 
-/** Files changed vs the merge-base with main (committed or not) plus untracked files, repo-relative. */
+/** The remote's default branch (`origin/main`, `origin/trunk`), or "" when origin/HEAD is not set. */
+const defaultBranchRef = (cwd: string): string => {
+  try {
+    return git(cwd, ["symbolic-ref", "-q", "--short", "refs/remotes/origin/HEAD"]).trim();
+  } catch {
+    return "";
+  }
+};
+
+/** Files changed vs the merge-base with the default branch (committed or not) plus untracked files, repo-relative. */
 export const changedFiles = (cwd: string): readonly string[] => {
-  const base = ["origin/main", "main", "@{upstream}"]
+  const base = [defaultBranchRef(cwd), "origin/main", "main", "@{upstream}"]
+    .filter((ref) => ref !== "")
     .map((ref) => {
       try {
         return git(cwd, ["merge-base", "HEAD", ref]).trim();
@@ -57,9 +67,29 @@ export const markerPath = (sessionId: unknown): string | undefined =>
     ? join(tmpdir(), `eval-authoring-stop-${sessionId}`)
     : undefined;
 
+/** A `--changed` subset, a `--neighbours` run or a `--trigger-boundary` run is no baseline: the first covers part of the suite, the other two have no without arm. */
+const isBaselineRun = (summary: Readonly<Record<string, unknown>>): boolean =>
+  !["subset", "neighbours", "triggerBoundary"].some((k) => summary[k] != null);
+
+const asRecord = (v: unknown): Readonly<Record<string, unknown>> =>
+  typeof v === "object" && v !== null ? Object.fromEntries(Object.entries(v)) : {};
+
+/** The newest results directory that can serve as a "before" score, with its case count when the run-evals summary says. Fails open: a directory with no readable summary counts. */
 const latestResults = (evalDir: string): string | undefined => {
   const dir = join(evalDir, "results");
-  return existsSync(dir) ? readdirSync(dir).sort().at(-1) : undefined;
+  if (!existsSync(dir)) return undefined;
+  for (const name of readdirSync(dir).sort().reverse()) {
+    let summary: Readonly<Record<string, unknown>>;
+    try {
+      summary = asRecord(JSON.parse(readFileSync(join(dir, name, "run-evals-summary.json"), "utf8")));
+    } catch {
+      return name;
+    }
+    if (!isBaselineRun(summary)) continue;
+    const cases = summary["invocations"];
+    return Array.isArray(cases) ? `${name} (${String(cases.length)} cases)` : name;
+  }
+  return undefined;
 };
 
 export interface Gap {

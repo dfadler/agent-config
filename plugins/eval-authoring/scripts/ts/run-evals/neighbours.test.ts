@@ -189,7 +189,7 @@ describe("--neighbours (trigger-set mode)", () => {
       expect(await s.go(["--tier", tier])).toBe(EXIT_OK);
       const args = cliCalls(s.calls)[0]?.args ?? [];
       expect(args.slice(args.indexOf("--ablation"), args.indexOf("--ablation") + 2)).toEqual(["--ablation", "none"]);
-      expect(s.out.join("")).toContain("| case | score | exit |");
+      expect(s.out.join("")).toContain("| case | score | pass | exit |");
       expect(s.out.join("")).not.toContain("| without |");
       expect(JSON.parse([...s.written.values()].find((t) => t.includes("scoringNote")) ?? "{}")).toMatchObject({ ablation: "none" });
     }
