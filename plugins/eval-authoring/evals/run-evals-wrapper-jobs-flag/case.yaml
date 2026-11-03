@@ -1,0 +1,65 @@
+# Run: node plugins/eval-authoring/scripts/ts/run-evals/run-evals.ts --tier standard --case run-evals-wrapper-jobs-flag plugins/eval-authoring
+# Shared run/grant facts: docs/contributing.md, "Plugin evals". No grant; reply-only. Default two arms.
+# Covers the "Faster feedback" section's wrapper concurrency lever. run-evals-speed-levers grades
+# the narrow-to-one-case and skip-the-baseline advice and deliberately not -j, so nothing pins
+# that the wrapper takes --jobs. SKILL.md lines 189-190 still say "The wrapper has no -j flag",
+# which sent the 2026-11-03 baseline sweep out without it.
+# Pre-registered: this case FAILS with the plugin on main today (the skill teaches the raw
+# `claude plugin eval -j` command and says the wrapper has no flag) and passes after the 3b text
+# fix; the without-arm may pass if the model guesses the flag, so read its replies before trusting a delta.
+# good-reply: Pass --jobs 4 to the wrapper so runs inside each case go in parallel; they share your rate limit, so drop it if runs stall.
+# bad-reply: The wrapper has no concurrency flag, so run the raw claude plugin eval command with -j instead.
+schema_version: "1.1"
+name: run-evals-wrapper-jobs-flag
+description: >
+  Asked how to speed up a long standard-tier sweep run through the wrapper, the reply names the
+  wrapper's own concurrency flag and warns about the shared rate limit.
+  expected_outcome: PASS when it names --jobs on the wrapper and mentions the rate limit; FAIL
+  when it sends the user to the raw command or gives no concurrency lever.
+tags: [eval-authoring, run-evals]
+
+execution:
+  prompt: |
+    I'm running a standard-tier sweep of about thirty cases through the run-evals wrapper and it
+    takes over an hour because the runs go one at a time. What do I pass to the wrapper to speed
+    it up, and what should I watch for? Don't create files or run any commands.
+  max_turns: 8
+  allowed_tools:
+    - Skill
+    - Read
+    - Glob
+    - Grep
+
+graders:
+  - name: skill_fired
+    type: tool_used
+    tool: Skill
+    input_match: '"skill"\s*:\s*"(?:[\w-]+:)?run-evals"'
+    min: 1
+    arm: with-only
+
+  # Result: --jobs is given as the answer, with a value. A bare `--jobs` also matches a guess to
+  # look for ("something like `--jobs`/`-j`": the 2026-11-03 baseline's no-plugin passes), so the
+  # pattern asks for `--jobs 4` or `--jobs <n>`.
+  - name: names_wrapper_jobs_flag
+    type: regex
+    target: last_message
+    pattern: '--jobs[ =](?:\d|<)'
+    flags: i
+    match: contains
+
+  # Polarity: the stale claim that sent the sweep out without it. Guards the with-arm replies
+  # that said "The wrapper has no concurrency flag" while naming no flag.
+  - name: no_false_no_flag_claim
+    type: regex
+    target: last_message
+    pattern: 'wrapper (?:has|takes|accepts) no (?:\S+ ){0,2}(?:flag|option)|no (?:`?-j`? |concurrency )flag'
+    flags: i
+    match: not_contains
+
+  - name: warns_shared_rate_limit
+    type: regex
+    target: last_message
+    pattern: 'rate[ -]?limit'
+    flags: i
+    match: contains

@@ -12,6 +12,10 @@ grants:
     - "Bash(node *lint/cli.ts*)"
     - "Bash(node *run-evals.ts*--dry-run*)"
     - "Bash(claude auth status)"
+  run-evals-fires-on-wrapper-command-request:
+    - "Bash(node *lint/cli.ts*)"
+    - "Bash(node *run-evals.ts*--dry-run*)"
+    - "Bash(claude auth status)"
   run-evals-not-model-invoked:
     - "Bash(node *lint/cli.ts*)"
     - "Bash(claude auth status)"
