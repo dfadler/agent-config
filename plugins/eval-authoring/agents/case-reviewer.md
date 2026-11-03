@@ -80,7 +80,7 @@ Run after the lint, on each case. Skip anything the lint already reported.
    skill and prompts that should not (or near-miss phrasings)? Read the skill's
    `description` and judge. A suite with only positive prompts cannot show the skill
    over-triggers. A trigger eval loads only the plugin under test, so it cannot show
-   competition from other skills (`run-evals --neighbours <siblings>` measures that).
+   competition from other skills (`run-evals --neighbours <plugin,plugin>`, sibling plugin names, measures that).
 4. **Can fail.** Would at least one scored grader fail if the skill were absent or
    broken? Look for graders any competent reply would pass (a regex on a word the
    prompt itself contains, a check that the reply is non-empty). Also flag a case whose
