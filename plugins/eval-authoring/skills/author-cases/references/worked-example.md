@@ -38,12 +38,14 @@ graders:
     input_match: '"skill"\s*:\s*"(?:[\w-]+:)?release-notes"'
     min: 1
 
-  # Result (regex): the breaking change is named. Free, and it can fail: a generic summary
-  # often drops the flag name.
+  # Result (regex): the notes say the flag is gone. Free, and it can fail: a generic summary
+  # often drops the flag. The pattern is not just '--legacy', which the prompt already
+  # contains, so an echo of the prompt would pass (EVAL024).
   - name: names_breaking_change
     type: regex
     target: last_message
-    pattern: '--legacy'
+    pattern: '(?:removed|no longer|gone|dropped)[^.]{0,40}--legacy|--legacy[^.]{0,40}(?:removed|no longer|gone|dropped)'
+    flags: i
     match: contains
 
   # Result (llm, last): semantic tone. Concrete PASS and FAIL wording so two judges agree.
