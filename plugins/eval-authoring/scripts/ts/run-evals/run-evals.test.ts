@@ -694,6 +694,67 @@ describe("one invocation per case", () => {
     }
   });
 
+  describe("SIGINT (the CI deadline)", () => {
+    const interruptedAt = async (n: number) => {
+      const holder: { s?: ReturnType<typeof setup> } = {};
+      const s = setup({
+        cases: three(),
+        onCli: (args, i) => {
+          if (i !== n) return okCli()(args);
+          holder.s?.stops.forEach((stop) => {
+            stop();
+          });
+          return { untilAborted: true };
+        },
+      });
+      holder.s = s;
+      const code = await main([s.root], { io: s.io, pluginsDir: "/p" });
+      const summary: unknown = JSON.parse([...s.written.values()][0] ?? "{}");
+      return { s, code, summary };
+    };
+
+    it("cuts the case in flight, starts no later case, lists them, and exits 7", async () => {
+      const { s, code, summary } = await interruptedAt(2);
+      expect(code).toBe(EXIT_PARTIAL);
+      expect(cliCalls(s.calls)).toHaveLength(2);
+      expect(summary).toMatchObject({
+        exit: EXIT_PARTIAL,
+        unstarted: ["c3"],
+        invocations: [
+          { caseName: "c1", exit: EXIT_OK },
+          { caseName: "c2", exit: EXIT_PARTIAL },
+        ],
+      });
+      expect(JSON.stringify(summary)).toContain("cut short by SIGINT");
+      expect(s.err.join("")).toContain("interrupted (SIGINT); not run: c3");
+      expect(s.out.join("")).toContain("c3");
+      expect(s.stops).toEqual([]);
+    });
+
+    it("lists every later case when the first one is cut", async () => {
+      const { summary } = await interruptedAt(1);
+      expect(summary).toMatchObject({ unstarted: ["c2", "c3"] });
+    });
+
+    it("starts no later case when the signal lands after a case that finished normally", async () => {
+      const holder: { s?: ReturnType<typeof setup> } = {};
+      const s = setup({
+        cases: three(),
+        onCli: (args) => {
+          holder.s?.stops.forEach((stop) => {
+            stop();
+          });
+          return okCli()(args);
+        },
+      });
+      holder.s = s;
+      expect(await main([s.root], { io: s.io, pluginsDir: "/p" })).toBe(EXIT_PARTIAL);
+      expect(cliCalls(s.calls)).toHaveLength(1);
+      const summary: unknown = JSON.parse([...s.written.values()][0] ?? "{}");
+      expect(summary).toMatchObject({ unstarted: ["c2", "c3"] });
+    });
+  });
+
   it("--dry-run prints one numbered line per case and a budget note", async () => {
     const s = setup({ cases: three() });
     expect(await run(s, ["--dry-run"])).toBe(EXIT_OK);
