@@ -233,10 +233,9 @@ increasing cost:
   merge-timing race too: pushing a new commit to a just-merged (and deleted)
   branch re-creates it, so a final commit can *look* merged without actually
   being on the default branch — verify against the PR's own state
-  (`gh pr view --json state,mergedAt`), not the branch name. (This repo merges
-  via ordinary merge commits, so "the merge commit's parent" is also a valid
-  check here; a repo using squash or rebase merges has no such merge commit to
-  check against, so the PR-state check is the one that generalizes.)
+  (`gh pr view --json state,mergedAt`), not the branch name. (This repo squash-merges, so
+  there is no merge commit to check against; the PR-state check is the one that
+  generalizes.)
 
 - **A hang in a setup step runs to the 6-hour default job cap.** The kcov
   `apt` install hung on PR #588 (`agent-config#594`) and held a runner for 6
