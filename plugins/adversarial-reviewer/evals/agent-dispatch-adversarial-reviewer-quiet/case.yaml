@@ -37,7 +37,7 @@ graders:
   - name: defines_race
     type: regex
     target: last_message
-    pattern: 'concurren|simultaneous|same time|same moment|at once|timing|order of|which (one )?(runs|happens|finishes|executes|goes|completes|wins|gets)|interleav|parallel|overlap|thread|shared'
+    pattern: 'concurren|simultaneous|same time|same moment|at once|timing|order of|which (one )?(runs|happens|finishes|executes|goes|completes|wins|gets)|interleav|parallel|overlap|thread|shared|whichever (one |of them )?(\w+ ){0,3}first|who (gets|reaches|arrives|finishes)'
     flags: i
     match: contains
     arm: both
