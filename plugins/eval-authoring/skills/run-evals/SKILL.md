@@ -177,8 +177,9 @@ failures.
   input; the weekly run is a local scheduled task; never `pull_request`).
 - Secret: `CLAUDE_CODE_OAUTH_TOKEN` (from `claude setup-token`), in the
   `plugin-evals` environment the workflow selects.
-- It runs the `standard` tier through the wrapper, then gates on the exit code. Why and what
-  fails: [plugin-eval-ci.md](../../../../docs/plugin-eval-ci.md).
+- It runs the `standard` tier through the wrapper, then gates on the exit code and on the mean
+  delta of the whole plugin (floor 0.14, a failure at 16 or more cases with a delta, a warning
+  below). Why and what fails: [plugin-eval-ci.md](../../../../docs/plugin-eval-ci.md).
 
 ## Faster feedback
 

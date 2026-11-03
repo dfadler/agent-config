@@ -12,9 +12,10 @@ name: Plugin evals
 # and fixes the pass threshold at 1. Its exit code is 0 pass, 1 below threshold,
 # 7 partial/untrustworthy, other codes setup problems.
 #
-# Each per-case aggregate-result.json is then read by scripts/ts/check-plugin-eval.ts
-# (#583) for the extra validity checks (both arms) and the delta gate (mean floor 0.14, advisory under 16 cases, #736):
-#   check-plugin-eval.ts --cli-exit N --threshold T --delta-floor 0.14 aggregate-result.json
+# The per-case aggregate-result.json files are then read in ONE call of scripts/ts/check-plugin-eval.ts
+# (#583) for the extra validity checks (both arms) and the delta gate (mean floor 0.14 over all
+# cases of the plugin, advisory under 16 cases, #736):
+#   check-plugin-eval.ts --cli-exit N --threshold T --delta-floor 0.14 aggregate-result.json...
 # A mean delta below 0.14 is a regression once there are 16 cases (warn only before);
 # per-case verdicts come from diagnose(); a missing delta is no signal.
 # Exit 0 pass, 1 regression, 7 inconclusive, 2 bad args. Inconclusive fails the
@@ -146,26 +147,24 @@ jobs:
           wrapper_exit="$(cat "$OUT_DIR/cli-exit")"
           # The checker takes 0 pass, 1 regression, 2 invalid run; the wrapper's
           # other codes (7 partial, setup errors) mean the run is not trustworthy.
-          # The wrapper exit is one code for all cases, so on exit 1 every file is labelled
-          # a regression; eval.log (in the artifact) has the per-case verdicts.
+          # The wrapper exit is one code for all cases; eval.log (in the artifact) has
+          # the per-case verdicts.
           case "$wrapper_exit" in 0) cli=0 ;; 1) cli=1 ;; *) cli=2 ;; esac
-          worst=0
-          found=0
-          while IFS= read -r f; do
-            found=1
-            node scripts/ts/check-plugin-eval.ts \
-              --cli-exit "$cli" --threshold 1 --delta-floor 0.14 "$f" 2>&1 | tee -a "$GITHUB_STEP_SUMMARY"
-            rc="${PIPESTATUS[0]}"
-            [ "$rc" -gt "$worst" ] && worst="$rc"
-          done < <(find "$OUT_DIR" -name aggregate-result.json | sort)
-          if [ "$found" -eq 0 ]; then
+          # The wrapper writes one aggregate-result.json per case. One checker call
+          # gets every file, so the mean-delta floor sees all cases of the plugin.
+          files=()
+          while IFS= read -r f; do files+=("$f"); done < <(find "$OUT_DIR" -name aggregate-result.json | sort)
+          if [ "${#files[@]}" -eq 0 ]; then
             echo "::error::No aggregate-result.json under $OUT_DIR (wrapper exit $wrapper_exit)"
             exit 7
           fi
-          if [ "$worst" -eq 7 ]; then
+          node scripts/ts/check-plugin-eval.ts \
+            --cli-exit "$cli" --threshold 1 --delta-floor 0.14 "${files[@]}" 2>&1 | tee -a "$GITHUB_STEP_SUMMARY"
+          rc="${PIPESTATUS[0]}"
+          if [ "$rc" -eq 7 ]; then
             echo "::error::Eval run was inconclusive (not a regression); see the result summary"
           fi
-          exit "$worst"
+          exit "$rc"
 
       - name: Upload results
         # always(), not !cancelled(): a job-level timeout cancels the job, and

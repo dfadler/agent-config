@@ -116,6 +116,85 @@ describe("eval job: cost ceiling", () => {
   });
 });
 
+// The Check results step, run against a fake `node` that logs its argv and exits
+// with a chosen code. The step must hand the checker every result file in ONE
+// call: the mean-delta floor (#736) needs all cases of the plugin at once.
+const checkStep = (
+  /- name: Check results\n {8}run: \|\n([\s\S]*?)\n\n {6}- name: Upload results/.exec(
+    workflow,
+  )?.[1] ?? ""
+).replace(/^ {10}/gm, "");
+
+const check = (resultFiles: string[], wrapperExit = "0", checkerRc = 0) => {
+  const dir = mkdtempSync(join(tmpdir(), "check-"));
+  const bin = join(dir, "bin");
+  mkdirSync(bin);
+  const log = join(dir, "node.log");
+  writeFileSync(
+    join(bin, "node"),
+    `#!/bin/bash\necho "$*" >> "${log}"\nexit ${String(checkerRc)}\n`,
+    { mode: 0o755 },
+  );
+  const out = join(dir, "out");
+  mkdirSync(out);
+  writeFileSync(join(out, "cli-exit"), wrapperExit);
+  for (const f of resultFiles) {
+    mkdirSync(join(out, f), { recursive: true });
+    writeFileSync(join(out, f, "aggregate-result.json"), "{}");
+  }
+  writeFileSync(log, "");
+  const summary = join(dir, "summary.md");
+  writeFileSync(summary, "");
+  const r = spawnSync("bash", ["-c", checkStep], {
+    encoding: "utf8",
+    env: {
+      ...process.env,
+      ["PATH"]: `${bin}:${process.env["PATH"] ?? ""}`,
+      ["OUT_DIR"]: out,
+      ["GITHUB_STEP_SUMMARY"]: summary,
+    },
+  });
+  return {
+    status: r.status,
+    out: r.stdout + r.stderr,
+    calls: readFileSync(log, "utf8").split("\n").filter((l) => l !== ""),
+  };
+};
+
+describe("eval job: check results step", () => {
+  it("calls the checker once with every result file (C17)", () => {
+    const r = check(["a", "b", "c"]);
+    expect(r.calls).toHaveLength(1);
+    const call = r.calls[0] ?? "";
+    expect(call).toContain("--delta-floor 0.14");
+    for (const c of ["a", "b", "c"]) {
+      expect(call).toContain(`/out/${c}/aggregate-result.json`);
+    }
+  });
+
+  it("exits with the checker's code", () => {
+    expect(check(["a"], "0", 1).status).toBe(1);
+    expect(check(["a"], "0", 0).status).toBe(0);
+  });
+
+  it("flags an inconclusive checker result (exit 7)", () => {
+    const r = check(["a"], "0", 7);
+    expect(r.status).toBe(7);
+    expect(r.out).toContain("inconclusive");
+  });
+
+  it("is inconclusive, without calling the checker, when no result file exists", () => {
+    const r = check([]);
+    expect(r.status).toBe(7);
+    expect(r.calls).toHaveLength(0);
+  });
+
+  it("maps a wrapper exit other than 0 or 1 to the checker's invalid-run code", () => {
+    expect(check(["a"], "137").calls[0]).toContain("--cli-exit 2");
+    expect(check(["a"], "1").calls[0]).toContain("--cli-exit 1");
+  });
+});
+
 describe("notify job: failure issue", () => {
   it("fires on a failed or cancelled eval (job timeout), not on success (#889)", () => {
     expect(workflow).toMatch(
