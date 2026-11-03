@@ -35,7 +35,7 @@ shown, checked, and cleared. The TypeScript CLI owns the list; never edit
 
 1. **Sync root:** the user's argument, else `CANVAS_SYNC_ROOT`. If neither is set,
    ask. Do not guess a directory.
-2. **Node 22.18 or newer** (`node --version`); otherwise use the version in the
+2. **A current Node** (`node --version`); otherwise use the version in the
    agent-config repo's `.nvmrc` via nvm.
 3. The CLI, used as `CANVAS` below:
 

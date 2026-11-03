@@ -220,7 +220,7 @@ session — both catch their own errors and always exit 0.
 
 Both underlying scripts (`scripts/ts/verify-worktree-symlinks.ts`,
 `scripts/ts/prune-merged-worktrees.ts` under the plugin root; run with
-`node <script>.ts`, Node 22.18 or newer) are also usable standalone — real exit
+`node <script>.ts`, current Node per `.nvmrc`) are also usable standalone — real exit
 codes, `--help`, no hook-only quieting — for a human running them by hand or a
 project wiring its own automation around them instead of the shipped hook.
 

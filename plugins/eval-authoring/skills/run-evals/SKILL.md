@@ -28,7 +28,7 @@ hands the command over instead. No environment variable stands in for the go-ahe
 session that is not logged in (`claude auth status` fails) hands off either way.
 
 The wrapper is `${CLAUDE_SKILL_DIR}/../../scripts/ts/run-evals/run-evals.ts`, run with
-`node` (22.18 or later). It owns tiers, grants, preflight checks and exit codes; call
+a current `node` (see `.nvmrc`). It owns tiers, grants, preflight checks and exit codes; call
 it, do not rebuild any of that.
 
 ## Steps

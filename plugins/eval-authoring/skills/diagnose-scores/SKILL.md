@@ -28,7 +28,7 @@ interprets the verdict.
    and say so: a run is needed first, and starting it is the user's call (see the
    [run-evals](../run-evals/SKILL.md) skill).
 2. **Run the script:** `node ${CLAUDE_SKILL_DIR}/../../scripts/ts/diagnose/diagnose.ts --format text RESULT.json`
-   (Node 22 or later). If it fails, report the error and stop; do not estimate a verdict by
+   (a current Node, see `.nvmrc`). If it fails, report the error and stop; do not estimate a verdict by
    hand. Never run `claude plugin eval`.
 3. **Interpret** each case below, using the script's numbers as given. Read the result file
    only in slices (`jq`, `grep`) for detail the verdict lacks (grader names, which grader

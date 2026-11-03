@@ -155,8 +155,8 @@ blind-case-writer agent, second bullet), then stop.
    and the case is unmeasured until it is rerun).
    Call a case a "regression guard" only if it should not fire the
    skill (delta 0 by design) and its `expected_outcome` says so.
-8. **Lint.** `node ${CLAUDE_SKILL_DIR}/../../scripts/ts/lint/cli.ts <plugin-path>` (Node 22
-   or later). Fix every error. Fix each warning or write down why it is intended.
+8. **Lint.** `node ${CLAUDE_SKILL_DIR}/../../scripts/ts/lint/cli.ts <plugin-path>` (a current Node,
+   see `.nvmrc`). Fix every error. Fix each warning or write down why it is intended.
 9. **Review and hand off.** Ask the [case-reviewer agent](../../agents/case-reviewer.md)
    for the judgment pass, if available (invocation recipe in the agent file), and optionally the
    [grader-red-team agent](../../agents/grader-red-team.md) to try wrong replies on the free
