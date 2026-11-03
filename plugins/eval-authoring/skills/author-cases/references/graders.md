@@ -8,8 +8,8 @@ graders", "Grader frontmatter", "Grader types"). The parser's schema table
 ## Free first
 
 `regex`, `tool_used`, `tool_order` and `file_exists` are computed from the transcript and
-files: no model call, same answer every time. `llm` and `baseline` call a judge (three
-short calls per grader per run) and add variance. There are no custom-code graders.
+files: no model call, same answer every time. `llm` and `baseline` call a judge: three
+short paid calls per grader per run. There are no custom-code graders.
 
 1. **Name what must be true**, then map it to something observable:
 
@@ -27,9 +27,9 @@ short calls per grader per run) and add variance. There are no custom-code grade
 3. **Guard the judge:** a reply can talk an `llm` judge into a pass, and an `llm` on
    `trace` reads only the first and last 12 messages (EVAL023). Put the rubric in the
    criteria, back it with a `regex` on `last_message` plus a negative regex for
-   rubric-echo phrases, keep `max_turns` at 12 or less when judging `trace`, and for a high-stakes
-   judge, consider one adversarial case whose reply claims a perfect score and must score 0
-   (it costs a paid grader run, so skip it for low-stakes ones).
+   rubric-echo phrases, and keep `max_turns` at 12 or less when judging `trace`. The
+   [grader-red-team](../../../agents/grader-red-team.md) agent tries a "meets all criteria"
+   reply on the free graders.
 4. **Keep paid graders narrow:** short output only, at most one per case unless the
    dimensions are independent, and paired with free graders.
 5. **Say why** with a one-line comment beside any paid grader. Comments are not parsed;
@@ -38,8 +38,8 @@ short calls per grader per run) and add variance. There are no custom-code grade
    run it at no judge cost. EVAL017 keeps the tag honest.
 
 For long output such as a generated file, use a `regex` over the file, not an `llm`.
-Give each case one grader on the result and one on the steps (docs, "Choose graders that
-give a stable signal").
+Grade the outcome first; add a steps grader only where a step is observable and not a rigid
+sequence (docs, "Choose graders that give a stable signal").
 
 ## Types and options
 
@@ -157,7 +157,8 @@ cap the calls (the `arm: both` here is correct for a two-arm `smoke` guard; in a
 
 ## Judge and limits
 
-- Default judge is the background-task model; `--judge-model sonnet` helps hard rubrics.
+- Default judge is the background-task model; `--judge-model sonnet` is the plugin-evals
+  docs' advice for a suspect judge, unmeasured here. Pin the judge when comparing scores.
   If a `tool_used: Skill` grader passes but Δ is negative, suspect the judge and tighten
   the rubric.
 - `runs` 1 to 50 (default 3), `max_turns` default 10 up to 200, `timeout_seconds` default
@@ -170,10 +171,7 @@ cap the calls (the `arm: both` here is correct for a two-arm `smoke` guard; in a
 ## Action-based grading: pilot result (#474)
 
 Grading the commands Claude runs (`tool_used` on `Bash` plus `tool_order`) instead of its
-prose needs a `Bash` grant, changes the behavior under test, and added variance in the
-vitest pilot (3 runs: with 0.53 vs without 0.20; Bash never called in the without arm,
-so those scores were the vacuous `max: 0` pass). `tool_order` also failed when one
-command held both flags. Keep prose `regex` graders as the primary guard; add an
-action-based case only if its with-arm variance is no worse and its Δ at least as large.
-Also: a negative `regex` such as `not_contains "delete process.env"` fires on a correct
+prose needs a `Bash` grant and changes the behavior under test. `tool_order` also failed
+when one command held both flags. Keep prose `regex` graders as the primary guard. Also: a
+negative `regex` such as `not_contains "delete process.env"` fires on a correct
 reply that names the thing as advice; match the code form, not the bare phrase.

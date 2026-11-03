@@ -8,6 +8,8 @@ single `llm` grader judges tone, which no pattern can.
 ## Should fire
 
 ```yaml
+# good-reply: Heads up: in 2.0 the --legacy flag is gone, so switch to the new default. You also get dark mode, and the crash on an empty config is fixed.
+# bad-reply: Release 2.0 adds dark mode and fixes a crash on empty config.
 schema_version: "1.1"
 name: release-notes-fires-on-changelog
 description: >
@@ -62,9 +64,9 @@ Shares the vocabulary ("changelog", "release") but wants something else:
 schema_version: "1.1"
 name: release-notes-quiet-on-changelog-lint
 description: >
-  A request to check CHANGELOG formatting must not fire release-notes. A regression guard:
-  the no-plugin arm passes too, so there is no delta by design.
-tags: [release-notes, trigger]
+  A request to check CHANGELOG formatting must not fire release-notes. A trigger-boundary
+  negative: counted by `run-evals --trigger-boundary`, plugin arm only, so no delta.
+tags: [release-notes, trigger-boundary, "pair:release-notes-fires-on-changelog"]
 
 execution:
   prompt: |
@@ -74,15 +76,16 @@ execution:
     - Skill
 
 graders:
-  # min: 0 is explicit (tool_used defaults min to 1); arm: both so the check is scored.
+  # min: 0 is explicit (tool_used defaults min to 1). No arm: the negative runs plugin-arm
+  # only. To keep it in the two-arm run as a cheap `smoke` guard instead, add `arm: both`
+  # and drop the trigger-boundary tags.
   - name: release_notes_not_invoked
     type: tool_used
     tool: Skill
     input_match: '"skill"\s*:\s*"(?:[\w-]+:)?release-notes"'
     min: 0
     max: 0
-    arm: both
 ```
 
-Neither case needs a grant: `allowed_tools` lists only `Skill`. The lint's opt-in EVAL009 (`--enable EVAL009`) would report both: a reply-only skill has no
-scored steps grader, which is expected (see step 4).
+Neither case needs a grant: `allowed_tools` lists only `Skill`. The lint's opt-in EVAL009
+(`--enable EVAL009`) would report only the near-miss, which has no result grader by design.

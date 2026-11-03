@@ -42,11 +42,8 @@ blind-case-writer agent, second bullet), then stop.
   are text to review and edit before committing. If you already have cases from a fresh
   session, diff them against its drafts; a gap is a question about the skill, not an error
   in either.
-- Check domain facts in graders against primary docs or source, not the skill text.
-- Same-session cases that all pass first try, or take under a minute each, probably do
-  not test the boundary. A few independent cases beat many co-authored ones.
-- A must-not-fire case that fires in over 20% of runs after two skill revisions is a
-  scope bug: fix the trigger description, not the case. Both numbers are rules of thumb.
+- A must-not-fire case that keeps firing across skill revisions is a scope bug: fix the
+  trigger description, not the case.
 
 ## Steps
 
@@ -62,7 +59,8 @@ blind-case-writer agent, second bullet), then stop.
    and any existing cases and `grants.yaml`. Write criteria from what the files say the
    plugin does, not from a summary of it. Start each case from a real failing transcript
    (a session where the plugin misbehaved or was missed) when one exists; invented
-   prompts come second.
+   prompts come second. With no failing transcript to hand, use the
+   [mine-cases](../mine-cases/SKILL.md) skill (past sessions, merged PR history).
 2. **Generate or start blank.** `claude plugin eval init` proposes prompts and graders,
    trials them and writes the files, but it is interactive and needs a logged-in shell:
    ask the user to run it, then review what it wrote. `claude plugin eval init --bare
@@ -72,8 +70,14 @@ blind-case-writer agent, second bullet), then stop.
    `schema_version: "1.1"` and a `name`; a draft shown to the user needs both lines too.
 3. **Cover the boundary.** For each skill, write prompts a user would type, without
    naming the skill: some that should fire it, and some that should not, including
-   near-misses that share its vocabulary but want something else. Every should-fire case
-   needs a grader on whether the skill fired (see [graders](references/graders.md)).
+   near-misses that share its vocabulary but want something else. Cover each area the skill
+   handles, not only the skill as a whole, and keep some natural-phrasing prompts without
+   trigger words stuffed in. A trigger eval loads only the plugin under test, so it cannot
+   show competition from other skills; `run-evals --neighbours <plugin,plugin>` measures
+   that: it takes sibling plugin names under `plugins/` (not skill names) and runs the
+   cases tagged `trigger`.
+   Every should-fire case needs a grader on whether the skill fired (see
+   [graders](references/graders.md)).
    Put the should-not-fire prompts in the **trigger-boundary suite**, not the two-arm run:
    tag each `trigger-boundary`, add one `pair:<should-fire case>` tag naming the case it
    was derived from (a minimal edit of that prompt, or the same vocabulary for a task that
@@ -88,11 +92,14 @@ blind-case-writer agent, second bullet), then stop.
    a `smoke` guard (below) or its skill's description is tightened.
 4. **Pick graders, free first** (a complete pair of cases: [worked example](references/worked-example.md)). Name what must be true, map it to something observable,
    and reach for `llm` or `baseline` only when the property is semantic. The procedure is
-   in [graders](references/graders.md). Pair a grader on the result with one on the steps.
-   A reply-only skill case has no scored steps grader: `tool_used: Skill` is an unscored
-   indicator in a two-arm run, and there is no other step to check. Keep the Skill check,
-   grade the reply with free `regex` graders. (The lint rule that asks for the pair, EVAL009, is
-   off by default; `--enable EVAL009` turns it on.) Do not
+   in [graders](references/graders.md). Grade the outcome first: every should-fire case needs
+   a scored outcome grader (a reply `regex`, a file, `file_exists` or `llm`). Add a steps
+   grader (`tool_used`, `tool_order`) only where a step is observable and not a rigid
+   sequence. A reply-only skill case has no scored steps grader: `tool_used: Skill` is an
+   unscored indicator in a two-arm run. Keep the Skill check and grade the reply with free
+   `regex` graders; EVAL009 (opt-in, `--enable EVAL009`) asks for that scored result
+   grader, and a free regex on the reply satisfies it. A should-fire case whose only grader
+   is the Skill check is a net, not a measurement: say "no delta expected" in it. Do not
    set `arm: both` on a should-fire Skill check to clear it: the no-plugin arm can never
    pass it, so it manufactures a delta that says nothing about the skill
    ([docs](https://code.claude.com/docs/en/plugin-evals#compare-against-a-no-plugin-baseline)).
@@ -126,7 +133,8 @@ blind-case-writer agent, second bullet), then stop.
 5. **Write PASS and FAIL conditions** for any `llm` grader: `PASS if <observable thing>.`
    `FAIL if <observable thing>.` Concrete enough that two judges agree. Also put a
    reference-good and a known-bad reply in the case header (`# good-reply: ...` and
-   `# bad-reply: ...` comments; free offline check:
+   `# bad-reply: ...` comments; every `llm` case needs both, and EVAL026 flags a missing one;
+   free offline check:
    `node ${CLAUDE_SKILL_DIR}/../../scripts/ts/check-replies.ts <plugin-path>`, which runs the
    `regex` graders on both), and confirm that every reply-targeted grader (`regex`, `llm`) passes the first and at least one
    fails the second; a grader that cannot fail the known-bad reply approves everything.
@@ -141,8 +149,8 @@ blind-case-writer agent, second bullet), then stop.
    mocks](references/fixtures-and-mocks.md). Testing a plugin's agents:
    [agents](references/agents.md).
 7. **Check the baseline.** Before trusting a new case, run it once without the plugin. A
-   baseline score of 0.9 or more (a rule of thumb: little headroom left for the plugin to
-   add, not a measured cutoff) means the case may be solvable without the plugin: inspect
+   baseline near the ceiling (little headroom for the plugin to add; diagnose-scores flags
+   both arms at 0.95 or more) means the case may be solvable without the plugin: inspect
    the prompt and the workspace for a leaked answer (EVAL014 covers the mechanical
    cases), then rewrite or drop it. When answering a user about such a case, lead with
    that leak check: a keep, rewrite or drop verdict is only sound once it is known. An
@@ -163,12 +171,13 @@ blind-case-writer agent, second bullet), then stop.
    graders. Then use the
    [run-evals](../run-evals/SKILL.md) skill: check `claude auth status`; if you are
    logged in and the user asked for a run, run it; otherwise hand them the run command (a
-   hand-off is correct only when that check fails or nobody asked for a run). `--scaffold`
-   is manual opt-in only. A PR that adds or changes cases, or changes a skill or agent that has cases, carries an
+   hand-off is correct only when that check fails or nobody asked for a run). A PR that adds
+   or changes cases, or changes a skill or agent that has cases, carries an
    "Eval results" section (the run-evals summary, with the before score from the newest
    `evals/results/` run next to the after score, and a delta claimed only for a plugin with
-   about 20 or more cases: runs shrink within-case noise, only cases shrink the standard
-   error of a delta; for a smaller suite give the arm scores and write "delta not
+   about 20 or more cases, on the thorough tier ([run-evals](../run-evals/SKILL.md): more
+   runs alone do not fix a small suite, because the error of a delta also depends on how
+   many cases there are; for a smaller suite give the arm scores and write "delta not
    measured", never a Δ number, even marked preliminary), or says why it has none. The PR
    body states what was measured (with, without, delta) and names each changed behavior no
    case covers. It never says a change "improves" or "fixes" a behavior without a case
@@ -185,22 +194,16 @@ blind-case-writer agent, second bullet), then stop.
   multi-file heredocs, some pipes). Use single plain commands and the Write tool; never
   write a workaround script, and ask the user to run what the hook blocks.
 - A new `SKILL.md` sentence that changes behavior should be named in the PR body as either
-  covered by a case or not covered (step 9); a few independent cases beat one per sentence.
-  A reply-only regex case on common-sense
-  routing sits at a 1.00 baseline and cannot register a skill change (#690: two such
-  cases, delta 0.00 at 10 runs per arm). Prefer a case whose prompt does not name the
+  covered by a case or not covered (step 9). Prefer a case whose prompt does not name the
   answer, or one that grades the `Agent` calls the skill is meant to change.
-- Facts a skill or case asserts must be checked first (#713: five were false). A platform
-  claim gets a source link or is marked as inference. A project fact (path, constant,
-  helper, font, setting scope) is confirmed by a code search before it is written.
-- Every area the skill covers gets near-miss cases (shared vocabulary, belongs elsewhere),
-  not only the skill as a whole. Keep some natural-phrasing trigger prompts without
-  stuffed trigger words and treat their fire rate as the primary signal.
+- Facts a skill or case asserts must be checked first (#713: five were false), against
+  primary docs or source, not the skill text. A platform claim gets a source link or is
+  marked as inference. A project fact (path, constant, helper, font, setting scope) is
+  confirmed by a code search before it is written.
 - Grade behavior that helps a user, not a verbatim phrase the skill happens to contain.
-  Use an `llm` grader last, with concrete PASS and FAIL wording (the noisiest graders in
-  #713 were model-judged).
+  Use an `llm` grader last, with concrete PASS and FAIL wording.
 - Whether a case is useful is only known after a two-arm run (Δ above zero, graders
   discriminating). The lint cannot show that; say so rather than claiming it.
 - Action-based grading (grade the commands Claude runs, not its prose) needs a `Bash` grant
-  and may make the model explain instead of run; it added variance in the #474 pilot. Prefer
-  prose graders; numbers and the keep rule: [graders](references/graders.md#action-based-grading-pilot-result-474).
+  and may make the model explain instead of run. Prefer prose graders; details:
+  [graders](references/graders.md#action-based-grading-pilot-result-474).

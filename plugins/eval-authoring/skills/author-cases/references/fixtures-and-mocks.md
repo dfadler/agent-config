@@ -4,8 +4,6 @@ Source: the [plugin-evals docs](https://code.claude.com/docs/en/plugin-evals), "
 fixtures and mocks" and "Mock files".
 
 Each run starts in an empty workspace, so put what the task needs in the prompt, or seed it.
-With nothing to read the model tends to hunt the workspace for files, so inline inputs
-beat leaving it empty.
 
 ## Faking a CLI or fixture files
 
@@ -83,13 +81,7 @@ graders are indicators only when the mocked server is plugin-declared, unless `a
   repeatable in CI. No suite in this repo uses one yet; the shape is the lint fixture
   `plugins/eval-authoring/tests/lint-fixtures/EVAL013/good-case-yaml/cases/mocks/tracker/triage.md`.
 
-**Success-only mock.** If SKILL.md claims a failure behavior (retry, fall back, tell the
-user) and every `mocks/<server>/*.md` returns a success body, the error branch never runs
-and the case passes on the happy path alone, for the wrong reason. Spot it: a skill sentence
-about failure with no mock file carrying `error: true` and no grader naming the fallback.
-`expect:` is not the error path: a violation aborts the run with score 0, it never returns
-an error to Claude. Smallest fix: one sibling case whose own `mocks/<server>/<tool>.md`
-(overrides the suite file) sets `error: true` with the error body, plus one grader on the
-claimed fallback. Shape (a lint fixture, not a live case; ignore its unrelated `expect:` line,
-only `type: fixed` and `error: true` matter here):
+**Success-only mock.** A failure behavior in SKILL.md (retry, fall back, tell the user) never
+runs when every mock returns a success body. Add a sibling case whose own
+`mocks/<server>/<tool>.md` sets `error: true`, plus a grader on the claimed fallback. Shape:
 `plugins/eval-authoring/tests/lint-fixtures/EVAL013/good-case-yaml/cases/case1/mocks/tracker/close_issue.md`.
