@@ -14,6 +14,7 @@ import {
   EXIT_DEPENDENCY,
   EXIT_FAILURE,
   EXIT_INTERNAL,
+  EXIT_INTERRUPTED,
   EXIT_OK,
   EXIT_PARTIAL,
   EXIT_USAGE,
@@ -192,9 +193,11 @@ Exit codes:
   3   bad cases or grants file, or the CLI says a case cannot pass with its grants
   4   unmet requirement (Claude Code < ${formatVersion(MIN_CLAUDE_VERSION)}, git < ${formatVersion(MIN_GIT_VERSION)}, sandbox backend,
       claude missing, or plugin eval unavailable)
-  7   partial or untrustworthy run (cost ceiling, rejected credential, a run
-      errored, paid graders skipped, a planned case missing from its result,
-      or a result that could not be read)
+  7   partial or untrustworthy run (cost ceiling, SIGINT such as a CI
+      deadline's timeout --signal=INT, rejected credential, a run errored,
+      paid graders skipped, a planned case missing from its result, or a
+      result that could not be read). On SIGINT the case in flight is cut
+      short, no later case starts, and the summary lists them as not run
   20  internal error
   130 interrupted
   143 terminated
@@ -534,6 +537,7 @@ const runInvocation = async (
   outputDir: string,
   budgetUsd: number,
   shareUsd: number,
+  interrupt: AbortSignal,
 ): Promise<{
   readonly summary: InvocationSummary;
   readonly stop: boolean;
@@ -562,6 +566,7 @@ const runInvocation = async (
   const raw = await io.spawn(cmd, argv, {
     onStdout: io.out,
     onStderr: io.err,
+    signal: interrupt,
   });
   const located = locateResult(io, outputDir);
   const ran = cmd === "caffeinate" ? unwrapExit(raw, located !== undefined, homedir()) : raw;
@@ -591,6 +596,9 @@ const runInvocation = async (
     resultProblem: read.problem,
     skipUnavailable: options.skipUnavailable,
   });
+  // Our own SIGINT (the CI deadline) cut this case short: the run is partial, not "interrupted by the user".
+  const cut = interrupt.aborted && verdict.code === EXIT_INTERRUPTED;
+  const code = cut ? EXIT_PARTIAL : verdict.code;
   const mismatch = plannedCaseProblem(inv.caseName, facts.caseNames);
   const unreadableCharge = Math.min(shareUsd, budgetUsd);
   const noCost =
@@ -598,7 +606,7 @@ const runInvocation = async (
       ? [`no readable costUsd in the result: charged the $${String(unreadableCharge)} per-case share of the ceiling`]
       : [];
   const reasons = [
-    ...verdict.reasons,
+    ...(cut ? ["cut short by SIGINT: the case did not finish"] : verdict.reasons),
     ...(mismatch === undefined ? [] : [mismatch]),
     ...noCost,
   ];
@@ -611,7 +619,7 @@ const runInvocation = async (
       cliStatus: ran.status,
       chargedUsd: facts.costUsd ?? unreadableCharge,
       exit:
-        mismatch === undefined ? verdict.code : worstExit(verdict.code, EXIT_PARTIAL),
+        mismatch === undefined ? code : worstExit(code, EXIT_PARTIAL),
       reasons,
       resultDir: located?.dir,
     },
@@ -895,10 +903,18 @@ const run = async (
     io.err(`run-evals: --neighbours ${(options.neighbours ?? []).join(",")}: running against the staged copy ${staged.root}\n`);
   }
   const runTarget = staged?.root ?? target;
+  // SIGINT (the CI deadline's `timeout --signal=INT`): stop launching, cut the case in flight, and
+  // fall through to the same partial summary a cost ceiling produces. SIGTERM still ends the run.
+  const interrupt = new AbortController();
+  const offSigint = io.onSigint(() => {
+    io.err("run-evals: SIGINT: stopping; the case in flight is cut short, the rest are not started\n");
+    interrupt.abort();
+  });
+  cleanups.push(offSigint);
   const progress = await invocations.reduce<Promise<Progress>>(
     async (accP, inv, i) => {
       const acc = await accP;
-      if (acc.stopped || acc.outOfBudget) return acc;
+      if (acc.stopped || acc.outOfBudget || interrupt.signal.aborted) return acc;
       const remaining = round4(ceilingUsd - acc.spentUsd);
       if (remaining <= 0) return { ...acc, outOfBudget: true };
       const outDir = invocationDir(runDir, i + 1, total, inv);
@@ -913,6 +929,7 @@ const run = async (
         outDir,
         remaining,
         shareUsd,
+        interrupt.signal,
       );
       return {
         done: [...acc.done, r.summary],
@@ -924,6 +941,9 @@ const run = async (
     },
     Promise.resolve({ done: [], texts: [], spentUsd: 0, stopped: false, outOfBudget: false }),
   );
+  // From here a SIGINT takes its default action again (nothing left to wind down).
+  const interrupted = interrupt.signal.aborted;
+  offSigint();
   // After the whole loop, so the summary below still reads each trace for its failing reply.
   const done = !options.reporting.keepTemp
     ? progress.done
@@ -939,6 +959,9 @@ const run = async (
   const unstarted = invocations
     .slice(progress.done.length)
     .map((inv) => inv.caseName);
+  if (interrupted) {
+    io.err(`run-evals: interrupted (SIGINT); not run: ${unstarted.join(", ") || "none"}\n`);
+  }
   if (progress.outOfBudget) {
     io.err(
       `run-evals: cost ceiling $${String(ceilingUsd)} spent ($${String(progress.spentUsd)}); not run: ${unstarted.join(", ")}\n`,
@@ -952,7 +975,7 @@ const run = async (
   // The last case can overspend without any later case to notice, so check the total too.
   const exit = progress.done.reduce<ExitCode>(
     (c, g) => worstExit(c, g.exit),
-    progress.outOfBudget || progress.spentUsd > ceilingUsd || boundaryResult?.withheld !== undefined
+    interrupted || progress.outOfBudget || progress.spentUsd > ceilingUsd || boundaryResult?.withheld !== undefined
       ? EXIT_PARTIAL
       : EXIT_OK,
   );

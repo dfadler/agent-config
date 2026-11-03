@@ -23,7 +23,12 @@ export interface SpawnOptions {
   /** Called with each stdout chunk as it arrives, so output can be shown live and still captured. */
   readonly onStdout?: (chunk: string) => void;
   readonly onStderr?: (chunk: string) => void;
+  /** When aborted, the child gets SIGINT, then SIGKILL after `KILL_GRACE_MS` if it is still running. */
+  readonly signal?: AbortSignal;
 }
+
+/** How long an interrupted child gets to exit before SIGKILL; under the workflow's `--kill-after=1m`. */
+export const KILL_GRACE_MS = 30_000;
 
 export interface SpawnResult {
   /** Exit status; null when the process died on a signal or never started. */
@@ -67,10 +72,16 @@ export interface Io {
   /** Removes exactly `path` (a directory `mkTemp` returned) and everything under it. */
   readonly remove: (path: string) => void;
   /**
-   * Runs `cleanup` once if the process gets SIGINT or SIGTERM, then lets that
-   * signal take its course. Returns a function that unregisters the handler.
+   * Runs `cleanup` once if the process gets SIGTERM, then lets that signal take
+   * its course. SIGINT is `onSigint`'s: the wrapper winds down and cleans up on its own. Returns a function that unregisters the handler.
    */
   readonly onInterrupt: (cleanup: () => void) => () => void;
+  /**
+   * Runs `handler` on every SIGINT without ending the process (the caller winds
+   * down and exits on its own). Returns a function that unregisters it, after
+   * which SIGINT takes its default action again.
+   */
+  readonly onSigint: (handler: () => void) => () => void;
   /** The user's home directory, shown as `~` in the replies files. */
   readonly home: string;
   /** Asks a yes/no question on the terminal. False (never a guess) when there is no one to ask. */
@@ -83,6 +94,12 @@ export const spawnProcess: Spawner = (command, args, options = {}) =>
       stdio: ["inherit", "pipe", "pipe"],
     });
     const chunks = { stdout: "", stderr: "" };
+    const killTimer: { current?: NodeJS.Timeout } = {};
+    const interrupt = (): void => {
+      child.kill("SIGINT");
+      killTimer.current = setTimeout(() => child.kill("SIGKILL"), KILL_GRACE_MS);
+    };
+    options.signal?.addEventListener("abort", interrupt, { once: true });
     child.stdout.setEncoding("utf8");
     child.stderr.setEncoding("utf8");
     child.stdout.on("data", (d: string) => {
@@ -103,6 +120,8 @@ export const spawnProcess: Spawner = (command, args, options = {}) =>
       });
     });
     child.on("close", (status, signal) => {
+      clearTimeout(killTimer.current);
+      options.signal?.removeEventListener("abort", interrupt);
       resolve({
         status,
         signal,
@@ -186,7 +205,7 @@ export const nodeIo = (env: Readonly<Record<string, string | undefined>>): Io =>
     const off = (): void => {
       handlers.forEach(({ sig, fn }) => process.off(sig, fn));
     };
-    const handlers = (["SIGINT", "SIGTERM"] as const).map((sig) => ({
+    const handlers = (["SIGTERM"] as const).map((sig) => ({
       sig,
       fn: (): void => {
         off();
@@ -197,6 +216,12 @@ export const nodeIo = (env: Readonly<Record<string, string | undefined>>): Io =>
     }));
     handlers.forEach(({ sig, fn }) => process.on(sig, fn));
     return off;
+  },
+  onSigint: (handler) => {
+    process.on("SIGINT", handler);
+    return () => {
+      process.off("SIGINT", handler);
+    };
   },
   home: homedir(),
   confirm: async (question) => {

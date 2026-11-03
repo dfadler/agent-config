@@ -74,7 +74,13 @@ export interface FakeIoOptions {
   readonly onCli?: (
     args: readonly string[],
     n: number,
-  ) => { readonly spawn?: SpawnResult; readonly result?: string; readonly resultSubdir?: string };
+  ) => {
+    readonly spawn?: SpawnResult;
+    readonly result?: string;
+    readonly resultSubdir?: string;
+    /** Hold the spawn open until its abort signal fires, then die on SIGINT like a real child. */
+    readonly untilAborted?: boolean;
+  };
   readonly onPath?: Readonly<Record<string, readonly string[]>>;
   readonly files?: Readonly<Record<string, string>>;
   /** Directory listings to return, by path. */
@@ -101,6 +107,8 @@ export interface FakeIo {
   readonly removed: string[];
   /** Cleanups registered with `onInterrupt` and not yet unregistered; call one to simulate Ctrl-C. */
   readonly interrupts: (() => void)[];
+  /** Handlers registered with `onSigint` and not yet unregistered; call one to simulate SIGINT. */
+  readonly stops: (() => void)[];
   readonly questions: string[];
 }
 
@@ -112,6 +120,7 @@ export const fakeIo = (o: FakeIoOptions = {}): FakeIo => {
   const copies: FakeIo["copies"] = [];
   const removed: string[] = [];
   const interrupts: (() => void)[] = [];
+  const stops: (() => void)[] = [];
   const questions: string[] = [];
   const files = new Map<string, string>(Object.entries(o.files ?? {}));
   let cliCount = 0;
@@ -145,6 +154,14 @@ export const fakeIo = (o: FakeIoOptions = {}): FakeIo => {
           join(dir, reply.resultSubdir ?? "", "aggregate-result.json"),
           reply.result,
         );
+      }
+      if (reply?.untilAborted === true) {
+        const sig = options?.signal;
+        const died = spawned({ status: null, signal: "SIGINT" });
+        return new Promise((resolve) => {
+          if (sig?.aborted === true) resolve(died);
+          else sig?.addEventListener("abort", () => { resolve(died); }, { once: true });
+        });
       }
       const r = reply?.spawn ?? o.cliResult ?? spawned();
       options?.onStdout?.(r.stdout);
@@ -182,13 +199,20 @@ export const fakeIo = (o: FakeIoOptions = {}): FakeIo => {
         interrupts.splice(interrupts.indexOf(cleanup), 1);
       };
     },
+    onSigint: (handler) => {
+      stops.push(handler);
+      return () => {
+        const i = stops.indexOf(handler);
+        if (i >= 0) stops.splice(i, 1);
+      };
+    },
     home: "/home/u",
     confirm: (q) => {
       questions.push(q);
       return Promise.resolve(o.confirm ?? false);
     },
   };
-  return { io, calls, out, err, written, copies, removed, interrupts, questions };
+  return { io, calls, out, err, written, copies, removed, interrupts, stops, questions };
 };
 
 /** Relative paths the fake `copyDir` asks each `skip` filter about. */
