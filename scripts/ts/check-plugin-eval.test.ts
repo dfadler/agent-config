@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { main } from "./check-plugin-eval.ts";
+import { main, MIN_GATE_CASES } from "./check-plugin-eval.ts";
 import { cliError, EXIT_FAILURE } from "./lib/exit-codes.ts";
 import { err, ok } from "./lib/result.ts";
 
@@ -180,6 +180,75 @@ describe("check-plugin-eval", () => {
     const r = check("0", many(15, 0.5, 0.4), f);
     expect(codeOf(r)).toBe(0);
     expect(r.tag === "ok" ? r.value : "").toContain("advisory");
+  });
+
+  // The wrapper writes one result file per case, so the gate must pool files.
+  const caseFile = (i: number, w: number, wo: number) =>
+    JSON.stringify({
+      schemaVersion: 1,
+      partial: false,
+      cases: [{ ...manyCases(1, w, wo)[0], name: `c${String(i)}` }],
+    });
+  const checkFiles = (
+    cliExit: string,
+    files: Record<string, string>,
+    extra: string[] = [],
+  ) =>
+    main(
+      ["--cli-exit", cliExit, "--threshold", "1", ...extra, ...Object.keys(files)],
+      {},
+      {
+        readFile: (p) =>
+          p in files
+            ? ok(files[p] ?? "")
+            : err(cliError(EXIT_FAILURE, `cannot read ${p}`)),
+      },
+    );
+  const perCase = (n: number, w: number, wo: number) =>
+    Object.fromEntries(
+      Array.from({ length: n }, (_, i) => [`r${String(i)}.json`, caseFile(i, w, wo)]),
+    );
+
+  it("pools one-case files so the floor can fail a run (C17)", () => {
+    // each file alone is under 16 cases, so a per-file call only warns
+    expect(codeOf(checkFiles("0", { "r0.json": caseFile(0, 0.5, 0.4) }, f))).toBe(0);
+    expect(codeOf(checkFiles("0", perCase(16, 0.5, 0.4), f))).toBe(1);
+    expect(codeOf(checkFiles("0", perCase(16, 0.6, 0.4), f))).toBe(0);
+  });
+
+  it("stays advisory when the pooled run has under 16 cases", () => {
+    const r = checkFiles("0", perCase(15, 0.5, 0.4), f);
+    expect(codeOf(r)).toBe(0);
+    expect(r.tag === "ok" ? r.value : "").toContain("advisory");
+  });
+
+  it("reports the pooled case count in the reliability line", () => {
+    const r = checkFiles("0", perCase(3, 1, 0.4));
+    expect(r.tag === "ok" ? r.value : "").toContain("(3 cases)");
+  });
+
+  it("makes the whole run inconclusive when one file is invalid, naming it", () => {
+    const files = { ...perCase(16, 0.9, 0.4), "bad.json": result({ partial: true }) };
+    const r = checkFiles("0", files, f);
+    expect(codeOf(r)).toBe(7);
+    expect(r.tag === "err" ? r.error.message : "").toContain("bad.json");
+  });
+
+  it("makes the run inconclusive when any file cannot be read", () => {
+    const r = main(
+      ["--cli-exit", "0", "--threshold", "1", "r0.json", "gone.json"],
+      {},
+      {
+        readFile: (p) =>
+          p === "r0.json" ? ok(caseFile(0, 1, 0.4)) : err(cliError(EXIT_FAILURE, "cannot read")),
+      },
+    );
+    expect(codeOf(r)).toBe(7);
+  });
+
+  it("states the advisory case count from MIN_GATE_CASES in --help", () => {
+    const h = main(["--help"], {}, { readFile: () => ok("") });
+    expect(h.tag === "ok" ? h.value : "").toContain(`under ${String(MIN_GATE_CASES)} cases`);
   });
 
   it("does not fail a single negative case when the mean delta clears the floor", () => {

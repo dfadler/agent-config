@@ -1,7 +1,7 @@
 // Plugin-eval result checker (#583), called by the plugin-evals workflow after
 // `claude plugin eval`. Decision record: docs/plugin-eval-ci.md (#436).
 //
-//   check-plugin-eval.ts --cli-exit N --threshold T [--delta-floor F] aggregate-result.json
+//   check-plugin-eval.ts --cli-exit N --threshold T [--delta-floor F] aggregate-result.json...
 //
 // Exit codes: 0 pass, 1 regression (valid run, CLI exit non-zero against the
 // threshold), 7 inconclusive (invalid run, so not a regression), 2 usage.
@@ -25,19 +25,30 @@ import { andThen, err, fromThrowable, ok, type Result } from "./lib/result.ts";
 import { run, type Main } from "./lib/run.ts";
 import { describeThrown } from "./lib/thrown.ts";
 
-const USAGE = `Usage: check-plugin-eval.ts [-h|--help] --cli-exit N --threshold T [--delta-floor F] RESULT.json
+/**
+ * Cases a plugin needs before the delta gate can fail a run (#736). Below it the
+ * gate only warns: with fewer cases the plugin-level mean delta is too noisy
+ * (about 80 runs per arm are needed to separate a +0.2 effect). The issue gives
+ * a 16 to 26 range; this is the low end.
+ */
+export const MIN_GATE_CASES = 16;
 
-Decide pass / regression / inconclusive for a \`claude plugin eval\` run.
+const USAGE = `Usage: check-plugin-eval.ts [-h|--help] --cli-exit N --threshold T [--delta-floor F] RESULT.json...
+
+Decide pass / regression / inconclusive for a \`claude plugin eval\` run. The
+run-evals wrapper writes one result file per case, so pass every file of the
+run: the cases are pooled and the delta gate sees all of them. A single file
+gates only its own cases.
 
   --cli-exit N     Exit code the eval CLI returned (run with --threshold T).
   --threshold T    The threshold the CLI was given; reported in messages.
   --delta-floor F  Opt-in gate (#736): the mean delta over cases with a delta
                    must reach F (CI uses 0.14) or the run is a regression.
-                   Advisory (warn, exit 0) under 16 cases. Per-case
+                   Advisory (warn, exit 0) under ${String(MIN_GATE_CASES)} cases. Per-case
                    verdicts come from diagnose() and only warn. pass^k
                    (share of cases whose with-plugin runs all scored 1) is
                    reported alongside the mean score.
-  RESULT.json      The run's aggregate-result.json.
+  RESULT.json...   The run's aggregate-result.json files, one or more.
 
 Inconclusive (exit 7, not a regression): CLI exit 2, \`partial: true\`, any
 \`skippedPaidGraders\`, any \`arms.with[].error\` or \`arms.without[].error\`, an implausible result
@@ -77,14 +88,6 @@ const invalidReasons = (doc: Record<string, unknown>): readonly string[] => [
     );
   }),
 ];
-
-/**
- * Cases a plugin needs before the delta gate can fail a run (#736). Below it the
- * gate only warns: with fewer cases the plugin-level mean delta is too noisy
- * (about 80 runs per arm are needed to separate a +0.2 effect). The issue gives
- * a 16 to 26 range; this is the low end.
- */
-export const MIN_GATE_CASES = 16;
 
 const mean = (xs: readonly number[]): number =>
   xs.reduce((a, b) => a + b, 0) / xs.length;
@@ -154,32 +157,64 @@ const parseCliExit = (v: unknown): Result<CliError, number> => {
       );
 };
 
+/** One result file, read and JSON-parsed. */
+interface Input {
+  readonly path: string;
+  readonly text: string;
+  readonly value: unknown;
+}
+
+/**
+ * Every file is validated on its own (any bad file makes the run inconclusive),
+ * then the cases of all files are pooled so the delta gate sees the whole run.
+ */
 const decide = (
   cliExit: number,
   threshold: string,
   floor: number | undefined,
-  text: string,
-  doc: unknown,
+  inputs: readonly Input[],
 ): Result<CliError, string> => {
   if (cliExit === 2) return inconclusive("eval CLI exited 2 (invalid run)");
-  if (!isRecord(doc)) return inconclusive("result is not a JSON object");
-  if (!Array.isArray(doc["cases"]))
-    return inconclusive("result is missing a cases array");
-  const bad = [
-    ...implausibleReasons(doc),
-    ...silentZeroReasons(doc),
-    ...invalidReasons(doc),
-  ];
+  // Name the file only when there is more than one to tell apart.
+  const at = (path: string, why: string): string =>
+    inputs.length > 1 ? `${path}: ${why}` : why;
+  const shape = inputs.flatMap((i) =>
+    !isRecord(i.value)
+      ? [at(i.path, "result is not a JSON object")]
+      : !Array.isArray(i.value["cases"])
+        ? [at(i.path, "result is missing a cases array")]
+        : [],
+  );
+  if (shape.length > 0) return inconclusive(shape.join("; "));
+  const docs = inputs.flatMap((i) =>
+    isRecord(i.value) ? [{ path: i.path, text: i.text, doc: i.value }] : [],
+  );
+  const bad = docs.flatMap((d) =>
+    [
+      ...implausibleReasons(d.doc),
+      ...silentZeroReasons(d.doc),
+      ...invalidReasons(d.doc),
+    ].map((why) => at(d.path, why)),
+  );
   if (bad.length > 0) return inconclusive(bad.join("; "));
-  const parsed = readAggregateResult(text);
-  if (!parsed.ok) return inconclusive(parsed.reason);
-  const diagnosis = diagnose(parsed.result);
+  const parsed = docs.map((d) => ({ path: d.path, r: readAggregateResult(d.text) }));
+  const unreadable = parsed.flatMap((p) => (p.r.ok ? [] : [at(p.path, p.r.reason)]));
+  if (unreadable.length > 0) return inconclusive(unreadable.join("; "));
+  // Every file passed the checks above (schemaVersion 1, not partial), so the
+  // pooled result takes those values.
+  const pooled: AggregateResult = {
+    schemaVersion: 1,
+    partial: false,
+    partialReason: undefined,
+    cases: parsed.flatMap((p) => (p.r.ok ? p.r.result.cases : [])),
+  };
+  const diagnosis = diagnose(pooled);
   const gate = floor === undefined ? {} : deltaGate(diagnosis, floor);
   const warns =
     verdictWarnings(diagnosis).join("") +
     (gate.warn ?? "") +
-    ungatedNotes(doc) +
-    reliabilityLine(parsed.result);
+    docs.map((d) => ungatedNotes(d.doc)).join("") +
+    reliabilityLine(pooled);
   if (gate.breach !== undefined) {
     return err(cliError(EXIT_FAILURE, `${warns}regression: ${gate.breach}`));
   }
@@ -204,19 +239,17 @@ export const main: Main = (argv, _env, io) =>
           { name: "delta-floor", valued: true },
         ],
         minPositionals: 1,
-        maxPositionals: 1,
       },
       argv,
     ),
     andThen((p: Parsed): Result<CliError, string> => {
       if (p.kind === "help") return ok(p.usage);
       const threshold = p.flags["threshold"];
-      const path = p.positionals[0];
-      if (typeof threshold !== "string" || path === undefined) {
+      if (typeof threshold !== "string") {
         return err(cliError(EXIT_USAGE, `--threshold is required\n\n${USAGE}`));
       }
       const rawFloor = p.flags["delta-floor"];
-      const floor = 
+      const floor =
         typeof rawFloor === "string" && rawFloor.trim() !== ""
           ? Number(rawFloor)
           : typeof rawFloor === "string"
@@ -231,21 +264,32 @@ export const main: Main = (argv, _env, io) =>
         parseCliExit(p.flags["cli-exit"]),
         andThen((cliExit) => {
           // An unreadable or unparseable result means the run is untrustworthy.
-          const doc = pipe(
-            io.readFile(path),
-            andThen((text) =>
-              fromThrowable(
-                () => {
-                  const value: unknown = JSON.parse(text);
-                  return { text, value };
-                },
-                (t) => cliError(EXIT_PARTIAL, describeThrown(t)),
+          const reads = p.positionals.map((path) => ({
+            path,
+            doc: pipe(
+              io.readFile(path),
+              andThen((text) =>
+                fromThrowable(
+                  (): Input => {
+                    const value: unknown = JSON.parse(text);
+                    return { path, text, value };
+                  },
+                  (t) => cliError(EXIT_PARTIAL, describeThrown(t)),
+                ),
               ),
             ),
+          }));
+          const failed = reads.flatMap((r) =>
+            r.doc.tag === "err" ? [`${r.path}: ${r.doc.error.message}`] : [],
           );
-          return doc.tag === "err"
-            ? inconclusive(`${path}: ${doc.error.message}`)
-            : decide(cliExit, threshold, floor, doc.value.text, doc.value.value);
+          return failed.length > 0
+            ? inconclusive(failed.join("; "))
+            : decide(
+                cliExit,
+                threshold,
+                floor,
+                reads.flatMap((r) => (r.doc.tag === "ok" ? [r.doc.value] : [])),
+              );
         }),
       );
     }),
