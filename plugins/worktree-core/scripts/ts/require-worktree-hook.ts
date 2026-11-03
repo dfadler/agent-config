@@ -1,5 +1,7 @@
 // PreToolUse hook: block/warn/allow Edit and Write based on whether the cwd is
-// the main git checkout rather than a linked worktree. Off by default.
+// the main git checkout rather than a linked worktree. Off by default. "The cwd"
+// is the one in the hook's stdin JSON (it follows the session into a worktree),
+// else the process directory (worktree-hook-lib.ts, payloadCwd).
 //
 // Mode (highest priority first): WORKTREE_ENFORCE env var (0/false/no/off,
 // warn, block), then worktree.enforce in .claude/settings.json, then off.

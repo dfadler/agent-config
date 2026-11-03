@@ -17,6 +17,7 @@ import { makeSandbox } from "./test-helpers.ts";
 import {
   EXIT_BLOCK,
   hookExitCode,
+  payloadCwd,
   realCtx,
   type Env,
   type HookCtx,
@@ -299,6 +300,32 @@ describe("realCtx", () => {
   });
 });
 
+describe("payloadCwd", () => {
+  let dir: string;
+  beforeEach(() => {
+    dir = mkdtempSync(join(tmpdir(), "wt-payload-"));
+  });
+  afterEach(() => {
+    rmSync(dir, { recursive: true, force: true });
+  });
+
+  it("returns the cwd of the stdin JSON when it is an existing absolute directory", () => {
+    expect(payloadCwd(JSON.stringify({ cwd: dir }))).toBe(dir);
+  });
+
+  it.each([
+    ["empty stdin", ""],
+    ["not JSON", "{nope"],
+    ["not an object", "[]"],
+    ["no cwd field", "{}"],
+    ["a non-string cwd", '{"cwd": 7}'],
+    ["a relative cwd", '{"cwd": "some/dir"}'],
+    ["a cwd that does not exist", '{"cwd": "/no/such/dir/for/wt-payload"}'],
+  ])("falls back to the process directory on %s", (_name, stdin) => {
+    expect(payloadCwd(stdin)).toBeUndefined();
+  });
+});
+
 // End-to-end: the real entrypoints, spawned the way hooks.json spawns them
 // (node + .ts path), against real temp git repos.
 describe("entrypoints (spawned)", () => {
@@ -308,9 +335,15 @@ describe("entrypoints (spawned)", () => {
   let linked: string;
   const git = (cwd: string, ...a: string[]) =>
     spawnSync("git", a, { cwd, encoding: "utf8" });
-  const hook = (cwd: string, env: Record<string, string>, name = "require-worktree-hook") =>
+  const hook = (
+    cwd: string,
+    env: Record<string, string>,
+    name = "require-worktree-hook",
+    input?: string,
+  ) =>
     spawnSync(process.execPath, [entry(name)], {
       cwd,
+      input,
       encoding: "utf8",
       env: { PATH: process.env["PATH"] ?? "", HOME: tmp, ...env },
     });
@@ -333,6 +366,38 @@ describe("entrypoints (spawned)", () => {
     expect(blocked.status).toBe(2);
     expect(blocked.stderr).toMatch(/main git checkout/);
     expect(hook(linked, { WORKTREE_ENFORCE: "block" }).status).toBe(0);
+  });
+
+  // The hook process can start in the main checkout while the session works in a
+  // worktree (app-started sessions); the stdin cwd is what says where the session is.
+  it("judges the stdin cwd, not the process directory", () => {
+    const env = { WORKTREE_ENFORCE: "block" };
+    const inLinked = JSON.stringify({ cwd: linked });
+    const inMain = JSON.stringify({ cwd: main });
+    expect(hook(main, env, "require-worktree-hook", inLinked).status).toBe(0);
+    const blocked = hook(linked, env, "require-worktree-hook", inMain);
+    expect(blocked.status).toBe(2);
+    expect(blocked.stderr).toMatch(/main git checkout/);
+  });
+
+  it("uses the process directory when the stdin cwd is unusable", () => {
+    const env = { WORKTREE_ENFORCE: "block" };
+    const bogus = JSON.stringify({ cwd: join(tmp, "gone") });
+    expect(hook(main, env, "require-worktree-hook", bogus).status).toBe(2);
+    expect(hook(main, env, "require-worktree-hook", "{nope").status).toBe(2);
+    expect(hook(linked, env, "require-worktree-hook", bogus).status).toBe(0);
+  });
+
+  it("reads worktree.enforce from the repo of the stdin cwd", () => {
+    mkdirSync(join(main, ".claude"));
+    writeFileSync(join(main, ".claude", "settings.json"), enforce("block"));
+    const elsewhere = mkdtempSync(join(tmpdir(), "wt-elsewhere-"));
+    try {
+      const r = hook(elsewhere, {}, "require-worktree-hook", JSON.stringify({ cwd: main }));
+      expect(r.status).toBe(2);
+    } finally {
+      rmSync(elsewhere, { recursive: true, force: true });
+    }
   });
 
   it("honours settings.json in the repo", () => {

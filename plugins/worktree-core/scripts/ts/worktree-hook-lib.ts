@@ -2,7 +2,8 @@
 // check-worktree-symlinks-hook.ts, prune-merged-worktrees-hook.ts).
 // Standalone: node builtins only, because a plugin installs on its own.
 import { spawnSync } from "node:child_process";
-import { readFileSync } from "node:fs";
+import { existsSync, readFileSync } from "node:fs";
+import { isAbsolute } from "node:path";
 
 export type Env = Readonly<Record<string, string | undefined>>;
 
@@ -27,10 +28,39 @@ export interface HookCtx {
   ) => { readonly stdout: string; readonly stderr: string };
 }
 
-export const realCtx = (): HookCtx => ({
+/**
+ * Directory git runs in: the `cwd` Claude Code puts in the hook's stdin JSON, or
+ * undefined (use the process directory) when it is absent, not a string, not an
+ * absolute path, or not an existing directory. The docs say that field follows the
+ * session into a worktree; the hook process's own directory is not documented to.
+ * https://code.claude.com/docs/en/hooks (Common input fields)
+ */
+export const payloadCwd = (stdin: string): string | undefined => {
+  try {
+    const v: unknown = JSON.parse(stdin);
+    const cwd =
+      typeof v === "object" && v !== null && "cwd" in v ? v.cwd : undefined;
+    return typeof cwd === "string" && isAbsolute(cwd) && existsSync(cwd)
+      ? cwd
+      : undefined;
+  } catch {
+    return undefined;
+  }
+};
+
+/** Hook stdin as text; empty on a terminal, a closed stdin or a read error. */
+const readStdin = (): string => {
+  try {
+    return process.stdin.isTTY ? "" : readFileSync(0, "utf8");
+  } catch {
+    return "";
+  }
+};
+
+export const realCtx = (cwd?: string): HookCtx => ({
   env: process.env,
   git: (args) => {
-    const r = spawnSync("git", [...args], { encoding: "utf8" });
+    const r = spawnSync("git", [...args], { encoding: "utf8", cwd });
     // status is null when git is missing or killed: treat as "failed".
     return { status: r.status ?? 1, stdout: r.stdout };
   },
@@ -79,7 +109,7 @@ export const runHook = (
   kind: HookKind,
   body: (ctx: HookCtx) => number,
 ): void => {
-  const ctx = realCtx();
+  const ctx = realCtx(payloadCwd(readStdin()));
   process.exitCode = hookExitCode(kind, () => body(ctx), ctx.err);
 };
 
