@@ -48,9 +48,17 @@ so pre-allow exactly that command, with a current Node (see `.nvmrc`) first on `
 
 ```bash
 PATH="<node-bin-dir>:$PATH" claude -p --agent case-reviewer \
-  --allowedTools "Bash(node *lint/cli.ts*)" "Bash(git log*)" "Read" "Grep" "Glob" \
+  --allowedTools "Bash(node plugins/eval-authoring/scripts/ts/lint/cli.ts *)" "Bash(git log*)" "Read" "Grep" "Glob" \
   "Review plugins/<name>/evals"
 ```
+
+Run it from the repository root. If the plugin lives elsewhere, put its real path in the
+rule, but keep `node <path to cli.ts> *` with no `*` before the script: the
+[permissions docs](https://code.claude.com/docs/en/permissions#wildcard-patterns) say
+`*` matches any text including spaces and that Claude Code matches everything before the
+first `*` as written, so `node *lint/cli.ts*` would also allow `node -e '<js>' lint/cli.ts`.
+(Inference: that the matcher accepts that exact string was not tested.) The test
+`scripts/ts/agent-allowed-tools.test.ts` guards this.
 
 Add `--add-dir plugins/<name>` if the skill under test lives outside the working directory;
 without it the agent cannot read the `SKILL.md` and reports the check as not run.
