@@ -20,7 +20,7 @@ metadata:
    Touch only `ask-form/questions.json` and `ask-form/form.html`. If either already exists
    it is left over from an interrupted run: overwrite it, and tell the user it was there.
    Never add `ask-form/` to the project's `.gitignore` or other config; do not `git add` it.
-2. Build the page with the fill script (Node 22.18+), which validates the
+2. Build the page with the fill script (current Node per `.nvmrc`), which validates the
    questions and exits non-zero with a readable error if one is malformed:
    `node <skill base dir>/../../scripts/ts/fill-form.ts ask-form/questions.json ask-form/form.html`
 3. Open it in the integrated browser: `mcp__Claude_Browser__navigate` to

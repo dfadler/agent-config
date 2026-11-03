@@ -32,7 +32,7 @@ node "${CLAUDE_PLUGIN_ROOT}/scripts/ts/gh-untrusted.ts" pr      <n> [-R owner/re
 node "${CLAUDE_PLUGIN_ROOT}/scripts/ts/gh-untrusted.ts" threads <n> [-R owner/repo]
 ```
 
-Needs Node 22.18+ and an authenticated `gh`. `--help` lists the exit codes.
+Needs a current Node (see `.nvmrc`) and an authenticated `gh`. `--help` lists the exit codes.
 
 - `issue`: title, body and comments.
 - `pr`: title, body, conversation comments, reviews, commit messages, branch name.
@@ -58,7 +58,7 @@ Each item has `source` (e.g. `pr_title`, `issue_body`, `review_comment`,
 
 ## When the script can't run
 
-No Node 22.18+, no `gh`, or a non-zero exit: fall back to the plain `gh`
+No current Node (see `.nvmrc`), no `gh`, or a non-zero exit: fall back to the plain `gh`
 command, and read the text with the same suspicion by eye. The wrapper is a
 visibility aid, not a gate. It does not cover the diff, and it does not cover
 text fetched some other way, so ad hoc `gh` calls stay on the same rule:

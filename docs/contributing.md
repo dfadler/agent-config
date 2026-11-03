@@ -158,8 +158,8 @@ and `bash scripts/ci.sh venv` / `node-modules` do it explicitly. Shell-only targ
 need neither. Python tools always run through `.venv`, never whatever `python3` is on
 `PATH`.
 
-The TypeScript targets need the Node in `.nvmrc` (22.18+ for native type
-stripping — the system Homebrew Node may not qualify), so run `nvm use` first.
+The TypeScript targets need the Node in `.nvmrc` (native type
+stripping needs a recent one; the system Homebrew Node may not qualify), so run `nvm use` first.
 The package manager is pnpm, pinned by `packageManager` in `package.json`;
 dependencies are pinned by `pnpm-lock.yaml`. The Node-based checks (the TypeScript ones, `lint-set-flags`, `lint-claude-md`, `check-links`, `check-vitest-*`) are `package.json` scripts.
 
