@@ -2,6 +2,7 @@ import { readdirSync, readFileSync } from "node:fs";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 import { describe, expect, it } from "vitest";
+import { readGrantsFile } from "./parser/grants.ts";
 
 // #885: a `*` before the script name lets `node -e '<js>' lint/cli.ts` or `node --import ...`
 // match. The permissions docs (https://code.claude.com/docs/en/permissions#wildcard-patterns)
@@ -24,7 +25,7 @@ const allowedBashSpecifiers = (markdown: string): string[] =>
   markdown
     .split("```")
     .filter((block) => block.includes("--allowedTools"))
-    .flatMap((block) => [...block.matchAll(/"Bash\(([^"]*)\)"/g)].map((m) => m[1] ?? ""));
+    .flatMap((block) => [...block.matchAll(/(['"])Bash\((.*?)\)\1/g)].map((m) => m[2] ?? ""));
 
 const agentsDir = join(pluginRoot, "agents");
 const agents = readdirSync(agentsDir).filter((f) => f.endsWith(".md"));
@@ -44,13 +45,20 @@ describe("agent --allowedTools Bash patterns", () => {
   });
 
   it("the per-case grants pin every node script too", () => {
-    const grants = readFileSync(join(pluginRoot, "evals", "grants.yaml"), "utf8");
-    const specifiers = [...grants.matchAll(/"Bash\(([^"]*)\)"/g)].map((m) => m[1] ?? "");
+    const { entries, issues } = readGrantsFile(join(pluginRoot, "evals", "grants.yaml"));
+    expect(issues).toEqual([]);
+    const specifiers = entries
+      .flatMap((e) => e.grants)
+      .filter((g) => g.tool === "Bash")
+      .map((g) => g.specifier ?? "");
     expect(specifiers.filter((s) => s.startsWith("node ")).length).toBeGreaterThan(0);
     expect(specifiers.map((s) => [s, nodePatternProblem(s)]).filter(([, p]) => p)).toEqual([]);
   });
 
   it("flags the patterns from #885", () => {
+    expect(
+      allowedBashSpecifiers("```bash\nclaude --allowedTools 'Bash(node *lint/cli.ts*)'\n```"),
+    ).toEqual(["node *lint/cli.ts*"]);
     expect(nodePatternProblem("node *lint/cli.ts*")).toMatch(/wildcard/);
     expect(nodePatternProblem("node -e * lint/cli.ts")).toMatch(/option/);
     expect(nodePatternProblem("node plugins/x/lint/cli.ts *")).toBe("");
