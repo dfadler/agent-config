@@ -189,10 +189,8 @@ blind-case-writer agent, second bullet), then stop.
   treat it as the task in step 9.
 - Declared plugin `dependencies` are not resolved in an eval run (observed in #450, not in
   the docs; EVAL018 checks it).
-- In a worktree-isolated session in this repo, a hook may block shell commands containing
-  the word `eval`. It may also refuse compound commands (`$VAR`, globs, `for` loops,
-  multi-file heredocs, some pipes). Use single plain commands and the Write tool; never
-  write a workaround script, and ask the user to run what the hook blocks.
+- In a worktree-isolated session in this repo a hook may block or refuse shell commands;
+  see the Gotchas in [run-evals](../run-evals/SKILL.md).
 - A new `SKILL.md` sentence that changes behavior should be named in the PR body as either
   covered by a case or not covered (step 9). Prefer a case whose prompt does not name the
   answer, or one that grades the `Agent` calls the skill is meant to change.
