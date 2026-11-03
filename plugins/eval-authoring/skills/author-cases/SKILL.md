@@ -73,7 +73,9 @@ blind-case-writer agent, second bullet), then stop.
    near-misses that share its vocabulary but want something else. Cover each area the skill
    handles, not only the skill as a whole, and keep some natural-phrasing prompts without
    trigger words stuffed in. A trigger eval loads only the plugin under test, so it cannot
-   show competition from other skills; `run-evals --neighbours <siblings>` measures that.
+   show competition from other skills; `run-evals --neighbours <plugin,plugin>` measures
+   that: it takes sibling plugin names under `plugins/` (not skill names) and runs the
+   cases tagged `trigger`.
    Every should-fire case needs a grader on whether the skill fired (see
    [graders](references/graders.md)).
    Put the should-not-fire prompts in the **trigger-boundary suite**, not the two-arm run:

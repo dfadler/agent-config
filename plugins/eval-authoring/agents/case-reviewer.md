@@ -89,8 +89,9 @@ Run after the lint, on each case. Skip anything the lint already reported.
    in a fixture workspace, a `smoke` tag with an honest label, or dropping it (EVAL025
    covers the mechanical part; see author-cases, "Can this case fail?"). A should-fire
    case needs a scored outcome grader (reply `regex`, file, `file_exists` or `llm`), not
-   only the Skill check; flag one whose only grader is the Skill check and that does not
-   say "no delta expected".
+   only the Skill check (EVAL009 has no exception); flag one whose only grader is the Skill
+   check. Only a should-not-fire guard or a stated regression guard may rely on the Skill
+   check alone, and it should say "no delta expected".
 5. **Tells the plugin from no plugin.** Is the property tested something the skill
    adds, or something the model does by default? A default behavior gives a Delta
    near zero in a two-arm run. If the case deliberately tests a default (only a
@@ -113,7 +114,8 @@ Run after the lint, on each case. Skip anything the lint already reported.
    reply.
 9. **Rubric shape (judge advice).** Does FAIL require a quoted span, does the
    rubric have a "do not fail for" list, and does it prescribe a command rather than
-   a goal? (A sequence claim with no `tool_used` or `tool_order` grader is EVAL027.)
+   a goal? (A sequence claim with no `tool_order` grader and no `tool_used` grader other than the
+   Skill check is EVAL027.)
 
 10. **Sources and facts (from #713).** Does the case or the skill sentence it tests state
     a platform claim with no source link and no "inference" mark? Does it name a
