@@ -177,3 +177,86 @@ it.each([
   expect(main(argv, (s) => out.push(s), [])).toBe(2);
   expect(out.join("\n")).toMatch(/needs a/);
 });
+
+// Formats added for #883. Every value is invented, and token-looking fixtures are assembled
+// at runtime so secret scanning does not flag this file.
+const b64 = (s: string): string => Buffer.from(s).toString("base64");
+const ASIA = "ASIA" + "ABCDEFGHIJKLMNOP";
+const SK_LIVE = "sk_" + "live_" + "0123456789abcdefghij";
+const BASIC = b64("jroe:hunter2");
+const PEM_HEAD = "-----BEGIN " + "PRIVATE KEY" + "-----";
+const PEM_FOOT = "-----END " + "PRIVATE KEY" + "-----";
+const SPECIAL = "p%40ss!w0rd";
+const E_ACUTE = "é";
+
+// [rule, text, a fragment of the text that must not survive redaction]
+const NEW_FORMATS: readonly (readonly [string, string, string])[] = [
+  ["token", `temporary key ${ASIA} in the log`, ASIA],
+  ["token", `stripe ${SK_LIVE} in the log`, SK_LIVE],
+  ["auth-header", `curl -H "Authorization: Basic ${BASIC}" https://widgetco.dev`, BASIC],
+  ["cookie", "curl -H 'Cookie: session=abc123def456; theme=dark' https://widgetco.dev", "abc123def456"],
+  ["cookie", "Set-Cookie: sid=abc123def456; Path=/; HttpOnly", "abc123def456"],
+  ["query-secret", "GET https://widgetco.dev/cb?code=4f9c2e7a1b&state=xyz", "4f9c2e7a1b"],
+  ["query-secret", "GET https://widgetco.dev/cb?x=1&sig=9d8c7b6a5f", "9d8c7b6a5f"],
+  ["query-secret", "GET https://widgetco.dev/cb?access_token=4f9c2e7a1b", "4f9c2e7a1b"],
+  ["query-secret", "GET https://widgetco.dev/cb#id_token=4f9c2e7a1b", "4f9c2e7a1b"],
+  ["file-url", "open file:///Users/jroe/code/widget/a.ts now", "jroe"],
+  ["file-url", "open file:///C:/Users/jroe/widget/a.ts now", "jroe"],
+  ["abs-path", `open /Users/jos${E_ACUTE}/code/widget`, E_ACUTE],
+  ["windows-path", "open C:\\Users\\Zo\u00eb\\widget", "\u00eb"],
+  ["home-path", "open ~/Documentos/\u00f1and\u00fa", "\u00f1"],
+  ["url-credentials", `psql https://jroe:${SPECIAL}@db.widgetco.dev/app`, SPECIAL],
+  ["url-credentials", "psql postgres://jroe:p@ss:w0rd@db.widgetco.dev:5432/app", "w0rd"],
+  ["pem", `${PEM_HEAD}\nQUJD\n${PEM_FOOT}`, "QUJD"],
+  ["pem", `key: ${PEM_HEAD} QUJD`, "QUJD"], // clipped: no END line
+];
+
+it.each(NEW_FORMATS)("%s fixture %# is flagged, redacted and failed by --check", (rule, text, secret) => {
+  expect(findLeaks(text)).toContain(rule);
+  const clean = redact(text);
+  expect(clean).not.toContain(secret);
+  expect(findLeaks(clean)).toEqual([]);
+  const f = join(mkdtempSync(join(tmpdir(), "redact-")), "draft.yaml");
+  writeFileSync(f, text);
+  const out: string[] = [];
+  expect(main(["--check", f], (s) => out.push(s), [])).toBe(1);
+  expect(out.join("\n")).toContain(rule);
+});
+
+it("a non-ASCII home directory is redacted whole, not left half in the text", () => {
+  expect(redact(`/Users/jos${E_ACUTE}/code/widget`)).toBe("<path>");
+  expect(redact("C:\\Users\\Zo\u00eb\\widget")).toBe("<path>");
+  expect(redact("~/Documentos/\u00f1and\u00fa")).toBe("<path>");
+});
+
+it("a url password is redacted whole and the host stays", () => {
+  expect(redact(`https://jroe:${SPECIAL}@db.widgetco.dev/app`)).toBe("https://<credentials>@db.widgetco.dev/app");
+});
+
+it("a short pem block is redacted whole", () => {
+  expect(redact(`a ${PEM_HEAD}\nQUJD\n${PEM_FOOT} b`)).toBe("a <private-key> b");
+});
+
+it("the new rules leave ordinary prose alone, and --check allows placeholder file urls", () => {
+  const s =
+    "Basic information about cookies. Cookie policy: see https://widgetco.dev/docs?page=2&code-style=x " +
+    "or https://widgetco.dev/a:b/c";
+  expect(redact(s)).toBe(s);
+  expect(findLeaks(s)).toEqual([]);
+  expect(findLeaks("see file:///Users/jdoe/code/widget/a.ts and file:///C:/Users/me/w.ts")).toEqual([]);
+});
+
+it("the new rules stay fast on long single lines", () => {
+  const started = Date.now();
+  const blobs = [
+    "Cookie: a=b;".repeat(5_000),
+    "-----BEGIN PRIVATE KEY----- ".repeat(2_000),
+    "https://a:".repeat(5_000),
+    "?code=".repeat(10_000),
+  ];
+  for (const blob of blobs) {
+    findLeaks(blob);
+    redact(blob);
+  }
+  expect(Date.now() - started).toBeLessThan(3000);
+});
