@@ -3,7 +3,7 @@
 import { readFileSync } from "node:fs";
 import { readAggregateResult } from "../parser/index.ts";
 import { formatJson, formatText } from "./format.ts";
-import { DEFAULT_THRESHOLDS, diagnose, type Thresholds } from "./verdict.ts";
+import { DEFAULT_THRESHOLDS, SMALL_ARM_RUNS, diagnose, type Thresholds } from "./verdict.ts";
 
 /** Shared exit-code taxonomy (docs/testing.md); only the codes this script uses. */
 export const EXIT_OK = 0;
@@ -22,7 +22,7 @@ The verdicts do not change the exit code.
   --format text|json   Output format (default: text).
   --neutral-band N, --se-floor N, --near-ceiling N, --high-variance N
                        Override a verdict cutoff for this run (defaults: no
-                       neutral band, 0.05, 0.95, 0.25 or 0.35 for an arm of 5
+                       neutral band, ${String(DEFAULT_THRESHOLDS.seFloor)}, ${String(DEFAULT_THRESHOLDS.nearCeiling)}, ${String(DEFAULT_THRESHOLDS.highVariance)} or ${String(DEFAULT_THRESHOLDS.highVarianceSmallArm)} for an arm of ${String(SMALL_ARM_RUNS)}
                        runs or fewer; see the diagnose-scores skill).
                        --neutral-band turns on a dead zone of that width around
                        zero; --high-variance replaces both SD cutoffs.

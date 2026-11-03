@@ -112,7 +112,8 @@ export interface Ceiling {
   readonly basis: string;
 }
 
-const round4 = (n: number): number => Math.round(n * 10000) / 10000;
+/** Round to the 4 decimals a `--max-cost-usd` is given in; also keeps float drift out of a running total. */
+export const round4 = (n: number): number => Math.round(n * 10000) / 10000;
 
 /**
  * The ceiling for a run of `cases` cases: the `--max-cost-usd` override when

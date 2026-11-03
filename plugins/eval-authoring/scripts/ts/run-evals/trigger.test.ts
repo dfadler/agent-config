@@ -163,15 +163,15 @@ describe("renderSummary trigger section", () => {
   it("drops the without and delta columns in neighbours mode, even at the thorough tier", () => {
     const row = { caseName: "t1", exit: 0, row: { caseName: "t1", with: 1, without: 0.5, delta: 0.5, failed: [], skillMissed: 0, skillRuns: 0 } };
     const one = renderSummary({ ...base, tier: "thorough", neighbours: ["sib"], trigger: rows, cases: [row], unstarted: ["t2"] });
-    expect(one).toContain("| case | score | exit |");
-    expect(one).toContain("| t1 | 1.00 | 0 |");
-    expect(one).toContain("| t2 | not run | |");
+    expect(one).toContain("| case | score | pass | exit |");
+    expect(one).toContain("| t1 | 1.00 | - | 0 |");
+    expect(one).toContain("| t2 | not run | | |");
     expect(one).not.toContain("| without |");
     expect(one).not.toContain("0.50");
     expect(one).not.toMatch(/Delta not (measured|significant)/);
     const two = renderSummary({ ...base, tier: "thorough", trigger: rows, cases: [row] });
-    expect(two).toContain("| case | with | without | delta | exit |");
-    expect(two).toContain("| t1 | 1.00 | 0.50 | 0.50 | 0 |");
+    expect(two).toContain("| case | with | without | pass | delta | exit |");
+    expect(two).toContain("| t1 | 1.00 | 0.50 | - / - | 0.50 | 0 |");
   });
   it("says so when neighbours were loaded but no grader could be tabulated", () => {
     expect(renderSummary({ ...base, neighbours: ["sib"], trigger: [] })).toContain("nothing to tabulate");

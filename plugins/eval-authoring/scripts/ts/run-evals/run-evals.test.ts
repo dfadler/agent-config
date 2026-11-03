@@ -11,6 +11,8 @@ import {
   EXIT_USAGE,
 } from "./exit-codes.ts";
 import { isRepoPlugin, main, parseArgs } from "./run-evals.ts";
+import { TIERS } from "./tiers.ts";
+import { MIN_CLAUDE_VERSION, MIN_GIT_VERSION, formatVersion } from "./versions.ts";
 import {
   fakeIo,
   makePlugin,
@@ -231,6 +233,13 @@ describe("--max-cost-usd", () => {
     expect(help).toContain("no default ceiling");
     expect(help).not.toContain("--json-file");
     expect(help).not.toContain("--report <path>");
+  });
+  it("takes the flat ceilings and the minimum versions in --help from their source", async () => {
+    const { io, out } = setup();
+    await main(["-h"], { io, pluginsDir: "/p" });
+    const help = out.join("");
+    expect(help).toContain(`${String(TIERS.standard.maxCostUsd)} and thorough ${String(TIERS.thorough.maxCostUsd)} (flat)`);
+    expect(help).toContain(`Claude Code < ${formatVersion(MIN_CLAUDE_VERSION)}, git < ${formatVersion(MIN_GIT_VERSION)}`);
   });
 
   const costs = (calls: ReturnType<typeof cliCalls>): (string | undefined)[] =>

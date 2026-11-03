@@ -46,6 +46,44 @@ describe("findGaps", () => {
     expect(findGaps(top, ["plugins/q/skills/s/SKILL.md"])).toEqual([]);
   });
 
+  describe("baseline", () => {
+    const summary = (top: string, run: string, body: Record<string, unknown>): void => {
+      mkdirSync(join(top, "plugins/p/evals/results", run), { recursive: true });
+      writeFileSync(join(top, "plugins/p/evals/results", run, "run-evals-summary.json"), JSON.stringify(body));
+    };
+    const baseline = (top: string): string | undefined =>
+      findGaps(top, ["plugins/p/skills/s/SKILL.md"])[0]?.baseline;
+
+    it("skips a newer subset, plugin-arm-only (quick, neighbours, trigger-boundary), unfinished or untrustworthy (exit 7, missing result) run and names the case count", () => {
+      const top = repoWithPlugin();
+      const ran = { resultDir: "r" };
+      // Exit 1 is a below-threshold result: a valid before score, so it stays eligible.
+      summary(top, "run-2", { ablation: "cli-default", subset: null, unstarted: [], exit: 1, invocations: [ran, ran, ran] });
+      summary(top, "run-8", { ablation: "cli-default", subset: null, unstarted: [], exit: 7, invocations: [ran, ran] });
+      summary(top, "run-9", { ablation: "cli-default", subset: null, unstarted: [], exit: 1, invocations: [ran, {}] });
+      summary(top, "run-3", { ablation: "cli-default", subset: "subset: 1 of 3 standard cases, --changed since base", invocations: [{}] });
+      summary(top, "run-4", { ablation: "none", neighbours: ["n"], invocations: [{}] });
+      summary(top, "run-5", { ablation: "none", triggerBoundary: { fires: 0 }, invocations: [{}] });
+      summary(top, "run-6", { ablation: "none", subset: null, invocations: [{}] });
+      summary(top, "run-7", { ablation: "cli-default", subset: null, unstarted: ["c3"], invocations: [{}, {}] });
+      expect(baseline(top)).toBe("run-2 (3 cases)");
+    });
+
+    it("says none recorded when every run is a subset", () => {
+      const top = mkdtempSync(join(tmpdir(), "stop-hook-"));
+      dirs.push(top);
+      touch(top, "plugins/p/.claude-plugin/plugin.json");
+      summary(top, "run-1", { subset: "subset: 1 of 3", invocations: [{}] });
+      expect(baseline(top)).toBeUndefined();
+    });
+
+    it("fails open on an unreadable summary", () => {
+      const top = repoWithPlugin();
+      touch(top, "plugins/p/evals/results/run-9/run-evals-summary.json");
+      expect(baseline(top)).toBe("run-9");
+    });
+  });
+
   it("ignores files that are not skills or agents", () => {
     const top = repoWithPlugin();
     expect(findGaps(top, ["plugins/p/README.md", "plugins/p/scripts/x.ts"])).toEqual([]);
@@ -124,6 +162,20 @@ describe("runStopHook in a real repo", () => {
     git(top, "commit", "-q", "-m", "base");
     git(top, "checkout", "-q", "-b", "feature");
     git(top, "branch", "--set-upstream-to=trunk");
+    touch(top, "plugins/p/skills/s/SKILL.md");
+    git(top, "add", "-A");
+    git(top, "commit", "-q", "-m", "skill");
+    expect(stop(top, sid())).toContain('"decision":"block"');
+  });
+
+  it("diffs against the remote's default branch when it is not called main", () => {
+    const top = repoWithPlugin();
+    git(top, "init", "-q", "-b", "work");
+    git(top, "add", "-A");
+    git(top, "commit", "-q", "-m", "base");
+    git(top, "update-ref", "refs/remotes/origin/trunk", "HEAD");
+    git(top, "symbolic-ref", "refs/remotes/origin/HEAD", "refs/remotes/origin/trunk");
+    git(top, "checkout", "-q", "-b", "feature");
     touch(top, "plugins/p/skills/s/SKILL.md");
     git(top, "add", "-A");
     git(top, "commit", "-q", "-m", "skill");

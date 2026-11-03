@@ -42,13 +42,14 @@ import {
 } from "./plan.ts";
 import { runPreflight } from "./preflight.ts";
 import { boundaryPlan, boundaryReport, type BoundaryReport } from "./boundary.ts";
-import { caseRow, redact, renderBlock, renderSummary, withBlock } from "./summary.ts";
+import { caseRow, maskHome, redact, renderBlock, renderSummary, withBlock } from "./summary.ts";
 import {
   DEFAULT_JUDGE_MODEL,
   DEFAULT_MODEL,
   DEFAULT_TIER,
   TIERS,
   ceilingFor,
+  round4,
   QUICK_FLOOR_USD,
   QUICK_PER_CASE_USD,
   TRIGGER_BOUNDARY_TIER,
@@ -57,6 +58,7 @@ import {
   type Tier,
 } from "./tiers.ts";
 import { replyFiles, runCount, safeName } from "./traces.ts";
+import { MIN_CLAUDE_VERSION, MIN_GIT_VERSION, formatVersion } from "./versions.ts";
 import { manifestOf } from "./plan.ts";
 import { checkNeighbours, checkStageable, parseNeighbours, stageNeighbours } from "./stage.ts";
 import { routablesOf, triggerRows } from "./trigger.ts";
@@ -75,7 +77,7 @@ ${Object.values(TIERS).map((t) => `                         ${t.name}: ${t.descr
   --max-cost-usd <usd> override the tier's cost ceiling (positive number).
                        The CLI has no default ceiling; the wrapper's tiers set
                        one: quick ${String(QUICK_PER_CASE_USD)} per case with a floor of ${String(QUICK_FLOOR_USD)}, standard
-                       5 and thorough 15 (flat). The override is always a
+                       ${String(TIERS.standard.maxCostUsd)} and thorough ${String(TIERS.thorough.maxCostUsd)} (flat). The override is always a
                        total for the whole wrapper run, never per case. Each
                        invocation gets the remaining budget as its own
                        --max-cost-usd, the wrapper adds up each result's
@@ -188,7 +190,7 @@ Exit codes:
   1   below threshold, load failure, no cases, untrusted directory, invalid option
   2   wrapper usage error
   3   bad cases or grants file, or the CLI says a case cannot pass with its grants
-  4   unmet requirement (Claude Code < 2.1.269, git < 2.31, sandbox backend,
+  4   unmet requirement (Claude Code < ${formatVersion(MIN_CLAUDE_VERSION)}, git < ${formatVersion(MIN_GIT_VERSION)}, sandbox backend,
       claude missing, or plugin eval unavailable)
   7   partial or untrustworthy run (cost ceiling, rejected credential, a run
       errored, paid graders skipped, a planned case missing from its result,
@@ -446,9 +448,6 @@ const fail = (io: Io, code: ExitCode, message: string): ExitCode => {
   return code;
 };
 
-/** Round to the 4 decimals a `--max-cost-usd` is given in; also keeps float drift out of the running total. */
-const round4 = (n: number): number => Math.round(n * 10000) / 10000;
-
 const runStamp = (io: Io): string => io.now().toISOString().replace(/[:.]/g, "-");
 
 const invocationSpec = (
@@ -520,12 +519,7 @@ export const unwrapExit = (
   // (so /Users/x does not eat /Users/xavier), redacted before the cap so a cut secret is never
   // left half-visible. redact's long-run catch-all can also shorten a path segment; that is
   // the conservative direction for a diagnostic string.
-  const bare = home.replace(/\/+$/, "");
-  const masked =
-    bare === ""
-      ? line
-      : line.replace(new RegExp(`${bare.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}(?=/|$)`, "g"), "~");
-  const detail = redact(masked).slice(0, 200);
+  const detail = redact(maskHome(line, home)).slice(0, 200);
   return { ...r, status: null, error: `caffeinate exit ${String(r.status)}: ${detail}` };
 };
 
@@ -990,7 +984,7 @@ const run = async (
   io.err(
     `run-evals: tier ${options.tier.name}, ablation ${options.tier.ablation}: exit ${String(exit)}\n`,
   );
-  const rendered = renderSummary({
+  const markdown = renderSummary({
     plugin: basename(target),
     tier: options.tier.name,
     model: options.model ?? DEFAULT_MODEL,
@@ -1000,6 +994,7 @@ const run = async (
     exit,
     command: `node plugins/eval-authoring/scripts/ts/run-evals/run-evals.ts ${argv.map(shellWord).join(" ")}`,
     unstarted,
+    subset,
     neighbours: options.neighbours,
     boundary: boundaryResult,
     trigger: triggerRows(suite, routablesOf(io, target), manifestOf(target).name, results),
@@ -1009,9 +1004,6 @@ const run = async (
       row: caseRow(d.caseName, progress.texts[i], io.readFile),
     })),
   });
-  // A --changed run is a subset: say so under the heading, in the terminal and in the PR block alike.
-  const markdown =
-    subset === null ? rendered : rendered.replace("\n\n", `\n\n${subset}\n\n`);
   if (options.pr === undefined) {
     io.out(`\n${markdown}\n`);
     return exit;
