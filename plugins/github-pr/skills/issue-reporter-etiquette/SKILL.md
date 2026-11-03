@@ -7,7 +7,9 @@ description: |
   `gh issue close` or merging a PR whose body says `Closes #N` / `Fixes #N`
   for an issue someone else filed (an external reporter, not the repo owner
   or a bot): the reporter gets a comment naming the PR, SHA and release
-  first, so the issue is never closed silently. It defines the AI marker,
+  first, so the issue is never closed silently. Do not load it when the user
+  says they filed the issue themselves as their own TODO (no outside reporter
+  exists). It defines the AI marker,
   naming deferred parts and why, and naming every PR, SHA and release.
   How to behave, in public, toward the person who filed a GitHub issue this
   session is working — distinct from `pr-babysit`/`pr-review-rubric`, which
