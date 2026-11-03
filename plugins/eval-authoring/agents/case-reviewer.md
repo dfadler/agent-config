@@ -26,7 +26,7 @@ list. You never change a case.
   findings. Do not restate, re-derive or second-guess a rule it owns (any
   rule `--list-rules` prints); `--list-rules` shows what exists:
   `node <plugin>/scripts/ts/lint/cli.ts --enable EVAL009 --format json <PLUGIN_ROOT>`
-  (`--enable EVAL009` adds the opt-in rule that checks the result-plus-steps grader pair;
+  (`--enable EVAL009` adds the opt-in rule that checks for a scored result grader;
   it is off by default), where `<plugin>` is the eval-authoring plugin directory and `<PLUGIN_ROOT>` is the
   plugin whose cases you review. It is free: no model calls, no network. If `node`
   is older than 22.18 (the lint runs TypeScript directly), is missing or broken, or the
@@ -79,39 +79,41 @@ Run after the lint, on each case. Skip anything the lint already reported.
 3. **Trigger boundary.** Does the suite hold both prompts that should fire the
    skill and prompts that should not (or near-miss phrasings)? Read the skill's
    `description` and judge. A suite with only positive prompts cannot show the skill
-   over-triggers.
+   over-triggers. A trigger eval loads only the plugin under test, so it cannot show
+   competition from other skills (`run-evals --neighbours <siblings>` measures that).
 4. **Can fail.** Would at least one scored grader fail if the skill were absent or
    broken? Look for graders any competent reply would pass (a regex on a word the
    prompt itself contains, a check that the reply is non-empty). Also flag a case whose
    only live signal is a no-plugin-passes Skill "must not fire" check, and a reply-only
    prompt where nothing observable separates the arms; the fix is a trace-action grader
    in a fixture workspace, a `smoke` tag with an honest label, or dropping it (EVAL025
-   covers the mechanical part; see author-cases, "Can this case fail?").
+   covers the mechanical part; see author-cases, "Can this case fail?"). A should-fire
+   case needs a scored outcome grader (reply `regex`, file, `file_exists` or `llm`), not
+   only the Skill check; flag one whose only grader is the Skill check and that does not
+   say "no delta expected".
 5. **Tells the plugin from no plugin.** Is the property tested something the skill
    adds, or something the model does by default? A default behavior gives a Delta
-   of zero in a two-arm run. If the case deliberately tests a default (only a
+   near zero in a two-arm run. If the case deliberately tests a default (only a
    should-not-fire guard), it should say so in `expected_outcome`.
-6. **Proportionate.** Free graders (`regex`, `tool_used`, `tool_order`,
-   `file_exists`) first; `llm` or `baseline` only for a semantic property. Flag an
-   `llm` grader whose property a regex or tool check could decide, high `runs` on a
-   case with no judge noise, or a Bash/Write grant the prompt does not need. Also
+6. **Proportionate.** Free-first per graders.md. Flag an
+   `llm` grader whose property a regex or tool check could decide, or a Bash/Write grant
+   the prompt does not need. Also
    check the two things the lint cannot, because it does not read comments (this
    is judgment, not EVAL016/EVAL017, which cover the mechanical parts): each `llm`
    or `baseline` grader should have a one-line comment beside it saying why a free
    grader cannot decide it, so flag a paid grader with no stated reason; and flag a
    case whose graders are all free but is not tagged `quick`.
    Also flag a case that allows `Read` or `Glob` with no `scaffold_script` and no inline
-   inputs in the prompt: the model hunts an empty workspace for files.
+   inputs in the prompt (see author-cases step 4).
 7. **Stable signal.** Could two reasonable judges disagree on the criteria? Flag
    conditions that hinge on wording choices or subjective degree.
 
-8. **Known-bad reply.** Does each `llm` case header hold a reference-good and a
-   known-bad reply, and would at least one applicable grader fail the known-bad one?
-   Flag a missing one.
+8. **Known-bad reply.** The lint reports a missing `# good-reply:` / `# bad-reply:` header
+   (EVAL026). You judge whether at least one applicable grader would fail the known-bad
+   reply.
 9. **Rubric shape (judge advice).** Does FAIL require a quoted span, does the
    rubric have a "do not fail for" list, and does it prescribe a command rather than
-   a goal? Does a sequence claim have a
-   `tool_used` or `tool_order` grader beside it?
+   a goal? (A sequence claim with no `tool_used` or `tool_order` grader is EVAL027.)
 
 10. **Sources and facts (from #713).** Does the case or the skill sentence it tests state
     a platform claim with no source link and no "inference" mark? Does it name a
