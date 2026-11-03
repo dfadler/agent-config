@@ -117,8 +117,19 @@ describe("eval job: cost ceiling", () => {
 });
 
 describe("notify job: failure issue", () => {
-  it("runs only on failure, with issues: write on that job alone", () => {
-    expect(workflow).toMatch(/notify:[\s\S]*if: \$\{\{ failure\(\) \}\}/);
+  it("fires on a failed or cancelled eval (job timeout), not on success (#889)", () => {
+    expect(workflow).toMatch(
+      /notify:[\s\S]*if: \$\{\{ always\(\) && \(needs\.plan\.result == 'failure' \|\| needs\.eval\.result == 'failure' \|\| needs\.eval\.result == 'cancelled'\) \}\}/,
+    );
+  });
+
+  it("uploads results even when the eval job is cancelled by its timeout (#889)", () => {
+    expect(workflow).toMatch(
+      /- name: Upload results\n\s+(?:#.*\n\s+)*if: \$\{\{ always\(\) \}\}/,
+    );
+  });
+
+  it("keeps issues: write on the notify job alone", () => {
     expect(workflow.match(/^ +issues: write$/gm)).toHaveLength(1);
   });
 
