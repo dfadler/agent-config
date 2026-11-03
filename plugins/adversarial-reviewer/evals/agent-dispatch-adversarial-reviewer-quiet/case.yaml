@@ -4,6 +4,8 @@
 # explained, with no change to tear apart. The dispatch case already exists
 # (adversarial-reviewer-reports-without-editing). Regression guard: the no-plugin arm passes it by
 # default, so Delta is zero by design.
+# good-reply: It means two operations touch the same data at once, so the result depends on which one happens to run first.
+# bad-reply: It means the code is slow because a loop runs too many times.
 # Can fail: reviewer_not_dispatched = 0 if the agent over-triggers on "review"; defines_race = 0 if
 # the question is not answered.
 schema_version: "1.1"
@@ -35,7 +37,7 @@ graders:
   - name: defines_race
     type: regex
     target: last_message
-    pattern: 'concurren|simultaneous|same time|timing|order of|interleav|parallel'
+    pattern: 'concurren|simultaneous|same time|same moment|at once|timing|order of|which (one )?(runs|happens|finishes|executes|goes|completes|wins|gets)|interleav|parallel|overlapping|(two|multiple|several|different) (threads|processes)|whichever (one |of them )?(\w+ ){0,3}first|who (gets|reaches|arrives|finishes)'
     flags: i
     match: contains
     arm: both

@@ -17,14 +17,18 @@ metadata:
    `<project>/ask-form/questions.json`. It must be inside the project
    folder: the integrated browser renders files outside it as static snapshots (the
    app's own message; observed, not documented), so the form would not respond.
-   Touch only `ask-form/questions.json` and `ask-form/form.html`. If either already exists
-   it is left over from an interrupted run: overwrite it, and tell the user it was there.
+   Touch only `ask-form/questions.json` and `ask-form/form.html`. Do not run `ls`, `cat` or
+   any other shell command first to look for them: go straight to Write, and the only shell
+   command you run is the fill script in step 2. If either file already existed it is left
+   over from an interrupted run: it is overwritten, and you tell the user it was there.
    Never add `ask-form/` to the project's `.gitignore` or other config; do not `git add` it.
 2. Build the page with the fill script (current Node per `.nvmrc`), which validates the
    questions and exits non-zero with a readable error if one is malformed:
    `node <skill base dir>/../../scripts/ts/fill-form.ts ask-form/questions.json ask-form/form.html`
 3. Open it in the integrated browser: `mcp__Claude_Browser__navigate` to
-   `file://<project>/ask-form/form.html`. Do not use an external browser.
+   `file://<project>/ask-form/form.html`. Do not use an external browser. If that browser tool
+   is not available, do not skip steps 1-2 or fall back yet: the form is still built, so give
+   the user the full `file://` path to open themselves.
    The page also shows the answers in a text box, so if **Copy answers** does
    nothing the user can select-all and copy.
 4. Tell the user in one line: fill in the form, click **Copy answers**, paste here.
@@ -36,8 +40,8 @@ metadata:
 
 ## If you cannot build the form
 
-If you cannot write the file, run the script or open the browser, do not improvise
-another route. Say so in one line ("I couldn't build the form") and ask the
+If you cannot write the file or run the script (a missing browser tool alone does not count,
+see step 3), do not improvise another route. Say so in one line ("I couldn't build the form") and ask the
 questions in chat as ONE compact numbered list, one short line each.
 
 ## Question schema
