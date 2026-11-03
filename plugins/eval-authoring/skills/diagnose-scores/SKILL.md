@@ -56,7 +56,9 @@ interprets the verdict.
 - **`no-discrimination` with a `tool_used: Skill` grader failing in the with arm:** the
   skill's description did not trigger on the prompt. Compare the two and propose a
   description change. If the Skill grader passes and Δ is still about zero, the model does
-  this by default: reword the case around what the skill adds, or drop it. Only a
+  this by default: reword the case around what the skill adds, or drop it. If the
+  behavior is wanted whatever the skill does, the skill may be retired and the case kept
+  as a regression net. Only a
   should-not-fire case is a regression guard (delta 0 by design; say so in `expected_outcome`).
 - **`split-judge-votes`, `high-variance`:** an unstable criterion. Name the grader, the
   condition two judges could read differently, and the rewording. To size the noise, run
@@ -69,7 +71,7 @@ interprets the verdict.
   `--ablation` back to two arms).
 - **`judge-skipped`:** the cost ceiling skipped paid graders; not a signal. Recommend a higher
   ceiling or a free grader.
-- **`weak-signal`:** Δ inside noise, positive or negative (a drop within the t cutoff below lands here, not under `negative-delta`). Do not change anything on this case alone: read its replies, and recommend more cases before more runs, because more cases shrink the suite's delta error while more runs only shrink this case's noise (unless an arm has under two usable runs, so its noise is unknown: then rerun first, as the `single-run` finding says). More runs are pointless when both arms have SD 0 (the 0.05 floor sets the bar, so more identical runs cannot change the verdict): then a larger effect or a sharper grader is the lever.
+- **`weak-signal`:** Δ inside noise, positive or negative (a drop within the t cutoff below lands here, not under `negative-delta`). Do not change anything on this case alone: read its replies, and recommend more cases before more runs (unless an arm has under two usable runs, so its noise is unknown: then rerun first, as the `single-run` finding says). More runs are pointless when both arms have SD 0 (the 0.05 floor sets the bar, so more identical runs cannot change the verdict): then a larger effect or a sharper grader is the lever.
 - **`both-arms-pass-all` / `both-arms-fail-all`:** a case that cannot fail (or has almost no headroom, both means at least 0.95: check for a leaked answer, then fix or drop it), or never passes
   (check graders and grants).
 - **`turn-limit`:** a run used every allowed turn and every non-guard `last_message` grader
@@ -90,13 +92,11 @@ interprets the verdict.
 
 Partial results (the script prints `PARTIAL`) are left out of trends; say so.
 
-Scores regress to the mean: a case picked out because it scored badly once will tend to
-score better on the next run with nothing changed, and one picked for a high score will tend
-to drop. So a rise on the case you singled out is not evidence for your fix; credit the fix
-from the delta over the suite, not from that case's with-arm score. A run that loads only the
-plugin under test (the only kind `claude plugin eval` makes) can overstate the trigger rate of a
-`tool_used: Skill` grader, because no other skill competes for the prompt; the only
-competition measurement is a manual run with the real skill set installed.
+A rise on the case you singled out is not evidence for your fix; credit the fix from the
+delta over the suite, not from that case's with-arm score. A run that loads only the plugin
+under test (the only kind `claude plugin eval` makes) cannot show how a `tool_used: Skill`
+grader fares when other skills compete for the prompt; `run-evals --neighbours <siblings>`
+measures that for sibling plugins.
 
 ## Verdict cutoffs
 
@@ -114,8 +114,6 @@ without-arm mean over usable runs.
 There is no fixed neutral band: a small Δ is called noise by the t cutoff, not by a dead zone around zero.
 
 The t cutoff is the two-sided 95% t quantile at the smaller arm's run count minus one (4.30 at 3 runs, 2.78 at 5, 2 from 31) times the standard error of Δ, floored at 0.05 so two arms with SD 0 do not count as noise-free. With an arm under two usable runs the SE is the 0.05 floor and the quantile is 2, so the cutoff is 0.10. The `both-arms-pass-all` finding fires when both arm means are at least 0.95.
-
-Δ is rounded to three decimals before these comparisons, so float error cannot move a Δ across a cutoff.
 
 | Finding | Rule |
 |---|---|

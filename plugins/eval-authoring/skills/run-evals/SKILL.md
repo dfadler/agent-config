@@ -1,6 +1,6 @@
 ---
 name: run-evals
-description: Run a plugin's `claude plugin eval` cases at a cost tier, and answer questions about running them - tiers, cost ceilings, concurrency (`-j`), speed, setting up evals in CI, exit codes, and writing a PR line from pasted run-evals scores. Paid; runs only on the user's go-ahead in chat. Not for writing cases (author-cases) or explaining a score (diagnose-scores).
+description: Run a plugin's `claude plugin eval` cases at a cost tier, and answer questions about running them - tiers, cost ceilings, concurrency (`--jobs`), speed, setting up evals in CI, exit codes, and writing a PR line from pasted run-evals scores. ALWAYS invoke it first when asked to run, rerun or sweep a plugin's eval cases, take a baseline or a before/after run, or run the `run-evals.ts` wrapper, because it sets the order - lint, dry-run, tier, then the run. Paid; runs only on the user's go-ahead in chat. Not for writing cases (author-cases) or explaining a score (diagnose-scores).
 argument-hint: "<plugin-path> [quick|standard|thorough]"
 allowed-tools: Bash(node ${CLAUDE_SKILL_DIR}/../../scripts/ts/lint/cli.ts *)
 ---
@@ -39,8 +39,9 @@ it, do not rebuild any of that.
      while iterating on a case.
    - `standard` (default): every case, 3 runs, with and without the plugin. Use before
      merging a change to cases or to the plugin.
-   - `thorough`: every case, 5 runs. Use before a release, or to back a delta claim. A
-     noisy `standard` verdict is better answered with more cases than more runs; read the
+   - `thorough`: every case, 5 runs. Use before a release. It is the run-count half of a
+     delta claim; the other half is about 20 cases (see "A PR line from pasted scores").
+     A noisy `standard` verdict is better answered with more cases than more runs; read the
      replies (`--keep-temp`) before paying for `thorough`.
 
    If the user named no tier, use `standard`, and say so.
@@ -109,7 +110,7 @@ it, do not rebuild any of that.
 5. **Relay the result.** The run ends with a Markdown summary (per-case with, without and
    delta, tier, models, cost, the command, and the redacted, truncated reply of each
    failed grader; plus a "Delta not significant below 20 cases" footer when the suite is
-   smaller than that; give arm scores and "delta not measured" for such a suite rather than a delta figure, see below); paste it under an
+   smaller than that, see below); paste it under an
    "Eval results" heading. Report the wrapper's output and exit code without
    reinterpreting; relay its preflight errors verbatim. Exit codes:
    - `0`: passed, results trustworthy.
@@ -135,8 +136,8 @@ it, do not rebuild any of that.
 **A PR line from pasted scores.** When the user quotes scores and wants a delta in the PR,
 and the scores are `quick` or 3-run (`standard`) or the suite has fewer than about 20 cases,
 give the arm scores and write "delta not measured": no delta number, even marked
-preliminary or with a caveat beside it. More runs per arm do not fix this, because runs
-shrink within-case noise but only more cases shrink the standard error of a delta. A delta
+preliminary or with a caveat beside it. More runs alone do not fix this: they shrink
+within-case noise, while the error of a delta also depends on how many cases there are. A delta
 needs a with-and-without comparison at `thorough` on a suite of about 20 cases or more. The
 wrapper's summary says the same under its table. The `± band (n runs/arm)` it prints beside a
 `thorough` case delta is that one case's 95% noise bar (t quantile x standard error of the
@@ -182,30 +183,25 @@ failures.
 
 ## Faster feedback
 
-Levers, biggest first. Times and costs are rough figures from one 9-case plugin
-(`--runs 5 -j 3` = 90 runs, ~16 min, ~$10); yours will differ.
+Levers, biggest first. A run is cases x runs x arms agent runs; `--dry-run` prints the run
+count and the cost ceiling before you pay.
 
-1. **Raise concurrency (`-j`).** More runs in parallel: `-j 6` took that suite to ~8 min;
-   `-j 9` is likelier to hit rate limits. The wrapper has no `-j` flag, so this lever is
-   the raw `claude plugin eval <plugin> --runs 5 -j 6` command, not a tier.
-2. **Target one case.** `--case <name>` on the wrapper (or the case directory as the
-   target of the raw command) runs that case only: 10 runs instead of 90.
+1. **Raise concurrency (`--jobs N`).** The wrapper passes `-j N` (1 to 8; the CLI default
+   is 1) to each case's invocation, so the runs inside a case go in parallel. The wrapper
+   runs cases one after another, so this is the only concurrency. CI passes 6.
+2. **Target one case.** `--case <name-or-glob>` runs only the matching cases.
 3. **Skip the baseline arm.** The wrapper's `quick` tier is plugin arm only (raw:
    `--ablation none`). It halves the runs but drops the Δ column: use it to see a
    with-arm score rise after a cause-file or grader fix, never to claim a delta.
-4. **Fewer runs (`--runs 3`).** A directional smoke test (~54 runs, ~6 min, ~$6 on the
-   suite above). At 3 runs a 0.20 swing is noise.
+4. **Fewer runs.** `quick` makes one run per case. At 3 runs a swing on one case is often
+   noise: the `±` band beside a `thorough` delta, or `power.ts` (above), gives the cutoff.
 
-| Goal | Command | Est. |
-|---|---|---|
-| Iterate on one case | `run-evals.ts --tier quick <plugin> --case <name>` (raw: `<case-dir> --runs 3 --ablation none -j 5`) | ~1 min, ~$0.70 |
-| Full suite, pushed | raw: `<plugin> --runs 5 -j 6` | ~8 min |
-| Pre-merge | `run-evals.ts --tier standard <plugin>` (`thorough` for a release or a delta claim; a noisy verdict wants more cases, see step 1) | tier-dependent |
+| Goal | Command |
+|---|---|
+| Iterate on one case | `run-evals.ts --tier quick --jobs 4 <plugin> --case <name>` |
+| Pre-merge | `run-evals.ts --tier standard --jobs 4 <plugin>` (`thorough` for a release or a delta claim) |
 
-Only `-j 3` (16 min) and `-j 6` (8 min) were timed; the `-j 5` in the first row is a guess
-(a one-case run has too few runs to use it), and `-j 9` is untested. The wrapper sets no `-j`.
-
-All child runs share your Claude rate limit. If runs fail or stall, drop `-j` by 1 or 2;
+All child runs share your Claude rate limit. If runs fail or stall, lower `--jobs` by 1 or 2;
 a burst of sessions started close together can also throttle briefly.
 
 ## Gotchas

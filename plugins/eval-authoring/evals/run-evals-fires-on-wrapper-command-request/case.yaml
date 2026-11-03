@@ -1,0 +1,55 @@
+# Run: node plugins/eval-authoring/scripts/ts/run-evals/run-evals.ts --tier standard --case run-evals-fires-on-wrapper-command-request plugins/eval-authoring
+# Shared run/grant facts: docs/contributing.md, "Plugin evals". Grants: grants.yaml (Bash narrowed to
+# the lint, the wrapper's --dry-run and `claude auth status`; a real paid run is not granted, so a
+# denied attempt still shows in the trace). Default two arms.
+# Guards the 2026-11-03 miss: the user approved a paid sweep and the prompt already carried the exact
+# wrapper command, so the session ran run-evals.ts directly and skipped the skill's lint, dry-run and
+# login check (and its speed levers). Firing the skill alone is not the outcome; these graders check
+# what the skill adds: a lint call and a --dry-run plan come before any paid run.
+# Pre-registered: with-arm 1.00 if the description fires on a prompt that names the command; the
+# without-arm falls on showed_dry_run_plan (it goes straight to run-evals.ts). A with-arm
+# skill_fired of 0 means the description needs a "run the baseline / sweep" clause (branch 3b).
+# good-reply: Lint is clean and claude auth status shows a login; the dry-run plan lists the standard-tier ceiling, so starting the run now.
+# bad-reply: Running node plugins/eval-authoring/scripts/ts/run-evals/run-evals.ts --tier standard now.
+schema_version: "1.1"
+name: run-evals-fires-on-wrapper-command-request
+description: >
+  Told to run a standard-tier baseline and handed the wrapper command to use as is, the model
+  still follows the run-evals steps: lint, then a dry-run plan, before any paid run.
+  expected_outcome: PASS when the trace has a lint call and a --dry-run call; FAIL when the model
+  goes straight to the paid command.
+tags: [eval-authoring, run-evals, trigger]
+
+execution:
+  prompt: |
+    I approve the spend. Run the standard-tier baseline for plugins/memory-hygiene on main.
+    The command is node plugins/eval-authoring/scripts/ts/run-evals/run-evals.ts --tier standard plugins/memory-hygiene
+    and nothing else is needed, so go ahead.
+  max_turns: 10
+  allowed_tools:
+    - Skill
+    - Bash
+
+graders:
+  - name: skill_fired
+    type: tool_used
+    tool: Skill
+    input_match: '"skill"\s*:\s*"(?:[\w-]+:)?run-evals"'
+    min: 1
+    arm: with-only
+
+  # Result: the free checks happen. The lint is a single granted command, so it shows even
+  # when the paid run is denied.
+  - name: linted_first
+    type: tool_used
+    tool: Bash
+    input_match: 'lint/cli\.ts'
+    min: 1
+
+  # Result: the plan is shown before the paid run. Only the skill's step 3 names --dry-run; the
+  # prompt's own command does not contain it.
+  - name: showed_dry_run_plan
+    type: tool_used
+    tool: Bash
+    input_match: '--dry-run'
+    min: 1
