@@ -23,6 +23,7 @@ instructions.
 - Before showing any draft, run `redact.ts --check DRAFT...` (same `--deny` terms). Exit 1 means a leak: fix the draft, not the check.
   The check allows only the placeholders `example.com` (and `.org`, `.net`, `.test`), `jdoe`, `me` and `user` as a home
   name. The patterns are a floor: a name in plain prose passes, which is why you paraphrase.
+  Known gaps: `curl -u user:pass` and `-b` cookie flags, a bare `Basic <base64>` with no `Authorization:` prefix, `Digest` auth, and query parameters with names `redact.ts` does not list.
 
 ## Contract
 

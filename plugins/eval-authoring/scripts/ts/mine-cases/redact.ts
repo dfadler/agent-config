@@ -14,23 +14,53 @@ import { readFileSync } from "node:fs";
 
 // Quantifiers are bounded and no group repeats an ambiguous class: long single-line input
 // (a minified blob, `a-a-a-...`) must stay linear.
+//
+// Order matters to redact (not to findLeaks): url-credentials and pem run before the email
+// and long-id rules so those cannot eat half of a password or key body first.
 const RULES: readonly (readonly [string, RegExp, string])[] = [
+  // scheme://user:pass@host: the password may hold %-escapes, punctuation or a bare "@".
+  ["url-credentials", /(?<=\b[a-z][a-z0-9+.-]{1,20}:\/\/)[^\s/@:"'<>]{1,64}:[^\s/"'<>]{1,128}@/gi, "<credentials>@"],
+  // The header alone is enough to flag: a clipped or one-line block may lack the END line.
+  [
+    "pem",
+    /-----BEGIN [A-Z ]{0,40}PRIVATE KEY(?: BLOCK)?-----(?:[\s\S]{0,8000}?(?:-----END [A-Z ]{0,40}PRIVATE KEY(?: BLOCK)?-----|$))?/g,
+    "<private-key>",
+  ],
   ["email", /[\w.+-]{1,64}@[\w-]{1,63}(?:\.[\w-]{1,63}){1,10}/g, "<email>"],
   [
     "token",
-    /\b(?:sk-[\w-]{16,}|gh[pousr]_\w{20,}|github_pat_\w{20,}|xox[abprs]-[\w-]{10,}|AKIA[0-9A-Z]{16}|eyJ[\w-]{8,}\.[\w-]{8,}\.[\w-]{8,})/g,
+    /\b(?:[sr]k[-_][\w-]{16,}|gh[pousr]_\w{20,}|github_pat_\w{20,}|xox[abprs]-[\w-]{10,}|A(?:KIA|SIA)[0-9A-Z]{16}|eyJ[\w-]{8,}\.[\w-]{8,}\.[\w-]{8,})/g,
     "<token>",
   ],
   ["bearer", /\bBearer\s+[\w.~+/=-]{8,}/gi, "Bearer <token>"],
+  [
+    "auth-header",
+    /\bAuthorization["']?\s*[:=]\s*["']?(?:Basic|Token|Negotiate)\s+[^\s"']{6,}/gi,
+    "Authorization: <secret>",
+  ],
+  // Cookie: a=b; c=d (and Set-Cookie): the whole pair list, the attributes included.
+  [
+    "cookie",
+    /\b(?:Set-)?Cookie["']?\s*:\s*["']?[\w.-]{1,64}=[^\s;"']*(?:;\s*[\w.-]{1,64}(?:=[^\s;"']*)?){0,30}/gi,
+    "Cookie: <secret>",
+  ],
+  // Exact parameter names after "?", "&" or "#" (the OAuth implicit flow uses the fragment).
+  [
+    "query-secret",
+    /(?<=[?&#])(?:access_token|refresh_token|id_token|client_secret|token|auth|code|sig|signature|apikey|key)=[^\s&#"'<>]+/gi,
+    "<secret>",
+  ],
   [
     "secret-assignment",
     /[\w-]{0,40}(?:api[_-]?key|token|secret(?:[_-]?access[_-]?key)?|passw(?:or)?d|credential)["']?\s*[=:]\s*["']?[^\s"',}]{4,}/gi,
     "<secret>",
   ],
   ["long-id", /\b(?=[\w-]{0,63}\d)[\w-]{32,}/g, "<id>"],
-  ["windows-path", /\b[A-Za-z]:\\[\w .-]+(?:\\[\w .-]+)*/g, "<path>"],
-  ["home-path", /~(?:\/[\w.@+-]+)+/g, "<path>"],
-  ["abs-path", /(?<![\w.:/])(?:\/[\w.@+~-]+){2,}/g, "<path>"],
+  ["file-url", /\bfile:\/\/[^\s"'<>)]*/gi, "<path>"],
+  // The path rules use the u flag and \p{L}\p{M}\p{N} so a home directory in any script is caught.
+  ["windows-path", /\b[A-Za-z]:\\[\p{L}\p{M}\p{N}_ .-]+(?:\\[\p{L}\p{M}\p{N}_ .-]+)*/gu, "<path>"],
+  ["home-path", /~(?:\/[\p{L}\p{M}\p{N}_.@+-]+)+/gu, "<path>"],
+  ["abs-path", /(?<![\p{L}\p{M}\p{N}_.:/])(?:\/[\p{L}\p{M}\p{N}_.@+~-]+){2,}/gu, "<path>"],
   // Claude Code names a project directory after its path: `-Users-<name>-<dir>`.
   ["project-dir", /(?<!\w)-(?:Users|home)-[\w.-]{1,200}/g, "<project-dir>"],
 ];
@@ -39,6 +69,7 @@ const RULES: readonly (readonly [string, RegExp, string])[] = [
 const ALLOWED: Readonly<Record<string, RegExp>> = {
   email: /@(?:example\.(?:com|org|net)|(?:[\w-]+\.)*(?:test|invalid|example|localhost))$/i,
   "abs-path": /^\/(?:Users|home)\/(?:jdoe|me|user)(?:\/|$)/,
+  "file-url": /^file:\/\/\/(?:[A-Za-z]:\/)?(?:Users|home)\/(?:jdoe|me|user)(?:\/|$)/i,
   "windows-path": /^[A-Za-z]:\\Users\\(?:jdoe|me|user)(?:\\|$)/i,
 };
 
