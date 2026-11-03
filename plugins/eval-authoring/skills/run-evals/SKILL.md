@@ -208,5 +208,7 @@ a burst of sessions started close together can also throttle briefly.
 ## Gotchas
 
 - In worktree-isolated sessions in this repo, a PreToolUse hook blocks Bash commands
-  containing the word `eval`. Use the sanctioned terminal tool, or have the user run
-  the command. Do not route around the hook with a wrapper script or a renamed path.
+  containing the word `eval`. It may also refuse compound commands (`$VAR`, globs, `for`
+  loops, multi-file heredocs, some pipes). Use the sanctioned terminal tool, single plain
+  commands and the Write tool, or have the user run the command. Do not route around the
+  hook with a wrapper script or a renamed path.
