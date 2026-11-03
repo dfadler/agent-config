@@ -2,6 +2,8 @@
 # Near-miss for run-evals (#745): shares "run" and "plugins/" but wants a shell test suite. Regression guard: a no-plugin arm passes it
 # by design (no delta), hence --ablation none via the quick tier.
 # Can fail: skill_not_fired fails if the description over-triggers on this vocabulary.
+# good-reply: Run them with bats tests/ from the repo root; install bats-core first if the command is missing.
+# bad-reply: I can't run the tests here, but they should pass once the fixture path is fixed.
 schema_version: "1.1"
 name: run-evals-quiet-on-bats-tests
 description: >
@@ -32,7 +34,7 @@ graders:
   - name: addresses_request
     type: regex
     target: last_message
-    pattern: '@test|\.bats|bats-core|bats\s+(?:-|[\w./-]*/)|(?:can.?t|cannot|unable to|won.?t|not able to) (?:run|execute)'
+    pattern: '\bbats-core\b|\bbats\s+(?:-{1,2}[\w-]+(?:\s+\S+)?\s+)*\S*(?:\.bats\b|/)'
     flags: i
     match: contains
     arm: both

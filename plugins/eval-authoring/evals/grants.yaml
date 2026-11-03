@@ -17,3 +17,5 @@ grants:
     - "Bash(claude auth status)"
   case-reviewer-clean-case-control:
     - "Write"
+  case-reviewer-flags-leaky-prompt:
+    - "Write"

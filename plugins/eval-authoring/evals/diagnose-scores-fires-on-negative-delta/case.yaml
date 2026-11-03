@@ -7,6 +7,8 @@
 # indicator in a two-arm run, per the graders reference); suspects_judge = 0 if the reply does not
 # name the judge, which a no-plugin model often skips for "tweak the prompt" advice.
 # Skill phrase checked: "suspect the judge first".
+# good-reply: Suspect the judge first: open aggregate-result.json and read the judge votes for the with arm before touching the skill.
+# bad-reply: A negative delta usually means the rubric is too strict; loosen the judge criteria and rerun.
 schema_version: "1.1"
 name: diagnose-scores-fires-on-negative-delta
 description: >
@@ -36,5 +38,13 @@ graders:
     type: regex
     target: last_message
     pattern: 'judge|llm grader|rubric'
+    flags: i
+    match: contains
+
+  # What the skill adds beyond "check the judge": it opens the result file and reads the votes.
+  - name: names_skill_artifact
+    type: regex
+    target: last_message
+    pattern: 'aggregate-result\.json|diagnose\.ts|\bjudge votes?\b|split-judge-votes'
     flags: i
     match: contains

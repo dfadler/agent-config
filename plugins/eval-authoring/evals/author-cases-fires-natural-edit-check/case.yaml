@@ -6,11 +6,14 @@
 # fails when the reply never names the `claude plugin eval` mechanism (a generic "write some tests"
 # or "try it by hand" reply); names_two_arms fails when it never mentions comparing with and without
 # the plugin or a baseline. Sabotage map: delete the step-9 before/after sentence -> names_two_arms drops.
-# Unmeasured: names_eval_command asks for the literal command or "eval case"; a no-plugin model knows
-# `claude plugin eval` only weakly (it is recent), so I expect it near 0.3-0.6, but a model that
-# says "eval cases" generically passes. names_two_arms is looser and a no-plugin reply may pass it
-# ("compare against the old version"); I expect the delta to come from names_eval_command. This
-# is why the existing natural-* graders were left untouched: this case is additive.
+# Unmeasured: names_eval_command asks for the literal command or a case file name (`claude plugin
+# eval`, case.yaml, prompt.md); the generic "eval cases" alternative was removed 2026-10-30 because
+# a no-plugin reply can say it. names_two_arms needs an explicit with/without, two-arm or no-plugin
+# comparison or a delta; bare "baseline" and "arms" were removed for the same reason. A no-plugin
+# model knows `claude plugin eval` only weakly, so I expect both near 0.3 without the plugin.
+# The existing natural-* graders were left untouched: this case is additive.
+# good-reply: Run claude plugin eval on the plugin and compare the with and without arms before claiming the edit helped; report the delta.
+# bad-reply: Re-run your eval cases against the baseline and see whether the arms moved.
 schema_version: "1.1"
 name: author-cases-fires-natural-edit-check
 description: >
@@ -43,13 +46,13 @@ graders:
   - name: names_eval_command
     type: regex
     target: last_message
-    pattern: 'claude plugin eval|eval cases?|case\.yaml|prompt\.md'
+    pattern: 'claude plugin eval|case\.yaml|prompt\.md'
     flags: i
     match: contains
 
   - name: names_two_arms
     type: regex
     target: last_message
-    pattern: 'with(?:out)?[ -]?(?:and|vs\.?|versus|/)?[ -]?without|no-plugin|baseline|\bdelta\b|\barms?\b'
+    pattern: 'with(?:out)?[ -]?(?:and|vs\.?|versus|/)?[ -]?without|with (?:the |your )?plugin[\s\S]{0,60}without|without (?:the |it|your )?plugin[\s\S]{0,60}\bwith\b|two[- ]arms?|both arms|no[- ]plugin(?: arm| baseline| run)?|\bdelta\b|Δ'
     flags: i
     match: contains

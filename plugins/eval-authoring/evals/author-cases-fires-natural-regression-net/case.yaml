@@ -4,6 +4,8 @@
 # has no scored steps grader; see author-cases step 4). Read its fire rate across runs, not one run.
 # Can fail: skill_fired fails on any run where the description does not match this phrasing;
 # the result regex fails if the reply never addresses the request.
+# good-reply: Add a case.yaml per behavior with a tool_used grader on the Skill call, then run claude plugin eval.
+# bad-reply: Add a test with a grader for each behavior you want to keep.
 schema_version: "1.1"
 name: author-cases-fires-natural-regression-net
 description: >
@@ -36,6 +38,6 @@ graders:
   - name: addresses_request
     type: regex
     target: last_message
-    pattern: 'case\.yaml|prompt\.md|grader|tool_used|claude plugin eval'
+    pattern: 'claude plugin eval|tool_used|case\.yaml|prompt\.md'
     flags: i
     match: contains

@@ -9,7 +9,8 @@
 schema_version: "1.1"
 name: diagnose-scores-quiet-on-vitest-failure
 description: >
-  A failing vitest test is not an eval score and must not invoke diagnose-scores.
+  A failing vitest test is not an eval score and must not invoke diagnose-scores. Cheap
+  trigger-boundary guard, no expected delta.
   expected_outcome: PASS when diagnose-scores is not invoked; FAIL otherwise.
 tags: [eval-authoring, diagnose-scores, trigger, trigger-boundary, pair:diagnose-scores-fires-on-natural-phrasing]
 
