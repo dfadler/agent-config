@@ -25,14 +25,14 @@ graders:
   - name: keeps_serial
     type: regex
     target: last_message
-    pattern: '(?:in order|sequential|serial|one (?:at a time|by one)|first.{0,80}(?:then|next)|myself|main context|single (?:agent|pass))'
+    pattern: '(?:in order|sequential|serial|one (?:at a time|by one)|first[\s\S]{0,300}\b(?:then|next|last|finally)\b|\bthen\b[\s\S]{0,300}\b(?:last|finally)\b|without (?:delegating|spawning|sub-?agents?)|myself|main context|single (?:agent|pass)|one after (?:the )?other|step[- ]by[- ]step|straight through|in (?:a )?single (?:pass|go|sweep|session|edit)|in sequence|back[- ]to[- ]back|in turn)'
     flags: is
     match: contains
 
   - name: names_dependency
     type: regex
     target: last_message
-    pattern: 'same file|shared file|single file|one file|depend|conflict|order|builds? on|each (?:step|change)|overlap|rely|relies'
+    pattern: 'same file|shared file|(?:in|to|touch(?:es)?|edits?) (?:only )?(?:that|this) (?:one )?file|single file|one file|depend|conflict|order|builds? on|each (?:step|change)|overlap|rely|relies'
     flags: i
     match: contains
     weight: 0.5
