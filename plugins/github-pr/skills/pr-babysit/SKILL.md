@@ -54,7 +54,7 @@ report-only).
 ## Step 1 — snapshot
 
 Run the project's snapshot command if it supplies one; otherwise the
-plugin's default, which needs only an authenticated `gh` and Node 22.18+.
+plugin's default, which needs only an authenticated `gh` and a current Node (see `.nvmrc`).
 Pass the PR argument through as-is if one was given:
 
 ```bash

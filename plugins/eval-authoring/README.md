@@ -69,7 +69,7 @@ tier-specific cost ceiling (`quick` scales with the number of cases); see [run-e
 
 - Claude Code, git and sandbox requirements: see the
   [plugin-evals docs](https://code.claude.com/docs/en/plugin-evals).
-- Node 22.18 or later: the TypeScript scripts run directly with `node`.
+- A current Node (see `.nvmrc`): the TypeScript scripts run directly with `node`.
 
 ## What it cannot do
 

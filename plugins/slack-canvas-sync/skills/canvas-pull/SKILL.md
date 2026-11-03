@@ -36,7 +36,7 @@ Never reimplement its logic, and never edit `.canvas-sync/manifest.json` by hand
 
 1. **Sync root:** the user's argument, else the `CANVAS_SYNC_ROOT` environment
    variable. If neither is set, ask. Do not guess a directory.
-2. **Node 22.18 or newer** (`node --version`); otherwise use the version in the
+2. **A current Node** (`node --version`); otherwise use the version in the
    agent-config repo's `.nvmrc` via nvm.
 3. The CLI, used as `CANVAS` below:
 

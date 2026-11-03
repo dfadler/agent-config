@@ -30,8 +30,8 @@ navigation blocks. Still to come: a live verification pass (#426).
 
 `canvas-push` and `canvas-pull` are user-invoked only (`disable-model-invocation`).
 All three skills use only the Slack connector's canvas tools and never delete
-anything. They need the sync root (`CANVAS_SYNC_ROOT` or an argument) and Node
-22.18+ (see `.nvmrc`).
+anything. They need the sync root (`CANVAS_SYNC_ROOT` or an argument) and a current
+Node (see `.nvmrc`).
 
 ## Navigation blocks
 

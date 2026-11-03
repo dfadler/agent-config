@@ -31,7 +31,7 @@ list. You never change a case.
   plugin whose cases you review. It is free: no model calls, no network. If `node`
   is older than 22.18 (the lint runs TypeScript directly), is missing or broken, or the
   lint exits 2, 3 or 20, or the Bash call is denied, report the exact failure, say the
-  mechanical pass was **not run**, ask the invoker to put Node 22.18 or later on `PATH`,
+  mechanical pass was **not run**, ask the invoker to put a current Node (see `.nvmrc`) on `PATH`,
   and continue with the judgment pass. Never guess a Node path or install anything. Say
   "not run" for any other pass you could not do (for example a skill file you cannot
   read).
@@ -43,11 +43,11 @@ list. You never change a case.
 ## Invoking headless
 
 Under `claude -p --agent case-reviewer` the lint call needs an approval nobody can give,
-so pre-allow exactly that command, with Node 22.18 or later first on `PATH`
+so pre-allow exactly that command, with a current Node (see `.nvmrc`) first on `PATH`
 ([flags](https://code.claude.com/docs/en/cli-reference)):
 
 ```bash
-PATH="<node-22.18+-bin-dir>:$PATH" claude -p --agent case-reviewer \
+PATH="<node-bin-dir>:$PATH" claude -p --agent case-reviewer \
   --allowedTools "Bash(node *lint/cli.ts*)" "Bash(git log*)" "Read" "Grep" "Glob" \
   "Review plugins/<name>/evals"
 ```
