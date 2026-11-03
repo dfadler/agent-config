@@ -119,13 +119,27 @@ describe("parseYaml", () => {
     expect(parseYaml(`a: '${long}`).ok).toBe(false);
   });
 
-  it("returns an error, never throws, for huge or deeply nested input", () => {
-    const items = Array.from({ length: 200_000 }, () => "1").join(",");
-    expect(() => parseYaml(`a: [${items}]`)).not.toThrow();
-    expect(() => parseYaml(`a: ${"[".repeat(200_000)}`)).not.toThrow();
-    const many = Array.from({ length: 200_000 }, (_, i) => `k${String(i)}: 1`);
-    expect(() => parseYaml(many.join("\n"))).not.toThrow();
-    expect(parseYaml(`a: ${"[".repeat(200_000)}`).ok).toBe(false);
+  // The parser recurses per entry and per nesting level, so it hits the
+  // engine's stack limit (about 5,000-10,000 levels on Node 22) and must turn
+  // the RangeError into an error result. 100,000 is 10x past that limit. The
+  // cost is the stack overflow itself (about 150 ms, whatever the size), not
+  // the input size, so each input is its own test: one test holding all three
+  // sat near vitest's 5 s timeout when the machine was busy (#886).
+  const BEYOND_STACK = 100_000;
+  it.each([
+    ["a long flow sequence", () => `a: [${"1,".repeat(BEYOND_STACK)}1]`],
+    ["deeply nested flow sequences", () => `a: ${"[".repeat(BEYOND_STACK)}`],
+    [
+      "a long block mapping",
+      () =>
+        Array.from({ length: BEYOND_STACK }, (_, i) => `k${String(i)}: 1`).join(
+          "\n",
+        ),
+    ],
+  ])("returns an error, never throws, for %s", (_name, build) => {
+    // One parse: a throw fails the test just as a wrong result does, and a
+    // second parse would pay the stack overflow again.
+    expect(parseYaml(build()).ok).toBe(false);
   });
 
   it.each([
