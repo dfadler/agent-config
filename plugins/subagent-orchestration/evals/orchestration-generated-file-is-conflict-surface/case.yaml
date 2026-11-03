@@ -29,7 +29,7 @@ graders:
   - name: names_generated_surface
     type: regex
     target: last_message
-    pattern: 'lock ?file|package-lock|snapshots?|baselines?|generated|binary|merge conflicts?|cannot (?:be )?merge|can.t (?:be )?merge'
+    pattern: 'lock ?file|package-lock|package\.json|snapshots?|baselines?|generated|binary|merge conflicts?|cannot (?:be )?merge|can.t (?:be )?merge'
     flags: i
     match: contains
 
