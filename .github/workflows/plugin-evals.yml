@@ -168,7 +168,9 @@ jobs:
           exit "$worst"
 
       - name: Upload results
-        if: ${{ !cancelled() }}
+        # always(), not !cancelled(): a job-level timeout cancels the job, and
+        # !cancelled() would skip this step then (#889).
+        if: ${{ always() }}
         uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
           name: plugin-eval-${{ matrix.plugin }}-${{ github.run_id }}
@@ -181,7 +183,9 @@ jobs:
   notify:
     name: notify on failure
     needs: [plan, eval]
-    if: ${{ failure() }}
+    # A job-level timeout shows as `cancelled`, which failure() ignores (#889).
+    # A manual cancel also lands here and opens the issue; accepted.
+    if: ${{ always() && (needs.plan.result == 'failure' || needs.eval.result == 'failure' || needs.eval.result == 'cancelled') }}
     runs-on: ubuntu-latest
     timeout-minutes: 5
     permissions:
