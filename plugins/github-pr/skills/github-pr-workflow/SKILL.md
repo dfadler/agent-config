@@ -7,7 +7,7 @@ description: |
   drafting a PR body, a PR comment or a `gh pr` command — even for a one-off
   request ("merge PR 55", "post this comment on the PR") with the details
   already given. It defines the AI-authorship marker on anything posted to a PR, the
-  `## Sequencing` section for dependent PRs, the merge-commit rule, and the
+  `## Sequencing` section for dependent PRs, the squash-merge rule, and the
   hand-off of security-critical merges (workflow edits) to a human.
   Conventions and guardrails for working with GitHub PRs: permissions, opening
   and sizing PRs, checking CI, responding to review comments, and the
@@ -54,8 +54,8 @@ reply terse.
   `## Sequencing` section to the PR body: name every related PR, state what
   happens under each possible merge order, and say explicitly what gets closed
   or superseded rather than leaving it to be inferred from the diff.
-- Merge via ordinary merge commits, not squash — keep review-iteration commits
-  as permanent, individually-referenceable history rather than collapsing them.
+- Merge via squash: this repo's practice is one commit per PR on the default
+  branch, so use `gh pr merge --squash`.
 
 ## After opening a PR
 

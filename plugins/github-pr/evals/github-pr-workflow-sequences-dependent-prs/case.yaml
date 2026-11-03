@@ -2,20 +2,18 @@
 # Shared run/grant facts: docs/contributing.md, "Plugin evals". No grant: Skill only; the
 # reply is a drafted PR body, nothing is opened.
 # Should-fire case for github-pr-workflow's "Opening and sizing a PR": two PRs whose merge
-# order matters get a `## Sequencing` section, and the merge method is an ordinary merge
-# commit. The prompt names neither convention.
+# order matters get a `## Sequencing` section, and the merge method is squash. The prompt names neither convention.
 # Can fail: skill_fired fails if the description stops matching PR work; sequencing_section
 # fails without the heading; merge_commit_method fails if the reply recommends another
-# method (a no-skill reply tends to say squash or "depends on your repo").
-# Skill phrases checked: "add a `## Sequencing` section to the PR body", "Merge via ordinary
-# merge commits, not squash".
+# method. A no-skill reply may also say squash, so the delta can be 0 (guard case).
+# Skill phrases checked: "add a `## Sequencing` section to the PR body", "Merge via squash".
 schema_version: "1.1"
 name: github-pr-workflow-sequences-dependent-prs
 description: >
   Asked to draft the body of a PR that depends on another open PR and to say how to merge
   them, the model invokes github-pr-workflow, includes a Sequencing section and recommends
-  merge commits. expected_outcome: PASS when the skill fires, the body has `## Sequencing`
-  and the merge method is a merge commit; FAIL otherwise.
+  squash. expected_outcome: PASS when the skill fires, the body has `## Sequencing`
+  and the merge method is squash; FAIL otherwise.
 tags: [github-pr-workflow, trigger, quick]
 
 execution:
@@ -42,12 +40,12 @@ graders:
     pattern: '(?:^|\n)##\s*Sequencing'
     match: contains
 
-  # The prompt asks for the method as the final line, so anchor to the last line: "I'd squash,
-  # not a merge commit" earlier in the body cannot satisfy it.
+  # The prompt asks for the method as the final line, so anchor to the last line: "I'd squash"
+  # earlier in the body cannot satisfy it.
   - name: merge_commit_method
     type: regex
     target: last_message
-    pattern: '(?:^|\n)[^\n]*(?:merge commit|ordinary merge|regular merge|--merge\b)[^\n]*\s*$'
+    pattern: '(?:^|\n)[^\n]*(?:squash|--squash\b)[^\n]*\s*$'
     flags: i
     match: contains
 
