@@ -3,8 +3,8 @@
 # Covers the run-evals "Faster feedback" section (#714). Rewritten for #746: the prompt gives no
 # case count, run count or duration, and the graders check the advice (narrow to one case, skip
 # the baseline arm, warn the delta is lost) instead of the section's wording on -j or the 3-run
-# noise caveat. Sabotage map: delete the `quick` tier / `--ablation none` bullet and
-# skips_baseline_arm should drop; delete the warning that skipping the baseline loses the delta and
+# noise caveat. Sabotage map: delete the `--no-baseline` / `--ablation none` bullet and
+# skips_baseline_arm should drop (not re-measured since the bullet named --no-baseline, #855); delete the warning that skipping the baseline loses the delta and
 # warns_delta_lost should drop. skill_fired is with-arm only.
 # Unknown until a two-arm run: whether the baseline already knows these levers (a high baseline
 # would mean the case does not discriminate and the section's benefit is unverified; it is an
@@ -48,7 +48,7 @@ graders:
   - name: skips_baseline_arm
     type: regex
     target: last_message
-    pattern: '--ablation\s+none|plugin[ -]arm only|(?:skip|drop|without)[^.\n]{0,30}(?:baseline|without-plugin|no-plugin) arm|\bquick\b[^.\n]{0,40}(?:tier|plugin)'
+    pattern: '--no-baseline|--ablation\s+none|plugin[ -]arm only|(?:skip|drop|without)[^.\n]{0,30}(?:baseline|without-plugin|no-plugin) arm|\bquick\b[^.\n]{0,40}(?:tier|plugin)'
     flags: i
     match: contains
 

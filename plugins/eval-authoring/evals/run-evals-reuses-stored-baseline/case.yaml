@@ -1,0 +1,51 @@
+# Run: node plugins/eval-authoring/scripts/ts/run-evals/run-evals.ts --tier standard --case run-evals-reuses-stored-baseline plugins/eval-authoring
+# Shared run/grant facts: docs/contributing.md, "Plugin evals". No grant; reply-only. Default two arms.
+# Covers the run-evals "Faster feedback" bullet on the baseline cache (#855). DRAFT, never run: no
+# with/without scores yet, so whether the baseline already knows this is unmeasured (a high baseline
+# would mean the case does not discriminate). The prompt names neither the cache nor its words.
+# Sabotage map: delete the "Reuse the stored baseline" bullet and names_stored_baseline should drop;
+# delete its "one earlier sample" caveat and names_sample_caveat should drop. skill_fired is with-arm only.
+schema_version: "1.1"
+name: run-evals-reuses-stored-baseline
+description: >
+  Asked whether re-running a suite after a skill edit pays for the whole thing again, the reply
+  says the without-plugin arm of an earlier run is stored and reused, and that a score from it is
+  one earlier sample.
+  expected_outcome: PASS when it says the earlier run's no-plugin arm can be reused and that the
+  reused score is one earlier sample, not a fresh draw; FAIL when it only says "run fewer cases".
+tags: [eval-authoring, run-evals]
+
+execution:
+  prompt: |
+    I just edited one skill in my plugin and I'm about to rerun its whole eval suite to compare
+    against my last run. Last time it took a while and cost a few dollars. Is there anything in
+    our run-evals tooling that avoids paying for the whole thing again when only the skill
+    changed? Don't create files or run any commands.
+  max_turns: 8
+  allowed_tools:
+    - Skill
+    - Read
+    - Glob
+    - Grep
+
+graders:
+  - name: skill_fired
+    type: tool_used
+    tool: Skill
+    input_match: '"skill"\s*:\s*"(?:[\w-]+:)?run-evals"'
+    min: 1
+    arm: with-only
+
+  - name: names_stored_baseline
+    type: regex
+    target: last_message
+    pattern: 'baseline[^.\n]{0,80}(?:cache|stored|reus|saved)|(?:cache|stored|reus)[^.\n]{0,80}(?:baseline|without arm|no-plugin arm|without-plugin arm)'
+    flags: i
+    match: contains
+
+  - name: names_sample_caveat
+    type: regex
+    target: last_message
+    pattern: '--no-cache|earlier sample|one sample|not a (?:fresh|same-run)|redraw'
+    flags: i
+    match: contains

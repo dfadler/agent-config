@@ -235,6 +235,8 @@ export interface SummaryInput {
   readonly subset?: string | null | undefined;
   /** The `--neighbours` plugins loaded beside the plugin under test; undefined when the flag was off. */
   readonly neighbours?: readonly string[] | undefined;
+  /** Cases whose without arm came from the baseline cache (#855) instead of this run; empty or undefined when none. */
+  readonly baselineCached?: readonly { readonly caseName: string; readonly savedAt: string }[] | undefined;
   /** The trigger table rows; empty or undefined leaves the table out. */
   readonly trigger?: readonly TriggerRow[] | undefined;
   /** The `--trigger-boundary` result; undefined when the flag was off. */
@@ -373,6 +375,12 @@ export const renderSummary = (s: SummaryInput): string => {
           : `| ${cell(c.caseName)} | ${fmt(c.row?.with)} | ${fmt(c.row?.without)} | ${passCell(c.row)} | ${showDelta ? deltaCell(c.row) : "-"} | ${String(c.exit)}${c.row === undefined ? " (no readable result)" : ""} |`,
     ),
     ...s.unstarted.map((n) => (oneArm ? `| ${cell(n)} | not run | | |` : `| ${cell(n)} | not run | | | | |`)),
+    ...((s.baselineCached ?? []).length === 0
+      ? []
+      : [
+          "",
+          `Baseline cache: the without arm of ${String((s.baselineCached ?? []).length)} of ${String(s.cases.length)} case(s) was reused, not re-run (stored ${(s.baselineCached ?? []).map((c) => `\`${c.caseName}\` ${c.savedAt.slice(0, 10)}`).join(", ")}). Same case, grants, model, judge and claude version, so the plugin edit is the only difference, but that without score is one earlier sample: a delta against it is not a same-run delta. Re-run with \`--no-cache\` to redraw it.`,
+        ]),
     ...(hasDelta
       ? ["", `Delta ± band: the 95% bar from the per-run scores (t quantile x standard error of the difference, SE floored at 0.05). A delta inside its band cannot be told from noise. Errored and skipped runs are left out of the band and the judged delta (shown as "from usable runs" when it differs from the file's); "a/b runs" is usable runs with and without the plugin. "provisional" means fewer than ${String(PROVISIONAL_BELOW_RUNS)} usable runs in an arm: rerun with more before quoting the delta.`]
       : []),

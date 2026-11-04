@@ -518,10 +518,10 @@ describe("main", () => {
     expect(s.err).toContain("PROGRESS");
   });
 
-  it("--dry-run prints the commands and runs nothing", async () => {
+  it("--dry-run prints the commands and runs nothing but the free claude --version probe for the baseline-cache key", async () => {
     const s = setup({ grants: GRANTS });
     expect(await main([s.root, "--dry-run"], { io: s.io, pluginsDir: "/p" })).toBe(EXIT_OK);
-    expect(s.calls).toEqual([]);
+    expect(s.calls).toEqual([{ command: "claude", args: ["--version"] }]);
     expect(s.out.join("")).toContain("'Bash(npx *)'");
     expect(s.out.filter((l) => l.startsWith("invocation"))).toHaveLength(2);
   });
@@ -763,7 +763,7 @@ describe("one invocation per case", () => {
     expect(lines[0]).toMatch(/^invocation 1\/3: claude plugin eval .* --case c1 /);
     expect(lines[2]).toMatch(/^invocation 3\/3: .* --case c3 /);
     expect(s.out.join("")).toContain("only the budget left");
-    expect(s.calls).toEqual([]);
+    expect(cliCalls(s.calls)).toEqual([]);
   });
 });
 

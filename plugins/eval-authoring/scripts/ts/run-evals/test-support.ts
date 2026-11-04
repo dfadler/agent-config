@@ -226,6 +226,19 @@ export const SKIP_PROBES: readonly string[] = [
   "evals",
 ];
 
+/** `v` unless it is undefined, which fails the test with a message instead of a non-null assertion. */
+export const must = <T>(v: T | undefined, what = "value"): T => {
+  if (v === undefined) throw new Error(`expected ${what} to be defined`);
+  return v;
+};
+
+/** Walk a parsed JSON value by keys and indexes; undefined when any step is missing. */
+export const at = (v: unknown, ...path: readonly (string | number)[]): unknown =>
+  path.reduce<unknown>(
+    (cur, k) => (typeof cur === "object" && cur !== null ? Reflect.get(cur, k) : undefined),
+    v,
+  );
+
 /** Minimal valid `aggregate-result.json` text. */
 export const resultJson = (over: Record<string, unknown> = {}): string =>
   resultJsonFor(["c"], over);

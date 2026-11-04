@@ -197,10 +197,19 @@ count and the cost ceiling before you pay.
    is 1) to each case's invocation, so the runs inside a case go in parallel. The wrapper
    runs cases one after another, so this is the only concurrency. CI passes 6.
 2. **Target one case.** `--case <name-or-glob>` runs only the matching cases.
-3. **Skip the baseline arm.** The wrapper's `quick` tier is plugin arm only (raw:
-   `--ablation none`). It halves the runs but drops the Δ column: use it to see a
+3. **Skip the baseline arm.** `--no-baseline` runs any tier plugin arm only (raw:
+   `--ablation none`), as `quick` does for the cases tagged `quick`. The without arm was 37% of
+   the cost of the stored runs, and it drops the without and Δ columns: use it to see a
    with-arm score rise after a cause-file or grader fix, never to claim a delta.
-4. **Fewer runs.** `quick` makes one run per case. At 3 runs a swing on one case is often
+4. **Reuse the stored baseline (automatic).** A finished two-arm run stores each case's without
+   arm under `evals/results/.baseline-cache`. The next two-arm run with the same case files,
+   grants, runs, model, judge model and `claude --version` runs that case plugin arm only and
+   splices the stored arm in, so a skill or agent edit re-pays only the plugin arm. That
+   without score is one earlier sample, not a fresh draw (the summary lists those cases, and
+   a delta against it is not a same-run delta): say so if you quote it, or redraw it with
+   `--no-cache`. `--dry-run` shows hit or miss per case. Off for
+   `--no-cache`, `--no-baseline`, `--neighbours` and `--trigger-boundary`; empty in CI.
+5. **Fewer runs.** `quick` makes one run per case. At 3 runs a swing on one case is often
    noise: the `±` band beside a `thorough` delta, or `power.ts` (above), gives the cutoff.
 
 | Goal | Command |
