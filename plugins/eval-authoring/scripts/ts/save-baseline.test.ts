@@ -85,11 +85,7 @@ describe("save-baseline", () => {
   });
 
   it("saves a run where one case scored 0 on every run, refuses when all did", () => {
-    const zeroed = (rel: string): string => {
-      const doc = JSON.parse(fixture(rel)) as { cases: { arms: Record<string, { score: number }[]> }[] };
-      for (const c of doc.cases) for (const runs of Object.values(c.arms)) for (const r of runs) r.score = 0;
-      return JSON.stringify(doc);
-    };
+    const zeroed = (rel: string): string => fixture(rel).replace(/"score": [\d.]+/g, '"score": 0');
     const one = memory({ "run/01-alpha/aggregate-result.json": zeroed("01-alpha/aggregate-result.json") });
     expect(main(["run"], one.io).code).toBe(0);
     const all = memory({
