@@ -1,0 +1,80 @@
+# Run: node plugins/eval-authoring/scripts/ts/run-evals/run-evals.ts plugins/agent-writing --case "agent-writing-steps-audit" (no grant needed; Skill only).
+# Maps to SKILL.md: "A step that reads more than about three files, searches the repo broadly, or prints more than about 50 lines goes to a read-only sub-agent" (AW17), and the AW05, AW07, AW16, AW18 and AW19 sentences.
+# good-reply: | AW17 | SKILL.md:6 | step 1 reads every file under src/ | delegate | / | AW18 | SKILL.md:7 | step 2 sub-agent has no return line or cap | add | / | AW19 | SKILL.md:6, SKILL.md:10 | until you understand, if appropriate | state finish line | / | AW05 | SKILL.md:8 | step 3 paragraph names package.json, lockfile, Dockerfile | make it a list | / | AW07 | SKILL.md:9 | request, left-pad, node-uuid is an offender list | state the property | / | AW16 | SKILL.md | 380 lines | split by branch |
+# bad-reply: Step 1 reads too much, step 2 never says what comes back, and the wording in steps 1 and 5 is vague. Consider splitting the 380-line file.
+# The prompt states the file's total length (380 lines) while pasting only the steps; the cases assume a stated length counts for AW16.
+schema_version: "1.1"
+name: agent-writing-steps-audit
+description: >
+  One pasted SKILL.md with a repo-wide read, a dispatch with no return line, vague
+  finish conditions, a location paragraph, an offender list and a stated 380-line
+  length should fire agent-writing. expected_outcome: PASS when the reply ties AW17,
+  AW18, AW19, AW05, AW07 and AW16 to the planted defects; FAIL otherwise.
+tags: [agent-writing, trigger, quick]
+
+execution:
+  prompt: |
+    Can you check this SKILL.md for problems? The file is 380 lines in total; the
+    steps below are the part I'm worried about.
+
+    ---
+    name: dep-audit
+    description: Audit a repo's dependencies.
+    ---
+    1. Read every file under src/ and note each import until you understand how the modules connect.
+    2. Dispatch a sub-agent to check each package's license.
+    3. Look in package.json, the lockfile, the Dockerfile, the CI config and .npmrc for pinned versions and write down anything odd.
+    4. Flag abandoned packages such as request, left-pad or node-uuid.
+    5. Open a fix PR if appropriate.
+  max_turns: 6
+  allowed_tools:
+    - Skill
+
+graders:
+  - name: skill_fired
+    type: tool_used
+    tool: Skill
+    input_match: '"skill"\s*:\s*"(?:[\w-]+:)?agent-writing"'
+    min: 1
+
+  - name: aw17_bulky_read_not_delegated
+    type: regex
+    target: last_message
+    pattern: 'AW17[^\n]*(?:step 1|every file|src/)|(?:step 1|every file|src/)[^\n]*AW17'
+    flags: i
+    match: contains
+
+  - name: aw18_dispatch_without_return
+    type: regex
+    target: last_message
+    pattern: 'AW18[^\n]*(?:step 2|sub-?agent|license)|(?:step 2|sub-?agent|license)[^\n]*AW18'
+    flags: i
+    match: contains
+
+  - name: aw19_unchecked_finish
+    type: regex
+    target: last_message
+    pattern: 'AW19[^\n]*(?:until you understand|if appropriate)|(?:until you understand|if appropriate)[^\n]*AW19'
+    flags: i
+    match: contains
+
+  - name: aw05_locations_in_paragraph
+    type: regex
+    target: last_message
+    pattern: 'AW05[^\n]*(?:step 3|package\.json|lockfile|Dockerfile|\.npmrc)|(?:step 3|package\.json|lockfile|Dockerfile|\.npmrc)[^\n]*AW05'
+    flags: i
+    match: contains
+
+  - name: aw07_offender_list
+    type: regex
+    target: last_message
+    pattern: 'AW07[^\n]*(?:step 4|abandoned|left-pad|node-uuid)|(?:step 4|abandoned|left-pad|node-uuid)[^\n]*AW07'
+    flags: i
+    match: contains
+
+  - name: aw16_long_skill_file
+    type: regex
+    target: last_message
+    pattern: 'AW16[^\n]*380|380[^\n]*AW16'
+    flags: i
+    match: contains
