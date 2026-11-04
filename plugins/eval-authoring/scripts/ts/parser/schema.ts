@@ -112,5 +112,5 @@ const SCHEMA: SchemaTable = {
   toolsNeedingGrant: ["Bash", "Write", "Edit", "WebFetch", "WebSearch"],
 };
 
-/** The schema table. The only place limits and key names live. Used by EVAL002, EVAL003. */
+/** The schema table. The only place limits and key names live. Used by EVAL002. */
 export const getSchema = (): SchemaTable => SCHEMA;

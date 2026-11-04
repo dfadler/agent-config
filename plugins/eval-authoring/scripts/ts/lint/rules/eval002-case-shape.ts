@@ -27,7 +27,7 @@ export const rule: Rule = {
   id: "EVAL002",
   severity: "error",
   title:
-    "Unknown prompt.md or grader key; case.yaml missing schema_version or name; run fields at the top level",
+    "Unknown prompt.md or grader key; case.yaml missing schema_version or name; run fields at the top level; env key not matching EVAL_*",
   source: fromDocs("the case.yaml and prompt.md field tables"),
   checkCase: (c, { schema }) => {
     const unknownPromptKeys: readonly Problem[] = c.keys
@@ -60,9 +60,20 @@ export const rule: Rule = {
         loc: k.loc,
       }));
 
+    // The CLI accepts any env key at load and fails the run later ("any other key fails the
+    // run"), so this is the one value check the CLI leaves to run time.
+    const envKey = new RegExp(schema.envKeyPattern);
+    const badEnv: readonly Problem[] = c.env.value
+      .filter((e) => !envKey.test(e.key))
+      .map((e) => ({
+        message: `env key '${e.key}' does not match ${schema.envKeyPattern}.`,
+        fix: `Rename it to start with EVAL_ and use only A-Z, 0-9 and _ (for example EVAL_${e.key.toUpperCase().replace(/[^A-Z0-9_]/g, "_")}).`,
+        loc: e.loc,
+      }));
+
     const caseYamlFile = c.caseYamlFile;
     if (caseYamlFile === undefined) {
-      return [...unknownPromptKeys, ...unknownGraderKeys, ...misplaced];
+      return [...unknownPromptKeys, ...unknownGraderKeys, ...misplaced, ...badEnv];
     }
 
     const wanted = schema.caseYamlSchemaVersion;
@@ -97,6 +108,7 @@ export const rule: Rule = {
       ...unknownPromptKeys,
       ...unknownGraderKeys,
       ...misplaced,
+      ...badEnv,
     ];
   },
 };

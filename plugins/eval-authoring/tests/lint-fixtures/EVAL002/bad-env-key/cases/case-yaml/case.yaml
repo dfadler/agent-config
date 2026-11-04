@@ -1,8 +1,10 @@
 schema_version: "1.1"
-name: timeout-over
+name: case-yaml
 execution:
   prompt: Do the thing.
-  timeout_seconds: 3601
+  env:
+    FOO: bar
 graders:
-  - type: regex
+  - name: done
+    type: regex
     pattern: done

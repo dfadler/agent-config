@@ -66,7 +66,7 @@ export type FieldKind =
   | "env-map"
   | "object";
 
-/** One key in the schema table: its name, shape, default and limits. Read by EVAL002 and EVAL003. */
+/** One key in the schema table: its name, shape, default and limits. Read by EVAL002. */
 export interface FieldSpec {
   readonly name: string;
   readonly kind: FieldKind;
@@ -99,7 +99,7 @@ export interface GraderTypeSpec {
 /**
  * The case schema as one table, stamped with the Claude Code version it was
  * written against. The lint rules read limits and key names from here and hold
- * none of their own. Used by EVAL002, EVAL003 and the runner's version report.
+ * none of their own. Used by EVAL002 and the runner's version report.
  */
 export interface SchemaTable {
   /** Claude Code version the table was written against, for the drift report. */
@@ -197,11 +197,11 @@ export interface GraderOrigin {
 interface GraderBase {
   /** The grader's own name, when it has one (case.yaml graders carry `name`; graders/*.md fall back to the file name). */
   readonly name: Field<string | undefined>;
-  /** Raw `weight`; default 1. Used by EVAL003 (non-positive weight). */
+  /** Raw `weight`; default 1. The CLI rejects a non-positive one at load. */
   readonly weight: Field<number>;
   /**
    * Raw `arm`. `undefined` when absent. Closed set per the schema table
-   * (`with-only`, `both`); anything else is for EVAL003 to report.
+   * (`with-only`, `both`); anything else the CLI rejects at load.
    */
   readonly arm: Field<string | undefined>;
   readonly origin: GraderOrigin;
@@ -256,7 +256,7 @@ export interface BaselineGrader extends GraderBase {
   readonly criteria: Field<string | undefined>;
 }
 
-/** A grader whose `type` is not one of the six. Kept so EVAL003 can report it. */
+/** A grader whose `type` is not one of the six. Kept so rules can skip it; the CLI rejects it at load. */
 export interface UnknownGrader extends GraderBase {
   readonly type: "unknown";
   /** The `type` value as written (undefined when the key is missing). */
@@ -276,7 +276,7 @@ export type Grader =
 /** Whether a grader checks the outcome or the steps taken. Used by EVAL009. */
 export type GraderCategory = "result" | "steps";
 
-/** One `env` entry. Keys are unvalidated (EVAL003 checks them). */
+/** One `env` entry. Keys are unvalidated (EVAL002 checks them). */
 export interface EnvEntry {
   readonly key: string;
   readonly value: string;

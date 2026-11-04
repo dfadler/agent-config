@@ -24,8 +24,7 @@ the authority; the severity is the default.
 
 | ID | Sev | Why it matters | Fix |
 |---|---|---|---|
-| EVAL002 | error | The CLI ignores or rejects keys it does not know, so a typo silently drops a check. | Use only documented keys, put run fields (`max_turns`, `allowed_tools`...) under `execution:`, and start `case.yaml` with `schema_version` and `name`. |
-| EVAL003 | error | A value outside the schema (bad `runs`, `max_turns`, `timeout_seconds`, `weight`, `arm`, grader `type`, an `env` key not starting `EVAL_`) fails to load or changes scoring. | Set the field to a value the message's range allows. |
+| EVAL002 | error | The CLI ignores or rejects keys it does not know, so a typo silently drops a check; an `env` key not matching `EVAL_[A-Z0-9_]*` loads, then fails the run. | Use only documented keys, put run fields (`max_turns`, `allowed_tools`...) under `execution:`, start `case.yaml` with `schema_version` and `name`, and start every `env` key with `EVAL_`. |
 | EVAL004 | error | A case cannot grant itself `Bash`, `Write`, `Edit`, `WebFetch` or `WebSearch`; without a recorded grant the tool is denied and the case cannot pass. | Add the exact entry to `grants.yaml`, or drop the tool from `allowed_tools`. |
 | EVAL005 | error | A `max: 0` `tool_used` grader on a tool the case never gets can never fail. (The CLI's preflight warns, without aborting, when a `min >= 1` one, explicit or the default, has no grant; probed on 2.1.300, see the audit below.) | Grant the tool, or grade something observable. |
 | EVAL006 | warn | A judge given no explicit pass and fail conditions guesses, and split votes make the score noise. | Write `PASS if ...` and `FAIL if ...` with observable conditions. |
@@ -67,7 +66,8 @@ Hits from running the lint over every plugin with evals (30 plugins, 269 cases),
 - 014: 0. The `fixtures/bin` check was removed (a probe in #450 refuted it); the rest stays.
 - 001: deleted. Probed: `case.yaml` with no `graders:` key or `graders: []`, and `prompt.md` with no `graders/` directory or an empty one, all fail to load (`graders: Required` / `Array must contain at least 1 element(s)`, exit 1, no run).
 - 005: narrowed to `max: 0`. Probed: the preflight warning "cannot pass with the granted tools" fires for `tool_used` with the default `min`, `min: 1` and `min: 2`, in both layouts, with Bash absent from `allowed_tools`, present in it, or `allowed_tools` omitted; `--allow-tools Bash` silences it. The run still launches, so it is a warning, not a rejection.
-- 003, 004, 008, 010, 021: 0. Open merge candidates (003 into 002, 004 with 021, 008 with 010).
+- 003: deleted, its `env` key check moved into 002. Probed: the CLI rejects at load, with exit 1 and `invalid case.yaml: ...`, `max_turns` over 200, `runs` over 50, `timeout_seconds` over 3600, an unknown `arm`, an unknown grader `type` and a `weight` of 0 or less, so those are now left to the CLI and the edit-time hook no longer reports them. An `env` key not matching `EVAL_[A-Z0-9_]*` loads and fails only at run time.
+- 004, 008, 010, 021: 0. Open merge candidates (004 with 021, 008 with 010).
 - All other rules: 0. Keep.
 
 Zero hits means the suites are clean now, not that a rule never caught anything.

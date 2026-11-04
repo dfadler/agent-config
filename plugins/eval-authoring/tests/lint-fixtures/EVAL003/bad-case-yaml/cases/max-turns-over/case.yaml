@@ -1,8 +1,0 @@
-schema_version: "1.1"
-name: max-turns-over
-execution:
-  prompt: Do the thing.
-  max_turns: 201
-graders:
-  - type: regex
-    pattern: done
