@@ -250,13 +250,18 @@ describe("delta band", () => {
       exit: 0, command: "c", unstarted: [], cases: [{ caseName: "c", exit: 0, row: caseRow("c", text) }],
     }).split("\n").find((l) => l.startsWith("| c |")) ?? "";
 
-  it("prints the 95% band and runs per arm beside a delta clear of its band", () => {
+  it("prints the 95% band and runs per arm beside a delta clear of its band, and labels a 3-run delta provisional", () => {
     // without sd 0.289, SE 0.167, t(2) 4.303: band 0.72.
-    expect(line(doc([1, 1, 1], [0, 0.5, 0], 0.83))).toContain("0.83 ± 0.72 (3 runs/arm) |");
+    expect(line(doc([1, 1, 1], [0, 0.5, 0], 0.83))).toContain("0.83 ± 0.72 (3 runs/arm; provisional) |");
   });
   it("marks a delta inside its band", () => {
     // with sd 0.3 over 3 runs: SE 0.173, band 0.75.
-    expect(line(doc([0.8, 0.2, 0.5], [0.3, 0.3, 0.3], 0.2))).toContain("0.20 ± 0.75 (3 runs/arm; inside band)");
+    expect(line(doc([0.8, 0.2, 0.5], [0.3, 0.3, 0.3], 0.2))).toContain("0.20 ± 0.75 (3 runs/arm; provisional; inside band)");
+  });
+  it("does not label a delta from 5 usable runs per arm provisional", () => {
+    const cell = line(doc([1, 1, 1, 1, 1], [0, 0.5, 0, 0.5, 0], 0.8));
+    expect(cell).toContain("(5 runs/arm");
+    expect(cell).not.toContain("provisional");
   });
   it("says noise is unknown for one run per arm and prints no band", () => {
     const cell = line(failing("c"));
@@ -279,7 +284,7 @@ describe("delta band", () => {
       ],
     });
     const cell = line(text);
-    expect(cell).toContain("0.20 (0.60 from usable runs) ± 0.22 (3/5 runs)");
+    expect(cell).toContain("0.20 (0.60 from usable runs) ± 0.22 (3/5 runs; provisional)");
     expect(cell).not.toContain("inside band");
   });
   it("adds no band or run count at a tier that does not measure a delta", () => {

@@ -250,6 +250,9 @@ export interface SummaryInput {
 /** Below this many cases a suite's delta is too noisy to call (see author-cases guidance). */
 export const DELTA_CASE_FLOOR = 20;
 
+/** A delta from fewer usable runs than this in either arm (the `thorough` tier's 5) is labelled provisional: a 3-run +0.83 shrank to +0.20 at 5 (#856). */
+export const PROVISIONAL_BELOW_RUNS = 5;
+
 const fmt = (n: number | undefined): string => (n === undefined ? "-" : n.toFixed(2));
 const cell = (s: string): string => s.replace(/\|/g, "\\|");
 
@@ -339,8 +342,9 @@ const deltaCell = (row: CaseRow | undefined): string => {
       ? `${String(row.runs)} run${row.runs === 1 ? "" : "s"}/arm`
       : `${String(row.runs)}/${String(without)} runs`;
   if (row.band === undefined) return `${base} (${runs}, noise unknown)`;
+  const provisional = Math.min(row.runs, without) < PROVISIONAL_BELOW_RUNS ? "; provisional" : "";
   const inside = Math.abs(judged) <= row.band ? "; inside band" : "";
-  return `${base} ± ${fmt(row.band)} (${runs}${inside})`;
+  return `${base} ± ${fmt(row.band)} (${runs}${provisional}${inside})`;
 };
 
 /** The paste-ready Markdown. Heading "Eval results" is what the PR convention looks for. */
@@ -370,7 +374,7 @@ export const renderSummary = (s: SummaryInput): string => {
     ),
     ...s.unstarted.map((n) => (oneArm ? `| ${cell(n)} | not run | | |` : `| ${cell(n)} | not run | | | | |`)),
     ...(hasDelta
-      ? ["", "Delta ± band: the 95% bar from the per-run scores (t quantile x standard error of the difference, SE floored at 0.05). A delta inside its band cannot be told from noise. Errored and skipped runs are left out of the band and the judged delta (shown as \"from usable runs\" when it differs from the file's); \"a/b runs\" is usable runs with and without the plugin."]
+      ? ["", `Delta ± band: the 95% bar from the per-run scores (t quantile x standard error of the difference, SE floored at 0.05). A delta inside its band cannot be told from noise. Errored and skipped runs are left out of the band and the judged delta (shown as "from usable runs" when it differs from the file's); "a/b runs" is usable runs with and without the plugin. "provisional" means fewer than ${String(PROVISIONAL_BELOW_RUNS)} usable runs in an arm: rerun with more before quoting the delta.`]
       : []),
     ...(hasDelta && s.cases.length + s.unstarted.length < DELTA_CASE_FLOOR
       ? ["", `Delta not significant below ${String(DELTA_CASE_FLOOR)} cases (this suite has ${String(s.cases.length + s.unstarted.length)}).`]
