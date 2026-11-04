@@ -198,22 +198,30 @@ export const implausibleReasons = (doc: Rec): readonly string[] => {
 };
 
 /** Only the CI gate rejects these; the diagnosis reads them and judges per run. */
-export const silentZeroReasons = (doc: Rec): readonly string[] => {
-  const runs = arr(doc["cases"])
+const runsOfDoc = (doc: Rec): readonly Rec[] =>
+  arr(doc["cases"])
     .filter(isRec)
     .flatMap((c) =>
       ["with", "without"].flatMap((side) =>
         arr(isRec(c["arms"]) ? c["arms"][side] : undefined).filter(isRec),
       ),
     );
-  return [
-    ...(runs.some((r) => isSilentZero(r))
-      ? ["a run scored 0 with no grader detail (usage limit?)"]
-      : []),
-    ...(runs.length > 0 && runs.every((r) => r["score"] === 0)
-      ? ["every run scored 0"]
-      : []),
-  ];
+
+export const silentZeroReasons = (doc: Rec): readonly string[] =>
+  runsOfDoc(doc).some((r) => isSilentZero(r))
+    ? ["a run scored 0 with no grader detail (usage limit?)"]
+    : [];
+
+/**
+ * A dead run: every run of the whole run scored 0. Takes all result files of a
+ * run, because the wrapper writes one file per case and a single case that
+ * fails every run is a case problem for the diagnosis, not a dead run.
+ */
+export const everyRunZeroReasons = (docs: readonly Rec[]): readonly string[] => {
+  const runs = docs.flatMap(runsOfDoc);
+  return runs.length > 0 && runs.every((r) => r["score"] === 0)
+    ? ["every run scored 0"]
+    : [];
 };
 
 /**
