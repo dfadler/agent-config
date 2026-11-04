@@ -72,6 +72,11 @@ interprets the verdict.
 - **`judge-skipped`:** the cost ceiling skipped paid graders; not a signal. Recommend a higher
   ceiling or a free grader.
 - **`weak-signal`:** Δ inside noise, positive or negative (a drop within the t cutoff below lands here, not under `negative-delta`). Do not change anything on this case alone: read its replies, and recommend more cases before more runs (unless an arm has under two usable runs, so its noise is unknown: then rerun first, as the `single-run` finding says). More runs are pointless when both arms have SD 0 (the 0.05 floor sets the bar, so more identical runs cannot change the verdict): then a larger effect or a sharper grader is the lever.
+  A case you are looking at because it scored unusually low or high was selected by that
+  score, and on a re-run it will tend to land closer to average (regression to the mean). Re-run it
+  (paid: cases x runs x arms, hand to [run-evals](../run-evals/SKILL.md)) before changing the
+  skill or the case on that score alone. A case whose grader was edited after seeing a run is
+  selected too: say the later number is not independent evidence the edit worked.
 - **`both-arms-pass-all` / `both-arms-fail-all`:** a case that cannot fail (or has almost no headroom, both means at least 0.95: check for a leaked answer, then fix or drop it), or never passes
   (check graders and grants).
 - **`turn-limit`:** a run used every allowed turn and every non-guard `last_message` grader
