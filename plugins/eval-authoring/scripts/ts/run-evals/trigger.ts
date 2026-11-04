@@ -12,6 +12,8 @@
 import { join } from "node:path";
 import { comparable } from "../diagnose/verdict.ts";
 import {
+  isMustFire,
+  isMustNotFire,
   parseYaml,
   readAggregateResult,
   splitFrontmatter,
@@ -77,14 +79,24 @@ export const triggerGraders = (
     const grader = g.name.value;
     if (g.type !== "tool_used" || grader === undefined) return [];
     if (g.tool.value !== "Skill" && g.tool.value !== "Agent") return [];
-    const role: Role | undefined =
-      g.max.value === 0 ? "must-not-fire" : g.min.value >= 1 ? "fires" : undefined;
+    const role: Role | undefined = isMustNotFire(g) ? "must-not-fire" : isMustFire(g) ? "fires" : undefined;
     const names = routables
       .map((r) => r.name)
       .filter((n) => matchesCall(g.inputMatch.value, n, plugin))
       .toSorted();
     return role === undefined || names.length === 0 ? [] : [{ grader, role, names }];
   });
+
+/**
+ * The names of case `caseName`'s `fires` graders, by role, for the summary's "fires check failed" list.
+ * Unlike `triggerGraders` it does not need an `input_match` to name a skill: a fires check with no
+ * matcher still failed when it failed.
+ */
+export const firesGraderNames = (suite: EvalSuite, caseName: string): readonly string[] =>
+  suite.cases
+    .filter((c) => c.name.value === caseName)
+    .flatMap((c) => c.graders.filter(isMustFire))
+    .flatMap((g) => (g.name.value === undefined ? [] : [g.name.value]));
 
 /**
  * In the plugin arm of a result: the runs that gave grader `grader` of case

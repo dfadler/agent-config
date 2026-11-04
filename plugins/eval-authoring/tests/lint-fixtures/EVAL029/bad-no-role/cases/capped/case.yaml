@@ -1,0 +1,15 @@
+schema_version: "1.1"
+name: capped
+tags: [trigger]
+execution:
+  prompt: Run the test suite with npm test.
+  allowed_tools:
+    - Skill
+    - Write
+graders:
+  - name: skill_fired
+    type: tool_used
+    tool: Skill
+    input_match: '"skill"\s*:\s*"(?:[\w-]+:)?alpha"'
+    min: 0
+    max: 2

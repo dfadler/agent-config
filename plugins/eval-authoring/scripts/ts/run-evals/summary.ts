@@ -148,16 +148,17 @@ export interface CaseRow {
   readonly band?: number;
   /** Graders that failed in the plugin arm. */
   readonly failed: readonly FailedGrader[];
-  /** Plugin-arm runs where skill_fired failed, and how many runs had that grader. */
+  /** Plugin-arm runs in which a `fires` grader failed, and how many runs had one. */
   readonly skillMissed: number;
   readonly skillRuns: number;
 }
 
-/** Read the one case row from an invocation's `aggregate-result.json` text; undefined when unreadable. The reply of a failed run comes from its trace via `readFile`; without one it is left out. */
+/** Read the one case row from an invocation's `aggregate-result.json` text; undefined when unreadable. The reply of a failed run comes from its trace via `readFile`; without one it is left out. `firesGraders` names the case's `fires`-role graders (`firesGraderNames`), so the skill-never-fired count does not depend on what the grader is called. */
 export const caseRow = (
   caseName: string,
   text: string | undefined,
   readFile: (path: string) => string | undefined = () => undefined,
+  firesGraders: readonly string[] = [],
 ): CaseRow | undefined => {
   const c = list(parse(text)?.["cases"]).find(
     (x) => isRec(x) && x["name"] === caseName,
@@ -166,9 +167,10 @@ export const caseRow = (
   const agg = isRec(c["aggregates"]) ? c["aggregates"] : {};
   const arms = isRec(c["arms"]) ? c["arms"] : {};
   const runs = list(arms["with"]);
-  const skillGraders = runs.flatMap((r) =>
-    isRec(r) ? list(r["graders"]).filter((g) => isRec(g) && g["name"] === "skill_fired") : [],
+  const firesResults = runs.map((r) =>
+    isRec(r) ? list(r["graders"]).filter((g) => isRec(g) && firesGraders.includes(String(g["name"]))) : [],
   );
+  const firesRuns = firesResults.filter((gs) => gs.length > 0);
   const parsed = text === undefined ? undefined : readAggregateResult(text);
   const v = parsed?.ok === true ? diagnose(parsed.result).cases.find((x) => x.name === caseName) : undefined;
   const noiseKnown = v !== undefined && v.with.stdDev !== undefined && v.without.stdDev !== undefined;
@@ -176,8 +178,8 @@ export const caseRow = (
     ...(v === undefined ? {} : { runs: v.with.usedRuns, runsWithout: v.without.usedRuns }),
     ...(v?.delta === undefined ? {} : { usableDelta: v.delta }),
     ...(v !== undefined && noiseKnown ? { band: deltaBar(v.with, v.without).bar } : {}),
-    skillRuns: skillGraders.length,
-    skillMissed: skillGraders.filter((g) => isRec(g) && g["passed"] === false).length,
+    skillRuns: firesRuns.length,
+    skillMissed: firesRuns.filter((gs) => gs.some((g) => isRec(g) && g["passed"] === false)).length,
     caseName,
     with: num(agg["score"]),
     without: num(agg["scoreWithout"]),
@@ -382,10 +384,10 @@ export const renderSummary = (s: SummaryInput): string => {
       ? []
       : [
           "",
-          "Skill never fired (skill_fired is not scored, so the score can still look fine):",
+          "Fires check failed (a fires check may not be scored, so the score can still look fine; a `min` above 1 can fail on a skill that fired):",
           "",
           ...unfired.map(
-            (c) => `- \`${c.caseName}\`: skill_fired failed in ${String(c.row.skillMissed)} of ${String(c.row.skillRuns)} runs`,
+            (c) => `- \`${c.caseName}\`: fires check failed in ${String(c.row.skillMissed)} of ${String(c.row.skillRuns)} runs`,
           ),
         ]),
     ...(failures.length === 0

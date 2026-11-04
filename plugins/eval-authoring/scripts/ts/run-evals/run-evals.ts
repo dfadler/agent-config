@@ -63,7 +63,7 @@ import { replyFiles, runCount, safeName } from "./traces.ts";
 import { MIN_CLAUDE_VERSION, MIN_GIT_VERSION, formatVersion } from "./versions.ts";
 import { manifestOf } from "./plan.ts";
 import { checkNeighbours, checkStageable, parseNeighbours, stageNeighbours } from "./stage.ts";
-import { routablesOf, triggerRows } from "./trigger.ts";
+import { firesGraderNames, routablesOf, triggerRows } from "./trigger.ts";
 
 export const USAGE = `Usage: run-evals.ts [options] <plugin-path>
 
@@ -1051,7 +1051,7 @@ const run = async (
     cases: done.map((d, i) => ({
       caseName: d.caseName,
       exit: d.exit,
-      row: caseRow(d.caseName, progress.texts[i], io.readFile),
+      row: caseRow(d.caseName, progress.texts[i], io.readFile, firesGraderNames(suite, d.caseName)),
     })),
   });
   if (options.pr === undefined) {
