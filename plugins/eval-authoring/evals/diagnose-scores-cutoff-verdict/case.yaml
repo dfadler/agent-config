@@ -15,6 +15,10 @@
 # 1.00 / 0.00.
 # A model without the skill cannot guess the label
 # `no-discrimination`; a pass does not show the table helps a user.
+# 2026-11-04 (standard run in CI and a local re-run, #648): with "One line, no files, no commands."
+# the with arm answered "I can't tell you without reading the diagnose script, and you ruled out
+# files and commands" and never called the skill (0.00 in CI, 1 of 3 locally). The clause read as a
+# ban on tool use, Skill included; the prompt now only asks for one line.
 schema_version: "1.1"
 name: diagnose-scores-cutoff-verdict
 description: >
@@ -25,7 +29,7 @@ tags: [eval-authoring, diagnose-scores, quick]
 execution:
   prompt: |
     The eval-authoring diagnose script gives each case a verdict. My case has a Delta of exactly 0.
-    Which verdict does it get? One line, no files, no commands.
+    Which verdict does it get? Answer in one line.
   max_turns: 6
   allowed_tools:
     - Skill
