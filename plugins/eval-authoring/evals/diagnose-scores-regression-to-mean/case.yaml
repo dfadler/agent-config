@@ -1,0 +1,54 @@
+# Run: claude plugin eval plugins/eval-authoring --case diagnose-scores-regression-to-mean
+# Not run. Paid: hand-off only. No grant: Skill only.
+# Covers the first half of the weak-signal paragraph added in PR 945: a case picked because it
+# scored unusually low will tend to score closer to average on a re-run, so re-run it (paid)
+# before changing the skill or the case on that score alone.
+# Sabotage map: delete the added paragraph under `weak-signal` in diagnose-scores/SKILL.md;
+# explains_selection_effect and says_rerun_first_paid should drop in the with arm.
+# good-reply: Not yet. You picked this case because it was the worst of eight, and a case chosen for an unusually low score tends to land closer to the average on a re-run. The delta of -0.17 is inside the t cutoff of 1.01, so it is weak-signal. Re-run it first (paid: cases x runs x arms, via run-evals) before rewriting the description.
+# bad-reply: Yes, go ahead. The with arm scored 0.17 and the without arm 0.33, so the description is failing to trigger. Rewrite it tonight.
+schema_version: "1.1"
+name: diagnose-scores-regression-to-mean
+description: >
+  A case chosen because it was the suite's worst must be re-run before editing.
+  expected_outcome: PASS when the reply says the pick was selected by its low score and asks for
+  a re-run (paid) before any edit; FAIL when it jumps to editing the skill.
+tags: [eval-authoring, diagnose-scores, quick]
+
+execution:
+  prompt: |
+    Of my 8 eval cases this one is clearly the worst, so I'm going to rewrite the skill's
+    description tonight to fix it. The other seven all sit between 0.70 and 0.95. Diagnosis for the bad one:
+
+    case: handles-empty-config
+    verdict: weak-signal
+    with arm:    3 usable runs, scores 0.00 0.50 0.00 (mean 0.17, SD 0.29)
+    without arm: 3 usable runs, scores 0.50 0.50 0.00 (mean 0.33, SD 0.29)
+    delta: -0.17 (t cutoff 1.01)
+
+    Okay to go ahead and rewrite?
+  max_turns: 6
+  allowed_tools:
+    - Skill
+
+graders:
+  - name: skill_fired
+    type: tool_used
+    tool: Skill
+    input_match: '"skill"\s*:\s*"(?:[\w-]+:)?diagnose-scores"'
+    min: 1
+    arm: with-only
+
+  - name: explains_selection_effect
+    type: regex
+    target: last_message
+    pattern: 'regress\w*\s+(?:to|toward|towards)\s+(?:the\s+)?(?:mean|average)|closer to (?:the\s+)?(?:average|mean|typical)|(?:picked|chosen|selected|singled)\s+(?:it\s+)?(?:out\s+)?(?:because|by|for)|cherry'
+    flags: i
+    match: contains
+
+  - name: says_rerun_first_paid
+    type: regex
+    target: last_message
+    pattern: '(?:re-?run|run (?:it|this|that|the case) again)[\s\S]{0,200}(?:paid|cost|spend)|(?:paid|cost|spend)[\s\S]{0,200}(?:re-?run|run (?:it|this|that|the case) again)'
+    flags: i
+    match: contains
