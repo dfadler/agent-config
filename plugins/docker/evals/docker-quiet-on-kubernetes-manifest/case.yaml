@@ -1,0 +1,26 @@
+# Run: node plugins/eval-authoring/scripts/ts/run-evals/run-evals.ts plugins/docker --trigger-boundary (plugin arm only; no grant needed).
+# Maps to SKILL.md description: "Not for Kubernetes, Podman, or Docker steps in GitHub Actions workflows." Shares "image", "container", "port", "health" vocabulary.
+# good-reply: apiVersion: apps/v1 kind: Deployment ... replicas: 2 ... readinessProbe: httpGet: path: /healthz port: 8080 (a plain manifest, no skill call)
+# bad-reply: (invokes the docker skill and answers with Dockerfile HEALTHCHECK and Compose rules)
+schema_version: "1.1"
+name: docker-quiet-on-kubernetes-manifest
+description: >
+  A Kubernetes Deployment request must not fire docker. Trigger-boundary negative: plugin arm
+  only, counted by `run-evals --trigger-boundary`, no delta.
+tags: [docker, trigger-boundary, "pair:docker-fires-on-dockerfile-review"]
+
+execution:
+  prompt: |
+    Write me a Kubernetes Deployment manifest for the image myorg/api:1.4. The container
+    listens on 8080 and should have a readiness probe on /healthz and 2 replicas.
+  max_turns: 4
+  allowed_tools:
+    - Skill
+
+graders:
+  - name: docker_not_invoked
+    type: tool_used
+    tool: Skill
+    input_match: '"skill"\s*:\s*"(?:[\w-]+:)?docker"'
+    min: 0
+    max: 0

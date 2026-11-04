@@ -1,0 +1,48 @@
+# Run: node plugins/eval-authoring/scripts/ts/run-evals/run-evals.ts plugins/docker --case docker-fires-on-exited-container (no grant needed; Skill only).
+# Maps to SKILL.md: "docker logs --tail 100 <container> ... Exit code 137 means the process received SIGKILL" and "State the diagnosis with the evidence before proposing a fix".
+# good-reply: Exited (137) means the process got SIGKILL, often the OOM killer. Read-only next steps: `docker logs --tail 100 worker`, then `docker inspect worker` for the memory limit and OOMKilled. I won't restart it until we know why. https://docs.docker.com/reference/cli/docker/container/logs/
+# bad-reply: Just run `docker restart worker` and `docker logs -f worker` and see if it comes back.
+schema_version: "1.1"
+name: docker-fires-on-exited-container
+description: >
+  A pasted docker ps -a line showing exit 137 should fire the docker skill. expected_outcome:
+  PASS when the reply names SIGKILL and gives a bounded `docker logs --tail` step and cites the
+  logs docs; FAIL when it jumps to restart or a streaming `logs -f`.
+tags: [docker, trigger, quick]
+
+execution:
+  prompt: |
+    My worker container keeps dying. docker ps -a shows:
+
+    CONTAINER ID   IMAGE          COMMAND        STATUS                       NAMES
+    3f2a9c1b7d10   acme/worker:2  "node app.js"  Exited (137) 40 seconds ago  worker
+
+    What's going on and what should I run to find out?
+  max_turns: 6
+  allowed_tools:
+    - Skill
+
+graders:
+  - name: skill_fired
+    type: tool_used
+    tool: Skill
+    input_match: '"skill"\s*:\s*"(?:[\w-]+:)?docker"'
+    min: 1
+
+  - name: names_sigkill
+    type: regex
+    target: last_message
+    pattern: '137[^\n]{0,80}SIGKILL|SIGKILL[^\n]{0,80}137'
+    match: contains
+
+  - name: bounded_logs
+    type: regex
+    target: last_message
+    pattern: 'docker logs[^\n]{0,40}--tail'
+    match: contains
+
+  - name: cites_logs_docs
+    type: regex
+    target: last_message
+    pattern: 'https://docs\.docker\.com/reference/cli/docker/container/logs'
+    match: contains

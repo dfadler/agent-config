@@ -1,0 +1,26 @@
+# Run: node plugins/eval-authoring/scripts/ts/run-evals/run-evals.ts plugins/docker --trigger-boundary (plugin arm only; no grant needed).
+# Maps to SKILL.md scope: Docker CLI, Dockerfile and Compose only. ECS is not named as excluded in the text, so this negative encodes an inference that it is out of scope; a fire here is a question about the description, not an error.
+# good-reply: resource "aws_ecs_task_definition" "worker" { requires_compatibilities = ["FARGATE"] memory = 512 container_definitions = ... } (no skill call)
+# bad-reply: (invokes the docker skill and answers with Dockerfile and Compose rules)
+schema_version: "1.1"
+name: docker-quiet-on-ecs-task-definition
+description: >
+  A Terraform ECS task definition request must not fire docker. Trigger-boundary negative:
+  plugin arm only, no delta.
+tags: [docker, trigger-boundary, "pair:docker-fires-on-exited-container"]
+
+execution:
+  prompt: |
+    Write a Terraform aws_ecs_task_definition for a Fargate task that runs the container image
+    acme/worker:2 with 512 MB memory, and make the service restart the task if it exits non-zero.
+  max_turns: 4
+  allowed_tools:
+    - Skill
+
+graders:
+  - name: docker_not_invoked
+    type: tool_used
+    tool: Skill
+    input_match: '"skill"\s*:\s*"(?:[\w-]+:)?docker"'
+    min: 0
+    max: 0

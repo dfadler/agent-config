@@ -1,0 +1,27 @@
+# Run: node plugins/eval-authoring/scripts/ts/run-evals/run-evals.ts plugins/docker --trigger-boundary (plugin arm only; no grant needed).
+# Maps to SKILL.md description: "Not for Kubernetes, Podman, ..." Shares compose.yaml, ports and depends_on vocabulary with the compose case.
+# good-reply: Edit /etc/containers/registries.conf and set unqualified-search-registries = ["docker.io"], or use the full name docker.io/library/postgres:16 (no skill call)
+# bad-reply: (invokes the docker skill and answers with docker compose rules)
+schema_version: "1.1"
+name: docker-quiet-on-podman-compose
+description: >
+  A Podman rootless-compose question must not fire docker. Trigger-boundary negative: plugin
+  arm only, no delta.
+tags: [docker, trigger-boundary, "pair:docker-fires-on-compose-review"]
+
+execution:
+  prompt: |
+    I'm on Fedora using rootless podman with podman-compose. My compose.yaml publishes
+    8080:8080 and depends_on a db service, but podman-compose says "Error: short-name
+    resolution enforced" when pulling postgres:16. How do I set the registry search order?
+  max_turns: 4
+  allowed_tools:
+    - Skill
+
+graders:
+  - name: docker_not_invoked
+    type: tool_used
+    tool: Skill
+    input_match: '"skill"\s*:\s*"(?:[\w-]+:)?docker"'
+    min: 0
+    max: 0

@@ -6,7 +6,7 @@ description: |
   a failing `docker build`, a container that exits or restarts, or freeing disk with
   `docker prune`, `rm` or `compose down -v`. Returns Dockerfile and Compose rules cited to
   docs.docker.com, a read-only diagnosis order, and which docker commands need a go-ahead.
-  Not for Kubernetes, Podman, or Docker steps in GitHub Actions workflows.
+  Not for Kubernetes, Podman, Docker Desktop setup, or Docker steps in GitHub Actions workflows.
 metadata:
   version: "1.0.0"
 ---
