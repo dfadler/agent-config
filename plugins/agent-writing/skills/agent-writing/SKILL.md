@@ -33,11 +33,13 @@ its number is never reused.
 1. Audit: run each rule's **Check** on each file in scope. Read every grep hit before
    you accept it. When the user gives one pasted file or snippet, that text is the whole
    scope: skip the rules that compare files (AW01, AW04, AW12, AW13) and say you did.
-2. List findings, then ask which to fix. Change only what the user chose.
+2. List findings, then ask which to fix. Show no rewritten file or patch before the user
+   chooses, and change only what they chose.
 3. After editing, re-run every check on the changed files and grep for the old name
    or path of anything you moved.
-4. A miss that no rule caught: tighten the nearest rule if its check should have
-   caught it, otherwise add a rule at the next free number.
+4. A miss that no rule caught: report it as a gap in this ruleset, naming the nearest
+   rule to tighten or proposing a new rule at the next free number. Do not edit this
+   skill during an audit; changing the ruleset needs its own approval.
 
 ## Structure
 
@@ -52,10 +54,12 @@ its number is never reused.
   Fix: move them into the skill. If no skill exists for the procedure, propose one
   rather than keeping the steps in the agent.
 - **AW03 model-alias.** Declare a model by alias (`sonnet`, `opus`, `haiku`), never a
-  versioned ID. Check: `grep -rnE "^model:.*[0-9]"`. Fix: use the alias.
+  versioned ID. Check: `grep -rnE "^model:.*[0-9]" <agents-dir>`. Fix: use the alias.
 - **AW04 register-and-delete.** A new skill is listed wherever skills are discovered
   (README table, router skill, agent roster); what it replaces is deleted, with the
-  text it made stale. Check: grep the old name across the repo. Fix: remove each hit.
+  text it made stale. Check: grep the old name across the repo. Fix: point each live
+  reference (an instruction that still tells the reader to use it) at the replacement,
+  and remove only the entries and text that are obsolete.
 - **AW05 flat-steps.** Steps are ordered, named by action ("ensure X"), and safe to
   repeat. Where to look is a bullet list. Check: a paragraph that names three or more
   locations. Fix: make it a list.
@@ -70,9 +74,11 @@ its number is never reused.
 
 ## Content
 
-- **AW08 instructions-not-history.** No incident logs, build numbers, dates, or words
-  that age ("currently", "yet", "recently", "no longer"). A link to the issue that owns
-  the rationale is fine; the story is not. Check: `grep -nEi "currently|\byet\b|recently|no longer|decision:|we chose"`.
+- **AW08 instructions-not-history.** No incident logs, build numbers, historical dates,
+  or words that age ("currently", "yet", "recently", "no longer"). Keep a date the
+  instruction needs to be carried out, such as a deadline. A link to the issue that
+  owns the rationale is fine; the story is not. Check:
+  `grep -nEi "currently|\byet\b|recently|no longer|decision:|we chose" <file>`.
   Fix: delete, or move the history to the PR or issue.
 - **AW09 placeholders-in-examples.** Examples use placeholders (`<ComponentName>`,
   `@<scope>/<package>`), not real project, company or person names. Check: grep
@@ -84,18 +90,21 @@ its number is never reused.
 ## Consistency
 
 - **AW11 capability-matches-limits.** An agent described as read-only or report-only
-  lists no `Write`, `Edit` or other mutating tool in `tools:`. `Bash` counts as mutating,
-  because it can write; list it only when the body limits it to named read-only commands.
-  Check: grep `tools:` in
-  every agent whose description says "read-only" or "report-only". Fix: remove the tool
-  or change the description.
+  has an explicit `tools:` allowlist with no `Write`, `Edit` or other mutating tool. A
+  missing `tools:` field is a finding: the agent
+  [inherits every tool](https://code.claude.com/docs/en/sub-agents), `Write` included.
+  `Bash` counts as mutating, because it can write, and body text cannot limit it; list it
+  only with an enforced restriction (a `PreToolUse` hook, `disallowedTools` or a
+  permission rule). Check: read the frontmatter of every agent whose description says
+  "read-only" or "report-only". Fix: add the allowlist and any Bash restriction, or
+  change the description.
 - **AW12 statements-agree.** Two files must not state the same thing differently. Check:
   grep a distinctive term and compare every hit. Fix: keep one, link from the other.
 - **AW13 one-example.** Show one example, in valid form with no escaped markup, and do
   not restate a format in several files. Check: grep the format's fence or keyword
   across the plugin. Fix: keep the single example.
 - **AW14 reference-by-name.** Point to a file or section by its name, never "Step 4" or
-  "above". Check: `grep -nE "Step [0-9]|see above|below"`. Fix: name the target.
+  "above". Check: `grep -nE "Step [0-9]|see above|below" <file>`. Fix: name the target.
 - **AW15 description-earns-its-load.** A `description` is permanent context. It holds a
   trigger and a contract (when to use, what comes back), no procedure and no rationale,
   and stays under about 500 characters. A skill that only runs by hand sets
@@ -125,7 +134,7 @@ its number is never reused.
   the actor. Use the concrete word where a metaphor or inflated verb stands in
   ("use" for "leverage", "utilize"; "is" for "serves as"). Describe what a thing does
   or returns, not how it feels ("fast" is a number or a mechanism). Do not squeeze
-  sentences into fragments, arrows or symbols the reader must decode. Check: grep
-  `leverage|utilize|facilitate|robust|seamless|serves as`, then read the file for
+  sentences into fragments, arrows or symbols the reader must decode. Check:
+  `grep -nEi "leverage|utilize|facilitate|robust|seamless|serves as" <file>`, then read the file for
   passives and fragments. Fix: rewrite the sentence so it states an action, fact or
   number.

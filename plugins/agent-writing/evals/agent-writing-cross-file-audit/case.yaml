@@ -59,7 +59,7 @@ graders:
   - name: aw12_conflicting_pr_size
     type: regex
     target: last_message
-    pattern: 'AW12[^\n]*(?:400|500)|(?:400|500)[^\n]*AW12'
+    pattern: '(?:^|\n)(?=[^\n]*AW12)(?=[^\n]*\b400\b)[^\n]*\b500\b'
     flags: i
     match: contains
 

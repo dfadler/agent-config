@@ -24,7 +24,7 @@ execution:
     1. Read every file under src/ and note each import until you understand how the modules connect.
     2. Dispatch a sub-agent to check each package's license.
     3. Look in package.json, the lockfile, the Dockerfile, the CI config and .npmrc for pinned versions and write down anything odd.
-    4. Flag abandoned packages such as request, left-pad or node-uuid.
+    4. Flag these packages: request, left-pad, node-uuid.
     5. Open a fix PR if appropriate.
   max_turns: 6
   allowed_tools:

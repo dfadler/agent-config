@@ -45,15 +45,17 @@ graders:
   - name: no_mutating_tools
     type: regex
     target: last_message
-    pattern: 'tools:[^\n]*\b(?:Write|Edit|MultiEdit|NotebookEdit)\b'
+    pattern: 'tools:(?:[^\n]*\n[ \t]*-)*[^\n]*\b(?:Write|Edit|MultiEdit|NotebookEdit)\b'
     flags: i
     match: not_contains
 
-  # AW02: no numbered procedure in the agent body. Anchored to a Procedure/Steps heading because
-  # a numbered "Return format" list (seen in a with-arm reply) is a format, not a procedure.
+  # AW02: no numbered procedure in the agent body: either a numbered list under a
+  # Procedure/Steps heading, or a list whose first item starts with an action verb. A numbered
+  # "Return format" list (seen in a with-arm reply; its first item starts "A single line...") is
+  # a format, not a procedure, and does not match.
   - name: no_numbered_steps
     type: regex
     target: last_message
-    pattern: '(?:Procedure|Steps|Process|Workflow)\W*1[.)]\s'
+    pattern: '(?:Procedure|Steps|Process|Workflow)\W*1[.)]\s|\n[ \t]*1[.)][ \t]+(?:Read|Find|Open|Run|Check|Glob|Grep|Scan|Parse|List|Look|Search|Compare|Collect|Identify|Locate)\b'
     flags: i
     match: not_contains

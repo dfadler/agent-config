@@ -70,3 +70,12 @@ graders:
     pattern: '(?:which|want me to|shall I|should I|let me know)[^.?\n]{0,80}(?:fix|apply|change|rewrite|address)'
     flags: i
     match: contains
+
+  # Ask-first means no rewritten file before approval: a rewrite puts frontmatter keys at the
+  # start of a line, whereas findings quote them inline. The prompt's keys carry a "5|" prefix,
+  # so an echo of the file does not trip this.
+  - name: no_unasked_rewrite
+    type: regex
+    target: last_message
+    pattern: '\n(?:tools|model):[ \t]*\S'
+    match: not_contains
