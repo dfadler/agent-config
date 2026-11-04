@@ -1007,7 +1007,6 @@ const run = async (
   io.err(
     `run-evals: tier ${options.tier.name}, ablation ${options.tier.ablation}: exit ${String(exit)}\n`,
   );
-  const routables = routablesOf(io, target);
   const markdown = renderSummary({
     plugin: basename(target),
     tier: options.tier.name,
@@ -1021,11 +1020,11 @@ const run = async (
     subset,
     neighbours: options.neighbours,
     boundary: boundaryResult,
-    trigger: triggerRows(suite, routables, manifestOf(target).name, results),
+    trigger: triggerRows(suite, routablesOf(io, target), manifestOf(target).name, results),
     cases: done.map((d, i) => ({
       caseName: d.caseName,
       exit: d.exit,
-      row: caseRow(d.caseName, progress.texts[i], io.readFile, firesGraderNames(suite, routables, manifestOf(target).name, d.caseName)),
+      row: caseRow(d.caseName, progress.texts[i], io.readFile, firesGraderNames(suite, d.caseName)),
     })),
   });
   if (options.pr === undefined) {

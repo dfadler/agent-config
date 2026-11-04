@@ -162,9 +162,9 @@ A case has no `role:` key (the CLI rejects unknown grader keys), so the role of 
 
 | Role | Bounds | Counted in |
 |---|---|---|
-| fires | `min >= 1` (`min` defaults to 1) and `max` not 0 | the fire rate, and "Skill never fired" in the run summary |
+| fires | `min >= 1` (`min` defaults to 1) and `max` not 0 | the fire rate, and "Fires check failed" in the run summary |
 | must-not-fire | `max: 0` | the false-fire rate (a failed grader is a hit) |
-| none | `min: 0` with no `max`, or `max` of 1 or more | neither rate; EVAL029 flags a `Skill` check like this |
+| none | `min: 0` with no `max`, or `min: 0` with a `max` of 1 or more | neither rate; EVAL029 flags a `Skill` check like this |
 
 Name graders for people (`skill_fired`, `stays_quiet`, anything): the summary and trigger
 table never look at the name. A `tool_used` grader on any other tool (`Write`, `Bash`) is an

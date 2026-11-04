@@ -169,6 +169,19 @@ describe("skill-never-fired count", () => {
     });
     expect(md).toContain("`quiet`: fires check failed in 2 of 3 runs");
   });
+  it("counts runs, not grader results, when a run has two fires graders", () => {
+    const two = (a: boolean, b: boolean) => ({
+      score: 1,
+      graders: [
+        { name: "f1", passed: a },
+        { name: "f2", passed: b },
+      ],
+    });
+    const t = JSON.stringify({
+      cases: [{ name: "c", aggregates: {}, arms: { with: [two(false, false), two(true, true)], without: [] } }],
+    });
+    expect(caseRow("c", t, undefined, ["f1", "f2"])).toMatchObject({ skillMissed: 1, skillRuns: 2 });
+  });
   it("counts nothing for a case with no fires grader, even one named skill_fired", () => {
     expect(caseRow("quiet", text)).toMatchObject({ skillMissed: 0, skillRuns: 0 });
   });

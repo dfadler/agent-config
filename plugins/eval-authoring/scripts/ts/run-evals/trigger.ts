@@ -87,18 +87,16 @@ export const triggerGraders = (
     return role === undefined || names.length === 0 ? [] : [{ grader, role, names }];
   });
 
-/** The names of case `caseName`'s `fires` graders, by role, for a summary that flags a skill that never fired. */
-export const firesGraderNames = (
-  suite: EvalSuite,
-  routables: readonly Routable[],
-  plugin: string,
-  caseName: string,
-): readonly string[] =>
+/**
+ * The names of case `caseName`'s `fires` graders, by role, for the summary's "fires check failed" list.
+ * Unlike `triggerGraders` it does not need an `input_match` to name a skill: a fires check with no
+ * matcher still failed when it failed.
+ */
+export const firesGraderNames = (suite: EvalSuite, caseName: string): readonly string[] =>
   suite.cases
     .filter((c) => c.name.value === caseName)
-    .flatMap((c) => triggerGraders(c, routables, plugin))
-    .filter((g) => g.role === "fires")
-    .map((g) => g.grader);
+    .flatMap((c) => c.graders.filter(isMustFire))
+    .flatMap((g) => (g.name.value === undefined ? [] : [g.name.value]));
 
 /**
  * In the plugin arm of a result: the runs that gave grader `grader` of case
