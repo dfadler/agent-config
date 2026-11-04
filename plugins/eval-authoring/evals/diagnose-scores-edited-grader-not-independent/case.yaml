@@ -1,0 +1,53 @@
+# Run: claude plugin eval plugins/eval-authoring --case diagnose-scores-edited-grader-not-independent
+# Not run yet with this prompt: paid, hand-off only. No grant: Skill only.
+# Covers the second half of the weak-signal paragraph added in PR 945: a case whose grader was
+# edited after seeing a run is selected too, so the later number is not independent evidence the
+# edit worked. The first half (a worst-of-N case regresses to the mean) was measured on
+# 2026-11-04 as diagnose-scores-regression-to-mean: with 0.67 / without 0.50, and the no-plugin
+# arm already named the selection effect, so that prompt was dropped.
+# 2026-11-04: the first version of this prompt (no result text) never fired the skill (0/3) and
+# both arms scored 0.00; the diagnose output is now pasted in, as in diagnose-scores-two-negative-cases
+# (add_dirs files were not visible to the model there).
+# Sabotage map: delete the last sentence of the added paragraph under `weak-signal` in
+# diagnose-scores/SKILL.md; names_not_independent should drop in the with arm.
+# good-reply: Not as proof. You edited the regex after reading that run, so the 1.00 was measured on the same replies you tuned the grader to; it is not independent evidence the edit worked. Re-run on fresh replies before citing it.
+# bad-reply: Yes, the score went from 0.33 to 1.00, so the edit worked. Put the +0.67 in the PR.
+schema_version: "1.1"
+name: diagnose-scores-edited-grader-not-independent
+description: >
+  A weak-signal result from a case whose regex grader the user loosened after reading the first
+  run. expected_outcome: PASS when the reply says the later score is not independent evidence the
+  edit worked because the grader was edited after seeing the run; FAIL when it accepts the rise
+  as proof.
+tags: [eval-authoring, diagnose-scores, quick]
+
+execution:
+  prompt: |
+    Here is the diagnose script output for one case, from my second run (no files to open):
+
+    commit-message-body: weak-signal
+      delta: +0.17; with: 1 (sd 0) over 3/3 runs; without: 0.83 (sd 0.29) over 3/3 runs;
+      scored graders: 2
+
+    On my first run this case scored with 0.33, because the regex grader mentions_why rejected
+    most replies. I read those replies, loosened the regex so they matched, and ran again to get
+    the 1 above. Can I put "grader fix raised the score from 0.33 to 1.00" in the PR description
+    as proof the fix worked? Answer in your reply.
+  max_turns: 8
+  allowed_tools:
+    - Skill
+
+graders:
+  - name: skill_fired
+    type: tool_used
+    tool: Skill
+    input_match: '"skill"\s*:\s*"(?:[\w-]+:)?diagnose-scores"'
+    min: 1
+    arm: with-only
+
+  - name: names_not_independent
+    type: regex
+    target: last_message
+    pattern: 'not independent|independent (?:evidence|confirmation|test|check|sample)|(?:tuned|fit|fitted|adapted) to|over-?fit|selected (?:by|after|because)|(?:after|once) (?:you |i )?(?:saw|read|looked)'
+    flags: i
+    match: contains
