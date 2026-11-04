@@ -1,5 +1,6 @@
 # Run: claude plugin eval plugins/eval-authoring --case diagnose-scores-regression-to-mean
-# Not run. Paid: hand-off only. No grant: Skill only.
+# Standard tier 2026-11-04, 3 runs per arm, claude-sonnet-5-5: with 0.83 / without 0.00, skill fired 3/3; sabotage check pending.
+# Paid: hand-off only. No grant: Skill only.
 # Covers the first half of the weak-signal paragraph added in PR 945: a case picked because it
 # scored unusually low will tend to score closer to average on a re-run, so re-run it (paid)
 # before changing the skill or the case on that score alone.
