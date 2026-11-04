@@ -1,7 +1,7 @@
 ---
 name: diagnose-scores
 description: ALWAYS invoke this skill first when scores already exist and you are asked where to start on an eval case with a negative Delta or a low score on replies that look correct, even when nothing is to hand to run, because it sets the order of suspects (judge first). Explain why an eval case scored low - "my eval fails", "score 0.4", negative or zero Δ, 0.00 on output that looks correct, exit 1 or 2 with fine-looking results. Free, read-only. Not for running evals (run-evals) or writing cases (author-cases).
-allowed-tools: Bash(node ${CLAUDE_SKILL_DIR}/../../scripts/ts/diagnose/diagnose.ts *), Bash(node ${CLAUDE_SKILL_DIR}/../../scripts/ts/judge-agreement.ts *)
+allowed-tools: Bash(node ${CLAUDE_SKILL_DIR}/../../scripts/ts/diagnose/diagnose.ts *), Bash(node ${CLAUDE_SKILL_DIR}/../../scripts/ts/judge-agreement.ts *), Bash(node ${CLAUDE_SKILL_DIR}/../../scripts/ts/run-evals/actors.ts *)
 argument-hint: "[results-dir | aggregate-result.json | plugin-path]"
 ---
 
@@ -60,6 +60,8 @@ interprets the verdict.
   behavior is wanted whatever the skill does, the skill may be retired and the case kept
   as a regression net. Only a
   should-not-fire case is a regression guard (delta 0 by design; say so in `expected_outcome`).
+  For a case that dispatches a subagent with delta 0 or a low score, and a run kept with `--keep-temp`, first run
+  `node ${CLAUDE_SKILL_DIR}/../../scripts/ts/run-evals/actors.ts TRACE` (free): denied tools or reads in the subagent explain the score before the judge does.
 - **`split-judge-votes`, `high-variance`:** an unstable criterion. Name the grader, the
   condition two judges could read differently, and the rewording. To size the noise, run
   `node ${CLAUDE_SKILL_DIR}/../../scripts/ts/judge-agreement.ts RESULTS` (free; `--labels FILE` of
