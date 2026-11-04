@@ -8,6 +8,9 @@
 # 2026-11-04: the first version of this prompt (no result text) never fired the skill (0/3) and
 # both arms scored 0.00; the diagnose output is now pasted in, as in diagnose-scores-two-negative-cases
 # (add_dirs files were not visible to the model there).
+# 2026-11-04: both arms' replies already say the regex was "tuned to the data it's then scored on" and
+# ask for fresh outputs, so the base model does this unaided. Expect delta ~0: this case only checks
+# the skill fires on a diagnose request and does not contradict the note. It is a net, not a measurement.
 # Sabotage map: delete the last sentence of the added paragraph under `weak-signal` in
 # diagnose-scores/SKILL.md; names_not_independent should drop in the with arm.
 # good-reply: Not as proof. You edited the regex after reading that run, so the 1.00 was measured on the same replies you tuned the grader to; it is not independent evidence the edit worked. Re-run on fresh replies before citing it.
@@ -31,8 +34,9 @@ execution:
 
     On my first run this case scored with 0.33, because the regex grader mentions_why rejected
     most replies. I read those replies, loosened the regex so they matched, and ran again to get
-    the 1 above. Can I put "grader fix raised the score from 0.33 to 1.00" in the PR description
-    as proof the fix worked? Answer in your reply.
+    the 1 above. Diagnose this result for me: what does it tell me, and can I put "grader fix
+    raised the score from 0.33 to 1.00" in the PR description as proof the fix worked? Answer in
+    your reply.
   max_turns: 8
   allowed_tools:
     - Skill
@@ -48,6 +52,6 @@ graders:
   - name: names_not_independent
     type: regex
     target: last_message
-    pattern: 'not independent|independent (?:evidence|confirmation|test|check|sample)|(?:tuned|fit|fitted|adapted) to|over-?fit|selected (?:by|after|because)|(?:after|once) (?:you |i )?(?:saw|read|looked)'
+    pattern: 'not independent|independent (?:evidence|confirmation|test|check|sample)|(?:tune[sd]?|fit|fitted|adapted) (?:the |it |your )?(?:grader|regex )?to|over-?fit|selected (?:by|after|because)|fresh (?:outputs|replies|runs?)|(?:after|once) (?:you |i )?(?:saw|read|looked)'
     flags: i
     match: contains
