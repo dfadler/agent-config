@@ -204,7 +204,8 @@ ${Object.values(TIERS).map((t) => `                         ${t.name}: ${t.descr
                        also runs the free claude --version, to look each case
                        up in the baseline cache and show hit or miss). For a two-arm
                        tier it also prints the smallest per-case delta the plan
-                       can detect (power.ts), when an SD is known: from --sd,
+                       can detect (power.ts), per case and averaged over the planned
+                       cases, when an SD is known: from --sd,
                        else pooled from the newest run under <eval-dir>/results;
                        with neither it says so and shows the power.ts command
   --sd <S>             with --dry-run: per-run score standard deviation, 0 to 1,
@@ -1029,7 +1030,7 @@ const run = async (
         options.sd === undefined
           ? newestRunSd(io, join(suite.evalDir, "results"))
           : { sd: options.sd, source: "--sd" };
-      io.out(detectableLine(options.tier.runs, known));
+      io.out(detectableLine(options.tier.runs, known, total));
     }
     if (boundary !== undefined) {
       io.out(
