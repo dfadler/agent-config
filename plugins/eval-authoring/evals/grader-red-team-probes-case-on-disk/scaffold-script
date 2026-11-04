@@ -1,9 +1,36 @@
 #!/usr/bin/env bash
-# Plants a small eval-authoring-style plugin with one case on disk, so the grader-red-team
-# agent can probe it by directory name (check-replies.ts --probe <dir> --reply - <root>).
+# Plants (1) a small plugin with one case on disk, so the grader-red-team agent can probe it by
+# directory name, and (2) a copy of check-replies.ts and the parser it imports at the path the
+# grant pins (plugins/eval-authoring/scripts/ts/check-replies.ts), because the eval workspace
+# starts empty and that relative path does not exist in it.
+#
+# Where the copy comes from: the script's own location (evals/<case>/scaffold-script, so the
+# plugin root is two levels up), else $CLAUDE_PLUGIN_ROOT. Unverified whether the harness runs
+# the script from the case directory or from a copy; if neither resolves, the script says so on
+# stderr and still exits 0 (a non-zero exit scores the run 0), and the probe then fails in the
+# run, which probe_ran (a regex on the probe's output) reports.
+#
 # Planted defect: `names_deprecation` matches the bare stem "deprecat", so a reply that says
-# "Nothing is deprecated in this release." passes it. `names_removal_date` is the sound control.
+# "Nothing is deprecated in this release." passes it. `names_removal_date` is the sound control:
+# the date must follow "removed on"/"removal by" on a line with no negation word, so a bare or
+# negated mention ("removal planned 2028-01-01 (not 2027-01-01)") does not satisfy it.
 set -euo pipefail
+here="$(cd "$(dirname "$0")" && pwd)"
+src=""
+for cand in "$here/../.." "${CLAUDE_PLUGIN_ROOT:-}"; do
+  if [ -n "$cand" ] && [ -f "$cand/scripts/ts/check-replies.ts" ]; then src="$(cd "$cand" && pwd)"; break; fi
+done
+if [ -n "$src" ]; then
+  dest=plugins/eval-authoring/scripts/ts
+  mkdir -p "$dest/parser"
+  cp "$src/scripts/ts/check-replies.ts" "$dest/"
+  for f in "$src"/scripts/ts/parser/*.ts; do
+    case "$f" in *.test.ts) ;; *) cp "$f" "$dest/parser/" ;; esac
+  done
+else
+  echo "scaffold-script: plugin root not found; check-replies.ts not copied" >&2
+fi
+
 mkdir -p planted/evals/release-notes-deprecation planted/.claude-plugin
 cat > planted/evals/release-notes-deprecation/case.yaml <<'CASE'
 schema_version: "1.1"
@@ -30,7 +57,8 @@ graders:
   - name: names_removal_date
     type: regex
     target: last_message
-    pattern: '2027-01-01'
+    pattern: '^(?![^\n]*(?:\bnot\b|\bnever\b|n.t\b|\bno\b))[^\n]*\b(?:removed|removal)\s+(?:on|by)\s+2027-01-01'
+    flags: im
     match: contains
 CASE
 echo '{"name":"planted","version":"0.0.0","description":"planted case for a red-team eval"}' > planted/.claude-plugin/plugin.json

@@ -9,17 +9,33 @@
 # case text into the prompt, so the agent traces by hand and no eval exercises the probe. Here a
 # scaffold_script puts the case on disk at ./planted/evals/release-notes-deprecation and the
 # prompt names it by directory.
-# Unverified: (1) whether `plugins/eval-authoring/scripts/ts/check-replies.ts` resolves in the
-# eval workspace (if not, the agent's probe Bash call fails and it falls back to by hand;
-# probe_used still counts the attempt); (2) whether the grant rule matches the heredoc form
-# (agents/grader-red-team.md, "Unverified"); (3) whether a subagent's Bash call appears in the
-# graded trace. probe_used = 0 may mean one of these, not an agent fault: read the --keep-temp
-# trace first.
+# First paid run (0.83) found: the relative probe path did not exist in the empty workspace and
+# the agent's absolute-path retry was denied by the grant, so probe_used passed on a failed
+# attempt; the "sound" control (a bare date) was fooled by "removal planned 2028-01-01 (not
+# 2027-01-01)", so the agent flagged both graders; names_weak_grader never matched. Fixed: the
+# scaffold-script now copies check-replies.ts and the parser it imports (non-test .ts files) to
+# plugins/eval-authoring/scripts/ts/ in the workspace, the path the grant pins; the control is a
+# negation-guarded "removed on/removal by <date>" line; probe_ran requires the agent's own
+# `| probe |` label (it writes `by hand` when the probe failed); names_weak_grader accepts the
+# grader name before or after the wrong-reply wording, backticked or plain.
+# Unverified: (1) the scaffold finds the plugin root from the script's own location
+# (evals/<case>/ two levels up) or $CLAUDE_PLUGIN_ROOT; if the harness runs a copy elsewhere
+# neither resolves, the script warns on stderr, exits 0 and the probe fails in the run (offline
+# I ran the scaffold from the case dir into an empty directory and the exact grant-form probe
+# worked there); (2) whether the grant rule matches the heredoc form (agents/grader-red-team.md,
+# "Unverified"); (3) whether a subagent's Bash call appears in the graded trace.
+# probe_used / probe_ran = 0 may mean one of these, not an agent fault: read the --keep-temp
+# trace first. If (1) cannot be made to work, drop probe_used and probe_ran and grade only the
+# by-hand finding.
 # Planted defect: names_deprecation matches the bare stem "deprecat"; "Nothing is deprecated in
-# this release." passes it. names_removal_date (the literal date) is the sound control.
+# this release." passes it. names_removal_date is anchored to a removal word and rejects negated
+# lines (the probe printed FAIL on "removal planned 2028-01-01 (not 2027-01-01)"), so
+# names_deprecation is the only planted weakness. A reply that finds another hole in the control
+# is a real finding about the control, not a pass.
 # Can fail: reviewer_dispatched = 0 if the main model red-teams it itself; probe_used = 0 if the
-# agent traces by hand; names_weak_grader = 0 if it answers Clean or names only the sound grader;
-# quotes_wrong_reply = 0 if it gives no negated-deprecation wrong reply; not_denial and
+# agent never tries the probe; probe_ran = 0 if the probe failed and the agent fell back to by
+# hand; names_weak_grader = 0 if it answers Clean or never ties names_deprecation to a wrong
+# reply; quotes_wrong_reply = 0 if it gives no negated-deprecation wrong reply; not_denial and
 # not_bare_clean reject the opposite verdicts.
 # Sabotage note: deleting step 3 ("Probe the free graders") from agents/grader-red-team.md
 # should fail probe_used.
@@ -30,9 +46,10 @@ name: grader-red-team-probes-case-on-disk
 description: >
   Asked to red-team a case that exists on disk by its directory name, the grader-red-team agent
   runs check-replies.ts --probe on it and names the grader a wrong reply fools.
-  expected_outcome (unmeasured draft): PASS when the agent is dispatched, runs the probe, and the
-  reply ties names_deprecation to a negated wrong reply that passes it; FAIL when it traces by
-  hand, answers Clean, or names only the sound grader.
+  expected_outcome (unmeasured draft, second revision): PASS when the agent is dispatched, its
+  probe runs (the finding is labelled `probe`, not `by hand`), and the reply ties
+  names_deprecation to a negated wrong reply that passes it; FAIL when it traces by hand, the
+  probe fails, or it answers Clean.
 tags: [eval-authoring, grader-red-team, agent, quick]
 
 context:
@@ -56,17 +73,29 @@ graders:
     input_match: '"subagent_type"\s*:\s*"(?:[\w-]+:)?grader-red-team"'
     min: 1
 
-  # The probe, by directory name (the case is on disk, so no hand trace is needed).
+  # The probe was attempted, by directory name (the case is on disk, so no hand trace is needed).
+  # An attempt only: it passes on a failed call, so probe_ran below checks it worked.
   - name: probe_used
     type: tool_used
     tool: Bash
     input_match: 'check-replies\.ts --probe release-notes-deprecation'
     min: 1
 
+  # The agent's output format labels each finding `probe` or `by hand`; it writes `by hand` when
+  # the probe did not run. Wording regex: a relay that drops the table row can miss it.
+  - name: probe_ran
+    type: regex
+    target: last_message
+    pattern: 'names_deprecation[`*\s]*\|\s*probe\b'
+    flags: i
+    match: contains
+
+  # The grader name and wrong-reply wording within 600 characters, either order, backticked or
+  # plain (the agent's row is `<case>:<grader> | probe | wrong reply: ... | passes because ...`).
   - name: names_weak_grader
     type: regex
     target: last_message
-    pattern: "names_deprecation[\\s\\S]{0,600}(?:wrong repl|fooled|would pass|passes|accepts)"
+    pattern: "names_deprecation[\\s\\S]{0,600}(?:wrong repl|fooled|would pass|passes|accepts)|(?:wrong repl|fooled|would pass|passes|accepts)[\\s\\S]{0,600}names_deprecation"
     flags: i
     match: contains
 
