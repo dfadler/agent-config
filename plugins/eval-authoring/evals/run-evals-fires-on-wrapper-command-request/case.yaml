@@ -55,3 +55,14 @@ graders:
     tool: Bash
     input_match: '--dry-run|auth status'
     min: 1
+
+  # Result: no paid run is attempted. The sandbox is never logged in, so the skill hands off
+  # instead of starting it; a denied attempt still shows in the trace. Without this, a reply that
+  # checks the login, skips the dry-run and then tries the paid command would pass the grader
+  # above (CodeRabbit, PR 942). A dry-run call carries --dry-run after the script name.
+  - name: no_paid_run_attempt
+    type: tool_used
+    tool: Bash
+    input_match: 'run-evals\.ts(?!.*--dry-run)'
+    min: 0
+    max: 0
