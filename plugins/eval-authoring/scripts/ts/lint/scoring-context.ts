@@ -1,8 +1,7 @@
-/** Scoring helpers shared by the scoring rules (EVAL008, EVAL009, EVAL010). */
+/** Scoring helpers shared by the scoring rules (EVAL008, EVAL009). */
 import {
   readMocks,
   type EvalCase,
-  type Grader,
   type ScoringContext,
 } from "../parser/index.ts";
 import type { LintContext } from "./types.ts";
@@ -28,8 +27,3 @@ export const scoringContextFor = (
     ),
   };
 };
-
-/** True when a `regex` or `llm` grader looks at the mock calls. */
-export const checksMockCalls = (grader: Grader): boolean =>
-  (grader.type === "regex" && grader.target.value.kind === "mock_calls") ||
-  (grader.type === "llm" && grader.focus.value.kind === "mock_calls");

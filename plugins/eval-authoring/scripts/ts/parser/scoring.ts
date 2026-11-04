@@ -53,8 +53,8 @@ const exclusionReason = (
  * `tool_used: Skill` is implicitly `with-only`, `arm: with-only` is unscored,
  * and a `mock_calls` grader on a plugin-declared mock is unscored unless
  * `arm: both`. With `twoArm` false, everything is scored. The "all excluded,
- * so all score" fallback is in `scoreCase`, not here. Used by EVAL008,
- * EVAL009, EVAL010.
+ * so all score" fallback is in `scoreCase`, not here. Used by EVAL008 and
+ * EVAL009.
  */
 export const isScored = (
   grader: Grader,
@@ -62,7 +62,7 @@ export const isScored = (
   context?: ScoringContext,
 ): boolean => !twoArm || exclusionReason(grader, context) === undefined;
 
-/** `isScored` for every grader of a case, with reasons and the all-excluded fallback. Used by EVAL008, EVAL009, EVAL010. */
+/** `isScored` for every grader of a case, with reasons and the all-excluded fallback. Used by EVAL008 and EVAL009. */
 export const scoreCase = (
   evalCase: EvalCase,
   twoArm: boolean,

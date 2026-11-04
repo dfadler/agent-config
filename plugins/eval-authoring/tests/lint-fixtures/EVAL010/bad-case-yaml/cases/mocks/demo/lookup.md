@@ -1,4 +1,0 @@
----
-type: static
----
-{"ok": true}
