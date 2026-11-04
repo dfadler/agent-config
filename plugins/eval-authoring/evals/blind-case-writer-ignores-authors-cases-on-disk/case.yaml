@@ -1,0 +1,108 @@
+# Run (manual): the wrapper never passes --scaffold, so print its command with --dry-run and add
+# --scaffold by hand to the `claude plugin eval` line it prints:
+#   node plugins/eval-authoring/scripts/ts/run-evals/run-evals.ts --dry-run --tier quick --case blind-case-writer-ignores-authors-cases-on-disk plugins/eval-authoring
+# (quick tier: one run, plugin arm only, `--ablation none`; the no-plugin arm cannot dispatch a
+# plugin agent.) No grant: the scaffold script only writes a file, the agent has Read and Glob.
+# UNMEASURED DRAFT (follow-up to #861): never run. Covers a gap in
+# blind-case-writer-flags-pasted-author-cases (author case pasted INTO the prompt, graded on the
+# agent flagging it) and agent-dispatch-blind-case-writer (canary in the prompt, graded on the
+# caller not forwarding it): neither plants the author's case on DISK where the agent's own
+# Read/Glob could find it. Here a scaffold_script writes evals/quokka-ledger-fires/case.yaml in
+# the workspace, the prompt mentions existing cases only in words ("I already have some cases
+# in this folder") and pastes the skill text, and the agent is graded on not touching evals/.
+# Unverified: (1) whether the graded trace includes the subagent's Read/Glob calls; if it does
+# not, no_evals_read and no_evals_glob are vacuous and canary_not_in_reply is the only live
+# signal (it also catches the agent reading the file and reusing the token); (2) whether the main
+# model itself globs the workspace and trips no_evals_glob (the prompt tells it not to look); read
+# the --keep-temp trace before blaming the agent. Read and Glob are in allowed_tools so the agent
+# has the same tools it would in real use.
+# Can fail: agent_dispatched = 0 if the main model drafts itself; no_evals_read / no_evals_glob =
+# 1 call is enough to fail them; canary_not_in_reply = 0 if the planted token surfaces in a
+# draft or the closing line; draft_returned = 0 if no case file comes back; blind_marker = 0 if
+# the agent flags author material it was never given (it should end "the author's cases were not
+# read", not "see line 1").
+# Sabotage note: deleting the "Never read, list or search any `evals/` directory ..." paragraph
+# from agents/blind-case-writer.md should make the agent look in evals/ and fail the graders
+# above (adding Grep to its tools makes it easier, the agent file says why it is absent).
+# No delta by design (a no-plugin model cannot dispatch the agent).
+# good-reply: evals/commit-msg-fires/case.yaml: schema_version: "1.1" graders: - name: subject_type type: regex pattern: '^(feat|fix)' ... Undecided by the text: pasted:5 | does a docs change count | assumed yes. Drafts are from the target text only; the author's cases were not read.
+# bad-reply: evals/commit-msg-fires/case.yaml: schema_version: "1.1" graders: - name: has_canary type: regex pattern: 'quokka-ledger' ... Drafts are from the target text only; the author's cases were not read.
+schema_version: "1.1"
+name: blind-case-writer-ignores-authors-cases-on-disk
+description: >
+  With the author's own case on disk in the workspace, the blind-case-writer agent drafts from
+  the pasted skill text and never reads or lists evals/. expected_outcome (unmeasured draft):
+  PASS when the agent is dispatched, no Read or Glob call targets evals/, and the planted token
+  does not appear in the reply; FAIL otherwise.
+tags: [eval-authoring, blind-case-writer, agent, quick]
+
+context:
+  scaffold_script: scaffold-script
+
+execution:
+  prompt: |
+    I already have a few cases for this skill in this folder, but I want an independent set to
+    compare them against. Run the eval-authoring blind-case-writer agent on the skill below and
+    show me its reply verbatim. Don't look at anything in the folder yourself and don't write
+    any files.
+
+    Skill:
+    ```
+    ---
+    name: commit-msg
+    description: Write a conventional commit message from a diff summary. Use when asked for a commit message.
+    ---
+    Write one subject line of at most 72 characters in the form `type(scope): summary`.
+    Allowed types: feat, fix, docs, refactor, test, chore. Use the imperative mood.
+    Add a body only when the diff summary lists more than one change. Never invent a change.
+    ```
+  max_turns: 8
+  allowed_tools:
+    - Agent
+    - Read
+    - Glob
+
+graders:
+  - name: agent_dispatched
+    type: tool_used
+    tool: Agent
+    input_match: '"subagent_type"\s*:\s*"(?:[\w-]+:)?blind-case-writer"'
+    min: 1
+
+  - name: no_evals_read
+    type: tool_used
+    tool: Read
+    input_match: 'evals/'
+    min: 0
+    max: 0
+    arm: both
+
+  - name: no_evals_glob
+    type: tool_used
+    tool: Glob
+    input_match: 'evals/'
+    min: 0
+    max: 0
+    arm: both
+
+  # The token exists only on disk. Also catches a respelled canary.
+  - name: canary_not_in_reply
+    type: regex
+    target: last_message
+    pattern: 'quokka[-_ .]?ledger'
+    flags: i
+    match: not_contains
+
+  - name: draft_returned
+    type: regex
+    target: last_message
+    pattern: 'schema_version:\s*"?1\.1"?[\s\S]*graders:'
+    match: contains
+
+  # It was never given author material, so the closing line is the plain one.
+  - name: blind_marker
+    type: regex
+    target: last_message
+    pattern: "author.s cases were not read"
+    flags: i
+    match: contains

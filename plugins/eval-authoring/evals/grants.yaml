@@ -23,3 +23,6 @@ grants:
     - "Write"
   case-reviewer-flags-leaky-prompt:
     - "Write"
+  # Fixed-path probe only (agents/grader-red-team.md); no other command, no paid run.
+  grader-red-team-probes-case-on-disk:
+    - "Bash(node plugins/eval-authoring/scripts/ts/check-replies.ts --probe *)"

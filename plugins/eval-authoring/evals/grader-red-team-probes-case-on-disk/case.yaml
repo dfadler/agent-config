@@ -1,0 +1,94 @@
+# Run (manual): the wrapper never passes --scaffold, so print its command with --dry-run and add
+# --scaffold by hand to the `claude plugin eval` line it prints:
+#   node plugins/eval-authoring/scripts/ts/run-evals/run-evals.ts --dry-run --tier quick --case grader-red-team-probes-case-on-disk plugins/eval-authoring
+# (quick tier: one run, plugin arm only, `--ablation none`; the no-plugin arm cannot dispatch a
+# plugin agent.) Grant: Bash(node plugins/eval-authoring/scripts/ts/check-replies.ts --probe *)
+# only (grants.yaml), the fixed-path probe command from agents/grader-red-team.md.
+# UNMEASURED DRAFT (follow-up to #859): never run. Why it exists: the probe looks a case up by
+# directory name on disk (readSuite), but grader-red-team-flags-planted-weak-grader pastes the
+# case text into the prompt, so the agent traces by hand and no eval exercises the probe. Here a
+# scaffold_script puts the case on disk at ./planted/evals/release-notes-deprecation and the
+# prompt names it by directory.
+# Unverified: (1) whether `plugins/eval-authoring/scripts/ts/check-replies.ts` resolves in the
+# eval workspace (if not, the agent's probe Bash call fails and it falls back to by hand;
+# probe_used still counts the attempt); (2) whether the grant rule matches the heredoc form
+# (agents/grader-red-team.md, "Unverified"); (3) whether a subagent's Bash call appears in the
+# graded trace. probe_used = 0 may mean one of these, not an agent fault: read the --keep-temp
+# trace first.
+# Planted defect: names_deprecation matches the bare stem "deprecat"; "Nothing is deprecated in
+# this release." passes it. names_removal_date (the literal date) is the sound control.
+# Can fail: reviewer_dispatched = 0 if the main model red-teams it itself; probe_used = 0 if the
+# agent traces by hand; names_weak_grader = 0 if it answers Clean or names only the sound grader;
+# quotes_wrong_reply = 0 if it gives no negated-deprecation wrong reply; not_denial and
+# not_bare_clean reject the opposite verdicts.
+# Sabotage note: deleting step 3 ("Probe the free graders") from agents/grader-red-team.md
+# should fail probe_used.
+# good-reply: names_deprecation | probe | wrong reply: "Nothing is deprecated in this release." | passes because the pattern is the bare stem | Fix: anchor it to the command name and the removal
+# bad-reply: names_removal_date passes no wrong replies; every weak reply it tried is rejected.
+schema_version: "1.1"
+name: grader-red-team-probes-case-on-disk
+description: >
+  Asked to red-team a case that exists on disk by its directory name, the grader-red-team agent
+  runs check-replies.ts --probe on it and names the grader a wrong reply fools.
+  expected_outcome (unmeasured draft): PASS when the agent is dispatched, runs the probe, and the
+  reply ties names_deprecation to a negated wrong reply that passes it; FAIL when it traces by
+  hand, answers Clean, or names only the sound grader.
+tags: [eval-authoring, grader-red-team, agent, quick]
+
+context:
+  scaffold_script: scaffold-script
+
+execution:
+  prompt: |
+    Before I pay for a run, please use the eval-authoring grader-red-team agent to find which
+    grader in the case `release-notes-deprecation` can be fooled by a wrong reply. The case is
+    in this workspace under `planted/evals/` (plugin root `planted`), and the plugin's probe
+    script is `plugins/eval-authoring/scripts/ts/check-replies.ts`. Tell me what it found.
+  max_turns: 12
+  allowed_tools:
+    - Agent
+    - Bash
+
+graders:
+  - name: reviewer_dispatched
+    type: tool_used
+    tool: Agent
+    input_match: '"subagent_type"\s*:\s*"(?:[\w-]+:)?grader-red-team"'
+    min: 1
+
+  # The probe, by directory name (the case is on disk, so no hand trace is needed).
+  - name: probe_used
+    type: tool_used
+    tool: Bash
+    input_match: 'check-replies\.ts --probe release-notes-deprecation'
+    min: 1
+
+  - name: names_weak_grader
+    type: regex
+    target: last_message
+    pattern: "names_deprecation[\\s\\S]{0,600}(?:wrong repl|fooled|would pass|passes|accepts)"
+    flags: i
+    match: contains
+
+  # Affirmative evidence: a quoted reply that negates "deprecated", not just the grader name next
+  # to a pass word.
+  - name: quotes_wrong_reply
+    type: regex
+    target: last_message
+    pattern: '["“`\x27](?:[^"”`\x27\n]*\s)?(?:no|not|none|nothing|without|never|zero|non)\s+(?:\w+\s+){0,3}deprecat[^"”`\x27\n]*["”`\x27]|["“`\x27][^"”`\x27\n]*\bdeprecat\w*\b[^"”`\x27\n]*\b(?:none|nothing|zero)\b[^"”`\x27\n]*["”`\x27]'
+    flags: i
+    match: contains
+
+  - name: not_denial
+    type: regex
+    target: last_message
+    pattern: '\b(?:pass|passes|accept|accepts|fool|fools|let|lets)\s+(?:through\s+)?(?:no|zero|none of)\b[^.\n]{0,40}wrong|\b(?:no|none|zero|not one|neither)\b[^.\n]{0,40}wrong repl\w*[^.\n]{0,40}\b(?:pass|passes|passed|accept|accepts|fool|fools|slip|slips)\b'
+    flags: i
+    match: not_contains
+
+  - name: not_bare_clean
+    type: regex
+    target: last_message
+    pattern: "^\\s*Clean\\s*$"
+    flags: im
+    match: not_contains

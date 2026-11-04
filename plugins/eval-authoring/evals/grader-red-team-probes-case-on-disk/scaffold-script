@@ -1,0 +1,36 @@
+#!/usr/bin/env bash
+# Plants a small eval-authoring-style plugin with one case on disk, so the grader-red-team
+# agent can probe it by directory name (check-replies.ts --probe <dir> --reply - <root>).
+# Planted defect: `names_deprecation` matches the bare stem "deprecat", so a reply that says
+# "Nothing is deprecated in this release." passes it. `names_removal_date` is the sound control.
+set -euo pipefail
+mkdir -p planted/evals/release-notes-deprecation planted/.claude-plugin
+cat > planted/evals/release-notes-deprecation/case.yaml <<'CASE'
+schema_version: "1.1"
+name: release-notes-deprecation
+description: >
+  A pasted changelog gets release notes that warn about the deprecation and its date.
+  expected_outcome: PASS when the reply names the deprecated command and the removal date;
+  FAIL otherwise.
+tags: [release-notes, quick]
+execution:
+  prompt: |
+    Turn this changelog into release notes for users:
+    - fix: login redirect loop
+    - DEPRECATED: `export` is removed on 2027-01-01, use `download`
+  max_turns: 4
+  allowed_tools: [Skill]
+graders:
+  - name: names_deprecation
+    type: regex
+    target: last_message
+    pattern: 'deprecat'
+    flags: i
+    match: contains
+  - name: names_removal_date
+    type: regex
+    target: last_message
+    pattern: '2027-01-01'
+    match: contains
+CASE
+echo '{"name":"planted","version":"0.0.0","description":"planted case for a red-team eval"}' > planted/.claude-plugin/plugin.json
