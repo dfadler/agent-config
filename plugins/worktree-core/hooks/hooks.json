@@ -10,6 +10,18 @@
             "args": ["${CLAUDE_PLUGIN_ROOT}/scripts/ts/require-worktree-hook.ts"]
           }
         ]
+      },
+      {
+        "matcher": "Bash",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "node",
+            "args": [
+              "${CLAUDE_PLUGIN_ROOT}/scripts/ts/commit-branch-guard-hook.ts"
+            ]
+          }
+        ]
       }
     ],
     "SessionStart": [

@@ -218,6 +218,14 @@ session — both catch their own errors and always exit 0.
   is still wanted. Skipped entirely in cloud/remote sessions and in non-git
   directories.
 
+- **`commit-branch-guard-hook.ts`** is a `PreToolUse` hook on Bash that
+  asks (never blocks) before a `git commit` when the checked-out branch is
+  the default branch, or when the main checkout's branch is already ahead of
+  the default (commits this session may not own). A linked worktree on its
+  own branch and a detached HEAD pass silently. On by default as a prompt;
+  `WORKTREE_COMMIT_GUARD=off` or `worktree.commitGuard: "off"` turns it off.
+  Skipped in cloud/remote sessions and non-git directories.
+
 Both underlying scripts (`scripts/ts/verify-worktree-symlinks.ts`,
 `scripts/ts/prune-merged-worktrees.ts` under the plugin root; run with
 `node <script>.ts`, current Node per `.nvmrc`) are also usable standalone — real exit
