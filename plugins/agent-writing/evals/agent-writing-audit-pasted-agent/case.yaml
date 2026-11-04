@@ -1,0 +1,72 @@
+# Run: node plugins/eval-authoring/scripts/ts/run-evals/run-evals.ts plugins/agent-writing --case "agent-writing-audit-pasted-agent" (no grant needed; Skill only).
+# Maps to SKILL.md: "List findings, then ask which to fix. Change only what the user chose." (How to use) and the rule ids AW03 (Structure), AW11 and AW14 (Consistency).
+# good-reply: | Rule | Line | Evidence | Fix | table with AW03 at line 4 (versioned model id, use `opus`), AW11 at line 5 (Write in tools: of a read-only agent), AW08 line 7 ("Recently"), AW20 line 8 ("Leverage"), AW14 line 8 ("Step 4 below"); then "Which of these should I fix?"
+# bad-reply: This agent file mixes a read-only description with a Write tool, and the wording is vague. Here is a cleaned-up version of the whole file: --- name: config-checker (rewrites the file unasked, names no rule ids, asks nothing)
+schema_version: "1.1"
+name: agent-writing-audit-pasted-agent
+description: >
+  A user asks, in natural phrasing, for a look at an agent file with planted defects. The
+  skill should fire and return findings keyed by rule id and line, then ask which to fix.
+  expected_outcome: PASS when the reply cites AW03 and AW11 with the right line numbers and
+  asks before changing anything; FAIL when it rewrites the file or names no rule ids. The
+  rule-id graders cannot pass without the skill (the ids exist only in it), so they separate
+  the arms by construction; the ask-first grader is the behavior check.
+tags: [agent-writing, trigger, quick]
+
+execution:
+  prompt: |
+    This agent keeps running Write calls even though it's supposed to be report-only, and a
+    teammate said the file reads badly. Can you look it over? Line numbers are on the left.
+
+    1| ---
+    2| name: config-checker
+    3| description: Read-only agent that reports misconfigured services. Never edits files.
+    4| model: claude-opus-4-1-20250805
+    5| tools: Read, Grep, Write
+    6| ---
+    7| Recently we moved to a new config layout, so check the old paths too.
+    8| Leverage the checklist in Step 4 below to verify each service.
+    9| When done, return the findings.
+  max_turns: 6
+  allowed_tools:
+    - Skill
+
+graders:
+  # Indicator only (unscored in a two-arm run): the skill fired on a prompt that never names it.
+  - name: skill_fired
+    type: tool_used
+    tool: Skill
+    input_match: '"skill"\s*:\s*"(?:[\w-]+:)?agent-writing"'
+    min: 1
+
+  # Versioned model id on line 4, rule id and line number on one line of the reply (table row
+  # or sentence, either order).
+  - name: flags_versioned_model_line4
+    type: regex
+    target: last_message
+    pattern: 'AW03[^\n]*(?:\bline\s*4\b|\bL4\b|:4\b|\|\s*4\s*\|)|(?:\bline\s*4\b|\bL4\b|:4\b|\|\s*4\s*\|)[^\n]*AW03'
+    flags: i
+    match: contains
+
+  # Read-only agent that lists Write, line 5.
+  - name: flags_write_tool_line5
+    type: regex
+    target: last_message
+    pattern: 'AW11[^\n]*(?:\bline\s*5\b|\bL5\b|:5\b|\|\s*5\s*\|)|(?:\bline\s*5\b|\bL5\b|:5\b|\|\s*5\s*\|)[^\n]*AW11'
+    flags: i
+    match: contains
+
+  - name: flags_relative_reference
+    type: regex
+    target: last_message
+    pattern: 'AW14'
+    match: contains
+    weight: 0.5
+
+  # Ask before changing. A rewrite-first reply fails this.
+  - name: asks_which_to_fix
+    type: regex
+    target: last_message
+    pattern: '(?:which|want me to|shall I|should I|let me know)[^.?\n]{0,80}(?:fix|apply|change|rewrite|address)'
+    flags: i
+    match: contains

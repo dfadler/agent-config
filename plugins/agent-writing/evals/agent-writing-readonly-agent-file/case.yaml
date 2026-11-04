@@ -1,0 +1,57 @@
+# Run: node plugins/eval-authoring/scripts/ts/run-evals/run-evals.ts plugins/agent-writing --case "agent-writing-readonly-agent-file" (no grant needed; Skill only).
+# Maps to SKILL.md: "Declare a model by alias" (AW03) and "An agent file holds the input contract, scope and permission limits, and return format" (AW02).
+# good-reply: --- name: dep-auditor description: Read-only scan of package.json and lockfiles; returns outdated or vulnerable dependencies. tools: Read, Grep, Glob model: haiku --- Input: repo root path. Scope: read only. Return: findings list, max 30 lines.
+# bad-reply: --- name: dep-auditor model: claude-3-5-haiku-20241022 tools: Read, Grep, Write --- Steps: 1. Read package.json. 2. ...
+schema_version: "1.1"
+name: agent-writing-readonly-agent-file
+description: >
+  Writing mode: a read-only agent file in a reply. expected_outcome: PASS when the model is an
+  alias, no mutating tool is listed, and the body has no numbered procedure; FAIL on a
+  versioned model id, a Write or Edit tool, or numbered steps in the body. A bare model likely
+  passes the tools check by itself (the prompt says read-only), so the model-alias and
+  no-steps graders carry the delta.
+tags: [agent-writing, trigger, quick]
+
+execution:
+  prompt: |
+    Write the full markdown file for a subagent called dep-auditor, to drop into
+    .claude/agents/. It reads package.json and the lockfile and reports outdated or vulnerable
+    dependencies. It must never change anything. Pick whichever Claude model suits a quick
+    scan. Reply with only the file.
+  max_turns: 4
+  allowed_tools:
+    - Skill
+
+graders:
+  - name: skill_fired
+    type: tool_used
+    tool: Skill
+    input_match: '"skill"\s*:\s*"(?:[\w-]+:)?agent-writing"'
+    min: 1
+
+  - name: model_is_alias
+    type: regex
+    target: last_message
+    pattern: 'model:\s*(?:sonnet|opus|haiku)\b(?!-)'
+    flags: i
+    match: contains
+
+  - name: no_version_digits_in_model
+    type: regex
+    target: last_message
+    pattern: 'model:\s*\S*\d'
+    match: not_contains
+
+  - name: no_mutating_tools
+    type: regex
+    target: last_message
+    pattern: 'tools:[^\n]*\b(?:Write|Edit|MultiEdit|NotebookEdit)\b'
+    flags: i
+    match: not_contains
+
+  # AW02: no numbered procedure in the agent body.
+  - name: no_numbered_steps
+    type: regex
+    target: last_message
+    pattern: '\n\s*1[.)]\s'
+    match: not_contains

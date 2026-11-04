@@ -95,7 +95,8 @@ its number is never reused.
   trigger and a contract (when to use, what comes back), no procedure and no rationale,
   and stays under about 500 characters. A skill that only runs by hand sets
   `disable-model-invocation: true` and needs no trigger text. Check: count the
-  description's characters. Fix: cut it to trigger plus contract.
+  description's characters, and confirm it says when to use the skill. Fix: cut it to
+  trigger plus contract.
 
 ## Context
 
