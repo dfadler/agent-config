@@ -8,6 +8,17 @@
 import { homedir } from "node:os";
 import { basename, dirname, join, resolve } from "node:path";
 import { readGrantsFile, readSuite } from "../parser/index.ts";
+import {
+  CACHE_DIR,
+  cacheKey,
+  extractEntry,
+  hashTree,
+  loadEntry,
+  saveEntry,
+  spliceResult,
+  statusAfterSplice,
+  type CacheEntry,
+} from "./baseline-cache.ts";
 import { buildCliArgs, type Reporting, type RunSpec } from "./command.ts";
 import {
   EXIT_CONFIG,
@@ -164,6 +175,24 @@ ${Object.values(TIERS).map((t) => `                         ${t.name}: ${t.descr
                        combined with --tier, --neighbours, --changed or --case.
                        Standard and thorough skip these cases: a must-not-fire
                        check passes the no-plugin arm by construction
+  --no-baseline        plugin arm only (--ablation none) at any tier: roughly
+                       a third less spend, no without score and no delta. For
+                       iterating on a skill or a grader; take the delta from a
+                       two-arm run. Boundary cases are not skipped (no
+                       two-arm run to skip them from)
+  --no-cache           two-arm tiers only: ignore and do not write the baseline
+                       cache. Otherwise a finished two-arm run stores each
+                       case's without arm under <eval-dir>/results/.baseline-cache,
+                       keyed on the case directory, suite mocks and .mcp.json,
+                       grants, runs, threshold, model, judge model and the
+                       claude version (never on the plugin: that arm loads
+                       none). A later run with the same key runs the case with
+                       --ablation none and splices the stored arm in, scoring
+                       it as a two-arm run would, so a skill edit re-pays only
+                       the plugin arm. The without score is then from an
+                       earlier run, one sample reused rather than redrawn: the
+                       summary lists those cases. Not used with --neighbours,
+                       --trigger-boundary or --no-baseline
   --output-dir <dir>   base results directory (default: <eval-dir>/results).
                        Each wrapper run writes <dir>/run-<time>/<NN>-<case>
   --publish-report     publish the report (default: --no-publish)
@@ -171,7 +200,9 @@ ${Object.values(TIERS).map((t) => `                         ${t.name}: ${t.descr
                        each run's final reply and tool calls, redacted, at
                        <dir>/run-<time>/replies/<NN>-<case>/<case>/<arm>-<run>.md
   --skip-unavailable   exit 0 when plugin eval is in early access or down
-  --dry-run            print the commands and exit; runs nothing. For a two-arm
+  --dry-run            print the commands and exit; runs no case (a two-arm tier
+                       also runs the free claude --version, to look each case
+                       up in the baseline cache and show hit or miss). For a two-arm
                        tier it also prints the smallest per-case delta the plan
                        can detect (power.ts), when an SD is known: from --sd,
                        else pooled from the newest run under <eval-dir>/results;
@@ -234,6 +265,8 @@ interface Options {
   readonly neighbours: readonly string[] | undefined;
   /** `--trigger-boundary`: the paired should-not-fire suite, single arm. */
   readonly triggerBoundary: boolean;
+  /** `--no-cache`: neither read nor write the baseline cache. */
+  readonly noCache: boolean;
 }
 
 type Parsed =
@@ -262,6 +295,8 @@ const BOOL_FLAGS: readonly string[] = [
   "--yes",
   "--changed-allow-empty",
   "--trigger-boundary",
+  "--no-baseline",
+  "--no-cache",
 ];
 
 /** A plain decimal greater than zero ("0.5", "2", ".5"); anything else (empty, "abc", "-1", "NaN", "1e3", "0x10", "0") is undefined. */
@@ -373,7 +408,7 @@ export const parseArgs = (argv: readonly string[]): Parsed => {
       // Trigger-set mode reads the plugin arm only, whatever the tier (see --neighbours in USAGE).
       tier: bools.has("--trigger-boundary")
         ? TRIGGER_BOUNDARY_TIER
-        : neighbours === undefined
+        : neighbours === undefined && !bools.has("--no-baseline")
           ? TIERS[tierName]
           : { ...TIERS[tierName], ablation: "none" },
       model: values.get("--model"),
@@ -396,6 +431,7 @@ export const parseArgs = (argv: readonly string[]): Parsed => {
       yes: bools.has("--yes"),
       neighbours,
       triggerBoundary: bools.has("--trigger-boundary"),
+      noCache: bools.has("--no-cache"),
     },
   };
 };
@@ -450,7 +486,65 @@ export interface InvocationSummary {
   readonly resultDir: string | undefined;
   /** Where each run's final reply and tool calls went (`<arm>-<run>.md`); unset when no trace was readable. */
   readonly repliesDir?: string | undefined;
+  /** The baseline cache (#855): `cached` ran the plugin arm only and spliced in the stored without arm (from `baselineSavedAt`); `stored` was a two-arm run whose without arm is now cached. Unset when the cache was off or the case was neither. */
+  readonly baseline?: "cached" | "stored" | undefined;
+  readonly baselineSavedAt?: string | undefined;
 }
+
+/** One invocation's baseline-cache lookup: its key, the directory entries live in, and the stored arm on a hit. */
+interface CacheUse {
+  readonly dir: string;
+  readonly key: string;
+  readonly claudeVersion: string;
+  readonly runs: number;
+  readonly entry: CacheEntry | undefined;
+}
+
+/** Hit: run the plugin arm alone and splice the stored without arm in afterwards. */
+const optionsFor = (options: Options, cache: CacheUse | undefined): Options =>
+  cache?.entry === undefined ? options : { ...options, tier: { ...options.tier, ablation: "none" } };
+
+/**
+ * Look every invocation up in the baseline cache. Off (undefined) unless the tier runs two arms and
+ * nothing narrows it to one: `--no-cache`, `--neighbours`, `--trigger-boundary` and `--no-baseline`
+ * all end here. The key covers what a no-plugin run depends on (see baseline-cache.ts); the plugin
+ * is not in it, so a skill or agent edit keeps the entry.
+ */
+const planCache = async (
+  io: Io,
+  options: Options,
+  suite: { readonly evalDir: string; readonly cases: readonly { readonly name: { readonly value: string }; readonly dir: string }[] },
+  target: string,
+  invocations: readonly Invocation[],
+): Promise<readonly (CacheUse | undefined)[] | undefined> => {
+  if (options.tier.ablation !== "cli-default" || options.noCache || options.neighbours !== undefined || options.triggerBoundary) {
+    return undefined;
+  }
+  const probe = await io.spawn("claude", ["--version"]);
+  const claudeVersion = probe.status === 0 ? probe.stdout.trim() : "";
+  if (claudeVersion === "") {
+    io.err("run-evals: baseline cache off: could not read the claude version, which is part of the key\n");
+    return undefined;
+  }
+  const dir = join(suite.evalDir, "results", CACHE_DIR);
+  const sharedHash = `${hashTree(io, join(suite.evalDir, "mocks"))}:${io.readFile(join(target, ".mcp.json")) ?? ""}`;
+  return invocations.map((inv) => {
+    const c = suite.cases.find((x) => x.name.value === inv.caseName);
+    if (c === undefined) return undefined;
+    const key = cacheKey({
+      caseName: inv.caseName,
+      caseHash: hashTree(io, c.dir),
+      sharedHash,
+      grants: inv.grants,
+      runs: options.tier.runs,
+      threshold: options.tier.threshold,
+      model: options.model ?? DEFAULT_MODEL,
+      judgeModel: options.judgeModel ?? DEFAULT_JUDGE_MODEL,
+      claudeVersion,
+    });
+    return { dir, key, claudeVersion, runs: options.tier.runs, entry: loadEntry(io, dir, key) };
+  });
+};
 
 const scoringNote = (a: AblationMode): string =>
   a === "none"
@@ -558,14 +652,15 @@ const runInvocation = async (
   budgetUsd: number,
   shareUsd: number,
   interrupt: AbortSignal,
+  cache: CacheUse | undefined,
 ): Promise<{
   readonly summary: InvocationSummary;
   readonly stop: boolean;
-  /** The located aggregate-result.json text, for the printed summary only. */
+  /** The located aggregate-result.json text (spliced on a cache hit), for the printed summary only. */
   readonly resultText: string | undefined;
 }> => {
   const args = buildCliArgs(
-    invocationSpec(options, target, trust, inv, outputDir, budgetUsd),
+    invocationSpec(optionsFor(options, cache), target, trust, inv, outputDir, budgetUsd),
   );
   const label = `invocation ${String(n)}/${String(total)} (${inv.caseName})`;
   io.err(
@@ -606,10 +701,27 @@ const runInvocation = async (
       resultText: undefined,
     };
   }
-  const read = findingsFromText(located?.text, outputDir);
-  const facts = rawResultFacts(located?.text);
+  // A hit ran the plugin arm alone: put the stored without arm back, rescored as a two-arm run scores it,
+  // and let the exit status follow that score (`--ablation none` scored every grader, with-only ones too).
+  const spliced =
+    cache?.entry !== undefined && located !== undefined ? spliceResult(located.text, cache.entry) : undefined;
+  if (spliced?.ok === false) {
+    io.err(`run-evals: ${label}: baseline cache: could not splice the stored arm (${spliced.reason}); this result is the plugin arm only\n`);
+  }
+  const resultText = spliced?.ok === true ? spliced.text : located?.text;
+  if (spliced?.ok === true && located !== undefined) {
+    try {
+      io.writeFile(join(located.dir, AGGREGATE_FILE), spliced.text);
+      io.err(`run-evals: ${label}: baseline cache hit: without arm from ${cache?.entry?.savedAt ?? "?"}, not re-run\n`);
+    } catch (e: unknown) {
+      io.err(`run-evals: ${label}: baseline cache: could not rewrite the result file (${errorText(e)}); the summary still uses the spliced result\n`);
+    }
+  }
+  const status = spliced?.ok === true ? statusAfterSplice(ran.status, spliced.belowThreshold) : ran.status;
+  const read = findingsFromText(resultText, outputDir);
+  const facts = rawResultFacts(resultText);
   const verdict: Judgement = judgeRun({
-    status: ran.status,
+    status,
     signal: ran.signal,
     signals: scanOutput(`${ran.stdout}\n${ran.stderr}`),
     findings: read.findings,
@@ -633,18 +745,37 @@ const runInvocation = async (
   reasons.forEach((r) => {
     io.err(`run-evals: ${label}: ${r}\n`);
   });
+  // A finished two-arm run (exit 0, or 1 for below threshold) leaves its without arm for the next run.
+  const stored =
+    cache !== undefined && cache.entry === undefined && located !== undefined && !cut && mismatch === undefined && (ran.status === 0 || ran.status === 1)
+      ? extractEntry(located.text, inv.caseName, cache.key, cache.claudeVersion, cache.runs, io.now())
+      : undefined;
+  if (cache !== undefined && stored?.ok === true) {
+    try {
+      saveEntry(io, cache.dir, stored.entry);
+      io.err(`run-evals: ${label}: baseline cache: without arm stored (key ${cache.key})\n`);
+    } catch (e: unknown) {
+      io.err(`run-evals: ${label}: baseline cache: could not store the without arm (${errorText(e)}); continuing\n`);
+    }
+  } else if (stored?.ok === false) {
+    io.err(`run-evals: ${label}: baseline cache: not stored (${stored.reason})\n`);
+  }
+  const baseline =
+    spliced?.ok === true ? ("cached" as const) : stored?.ok === true ? ("stored" as const) : undefined;
   return {
     summary: {
       ...base,
-      cliStatus: ran.status,
+      cliStatus: ran.status, // what the CLI said; on a cache hit `exit` follows the spliced score instead
       chargedUsd: facts.costUsd ?? unreadableCharge,
       exit:
         mismatch === undefined ? code : worstExit(code, EXIT_PARTIAL),
       reasons,
       resultDir: located?.dir,
+      ...(baseline === undefined ? {} : { baseline }),
+      ...(baseline === "cached" ? { baselineSavedAt: cache?.entry?.savedAt } : {}),
     },
     stop: verdict.stop,
-    resultText: located?.text,
+    resultText,
   };
 };
 
@@ -859,11 +990,14 @@ const run = async (
   const ceiling = ceilingFor(options.tier, total, options.maxCostUsd);
   const ceilingUsd = ceiling.usd;
   const shareUsd = round4(ceilingUsd / total);
+  // Free (one `claude --version`, file reads): also done under --dry-run so the plan shows what would be reused.
+  const cacheUses = await planCache(io, options, suite, target, invocations);
 
   if (options.dryRun) {
     invocations.forEach((inv, i) => {
+      const cache = cacheUses?.[i];
       const spec = invocationSpec(
-        options,
+        optionsFor(options, cache),
         target,
         trust,
         inv,
@@ -875,6 +1009,13 @@ const run = async (
           .map(shellWord)
           .join(" ")}\n`,
       );
+      if (cache !== undefined) {
+        io.out(
+          cache.entry === undefined
+            ? `  baseline cache: miss (key ${cache.key}); both arms run and the without arm is stored\n`
+            : `  baseline cache: hit (key ${cache.key}, stored ${cache.entry.savedAt}); plugin arm only, the stored without arm is spliced in\n`,
+        );
+      }
     });
     io.out(
       `ceiling: $${String(ceilingUsd)} for the whole run (${ceiling.basis}); a result with no costUsd is charged $${String(shareUsd)} (ceiling / ${String(total)} cases)\n`,
@@ -958,6 +1099,7 @@ const run = async (
         remaining,
         shareUsd,
         interrupt.signal,
+        cacheUses?.[i],
       );
       return {
         done: [...acc.done, r.summary],
@@ -1048,6 +1190,9 @@ const run = async (
     subset,
     neighbours: options.neighbours,
     boundary: boundaryResult,
+    baselineCached: done.flatMap((d) =>
+      d.baseline === "cached" && d.baselineSavedAt !== undefined ? [{ caseName: d.caseName, savedAt: d.baselineSavedAt }] : [],
+    ),
     trigger: triggerRows(suite, routablesOf(io, target), manifestOf(target).name, results),
     cases: done.map((d, i) => ({
       caseName: d.caseName,

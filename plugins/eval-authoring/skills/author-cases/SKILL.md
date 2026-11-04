@@ -148,7 +148,10 @@ blind-case-writer agent, second bullet), then stop.
    recorded per case. Faking a CLI or MCP server: [fixtures and
    mocks](references/fixtures-and-mocks.md). Testing a plugin's agents:
    [agents](references/agents.md).
-7. **Check the baseline.** Before trusting a new case, run it once without the plugin. A
+7. **Check the baseline.** Before trusting a new case, run it once without the plugin. That
+   run is paid: the CLI has no without-only mode, so it is a two-arm run
+   (`run-evals.ts --case <name>`), both arms charged, and the wrapper stores the without
+   arm so the step 9 run does not pay for it again (see run-evals, "baseline cache"). A
    baseline near the ceiling (little headroom for the plugin to add; diagnose-scores flags
    both arms at 0.95 or more) means the case may be solvable without the plugin: inspect
    the prompt and the workspace for a leaked answer (EVAL014 covers the mechanical
@@ -169,8 +172,8 @@ blind-case-writer agent, second bullet), then stop.
    for the judgment pass, if available (invocation recipe in the agent file), and optionally the
    [grader-red-team agent](../../agents/grader-red-team.md) to try wrong replies on the free
    graders. Then use the
-   [run-evals](../run-evals/SKILL.md) skill: check `claude auth status`; if you are
-   logged in and the user asked for a run, run it; otherwise hand them the run command (a
+   [run-evals](../run-evals/SKILL.md) skill (a paid run, so only on the user's ask): check
+   `claude auth status`; if you are logged in and the user asked for a run, run it; otherwise hand them the run command (a
    hand-off is correct only when that check fails or nobody asked for a run). A PR that adds
    or changes cases, or changes a skill or agent that has cases, carries an
    "Eval results" section (the run-evals summary, with the before score from the newest
