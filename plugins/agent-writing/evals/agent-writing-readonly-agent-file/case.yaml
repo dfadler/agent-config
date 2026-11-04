@@ -49,9 +49,11 @@ graders:
     flags: i
     match: not_contains
 
-  # AW02: no numbered procedure in the agent body.
+  # AW02: no numbered procedure in the agent body. Anchored to a Procedure/Steps heading because
+  # a numbered "Return format" list (seen in a with-arm reply) is a format, not a procedure.
   - name: no_numbered_steps
     type: regex
     target: last_message
-    pattern: '\n\s*1[.)]\s'
+    pattern: '(?:Procedure|Steps|Process|Workflow)\W*1[.)]\s'
+    flags: i
     match: not_contains

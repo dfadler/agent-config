@@ -31,7 +31,8 @@ its number is never reused.
 ## How to use
 
 1. Audit: run each rule's **Check** on each file in scope. Read every grep hit before
-   you accept it.
+   you accept it. When the user gives one pasted file or snippet, that text is the whole
+   scope: skip the rules that compare files (AW01, AW04, AW12, AW13) and say you did.
 2. List findings, then ask which to fix. Change only what the user chose.
 3. After editing, re-run every check on the changed files and grep for the old name
    or path of anything you moved.
@@ -47,7 +48,8 @@ its number is never reused.
 - **AW02 agents-dispatch-only.** An agent file holds the input contract, scope and
   permission limits, and return format. The procedure lives in a skill the agent loads
   through `skills:` frontmatter. Check: does the agent body contain numbered steps?
-  Fix: move them into the skill.
+  Fix: move them into the skill. If no skill exists for the procedure, propose one
+  rather than keeping the steps in the agent.
 - **AW03 model-alias.** Declare a model by alias (`sonnet`, `opus`, `haiku`), never a
   versioned ID. Check: `grep -rnE "^model:.*[0-9]"`. Fix: use the alias.
 - **AW04 register-and-delete.** A new skill is listed wherever skills are discovered
@@ -81,7 +83,9 @@ its number is never reused.
 ## Consistency
 
 - **AW11 capability-matches-limits.** An agent described as read-only or report-only
-  lists no `Write`, `Edit` or other mutating tool in `tools:`. Check: grep `tools:` in
+  lists no `Write`, `Edit` or other mutating tool in `tools:`. `Bash` counts as mutating,
+  because it can write; list it only when the body limits it to named read-only commands.
+  Check: grep `tools:` in
   every agent whose description says "read-only" or "report-only". Fix: remove the tool
   or change the description.
 - **AW12 statements-agree.** Two files must not state the same thing differently. Check:
