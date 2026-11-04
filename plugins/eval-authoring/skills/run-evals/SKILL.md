@@ -161,7 +161,8 @@ rather than guess an SD.
 
 ## What the tier values mean
 
-Every tier passes `--threshold 1` (the CLI default is also 1.0). It was chosen so one failed
+`quick`, `standard` and `thorough` pass `--threshold 1` (the CLI default is also 1.0;
+`--trigger-boundary` passes 0). It was chosen so one failed
 grader is never averaged away; that is a design choice (see
 [plugin-eval-ci.md](../../../../docs/plugin-eval-ci.md)), not a measured optimum. A run's score is the
 fraction of its graders that passed, weighted, and a case's score is the mean over its
@@ -203,7 +204,7 @@ count and the cost ceiling before you pay.
    with-arm score rise after a cause-file or grader fix, never to claim a delta.
 4. **Reuse the stored baseline (automatic).** A finished two-arm run stores each case's without
    arm under `evals/results/.baseline-cache`. The next two-arm run with the same case files,
-   grants, runs, model, judge model and `claude --version` runs that case plugin arm only and
+   suite mocks, `.mcp.json`, grants, runs, threshold, model, judge model and `claude --version` runs that case plugin arm only and
    splices the stored arm in, so a skill or agent edit re-pays only the plugin arm. That
    without score is one earlier sample, not a fresh draw (the summary lists those cases, and
    a delta against it is not a same-run delta): say so if you quote it, or redraw it with
