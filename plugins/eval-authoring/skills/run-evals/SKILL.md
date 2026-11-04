@@ -89,8 +89,9 @@ it, do not rebuild any of that.
    for this; committed cases are not edited, and a case with its own `plugins:` is
    refused). The summary then has a Trigger set table: fire rate, false-fire rate and
    description length per skill. It always runs the plugin arm only (`--ablation none`
-   whatever the tier), because the injected `plugins:` list names the plugin itself and
-   a baseline arm that honours it would load the plugin: no without or delta column.
+   whatever the tier), because the CLI's baseline arm ignores `plugins:` and loads no
+   plugin at all, neighbours included (seen in a paid run, #884): a delta would compare
+   the skill with nothing, not with its neighbours, so there is no without or delta column.
    Neighbour hooks run inside the eval under the copy's trust, and `node_modules` is
    not copied.
    To measure the should-not-fire side of routing, run `--trigger-boundary`: the cases
