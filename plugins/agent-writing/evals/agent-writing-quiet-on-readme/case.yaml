@@ -1,0 +1,27 @@
+# Run: node plugins/eval-authoring/scripts/ts/run-evals/run-evals.ts plugins/agent-writing --trigger-boundary (plugin arm only; no grant needed).
+# Maps to SKILL.md description: "Not for READMEs, docs prose, commit messages or PR text."
+# good-reply: ## Getting started Install the plugin with /plugin install, then ... (plain README section, no skill call)
+# bad-reply: (invokes the agent-writing skill and returns an AW-rule audit table for the README)
+schema_version: "1.1"
+name: agent-writing-quiet-on-readme
+description: >
+  Near-miss: shares "SKILL.md" and "plugin" but wants human-read README prose. Trigger-boundary
+  negative, plugin arm only, scored as a fire count, no delta.
+tags: [agent-writing, trigger-boundary, "pair:agent-writing-audit-pasted-agent"]
+
+execution:
+  prompt: |
+    Draft the "Getting started" section of the README for our plugin. It should tell a new
+    user how to install it and what the SKILL.md it ships does: it turns meeting notes into
+    action items.
+  max_turns: 4
+  allowed_tools:
+    - Skill
+
+graders:
+  - name: agent_writing_not_invoked
+    type: tool_used
+    tool: Skill
+    input_match: '"skill"\s*:\s*"(?:[\w-]+:)?agent-writing"'
+    min: 0
+    max: 0
