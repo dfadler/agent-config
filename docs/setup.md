@@ -61,7 +61,7 @@ state under `.claude/worktrees`, listing any worktree that is locked, named `kee
 gitignored content (the prune hook's rules). Only the current project is checked.
 
 Two more report-only checks cover the TypeScript tooling. The Node check compares the `node`
-on PATH with `package.json` `engines.node` (currently `>=22.18`) and warns when it is older:
+on PATH with `package.json` `engines.node` (currently `>=24.0`) and warns when it is older:
 the scripts under `plugins/*/scripts/ts/` may then silently do nothing (seen on 22.17: the
 lint CLI and `run-evals.ts --help` printed nothing and exited 0; the cause is unverified).
 It also notes that `.nvmrc` pins only the major version, so `nvm use` does not enforce the

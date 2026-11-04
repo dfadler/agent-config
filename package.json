@@ -5,7 +5,7 @@
   "description": "TypeScript tooling for agent-config scripts. Not published; pins dev dependencies and exposes the Node-based checks (`pnpm run <name>`); CI calls these, and `scripts/ci.sh` delegates to them.",
   "packageManager": "pnpm@11.28.2",
   "engines": {
-    "node": ">=22.18"
+    "node": ">=24.0"
   },
   "scripts": {
     "lint": "eslint --no-error-on-unmatched-pattern scripts/ts \"plugins/*/scripts/ts/**/*.ts\"",
