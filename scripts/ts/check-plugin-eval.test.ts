@@ -265,6 +265,21 @@ describe("check-plugin-eval", () => {
     expect(codeOf(check("0", JSON.stringify(doc), f))).toBe(0);
   });
 
+  it("an active, met delta gate overrides CLI exit 1 (#906)", () => {
+    const r = check("1", many(16, 0.6, 0.4), f);
+    expect(codeOf(r)).toBe(0);
+    expect(r.tag === "ok" ? r.value : "").toContain("not gated");
+  });
+
+  it("CLI exit 1 still fails when the delta gate is advisory or absent (#906)", () => {
+    expect(codeOf(check("1", many(15, 0.6, 0.4), f))).toBe(1);
+    expect(codeOf(check("1", many(16, 0.6, 0.4)))).toBe(1);
+  });
+
+  it("an active gate that is breached fails whatever the CLI exit (#906)", () => {
+    expect(codeOf(check("1", many(16, 0.5, 0.4), f))).toBe(1);
+  });
+
   it("reports pass^k next to the mean (#736)", () => {
     const r = check("0", many(2, 1, 0.4));
     expect(r.tag === "ok" ? r.value : "").toContain("pass^k 1.00");
