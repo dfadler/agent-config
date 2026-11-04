@@ -1,0 +1,242 @@
+{
+  "plugin": "eval-authoring",
+  "date": "2026-11-04",
+  "pluginVersion": "0.1.0",
+  "tier": "standard",
+  "model": "claude-sonnet-5-5",
+  "judgeModel": "claude-sonnet-5-5",
+  "meanWithScore": 0.7741,
+  "meanWithoutScore": 0.3298,
+  "meanDelta": 0.4442,
+  "passK": 0.5,
+  "cases": [
+    {
+      "name": "agent-dispatch-blind-case-writer",
+      "with": 1,
+      "without": 0.444,
+      "delta": 0.556
+    },
+    {
+      "name": "author-cases-before-after-on-skill-change",
+      "with": 0.167,
+      "without": 0,
+      "delta": 0.167
+    },
+    {
+      "name": "author-cases-cannot-fail-quiet-case",
+      "with": 0.667,
+      "without": 0.667,
+      "delta": 0
+    },
+    {
+      "name": "author-cases-check-before-verdict",
+      "with": 0.889,
+      "without": 0.333,
+      "delta": 0.556
+    },
+    {
+      "name": "author-cases-delta-needs-twenty-cases",
+      "with": 0.111,
+      "without": 0.111,
+      "delta": 0
+    },
+    {
+      "name": "author-cases-fires-natural-agent-dispatch",
+      "with": 1,
+      "without": 0,
+      "delta": 1
+    },
+    {
+      "name": "author-cases-fires-natural-edit-check",
+      "with": 1,
+      "without": 0.333,
+      "delta": 0.667
+    },
+    {
+      "name": "author-cases-fires-natural-regression-net",
+      "with": 1,
+      "without": 0,
+      "delta": 1
+    },
+    {
+      "name": "author-cases-fires-natural-trigger-check",
+      "with": 1,
+      "without": 0,
+      "delta": 1
+    },
+    {
+      "name": "author-cases-fires-on-authoring-request",
+      "with": 0.963,
+      "without": 0.074,
+      "delta": 0.889
+    },
+    {
+      "name": "author-cases-fresh-session-for-cases",
+      "with": 0.444,
+      "without": 0.111,
+      "delta": 0.333
+    },
+    {
+      "name": "author-cases-pr-claims-need-measurement",
+      "with": 0.333,
+      "without": 0.278,
+      "delta": 0.056
+    },
+    {
+      "name": "author-cases-rubric-and-sequence-graders",
+      "with": 0.933,
+      "without": 0,
+      "delta": 0.933
+    },
+    {
+      "name": "author-cases-stays-quiet-on-unit-tests",
+      "with": 1,
+      "without": 1,
+      "delta": 0
+    },
+    {
+      "name": "delta-claim-after-run",
+      "with": 0.667,
+      "without": 0,
+      "delta": 0.667
+    },
+    {
+      "name": "diagnose-scores-cutoff-verdict",
+      "with": 0,
+      "without": 0,
+      "delta": 0
+    },
+    {
+      "name": "diagnose-scores-fires-on-exit-2-fine-results",
+      "with": 0,
+      "without": 0,
+      "delta": 0
+    },
+    {
+      "name": "diagnose-scores-fires-on-natural-phrasing",
+      "with": 1,
+      "without": 0,
+      "delta": 1
+    },
+    {
+      "name": "diagnose-scores-fires-on-negative-delta",
+      "with": 1,
+      "without": 0.5,
+      "delta": 0.5
+    },
+    {
+      "name": "diagnose-scores-fires-on-zero-on-correct-output",
+      "with": 1,
+      "without": 0,
+      "delta": 1
+    },
+    {
+      "name": "diagnose-scores-stays-quiet-on-run-request",
+      "with": 1,
+      "without": 1,
+      "delta": 0
+    },
+    {
+      "name": "diagnose-scores-two-negative-cases",
+      "with": 0.667,
+      "without": 0.333,
+      "delta": 0.333
+    },
+    {
+      "name": "grader-red-team-clean-case-control",
+      "with": 0.75,
+      "without": 0.583,
+      "delta": 0.167
+    },
+    {
+      "name": "grader-red-team-flags-planted-weak-grader",
+      "with": 0.933,
+      "without": 0.8,
+      "delta": 0.133
+    },
+    {
+      "name": "grader-red-team-llm-only-never-clean",
+      "with": 0.778,
+      "without": 0.333,
+      "delta": 0.444
+    },
+    {
+      "name": "mine-cases-fires-on-failing-session",
+      "with": 0.556,
+      "without": 0.556,
+      "delta": 0
+    },
+    {
+      "name": "run-evals-fires-natural-ci-setup",
+      "with": 1,
+      "without": 0,
+      "delta": 1
+    },
+    {
+      "name": "run-evals-fires-natural-go-ahead",
+      "with": 1,
+      "without": 0,
+      "delta": 1
+    },
+    {
+      "name": "run-evals-fires-natural-with-without",
+      "with": 1,
+      "without": 0,
+      "delta": 1
+    },
+    {
+      "name": "run-evals-quiet-on-bats-tests",
+      "with": 0.667,
+      "without": 0.833,
+      "delta": -0.167
+    },
+    {
+      "name": "run-evals-speed-levers",
+      "with": 1,
+      "without": 0.333,
+      "delta": 0.667
+    },
+    {
+      "name": "run-evals-wrapper-jobs-flag",
+      "with": 1,
+      "without": 0.667,
+      "delta": 0.333
+    },
+    {
+      "name": "case-reviewer-clean-case-control",
+      "with": 1,
+      "without": 1,
+      "delta": 0
+    },
+    {
+      "name": "case-reviewer-flags-leaky-prompt",
+      "with": 1,
+      "without": 0.556,
+      "delta": 0.444
+    },
+    {
+      "name": "case-reviewer-flags-planted-weak-case",
+      "with": 0.889,
+      "without": 0.63,
+      "delta": 0.259
+    },
+    {
+      "name": "run-evals-explicit-run-request",
+      "with": 1,
+      "without": 0.5,
+      "delta": 0.5
+    },
+    {
+      "name": "run-evals-fires-on-wrapper-command-request",
+      "with": 0,
+      "without": 0,
+      "delta": 0
+    },
+    {
+      "name": "run-evals-not-model-invoked",
+      "with": 1,
+      "without": 0.556,
+      "delta": 0.444
+    }
+  ]
+}
