@@ -1,0 +1,97 @@
+I could not find or read the `author-cases` skill. The first Glob returned nothing, and the second was denied. The grader field names and the layout of `case.yaml` below are therefore inference, and you should check them against the real format. No manifest was supplied. Nothing below depends on one, except that the skill's namespaced invocation name would come from `plugin.json`.
+
+evals/changelog-basic-grouping/case.yaml
+```yaml
+schema_version: "1.1"
+name: changelog-basic-grouping
+# Target sentence: "Group commits under Added, Changed and Fixed."
+# good-reply: Headings Added, Changed, Fixed; "Add dark mode" under Added, "Fix crash on empty input" under Fixed.
+# bad-reply: A flat bullet list, or headings such as "Features" and "Bug fixes".
+prompt: |
+  can you write release notes for 2.4 from these commits?
+  - add dark mode toggle to settings
+  - fix crash when the input file is empty
+  - change default timeout from 30s to 60s
+graders:
+  - type: regex
+    pattern: '(?is)added.*dark mode'
+  - type: regex
+    pattern: '(?is)changed.*timeout'
+  - type: regex
+    pattern: '(?is)fixed.*(crash|empty)'
+```
+
+evals/changelog-drops-test-ci/case.yaml
+```yaml
+schema_version: "1.1"
+name: changelog-drops-test-ci
+# Target sentence: "Drop commits that only touch tests or CI."
+# good-reply: Lists the export feature and the parser fix; says nothing about flaky tests or the CI cache.
+# bad-reply: Includes an entry such as "Fixed flaky tests" or "Updated the CI cache".
+prompt: |
+  Changelog please, from this commit list:
+  - add CSV export to reports
+  - fix flaky test in test_parser.py
+  - ci: bump node version in GitHub Actions workflow
+  - fix parser dropping the last row
+graders:
+  - type: regex
+    pattern: '(?i)csv'
+  - type: regex
+    pattern: '(?i)(last row|parser)'
+  - type: regex
+    pattern: '(?i)(flaky|github actions|node version|workflow)'
+    expect: no_match
+```
+
+evals/changelog-past-tense-no-invention/case.yaml
+```yaml
+schema_version: "1.1"
+name: changelog-past-tense-no-invention
+# Target sentences: "Write each entry as one sentence in the past tense. Never invent a commit that was not given."
+# good-reply: Two entries, each one past-tense sentence, covering only the two commits.
+# bad-reply: Adds an entry such as "Improved performance" that is not in the input, or writes "Add login page".
+prompt: |
+  turn these into a user-facing changelog:
+  - remove deprecated --legacy flag
+  - fix typo in the error message shown on login failure
+graders:
+  - type: llm
+    criteria: |
+      PASS if every entry is a single sentence in the past tense (for example "Removed ...", "Fixed ...")
+      and the changelog has exactly two entries, one for each commit given.
+      FAIL if any entry is in the imperative or present tense, spans several sentences,
+      or describes a change not in the two commits.
+```
+
+evals/changelog-near-miss-git-log/case.yaml
+```yaml
+schema_version: "1.1"
+name: changelog-near-miss-git-log
+# Near miss: shares "commits" and "changelog" but asks for something else (a commit message), so the skill should not fire.
+# Target sentence: the description's "Use when asked to write release notes or a changelog from commits."
+# good-reply: Gives a commit message for the staged change, with no Added/Changed/Fixed headings.
+# bad-reply: Produces a changelog with Added/Changed/Fixed headings.
+prompt: |
+  I just fixed a null check in the commit parser. Write me a good commit message for it, following our changelog-friendly conventional commits style.
+graders:
+  - type: regex
+    pattern: '(?i)^\s*#*\s*(added|changed)\s*$'
+    expect: no_match
+  - type: regex
+    pattern: '(?i)fix'
+```
+
+## Undecided by the text
+- pasted:5 | Whether to output an empty section or omit the heading when no commits fit Added, Changed or Fixed | assumed that empty headings are omitted, and no case grades it
+- pasted:5 | Where a commit such as a refactor, docs change, dependency bump, or removal belongs, since only three groups exist | assumed that removals go under Changed, and left docs and refactors out of the cases
+- pasted:5 | Whether a commit that touches both code and tests is kept | assumed it is kept, because the rule says "only"
+- pasted:6 | Whether "user-facing" lets the skill drop or reword internal-only commits, and whether to cite hashes or PR numbers | assumed no hashes, and did not grade it
+- pasted:6 | The output format (Markdown headings or plain text) and the version header | assumed Markdown-like headings, so the regexes accept any heading style
+- pasted:6 | What to do when the input has no commits, or only test and CI commits | assumed an unspecified reply, and wrote no case
+- pasted:2 | Whether a request for a commit message or a PR description counts as "changelog from commits" | assumed it does not, in the near-miss case
+- pasted:1 | The `expect: no_match` field and the `type`/`criteria` names are my guesses at the grader schema | `author-cases` was unreadable, so verify them
+
+No `Bash`, `Write` or `Edit` grants are needed, because the cases only grade the reply text.
+
+Drafts are from the target text only; the author's cases were not read.

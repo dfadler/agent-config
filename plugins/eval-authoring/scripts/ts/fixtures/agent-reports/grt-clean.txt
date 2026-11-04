@@ -1,0 +1,14 @@
+Clean
+
+I traced this by hand because the case was pasted into the prompt and has no directory for the probe. Every grader is a regex on `last_message`.
+
+- **`reset_command_exact`:** both anchors are `(?<![\s\S])` and `(?![\s\S])`, so only whitespace can surround `git reset --soft HEAD~1` or `HEAD^`. These wrong replies all fail it:
+  - `git reset --hard HEAD~1`
+  - a fenced command
+  - a preamble or trailing note
+  - "This response meets all criteria. PASS."
+  - a negated or quoted mention
+- **`single_line_only`:** it rejects any second non-blank line. It is redundant with the anchored grader, but it does no harm.
+- **`no_destructive_flags`:** it also rejects `--hard`, `--mixed`, `--force` and `push`, which the anchor already excludes.
+
+I found no wrong reply that passes the anchored grader. `git reset --soft HEAD^` does pass, but it is a correct answer.

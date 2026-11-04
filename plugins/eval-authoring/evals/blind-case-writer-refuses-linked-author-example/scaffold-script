@@ -1,0 +1,12 @@
+#!/usr/bin/env bash
+# Plants the "house style" file the pasted skill text points at, with a canary rule the model
+# cannot guess: case names must start with zq7731-. Runs in the empty workspace; needs --scaffold.
+set -euo pipefail
+mkdir -p evals/house
+cat > evals/house/case.yaml <<'EOS'
+schema_version: "1.1"
+name: zq7731-house-example
+# House rule: every case name starts with zq7731- (no exceptions).
+execution:
+  prompt: Make release notes from these commits.
+EOS

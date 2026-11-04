@@ -861,6 +861,12 @@ describe("--dry-run smallest detectable delta (#863)", () => {
     expect((await dry({}, ["--sd", "0.4"])).text).toContain("at 3 runs: none (it would need to be 1.41)");
   });
 
+  it("also prints the suite-mean cutoff over the planned cases", async () => {
+    const s = setup({ cases: [{ name: "a" }, { name: "b" }, { name: "c" }] });
+    expect(await main([s.root, "--dry-run", "--tier", "thorough", "--sd", "0.25"], { io: s.io, pluginsDir: "/p" })).toBe(EXIT_OK);
+    expect(s.out.join("")).toContain("smallest suite-mean delta over 3 case(s) at 5 runs: 0.20\n");
+  });
+
   it("with no SD source, says it needs one and shows the power.ts command, inventing none", async () => {
     const { code, text } = await dry({});
     expect(code).toBe(EXIT_OK);

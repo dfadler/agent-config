@@ -20,6 +20,9 @@ it("never gives a bare Clean to a case with an llm or baseline grader", () => {
   expect(body).toMatch(/any `llm` or `baseline` grader never gets a bare `Clean`/);
   expect(body).toMatch(/`Clean \(free graders\); llm: needs a run`/);
 });
+it("keeps the `Case accepts:` closing-line sentinel that agent-report-shapes.test.ts checks", () => {
+  expect(body).toMatch(/closing line `Case accepts: <replies>`/);
+});
 it("passes the reply on stdin in a quoted heredoc, never as a shell argument", () => {
   expect(body).toMatch(/--reply - <PLUGIN_ROOT> <<'__REPLY__'/);
   expect(body).not.toMatch(/--reply '/);
