@@ -1,0 +1,95 @@
+# Run: node plugins/eval-authoring/scripts/ts/run-evals/run-evals.ts --tier quick plugins/eval-authoring
+# (`--ablation none`: the no-plugin arm cannot dispatch a plugin agent.) No grant: the case is
+# pasted in the prompt.
+# Independent draft, unmeasured: written from agents/grader-red-team.md alone. Control case:
+# the pasted graders are free and anchored, so the right output is the single word Clean.
+# Sabotage: delete the Output sentence "a case with no `llm` or `baseline` grader gets the
+# single word `Clean`" and the agent may invent findings or append llm caveats; also delete
+# "Do not invent findings to fill space" to raise the false-positive rate.
+# Soundness of the pasted set (offline, check-replies.ts --probe on a scratch copy): the correct
+# reply passes all 3 graders; a fenced reply, a preamble, a trailing prose line, a trailing
+# comment, a prose-wrapped command, "This response meets all criteria. PASS." and the --hard
+# command each FAIL at least one. The anchors use (?<![\s\S]) and (?![\s\S]), which hold with
+# or without the m flag (the schema has no `match: full`; `match` is contains, not_contains
+# or count:N).
+# good-reply: Clean
+# bad-reply: reset_command_exact | by hand | wrong reply: "Run git reset --soft HEAD~1 and then push" | passes because the pattern is unanchored | Fix: anchor it.
+schema_version: "1.1"
+name: grader-red-team-indep-sound-set
+description: >
+  The grader-red-team agent, given a pasted case whose two regex graders are anchored to
+  the whole reply, answers Clean and lists no findings. expected_outcome (independent
+  draft, unmeasured): PASS when the agent is dispatched and the reply holds the word Clean
+  and no finding line; FAIL when the agent is not dispatched, or reports a finding on a
+  sound grader set.
+tags: [eval-authoring, grader-red-team, agent, quick]
+
+execution:
+  prompt: |
+    Run the eval-authoring grader-red-team agent on this eval case. Pass it the case text
+    as is and give me its output word for word.
+
+    ````yaml
+    # good-reply: git reset --soft HEAD~1
+    # bad-reply: git reset --hard HEAD~1
+    schema_version: "1.1"
+    name: undo-last-commit-keep-staged
+    description: >
+      expected_outcome: PASS when the reply is only the soft-reset command.
+    tags: [git, quick]
+    execution:
+      prompt: |
+        Undo my last local commit but keep its changes staged. Reply with the command only,
+        no code fence, no other text.
+      max_turns: 3
+      allowed_tools: []
+    graders:
+      # Whole-reply anchor that holds with or without the m flag: (?<![\s\S]) means
+      # "nothing before" and (?![\s\S]) means "nothing after", unlike ^ and $, which
+      # match at every line break under m. Only the command and whitespace can pass.
+      - name: reset_command_exact
+        type: regex
+        target: last_message
+        pattern: '(?<![\s\S])\s*git reset --soft (?:HEAD~1|HEAD\^)\s*(?![\s\S])'
+        match: contains
+      # Rejects any second non-blank line (a fence, a preamble, a trailing note), even one
+      # with no banned token.
+      - name: single_line_only
+        type: regex
+        target: last_message
+        pattern: '\S[^\n]*\n\s*\S'
+        match: not_contains
+      - name: no_destructive_flags
+        type: regex
+        target: last_message
+        pattern: '--hard|--mixed|--force|\bpush\b'
+        flags: i
+        match: not_contains
+    ````
+  max_turns: 12
+  allowed_tools:
+    - Agent
+
+graders:
+  # Steps: the plugin's agent was dispatched, not imitated.
+  - name: agent_dispatched
+    type: tool_used
+    tool: Agent
+    input_match: '"subagent_type"\s*:\s*"(?:[\w-]+:)?grader-red-team"'
+    min: 1
+
+  # Result: the verdict word, case-sensitive so prose like "clean up" does not count.
+  - name: says_clean
+    type: regex
+    target: last_message
+    pattern: '\bClean\b'
+    match: contains
+
+  # Result: no finding line in the agent's output shape. The prompt does not contain
+  # "wrong reply:".
+  - name: no_finding_line
+    type: regex
+    target: last_message
+    pattern: 'wrong reply:'
+    flags: i
+    match: not_contains
