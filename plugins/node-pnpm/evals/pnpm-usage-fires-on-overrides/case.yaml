@@ -1,0 +1,51 @@
+# Run: node plugins/eval-authoring/scripts/ts/run-evals/run-evals.ts plugins/node-pnpm --case pnpm-usage-fires-on-overrides (Skill only; no grant needed).
+# Maps to SKILL.md "Where settings go": pnpm 11 ignores the `pnpm` field of package.json; overrides belong in pnpm-workspace.yaml.
+# good-reply: Put it in pnpm-workspace.yaml (pnpm 11 ignores the "pnpm" field in package.json): `overrides:` then `minimist: 1.2.8`. Run `pnpm install`, then `pnpm why minimist` to confirm only 1.2.8 remains.
+# bad-reply: Add a "pnpm": { "overrides": { "minimist": "1.2.8" } } block to package.json, then run `pnpm install`.
+schema_version: "1.1"
+name: pnpm-usage-fires-on-overrides
+description: >
+  A user on pnpm 11 asks where to put a dependency override. The reply should point to
+  pnpm-workspace.yaml and not the package.json pnpm field, and give a check command.
+  expected_outcome: PASS when the skill fires, the reply names pnpm-workspace.yaml and
+  does not tell the user to add a "pnpm" block to package.json; FAIL otherwise.
+tags: [pnpm-usage, trigger, quick]
+
+execution:
+  prompt: |
+    We're on pnpm 11 (package.json has a "packageManager" pin). A transitive dep pulls in
+    minimist 1.2.5, which has an advisory, and I want the whole tree on 1.2.8. Where does the
+    override go, and how do I check afterwards that it took?
+  max_turns: 6
+  allowed_tools:
+    - Skill
+
+graders:
+  # Steps: indicator only in a two-arm run (unscored).
+  - name: skill_fired
+    type: tool_used
+    tool: Skill
+    input_match: '"skill"\s*:\s*"(?:[\w-]+:)?pnpm-usage"'
+    min: 1
+
+  # Result: the prompt never names pnpm-workspace.yaml, so an echo cannot pass.
+  - name: names_workspace_yaml
+    type: regex
+    target: last_message
+    pattern: 'pnpm-workspace\.ya?ml'
+    match: contains
+
+  # Result: code form of the wrong answer (a "pnpm": { block), not the bare words.
+  - name: no_package_json_pnpm_block
+    type: regex
+    target: last_message
+    pattern: '"pnpm"\s*:\s*\{|pnpm\.overrides'
+    match: not_contains
+
+  - name: gives_check_command
+    type: regex
+    target: last_message
+    pattern: 'pnpm (?:why|ls|list)\b'
+    flags: i
+    match: contains
+    weight: 0.5

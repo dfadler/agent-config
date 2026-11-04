@@ -1,0 +1,51 @@
+# Run: node plugins/eval-authoring/scripts/ts/run-evals/run-evals.ts plugins/node-pnpm --case pnpm-usage-fires-on-cannot-find-module (Skill only; no grant needed).
+# Maps to SKILL.md "Strict node_modules": a missing import is a missing dependency; add it with `pnpm add`, do not enable shamefullyHoist.
+# good-reply: yaml is imported in src/load-config.ts but not declared in package.json. pnpm does not hoist undeclared deps, so run `pnpm add yaml` (the npm install only worked because of hoisting), then rerun.
+# bad-reply: Add shamefully-hoist=true to .npmrc and reinstall so yaml is visible at the root of node_modules.
+schema_version: "1.1"
+name: pnpm-usage-fires-on-cannot-find-module
+description: >
+  A "Cannot find module" error under pnpm for an undeclared import. The reply should say to
+  declare the dependency with pnpm add and not turn on hoisting. expected_outcome: PASS when
+  the skill fires, the reply gives `pnpm add yaml` and does not set shamefully-hoist to true;
+  FAIL otherwise. A bare model may pass this too (expected delta near zero).
+tags: [pnpm-usage, trigger, quick]
+
+execution:
+  prompt: |
+    Fresh clone of our repo (it has a pnpm-lock.yaml), ran the install, and now `node
+    dist/cli.js` dies with:
+
+      Error: Cannot find module 'yaml'
+      Require stack:
+      - /work/app/dist/load-config.js
+
+    src/load-config.ts has `import { parse } from "yaml"`. package.json lists only
+    typescript and vitest. A teammate says it worked for them on their old npm setup. What's
+    the quickest fix?
+  max_turns: 6
+  allowed_tools:
+    - Skill
+
+graders:
+  - name: skill_fired
+    type: tool_used
+    tool: Skill
+    input_match: '"skill"\s*:\s*"(?:[\w-]+:)?pnpm-usage"'
+    min: 1
+
+  # Result: the prompt never says "pnpm add"; the command is the fix.
+  - name: gives_pnpm_add_yaml
+    type: regex
+    target: last_message
+    pattern: 'pnpm(?:\s+-\S+(?:\s+\S+)?)*?\s+(?:add|i)\b[^\n]*\byaml\b'
+    match: contains
+
+  # Result: code form of enabling hoisting. A reply that warns "don't set shamefullyHoist: true"
+  # would false-fail; accepted, since the skill's rule is not to enable it.
+  - name: does_not_enable_hoisting
+    type: regex
+    target: last_message
+    pattern: 'shamefully-?hoist|node-linker\s*[=:]\s*hoisted|public-hoist-pattern'
+    flags: i
+    match: not_contains

@@ -1,0 +1,49 @@
+# Run: node plugins/eval-authoring/scripts/ts/run-evals/run-evals.ts plugins/node-pnpm --case node-version-engines-floor-above-installed (Skill only; no grant needed).
+# Deleting "Compare the full version with `engines.node`, not just the major" from SKILL.md should make this fail: the reply would say the major matches and look for a code bug.
+# good-reply: Node v24.2.0 is below the engines floor of >=24.4 even though the major matches; nvm use picked the newest 24 you have installed. Run nvm install to get a current 24, rerun the build, and check node --version again.
+# bad-reply: Node 24 matches .nvmrc, so the version is fine. Check your build config, probably a bundler plugin that swallows errors.
+schema_version: "1.1"
+name: node-version-engines-floor-above-installed
+description: >
+  A silent exit-0 build where the major matches .nvmrc but the full version is below the
+  engines floor. expected_outcome: PASS when the reply identifies 24.2.0 as below >=24.4 and
+  proposes installing or switching to a satisfying release; FAIL when it accepts the major
+  match or debugs the code.
+tags: [node-version, trigger, quick]
+
+execution:
+  prompt: |
+    `pnpm build` finishes with exit 0 and no output, but dist/ is empty. Nothing in the logs.
+    Here is what I can see:
+
+    .nvmrc: 24
+    package.json engines: {"node": ">=24.4"}
+    nvm ls: v22.11.0, v24.2.0
+    node --version after nvm use: v24.2.0
+
+    What's going on?
+  max_turns: 6
+  allowed_tools:
+    - Skill
+
+graders:
+  - name: skill_fired
+    type: tool_used
+    tool: Skill
+    input_match: '"skill"\s*:\s*"(?:[\w-]+:)?node-version"'
+    min: 1
+
+  # Outcome: names the version as below the floor. Words like below/older are not in the prompt.
+  - name: flags_version_below_floor
+    type: regex
+    target: last_message
+    pattern: '24\.2(?:\.\d+)?[^.\n]{0,80}(?:below|older|lower|less than|under|short of|fail\w*|not (?:meet|satisfy)|does not|doesn.t)|(?:below|older|lower|less than|under|short of|not (?:meet|satisfy)|unmet)[^.\n]{0,80}24\.4'
+    flags: i
+    match: contains
+
+  # Outcome: a fix that installs a newer release; `nvm install` is not in the prompt.
+  - name: proposes_nvm_install
+    type: regex
+    target: last_message
+    pattern: 'nvm (?:install|i)\b'
+    match: contains

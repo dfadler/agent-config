@@ -1,0 +1,27 @@
+# Run: node plugins/eval-authoring/scripts/ts/run-evals/run-evals.ts plugins/node-pnpm --trigger-boundary (plugin arm only; no grant needed).
+# Maps to the SKILL.md description: a Node-version skill must not fire for another language's version manager.
+# good-reply: (no Skill call for node-version) Put `3.12` in .python-version and run `pyenv install` in the repo; pyenv shims pick it up per directory.
+# bad-reply: (invokes the node-version skill and talks about nvm and .nvmrc)
+schema_version: "1.1"
+name: node-version-quiet-on-python-version
+description: >
+  Near-miss: a version manager, a pinned version file and an agent shell, but for Python.
+  Trigger-boundary negative, plugin arm only, scored as a fire count, no delta.
+tags: [node-version, trigger-boundary, "pair:node-version-fires-on-nvm-not-found"]
+
+execution:
+  prompt: |
+    My agent's shell keeps using the system Python instead of the version pinned in
+    .python-version, though it works in my own terminal where pyenv is set up. How do I make
+    the agent's commands run on the pinned Python?
+  max_turns: 4
+  allowed_tools:
+    - Skill
+
+graders:
+  - name: node_version_not_invoked
+    type: tool_used
+    tool: Skill
+    input_match: '"skill"\s*:\s*"(?:[\w-]+:)?node-version"'
+    min: 0
+    max: 0

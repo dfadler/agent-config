@@ -1,0 +1,44 @@
+# Run: node plugins/eval-authoring/scripts/ts/run-evals/run-evals.ts plugins/node-pnpm --case node-version-fires-on-nvm-not-found (Skill only; no grant needed).
+# Deleting "Source nvm and run the command in the same call" from SKILL.md should make this fail: the reply would suggest a bare `nvm use` or an rc edit instead of one sourced call.
+# good-reply: Your agent's shell starts fresh for each call and never reads ~/.zshrc, so nvm (a shell function) is not defined. Source it in the same call: bash -c '. "${NVM_DIR:-$HOME/.nvm}/nvm.sh" && nvm use >/dev/null && pnpm test'
+# bad-reply: Install nvm again, then add the nvm init lines to your ~/.zshrc and restart the terminal; nvm use will then work.
+schema_version: "1.1"
+name: node-version-fires-on-nvm-not-found
+description: >
+  A pasted `nvm: command not found` from an agent shell should fire node-version and produce
+  a single-call sourced command. expected_outcome: PASS when the reply sources nvm.sh and
+  runs nvm use and the command in one call, and explains why separate calls lose it; FAIL
+  otherwise. The Skill check is an indicator; the regexes carry the score.
+tags: [node-version, trigger, quick]
+
+execution:
+  prompt: |
+    My agent ran `nvm use && pnpm test` in my repo and got `bash: nvm: command not found`.
+    It works fine when I run the same thing in my own terminal. How do I get it to run
+    on the project's Node?
+  max_turns: 6
+  allowed_tools:
+    - Skill
+
+graders:
+  - name: skill_fired
+    type: tool_used
+    tool: Skill
+    input_match: '"skill"\s*:\s*"(?:[\w-]+:)?node-version"'
+    min: 1
+
+  # Outcome: sourcing and nvm use chained in one invocation.
+  - name: sources_and_uses_in_one_call
+    type: regex
+    target: last_message
+    pattern: '(?:\.|source)\s+["'']?(?:\$\{?NVM_DIR(?::-[^}]*)?\}?|\$HOME/\.nvm|~/\.nvm)/nvm\.sh["'']?\s*(?:&&|;)\s*nvm use[^\n]*(?:&&|;)\s*\S+'
+    flags: i
+    match: contains
+
+  # Outcome: the reason, so the user is not handed a command with no cause.
+  - name: explains_fresh_shell
+    type: regex
+    target: last_message
+    pattern: '(?:each|every|fresh|new|separate)[^.\n]{0,60}(?:shell|call|command|invocation)|non-?interactive|(?:does not|doesn.t|never) (?:source|load|read)[^.\n]{0,40}(?:rc|zshrc|bashrc|profile)'
+    flags: i
+    match: contains

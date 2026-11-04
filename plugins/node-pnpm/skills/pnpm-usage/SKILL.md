@@ -38,8 +38,9 @@ metadata:
 
 pnpm 11 ignores the `pnpm` field of `package.json`; `overrides`,
 `onlyBuiltDependencies` and similar belong in `pnpm-workspace.yaml`
-([pnpm 11 release notes](https://pnpm.io/blog/releases/11.0)). pnpm 11.28.2 prints a
-warning and ignores the keys, so an `overrides` entry added to `package.json` has no effect.
+([pnpm 11 release notes](https://pnpm.io/blog/releases/11.0)). pnpm 11.28.2 printed a
+warning and ignored the keys when tested locally (observed, not from the docs), so an
+`overrides` entry added to `package.json` has no effect.
 When the project has `pnpm-workspace.yaml`, edit settings there. For pnpm 10, check
 [the 10.x settings page](https://pnpm.io/10.x/settings) before choosing a file.
 `catalog:` entries live in `pnpm-workspace.yaml` too ([catalogs](https://pnpm.io/catalogs)).

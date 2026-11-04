@@ -1,0 +1,62 @@
+# Run: node plugins/eval-authoring/scripts/ts/run-evals/run-evals.ts plugins/node-pnpm --case node-version-upgrade-pin-covers-all-places (Skill only; no grant needed).
+# Deleting the "Upgrade the pin across a repo" list from SKILL.md should make this fail: the reply would bump .nvmrc and engines and stop, missing CI, the Dockerfile and @types/node.
+# good-reply: Change .nvmrc and engines.node to 24, switch CI to node-version-file: .nvmrc so it reads the same file, change the Dockerfile to node:24-slim, bump @types/node to ^24, update the README, then grep the repo for the old major 22.
+# bad-reply: Edit .nvmrc to 24 and set engines to >=24, then run nvm install.
+schema_version: "1.1"
+name: node-version-upgrade-pin-covers-all-places
+description: >
+  Upgrading the Node major in a repo with a CI file, Dockerfile and @types/node.
+  expected_outcome: PASS when the reply covers CI (ideally reading .nvmrc), the Dockerfile,
+  @types/node and a final grep; FAIL when it stops at .nvmrc and engines.
+tags: [node-version, trigger, quick]
+
+execution:
+  prompt: |
+    We're moving this repo from Node 22 to Node 24. What do I need to change? Relevant bits:
+
+    .nvmrc: 22
+    package.json: "engines": {"node": ">=22"}, "devDependencies": {"@types/node": "^22.10.0"}
+    .github/workflows/ci.yml: uses actions/setup-node with `node-version: 22`
+    Dockerfile: FROM node:22-slim
+    README.md: "Requires Node 22"
+  max_turns: 6
+  allowed_tools:
+    - Skill
+
+graders:
+  - name: skill_fired
+    type: tool_used
+    tool: Skill
+    input_match: '"skill"\s*:\s*"(?:[\w-]+:)?node-version"'
+    min: 1
+
+  # Outcome: CI reads the pin file rather than a second copy of the number. This is the part
+  # the skill adds; a reply that only sets `node-version: 24` scores 0 here on purpose.
+  - name: ci_reads_pin_file
+    type: regex
+    target: last_message
+    pattern: 'node-version-file\s*:'
+    match: contains
+
+  # Outcome: Dockerfile moved to 24. `node:24` is not in the prompt.
+  - name: dockerfile_updated
+    type: regex
+    target: last_message
+    pattern: 'node:24'
+    match: contains
+
+  # Outcome: @types/node bumped to the new major.
+  - name: types_node_bumped
+    type: regex
+    target: last_message
+    pattern: '@types/node[\s\S]{0,80}\^?24'
+    match: contains
+
+  # Outcome: a final sweep for the old major. Weighted low: a rephrase can miss it.
+  - name: greps_for_old_major
+    type: regex
+    target: last_message
+    pattern: '(?:grep|rg)\b[\s\S]{0,80}\b22\b'
+    flags: i
+    match: contains
+    weight: 0.5

@@ -1,0 +1,26 @@
+# Run: node plugins/eval-authoring/scripts/ts/run-evals/run-evals.ts plugins/node-pnpm --trigger-boundary (plugin arm only; no grant needed).
+# Maps to the SKILL.md description: "Not for ... Node API questions."
+# good-reply: fs.promises.readFile returns a promise while fs.readFile takes a callback; prefer the promise form in new code.
+# bad-reply: (invokes the node-version skill and walks through nvm use and .nvmrc)
+schema_version: "1.1"
+name: node-version-quiet-on-node-api-question
+description: >
+  Near-miss: mentions .nvmrc and a Node version but wants a Node API answer. Trigger-boundary
+  negative, plugin arm only, scored as a fire count, no delta.
+tags: [node-version, trigger-boundary, "pair:node-version-fires-on-nvm-not-found"]
+
+execution:
+  prompt: |
+    We pin Node 24 in .nvmrc. What's the difference between `fs.readFile` with a callback
+    and `fs.promises.readFile`, and which should I use in new code?
+  max_turns: 4
+  allowed_tools:
+    - Skill
+
+graders:
+  - name: node_version_not_invoked
+    type: tool_used
+    tool: Skill
+    input_match: '"skill"\s*:\s*"(?:[\w-]+:)?node-version"'
+    min: 0
+    max: 0
