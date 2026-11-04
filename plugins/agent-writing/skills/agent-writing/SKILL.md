@@ -44,7 +44,8 @@ its number is never reused.
 - **AW01 one-owner.** Each fact, policy or command (labels, branch names, commit
   format, lint command) lives in one file; the others link to it. Check: grep a
   distinctive phrase; a second hit outside the owner is a duplicate. Fix: keep the
-  owner's copy, replace the rest with a link.
+  owner's copy, replace the rest with a link. A format example restated in several
+  files is AW13, not AW01.
 - **AW02 agents-dispatch-only.** An agent file holds the input contract, scope and
   permission limits, and return format. The procedure lives in a skill the agent loads
   through `skills:` frontmatter. Check: does the agent body contain numbered steps?

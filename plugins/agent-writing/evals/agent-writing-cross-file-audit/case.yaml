@@ -1,6 +1,6 @@
 # Run: node plugins/eval-authoring/scripts/ts/run-evals/run-evals.ts plugins/agent-writing --case "agent-writing-cross-file-audit" (no grant needed; Skill only).
 # Maps to SKILL.md: "Each fact, policy or command ... lives in one file; the others link to it." (AW01), and the AW04, AW12 and AW13 sentences in Structure and Consistency.
-# good-reply: | AW01 | CLAUDE.md:1, skills/release-check/SKILL.md:1 | lint command pnpm lint --max-warnings 0 repeated | link | / | AW12 | AGENTS.md:2 says 500, CLAUDE.md:2 says 400 | keep one | / | AW13 | CLAUDE.md:3, SKILL.md:7 | changelog entry format fix(scope) restated | keep one | / | AW04 | CLAUDE.md:4, AGENTS.md:1 | ship-it still listed and called | remove |
+# good-reply: | AW01 | CLAUDE.md:1, skills/release-check/SKILL.md:1 | lint command pnpm lint --max-warnings 0 repeated | link | / | AW12 | AGENTS.md:2 says 500, CLAUDE.md:2 says 400 | keep one | / | AW13 | CLAUDE.md:3, SKILL.md:7 | changelog entry format fix(scope) restated | keep one | / | AW04 | CLAUDE.md:4, AGENTS.md:1 | ship-it still listed and called | remove | / | AW15 | SKILL.md:3 | description has no trigger | add when to use |
 # bad-reply: The lint command is repeated, the PR size limits disagree, and ship-it is still referenced after you replaced it.
 # Every grader needs the rule id on the same line as the defect term, so an echo of the prompt cannot pass. AW01, AW12 and AW13 overlap on a verbatim repeat; a reply that tags the changelog line AW01 only fails aw13_restated_format.
 schema_version: "1.1"
@@ -67,6 +67,14 @@ graders:
     type: regex
     target: last_message
     pattern: 'AW13[^\n]*(?:fix\(scope\)|changelog)|(?:fix\(scope\)|changelog)[^\n]*AW13'
+    flags: i
+    match: contains
+
+  # AW15: the SKILL.md description says what the skill does but gives no trigger.
+  - name: aw15_description_without_trigger
+    type: regex
+    target: last_message
+    pattern: 'AW15[^\n]*(?:description|trigger|when to use)|(?:description|trigger|when to use)[^\n]*AW15'
     flags: i
     match: contains
 

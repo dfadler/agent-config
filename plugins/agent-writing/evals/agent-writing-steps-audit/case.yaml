@@ -61,7 +61,7 @@ graders:
   - name: aw05_locations_in_paragraph
     type: regex
     target: last_message
-    pattern: 'AW05[^\n]*(?:step 3|package\.json|lockfile|Dockerfile|\.npmrc)|(?:step 3|package\.json|lockfile|Dockerfile|\.npmrc)[^\n]*AW05'
+    pattern: 'AW05[^\n]*(?:step 3|locations|package\.json|lockfile|Dockerfile|\.npmrc)|(?:step 3|locations|package\.json|lockfile|Dockerfile|\.npmrc)[^\n]*AW05'
     flags: i
     match: contains
 
