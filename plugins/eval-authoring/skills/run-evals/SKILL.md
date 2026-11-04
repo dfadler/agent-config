@@ -151,7 +151,10 @@ recorded for this repo), so the figure is only as good as the SD you give it (a 
 of ceiling or floor cases pools in SD 0 and gives an optimistic cutoff). It is a
 cutoff, not a power calculation: a true delta of that size clears the bar about half the
 time. It cannot say how many cases a suite needs or whether a suite-level delta is
-detectable, and it is not wired into `--dry-run`.
+detectable. `--dry-run` prints the same cutoff for a two-arm tier as "smallest detectable
+delta at N runs: X (SD S from ...)", with the SD from `--sd S` or pooled from the newest
+run under `<eval-dir>/results/`; with neither it says so and shows the `power.ts` command
+rather than guess an SD.
 
 ## What the tier values mean
 
