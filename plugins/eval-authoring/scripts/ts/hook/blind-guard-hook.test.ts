@@ -3,10 +3,12 @@
 // whether the hook fires for a subagent inside `claude plugin eval`, and the exact
 // agent_type string of a plugin subagent (the hook suffix-matches).
 import { spawnSync } from "node:child_process";
-import { readFileSync } from "node:fs";
+import { mkdirSync, mkdtempSync, readFileSync, rmSync, symlinkSync, writeFileSync } from "node:fs";
+import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
-import { describe, expect, it } from "vitest";
+import { afterEach, describe, expect, it } from "vitest";
+import { decide, globToRegExp } from "./blind-guard-hook.ts";
 
 const pluginRoot = join(dirname(fileURLToPath(import.meta.url)), "..", "..", "..");
 const HOOK = join(pluginRoot, "scripts", "ts", "hook", "blind-guard-hook.ts");
@@ -70,6 +72,109 @@ describe("blind-guard-hook", () => {
       expect(run(raw).status).toBe(0);
     },
   );
+});
+
+const verdict = (tool: string, toolInput: object): number => decide(call(tool, toolInput, BLIND)).code;
+
+describe("directory scope (decide, imported without running the entrypoint)", () => {
+  const roots: string[] = [];
+  afterEach(() => {
+    for (const d of roots.splice(0)) rmSync(d, { recursive: true, force: true });
+  });
+
+  it("allows a checkout that merely lives under a directory called results/ or evals/", () => {
+    expect(verdict("Read", { file_path: "/home/dev/results/project/plugins/p/skills/s/SKILL.md" })).toBe(0);
+    expect(verdict("Read", { file_path: "/home/dev/evals/project/plugins/p/skills/s/SKILL.md" })).toBe(0);
+  });
+
+  it.each([
+    "/home/dev/results/project/plugins/p/evals/x/case.yaml",
+    "/home/dev/results/project/plugins/p/evals/x/prompt.md",
+    "plugins/p/evals/x/prompt.md",
+    "evals/x/prompt.md",
+    "./evals/x/prompt.md",
+    "results/run-1/aggregate-result.json",
+  ])("blocks %s", (file_path) => {
+    expect(verdict("Read", { file_path })).toBe(2);
+  });
+
+  it("blocks evals/ under a directory that holds .claude-plugin/plugin.json, and only there", () => {
+    const root = mkdtempSync(join(tmpdir(), "blind-guard-"));
+    roots.push(root);
+    mkdirSync(join(root, ".claude-plugin"), { recursive: true });
+    writeFileSync(join(root, ".claude-plugin", "plugin.json"), "{}");
+    expect(verdict("Read", { file_path: join(root, "evals", "x", "prompt.md") })).toBe(2);
+    expect(verdict("Read", { file_path: join(root, "results", "r", "a.json") })).toBe(2);
+    expect(verdict("Read", { file_path: join(root, "skills", "s", "SKILL.md") })).toBe(0);
+    const bare = mkdtempSync(join(tmpdir(), "blind-guard-"));
+    roots.push(bare);
+    expect(verdict("Read", { file_path: join(bare, "evals", "x", "prompt.md") })).toBe(0);
+  });
+});
+
+describe("globs that can reach protected paths", () => {
+  it.each(["**", "**/*", "**/*.yaml", "**/*.md", "evals/**", "{evals,skills}/**", "*/*/case.yaml", "plugins/p/**", "plugins/p/**/*.yaml"])(
+    "blocks Glob pattern and Grep glob %s",
+    (pattern) => {
+      expect(verdict("Glob", { pattern })).toBe(2);
+      expect(verdict("Grep", { pattern: "x", glob: pattern })).toBe(2);
+    },
+  );
+
+  it("joins the search path onto the pattern", () => {
+    const root = mkdtempSync(join(tmpdir(), "blind-guard-"));
+    try {
+      mkdirSync(join(root, ".claude-plugin"), { recursive: true });
+      writeFileSync(join(root, ".claude-plugin", "plugin.json"), "{}");
+      expect(verdict("Glob", { pattern: "**/*.yaml", path: root })).toBe(2);
+      expect(verdict("Glob", { pattern: "skills/**/*.md", path: root })).toBe(0);
+    } finally {
+      rmSync(root, { recursive: true, force: true });
+    }
+  });
+
+  it.each(["**/SKILL.md", "**/author-cases/**", "skills/*/SKILL.md", "*.md", "plugins/p/skills/**/*.md"])(
+    "allows Glob pattern and Grep glob %s",
+    (pattern) => {
+      expect(verdict("Glob", { pattern })).toBe(0);
+      expect(verdict("Grep", { pattern: "x", glob: pattern })).toBe(0);
+    },
+  );
+
+  it("globToRegExp translates the supported syntax and escapes the rest", () => {
+    expect(globToRegExp("a/**/b.{md,txt}").test("a/x/y/b.txt")).toBe(true);
+    expect(globToRegExp("a/**/b").test("a/b")).toBe(true);
+    expect(globToRegExp("a/?.md").test("a/xy.md")).toBe(false);
+    expect(globToRegExp("a.md").test("aXmd")).toBe(false);
+    expect(globToRegExp("*.md").test("d/x.md")).toBe(false);
+  });
+});
+
+describe("entrypoint", () => {
+  it("reads stdin and exits 2 when run directly", () => {
+    const r = run(call("Read", { file_path: "evals/x/case.yaml" }, BLIND));
+    expect(r.status).toBe(2);
+    expect(r.stderr).toContain("Blocked");
+  });
+
+  it("runs through a symlink to the script", () => {
+    const dir = mkdtempSync(join(tmpdir(), "blind-guard-link-"));
+    try {
+      const link = join(dir, "hook.ts");
+      symlinkSync(HOOK, link);
+      const r = spawnSync(process.execPath, [link], {
+        input: call("Read", { file_path: "evals/x/case.yaml" }, BLIND),
+        encoding: "utf8",
+      });
+      expect(r.status).toBe(2);
+    } finally {
+      rmSync(dir, { recursive: true, force: true });
+    }
+  });
+
+  it("importing it does not run the hook (decide is a plain function, no exit, no stdin read)", () => {
+    expect(decide("{{{")).toEqual({ code: 0, message: "" });
+  });
 });
 
 describe("registration", () => {
