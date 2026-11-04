@@ -5,8 +5,8 @@ description: |
   when only asked for a plan or a command list: a Dockerfile, .dockerignore, compose.yaml,
   a failing `docker build`, a container that exits or restarts, or freeing disk with
   `docker prune`, `rm` or `compose down -v`. Returns Dockerfile and Compose rules cited to
-  docs.docker.com, a read-only diagnosis order, and which docker commands need a go-ahead.
-  Not for Kubernetes, Podman, Docker Desktop setup, or Docker steps in GitHub Actions workflows.
+  docs.docker.com, a read-only diagnosis order, and command permission tiers. Not for
+  Kubernetes, Podman, Docker Desktop setup or GitHub Actions docker steps.
 metadata:
   version: "1.0.0"
 ---
@@ -19,7 +19,9 @@ metadata:
   question.
 - **Output:** a Dockerfile or Compose change that follows the rules below with the
   docs.docker.com link for each rule applied; a diagnosis that names the evidence; or the
-  tier of each `docker` command and the exact command awaiting a go-ahead.
+  tier of each `docker` command and the exact command awaiting a go-ahead. Every claim in
+  the reply about what a command, flag or instruction does carries its docs.docker.com
+  link.
 - **Does not:** run a command in the Ask or Hand-back tiers without the permission that
   tier requires, or cover Kubernetes, Podman, Docker Desktop installation, or `docker/*`
   actions in workflows (use `gha-workflow-authoring`).

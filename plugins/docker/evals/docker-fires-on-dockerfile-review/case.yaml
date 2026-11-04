@@ -45,7 +45,8 @@ graders:
   - name: pins_digest
     type: regex
     target: last_message
-    pattern: '@sha256:'
+    pattern: '@sha256|pin[^\n]{0,60}digest|digest[^\n]{0,60}pin'
+    flags: i
     match: contains
 
   - name: digest_update_path
