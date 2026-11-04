@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { main, pooledSd, smallestDetectableDelta } from "./power.ts";
+import { detectableLine, main, pooledSd, smallestDetectableDelta, smallestSuiteDelta } from "./power.ts";
 import { readAggregateResult } from "../parser/index.ts";
 import { tCutoff } from "../diagnose/verdict.ts";
 
@@ -25,6 +25,32 @@ describe("smallestDetectableDelta", () => {
   });
   it("is undefined below two runs", () => {
     expect(smallestDetectableDelta(1, 0.25)).toBeUndefined();
+  });
+});
+
+describe("smallestSuiteDelta", () => {
+  it("is the t cutoff at cases x (runs - 1) df times the per-case SE over sqrt(cases), for a fixed plan", () => {
+    // sd 0.25, 5 runs: per-case SE 0.1581; 3 cases: SE 0.0913, t(12) 2.179.
+    expect(smallestSuiteDelta(5, 0.25, 3)).toBeCloseTo(0.1989, 3);
+  });
+  it("equals the per-case cutoff at one case", () => {
+    expect(smallestSuiteDelta(5, 0.25, 1)).toBeCloseTo(smallestDetectableDelta(5, 0.25) ?? NaN, 6);
+  });
+  it("floors the per-case SE at 0.05 before dividing, so SD 0 over 4 cases is still not noise-free", () => {
+    // SE 0.05 / 2 = 0.025, t(16) 2.12.
+    expect(smallestSuiteDelta(5, 0, 4)).toBeCloseTo(0.053, 3);
+  });
+  it("is undefined below two runs or one case", () => {
+    expect(smallestSuiteDelta(1, 0.25, 3)).toBeUndefined();
+    expect(smallestSuiteDelta(5, 0.25, 0)).toBeUndefined();
+  });
+});
+
+describe("detectableLine", () => {
+  it("adds the suite-mean line only when a case count is given", () => {
+    const known = { sd: 0.25, source: "--sd" };
+    expect(detectableLine(5, known)).not.toContain("suite-mean");
+    expect(detectableLine(5, known, 3)).toContain("smallest suite-mean delta over 3 case(s) at 5 runs: 0.20\n");
   });
 });
 
@@ -55,6 +81,16 @@ describe("main", () => {
     expect(main(["--runs", "3", "--sd", "0.2", "--from-result", "r.json"], io({})).code).toBe(2);
     expect(main(["--runs", "3", "--from-result", "nope.json"], io({})).code).toBe(1);
     expect(main(["--runs", "3", "--from-result", "r.json"], io({ "r.json": result([1], [0]) })).code).toBe(1);
+  });
+  it("prints the suite-mean cutoff for --cases and rejects a bad --cases with exit 2", () => {
+    const out = main(["--runs", "5", "--sd", "0.25", "--cases", "3"], io({}));
+    expect(out.code).toBe(0);
+    expect(out.stdout).toContain("Averaged over 3 case(s), a suite-mean delta under 0.20 cannot be told from noise");
+    expect(main(["--runs", "5", "--sd", "0.25"], io({})).stdout).not.toContain("Averaged over");
+    for (const bad of ["0", "2.5", "abc", "-1"]) {
+      expect(main(["--runs", "5", "--sd", "0.25", "--cases", bad], io({})).code).toBe(2);
+    }
+    expect(main(["--runs", "5", "--sd", "0.25", "--cases"], io({})).code).toBe(2);
   });
   it("says no delta can clear the bar when the cutoff is 1 or more, still exit 0", () => {
     // 2 runs, sd 0.25: t(1) 12.706 x SE 0.25 = 3.18, past the 0-to-1 score range.

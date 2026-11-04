@@ -1,16 +1,17 @@
-// The smallest per-case delta a plan could tell from noise, before any money is spent (#863).
-// Pure arithmetic over a planned run count and a noise estimate; makes no model calls.
+// The smallest per-case delta (and, given a case count, the smallest suite-mean delta) a plan could
+// tell from noise, before any money is spent (#863). Pure arithmetic over a planned run count and a
+// noise estimate; makes no model calls.
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
 import { readAggregateResult, type AggregateResult } from "../parser/index.ts";
-import { deltaBar, diagnose, type ArmStats } from "../diagnose/verdict.ts";
+import { deltaBar, diagnose, tCutoff, type ArmStats } from "../diagnose/verdict.ts";
 import { candidateResultDirs } from "./outcome.ts";
 
 const EXIT_OK = 0;
 const EXIT_FAILURE = 1;
 const EXIT_USAGE = 2;
 
-export const USAGE = `Usage: power.ts [-h|--help] --runs N (--sd S | --from-result RESULT.json)
+export const USAGE = `Usage: power.ts [-h|--help] --runs N (--sd S | --from-result RESULT.json) [--cases N]
 
 Print the smallest delta one case could show at 95% confidence with N runs per
 arm, given the per-run score standard deviation S (scores run 0 to 1). It is the
@@ -25,6 +26,13 @@ the SE floored at 0.05): a delta below it reads as weak-signal. No model calls.
                         pass or fail every run have SD 0 and pull the pool
                         down, so the cutoff is optimistic for a suite with
                         many ceiling or floor cases.
+  --cases N             Also print the smallest suite-mean delta, averaged
+                        over N cases (an integer, at least 1). The SE of the
+                        mean of N independent per-case deltas is the per-case
+                        SE over sqrt(N), floor included, with the t quantile at
+                        N x (runs - 1) degrees of freedom. It assumes cases are
+                        independent and share one SD, and leaves out how much
+                        the true deltas differ between cases, so it is a floor.
   -h, --help            Show this message and exit.
 
 Exit codes: 0 printed, 1 unreadable result or no SD in it, 2 usage error.
@@ -44,6 +52,23 @@ export const smallestDetectableDelta = (
   seFloor?: number,
 ): number | undefined =>
   runs < 2 ? undefined : deltaBar(arm(runs, sd), arm(runs, sd), seFloor).bar;
+
+/**
+ * Smallest suite-mean delta that clears the same 95% bar when the mean is taken over `cases`
+ * independent cases at `runs` per arm each: the per-case SE (floor included) over sqrt(cases),
+ * times the t quantile at cases x (runs - 1) degrees of freedom. Equals the per-case cutoff at one
+ * case. Leaves out between-case spread of the true deltas, so it is a lower bound. Undefined below
+ * 2 runs or 1 case.
+ */
+export const smallestSuiteDelta = (
+  runs: number,
+  sd: number,
+  cases: number,
+  seFloor?: number,
+): number | undefined =>
+  runs < 2 || cases < 1
+    ? undefined
+    : (tCutoff(cases * (runs - 1)) ?? 2) * (deltaBar(arm(runs, sd), arm(runs, sd), seFloor).se / Math.sqrt(cases));
 
 /** Pooled SD (weighted by degrees of freedom) over every arm of `results` with 2 or more usable runs; undefined when none. */
 export const pooledSd = (results: readonly AggregateResult[]): number | undefined => {
@@ -96,6 +121,18 @@ export const newestRunSd = (
       return sd === undefined ? [] : [{ sd, source: `results/${run}` }];
     })[0];
 
+/** A cutoff as text; a cutoff of 1 or more is past the 0-to-1 score range. */
+const shown = (delta: number): string =>
+  delta >= 1 ? `none (it would need to be ${delta.toFixed(2)})` : delta.toFixed(2);
+
+/** The suite-mean line: "" when the cutoff is undefined (under 2 runs or no cases). */
+const suiteLine = (runs: number, sd: number, cases: number): string => {
+  const delta = smallestSuiteDelta(runs, sd, cases);
+  return delta === undefined
+    ? ""
+    : `smallest suite-mean delta over ${String(cases)} case(s) at ${String(runs)} runs: ${shown(delta)}\n`;
+};
+
 /**
  * The `--dry-run` line for a two-arm plan of `runs` per arm: the cutoff when `sd` is known, else
  * one line saying what it needs. Never invents an SD.
@@ -103,11 +140,13 @@ export const newestRunSd = (
 export const detectableLine = (
   runs: number,
   known: { readonly sd: number; readonly source: string } | undefined,
+  cases?: number,
 ): string => {
   const delta = known === undefined ? undefined : smallestDetectableDelta(runs, known.sd);
   return known === undefined || delta === undefined
     ? `smallest detectable delta: not shown; it needs an SD. Pass --sd S or run once first, or run: node scripts/ts/run-evals/power.ts --runs ${String(runs)} --sd S\n`
-    : `smallest detectable delta at ${String(runs)} runs: ${delta >= 1 ? "none (it would need to be " + delta.toFixed(2) + ")" : delta.toFixed(2)} (SD ${known.sd.toFixed(2)} from ${known.source})\n`;
+    : `smallest detectable delta at ${String(runs)} runs: ${shown(delta)} (SD ${known.sd.toFixed(2)} from ${known.source})\n` +
+        (cases === undefined ? "" : suiteLine(runs, known.sd, cases));
 };
 export interface Outcome {
   readonly code: number;
@@ -124,7 +163,7 @@ const flagValue = (argv: readonly string[], flag: string): string | undefined =>
 
 export const main = (argv: readonly string[], io: Io): Outcome => {
   if (argv.includes("-h") || argv.includes("--help")) return { code: EXIT_OK, stdout: USAGE, stderr: "" };
-  const known = new Set(["--runs", "--sd", "--from-result"]);
+  const known = new Set(["--runs", "--sd", "--from-result", "--cases"]);
   const stray = argv.find((a) => a.startsWith("--") && !known.has(a));
   if (stray !== undefined) return usage(`unknown option ${stray}`);
   const dangling = [...known].find((f) => {
@@ -136,6 +175,11 @@ export const main = (argv: readonly string[], io: Io): Outcome => {
   const runs = Number(runsText);
   if (runsText === undefined || !Number.isInteger(runs) || runs < 2) {
     return usage("--runs needs an integer of at least 2");
+  }
+  const casesText = flagValue(argv, "--cases");
+  const cases = casesText === undefined ? undefined : Number(casesText);
+  if (cases !== undefined && (!Number.isInteger(cases) || cases < 1)) {
+    return usage("--cases needs an integer of at least 1");
   }
   const sdText = flagValue(argv, "--sd");
   const resultPath = flagValue(argv, "--from-result");
@@ -165,7 +209,14 @@ export const main = (argv: readonly string[], io: Io): Outcome => {
     delta >= 1
       ? `${head}, no delta can clear the 95% bar at ${String(runs)} runs per arm (it would need to be ${delta.toFixed(2)}).\n`
       : `${head}, a case cannot show a delta under ${delta.toFixed(2)} apart from noise at 95% confidence; a true delta this size clears it about half the time.\n`;
-  return { code: EXIT_OK, stdout, stderr: "" };
+  const suite = cases === undefined ? undefined : smallestSuiteDelta(runs, sd, cases);
+  const suiteOut =
+    cases === undefined || suite === undefined
+      ? ""
+      : suite >= 1
+        ? `Averaged over ${String(cases)} case(s), no suite-mean delta can clear the 95% bar (it would need to be ${suite.toFixed(2)}).\n`
+        : `Averaged over ${String(cases)} case(s), a suite-mean delta under ${suite.toFixed(2)} cannot be told from noise at 95% confidence (a cutoff, not a power calculation; it assumes independent cases and ignores how much true deltas differ between cases).\n`;
+  return { code: EXIT_OK, stdout: stdout + suiteOut, stderr: "" };
 };
 
 if (import.meta.main) {
