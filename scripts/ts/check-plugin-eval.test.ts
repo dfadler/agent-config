@@ -280,11 +280,11 @@ describe("check-plugin-eval", () => {
     expect(codeOf(check("1", many(16, 0.5, 0.4), f))).toBe(1);
   });
 
-  it("reports pass^k next to the mean (#736)", () => {
+  it("reports all-runs-pass next to the mean (#736)", () => {
     const r = check("0", many(2, 1, 0.4));
-    expect(r.tag === "ok" ? r.value : "").toContain("pass^k 1.00");
+    expect(r.tag === "ok" ? r.value : "").toContain("all-runs-pass 1.00");
     const m = check("0", many(2, 0.5, 0.4));
-    expect(m.tag === "ok" ? m.value : "").toContain("pass^k 0.00");
+    expect(m.tag === "ok" ? m.value : "").toContain("all-runs-pass 0.00");
   });
 
   it("warns on a diagnose verdict, not a raw delta (#736)", () => {

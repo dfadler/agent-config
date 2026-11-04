@@ -14,7 +14,7 @@ const USAGE = `Usage: save-baseline.ts [-h|--help] [--out FILE] [--force] [--tie
 
 Write a compact baseline summary from a finished run: plugin, date, plugin
 version, tier, model and judge model, mean with-plugin score, mean without-plugin
-score, mean delta, pass^k (share of cases whose with-plugin runs all scored 1)
+score, mean delta, all-runs-pass share (cases whose with-plugin runs all scored 1)
 and per-case with/without scores. Reads results only; runs nothing, costs nothing.
 
   RESULTS       A run directory (every aggregate-result.json under it is merged,
