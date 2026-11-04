@@ -6,7 +6,7 @@
 import { existsSync, mkdirSync, readFileSync, readdirSync, statSync, writeFileSync } from "node:fs";
 import { dirname, join } from "node:path";
 import { diagnose } from "./diagnose/verdict.ts";
-import { implausibleReasons, isErrored, readAggregateResult, silentZeroReasons } from "./parser/result.ts";
+import { everyRunZeroReasons, implausibleReasons, isErrored, readAggregateResult, silentZeroReasons } from "./parser/result.ts";
 import type { AggregateResult } from "./parser/index.ts";
 import { isRec, list, parse } from "./run-evals/summary.ts";
 
@@ -14,7 +14,7 @@ const USAGE = `Usage: save-baseline.ts [-h|--help] [--out FILE] [--force] [--tie
 
 Write a compact baseline summary from a finished run: plugin, date, plugin
 version, tier, model and judge model, mean with-plugin score, mean without-plugin
-score, mean delta, pass^k (share of cases whose with-plugin runs all scored 1)
+score, mean delta, all-runs-pass share (cases whose with-plugin runs all scored 1)
 and per-case with/without scores. Reads results only; runs nothing, costs nothing.
 
   RESULTS       A run directory (every aggregate-result.json under it is merged,
@@ -125,6 +125,7 @@ export const buildBaseline = (
     else metas.push(meta);
     cases.push(...read.result.cases);
   });
+  reasons.push(...everyRunZeroReasons(docs.flatMap((d) => (d === undefined ? [] : [d]))));
   const first = metas[0];
   if (first !== undefined && metas.some((m) => !sameMeta(first, m))) {
     reasons.push("results disagree on plugin, version, model or judge model");

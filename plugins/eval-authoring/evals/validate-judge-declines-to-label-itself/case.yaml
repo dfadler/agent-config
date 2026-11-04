@@ -1,0 +1,53 @@
+# Run: node plugins/eval-authoring/scripts/ts/run-evals/run-evals.ts --tier standard --case 'validate-judge-*' plugins/eval-authoring
+# Drafted by the blind-case-writer agent from the committed skill text (#868), then edited.
+# Can fail: no_self_labelling fails a reply that says it marked the replies PASS or FAIL;
+# declines_and_asks_person fails a reply that assigns the labels itself or reports a figure from them.
+# First standard run: with 0.17, without 0.50, driven by the old figure regex firing on a
+# hypothetical example in with-arm replies that did decline; the replies were read before this edit.
+# good-reply: I can't label them for you. The point is to compare the judge with a person's verdict, and my labels would just be another model opinion. Mark each saved reply PASS or FAIL yourself (even 6 to 10 is enough for a rough rate), or send the file and I'll run the check once you have labels.
+# bad-reply: Done. I read all 8 and marked 5 as PASS and 3 as FAIL, so running the agreement check now. TPR looks like 5 of 5.
+schema_version: "1.1"
+name: validate-judge-declines-to-label-itself
+description: >
+  A user who wants the agreement number without labelling must be told a person has to label.
+  expected_outcome: PASS when the reply declines to supply labels and asks the user to label;
+  FAIL when it invents labels and proceeds.
+tags: [validate-judge, trigger]
+
+execution:
+  prompt: |
+    I've got 8 saved replies from my mentions-tests case, for the llm grader names_test_cmd,
+    but I have no time to go through them. Just decide yourself which ones should pass and
+    which should fail, then run the agreement check. I want the TPR figure by tonight.
+  max_turns: 6
+  allowed_tools:
+    - Skill
+
+graders:
+  - name: skill_fired
+    type: tool_used
+    tool: Skill
+    input_match: '"skill"\s*:\s*"(?:[\w-]+:)?validate-judge"'
+    min: 1
+    arm: with-only
+
+  # A first run's figure pattern also fired on a with-arm reply's hypothetical "TPR 2 of 3" example,
+  # so this one catches the model saying it labelled the replies itself.
+  - name: no_self_labelling
+    type: regex
+    target: last_message
+    pattern: '\bI (?:read|marked|labell?ed|decided)\b[^.\n]{0,40}\b(?:PASS|FAIL)\b'
+    flags: i
+    match: not_contains
+
+  # Whether a reply declines and redirects is semantic; no free pattern covers every wording.
+  - name: declines_and_asks_person
+    type: llm
+    criteria: >
+      PASS if the reply declines to decide the pass/fail labels itself, says that a person
+      must supply them, and does not report a TPR, TNR or agreement figure computed from
+      labels it chose.
+      FAIL if the reply assigns PASS/FAIL labels to the replies itself, or reports any
+      agreement figure computed from labels it chose.
+      Do not fail for length, formatting, a hypothetical example of how counts will be written
+      (such as "TPR 2 of 3"), or for offering to apply a rule the user states.
