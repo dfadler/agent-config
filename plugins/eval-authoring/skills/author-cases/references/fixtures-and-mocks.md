@@ -62,8 +62,9 @@ Body is the tool result. Options:
   saved `tools/list` for real descriptions and schemas.
 
 Grade the calls with `target: mock_calls` (or `focus: mock_calls`). In a two-arm run those
-graders are indicators only when the mocked server is plugin-declared, unless `arm: both`
-(EVAL010); read them as "did the plugin ask the right thing", not as part of Δ.
+graders are indicators only when the mocked server is plugin-declared, unless `arm: both`;
+read them as "did the plugin ask the right thing", not as part of Δ. The exception is a
+case where every grader is excluded: they all score normally and inflate Δ (EVAL008).
 
 ### Fixed or agent mock, and the success-only hazard
 

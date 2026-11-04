@@ -227,6 +227,18 @@ describe("check-plugin-eval", () => {
     expect(r.tag === "ok" ? r.value : "").toContain("(3 cases)");
   });
 
+  // "Every run scored 0" means a dead run (usage limit, bad login). One case that
+  // fails every run in both arms is a case problem for diagnose(), not a dead run.
+  it("does not call the run inconclusive for one all-zero case among scoring ones", () => {
+    const files = { ...perCase(3, 1, 0.4), "zero.json": caseFile(9, 0, 0) };
+    expect(codeOf(checkFiles("1", files))).toBe(1);
+    expect(codeOf(checkFiles("0", files))).toBe(0);
+  });
+
+  it("still calls a run inconclusive when every run of every file scored 0", () => {
+    expect(codeOf(checkFiles("1", { "a.json": caseFile(0, 0, 0), "b.json": caseFile(1, 0, 0) }))).toBe(7);
+  });
+
   it("makes the whole run inconclusive when one file is invalid, naming it", () => {
     const files = { ...perCase(16, 0.9, 0.4), "bad.json": result({ partial: true }) };
     const r = checkFiles("0", files, f);
@@ -280,11 +292,11 @@ describe("check-plugin-eval", () => {
     expect(codeOf(check("1", many(16, 0.5, 0.4), f))).toBe(1);
   });
 
-  it("reports pass^k next to the mean (#736)", () => {
+  it("reports all-runs-pass next to the mean (#736)", () => {
     const r = check("0", many(2, 1, 0.4));
-    expect(r.tag === "ok" ? r.value : "").toContain("pass^k 1.00");
+    expect(r.tag === "ok" ? r.value : "").toContain("all-runs-pass 1.00");
     const m = check("0", many(2, 0.5, 0.4));
-    expect(m.tag === "ok" ? m.value : "").toContain("pass^k 0.00");
+    expect(m.tag === "ok" ? m.value : "").toContain("all-runs-pass 0.00");
   });
 
   it("warns on a diagnose verdict, not a raw delta (#736)", () => {

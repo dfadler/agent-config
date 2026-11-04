@@ -1,0 +1,28 @@
+# Run: node plugins/eval-authoring/scripts/ts/run-evals/run-evals.ts --trigger-boundary --case validate-judge-quiet-on-low-score-question plugins/eval-authoring
+# Trigger-boundary negative (#868). Shares the vocabulary "llm grader", "judge" and "score" but
+# asks why a live run scored low, which belongs to diagnose-scores. Plugin arm only, so no delta.
+# Can fail: validate_judge_not_invoked fails any run that calls the validate-judge skill.
+schema_version: "1.1"
+name: validate-judge-quiet-on-low-score-question
+description: >
+  Trigger-boundary negative. A question about why a live run scored low is diagnose-scores
+  territory. expected_outcome: validate-judge is not invoked. Counted by run-evals
+  --trigger-boundary, so no delta is expected.
+tags: [validate-judge, trigger-boundary, "pair:validate-judge-fires-on-trust-question"]
+
+execution:
+  prompt: |
+    My llm grader has_citation scored 0.33 across three runs of the cites-sources case. The
+    reply in run 2 ended with "Sources: [1]" and the judge still failed it. Why is the score
+    so low?
+  max_turns: 4
+  allowed_tools:
+    - Skill
+
+graders:
+  - name: validate_judge_not_invoked
+    type: tool_used
+    tool: Skill
+    input_match: '"skill"\s*:\s*"(?:[\w-]+:)?validate-judge"'
+    min: 0
+    max: 0

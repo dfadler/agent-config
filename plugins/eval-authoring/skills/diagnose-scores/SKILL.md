@@ -63,8 +63,8 @@ interprets the verdict.
 - **`split-judge-votes`, `high-variance`:** an unstable criterion. Name the grader, the
   condition two judges could read differently, and the rewording. To size the noise, run
   `node ${CLAUDE_SKILL_DIR}/../../scripts/ts/judge-agreement.ts RESULTS` (free; `--labels FILE` of
-  human PASS/FAIL adds agreement, kappa, TPR and TNR). It cannot re-run the judge: only a direct
-  model call can, which is the owner's decision.
+  human PASS/FAIL adds agreement, kappa, TPR and TNR). It cannot re-run the judge; to put the
+  judge on labelled replies, hand off to [validate-judge](../validate-judge/SKILL.md) (paid, tiny).
 - **`no-scored-graders`, `no-delta-signal`:** every grader is excluded from scoring
   (`arm: with-only`, `tool_used: Skill` without `arm: both`, mock-calls on plugin mocks) or
   only one arm ran. Name which, and the change (`arm: both`, a free grader that counts, or
