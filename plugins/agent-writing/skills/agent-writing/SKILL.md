@@ -1,11 +1,11 @@
 ---
 name: agent-writing
 description: |
-  Write or audit text that agents read: SKILL.md files, agent definitions, CLAUDE.md,
-  AGENTS.md and convention files. Defines numbered rules AW01-AW20, each with a runnable
-  check and a fix. Use when creating, editing, shortening or reviewing such a file, or
-  when asked to audit a skill, agent or instruction file. Not for READMEs, docs prose,
-  commit messages or PR text.
+  ALWAYS invoke this skill first when writing, editing, shortening or auditing a SKILL.md,
+  an agent definition, a CLAUDE.md or AGENTS.md file, or a convention file, even for a
+  one-line rule or a short snippet written in a reply. It defines numbered rules
+  AW01-AW20, each with a runnable check and a fix. Not for READMEs, docs prose, commit
+  messages or PR text.
 metadata:
   version: "1.0.0"
 ---

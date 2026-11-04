@@ -2,6 +2,7 @@
 # Maps to SKILL.md: "No incident logs, build numbers, dates, or words that age" (AW08) and "A rule is one imperative sentence plus a check command" (AW06).
 # good-reply: Run `pnpm biome check .` before every commit and fix every reported error.
 # bad-reply: ## Linting We switched from eslint to biome last week after the Oct 12 CI breakage. Currently the lint command is `pnpm biome check .`.
+# First paid run (standard): "Do not use eslint" is kept out of the pattern because it is an instruction, not history; "replaced", "moved to", "no longer" are history words (AW08).
 # EVAL024 on no_history and short_paste is intended: both are not_contains/length checks where an echo of the prompt's backstory is the failure being graded.
 schema_version: "1.1"
 name: agent-writing-claude-md-rule-no-history
@@ -35,7 +36,7 @@ graders:
   - name: no_history
     type: regex
     target: last_message
-    pattern: 'eslint|Oct(?:ober)?\.?\s*12|last week|breakage|incident|switched|currently|recently'
+    pattern: 'Oct(?:ober)?\.?\s*12|last week|breakage|incident|switched|moved to|replaced|no longer|dropped|currently|recently'
     flags: i
     match: not_contains
 

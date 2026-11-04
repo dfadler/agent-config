@@ -52,7 +52,7 @@ graders:
   - name: flags_write_tool_line5
     type: regex
     target: last_message
-    pattern: 'AW11[^\n]*(?:\bline\s*5\b|\bL5\b|:5\b|\|\s*5\s*\|)|(?:\bline\s*5\b|\bL5\b|:5\b|\|\s*5\s*\|)[^\n]*AW11'
+    pattern: 'AW11[^\n]*(?:\bline\s*5\b|\bL5\b|:5\b|\|[^|\n]*\b5\b[^|\n]*\|)|(?:\bline\s*5\b|\bL5\b|:5\b|\|[^|\n]*\b5\b[^|\n]*\|)[^\n]*AW11'
     flags: i
     match: contains
 
