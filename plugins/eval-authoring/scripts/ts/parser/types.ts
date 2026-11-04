@@ -375,7 +375,7 @@ export type ResolvedEvalDir =
 /**
  * What `isScored` needs beyond the grader. `mock_calls` graders are excluded
  * only when they check a plugin-declared mock, which the grader alone cannot say.
- * Used by EVAL008, EVAL009, EVAL010.
+ * Used by EVAL008 and EVAL009.
  */
 export interface ScoringContext {
   /** Server names of mocks the plugin declares (`MockCatalog.declaredServers`). */
@@ -388,7 +388,7 @@ export type ExclusionReason =
   | "arm-with-only"
   | "mock-calls-on-declared-mock";
 
-/** One grader's scoring outcome. Used by EVAL008 and EVAL010. */
+/** One grader's scoring outcome. Used by EVAL008. */
 export interface GraderScoring {
   readonly grader: Grader;
   readonly scored: boolean;
