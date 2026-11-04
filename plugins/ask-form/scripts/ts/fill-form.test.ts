@@ -100,3 +100,11 @@ describe("cli", () => {
     expect(r.stderr).toMatch(/usage/);
   });
 });
+
+describe("template accessibility and answers block", () => {
+  it("labels the Other input, ties help to its fieldset, and flattens newlines in labels", () => {
+    expect(TEMPLATE).toContain("setAttribute('aria-label', 'Other answer for: '");
+    expect(TEMPLATE).toContain("setAttribute('aria-describedby'");
+    expect(TEMPLATE).toContain("q.label.replace(/\\s+/g, ' ')");
+  });
+});
