@@ -46,7 +46,7 @@ gates only its own cases.
   --delta-floor F  Opt-in gate (#736): the mean delta over cases with a delta
                    must reach F (CI uses 0.14) or the run is a regression.
                    Advisory (warn, exit 0) under ${String(MIN_GATE_CASES)} cases. Per-case
-                   verdicts come from diagnose() and only warn. pass^k
+                   verdicts come from diagnose() and only warn. all-runs-pass
                    (share of cases whose with-plugin runs all scored 1) is
                    reported alongside the mean score.
   RESULT.json...   The run's aggregate-result.json files, one or more.
@@ -104,14 +104,14 @@ const verdictWarnings = (d: Diagnosis): readonly string[] =>
     )
     .map((c) => `warning: ${c.name}: ${c.verdict}: ${c.reason}\n`);
 
-/** Mean with-arm score and pass^k (share of cases whose with-arm runs all scored 1). */
+/** Mean with-arm score and all-runs-pass share (cases whose with-arm runs all scored 1). */
 const reliabilityLine = (r: AggregateResult): string => {
   const cs = r.cases
     .map((c) => c.withRuns.flatMap((x) => (x.score === undefined ? [] : [x.score])))
     .filter((s) => s.length > 0);
   if (cs.length === 0) return "";
-  const passK = cs.filter((s) => s.every((x) => x >= 1)).length / cs.length;
-  return `with-plugin mean ${mean(cs.map(mean)).toFixed(2)}, pass^k ${passK.toFixed(2)} (${String(cs.length)} cases)\n`;
+  const allPass = cs.filter((s) => s.every((x) => x >= 1)).length / cs.length;
+  return `with-plugin mean ${mean(cs.map(mean)).toFixed(2)}, all-runs-pass ${allPass.toFixed(2)} (${String(cs.length)} cases)\n`;
 };
 
 /**
