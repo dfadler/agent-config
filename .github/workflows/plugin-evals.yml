@@ -123,7 +123,9 @@ jobs:
         env:
           CLAUDE_CODE_OAUTH_TOKEN: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
         run: |
-          set -uo pipefail
+          # +e: the runner's default shell is `bash -e`, which would end the step at
+          # the first non-zero wrapper exit, before cli-exit is written, and skip Check.
+          set +e -uo pipefail
           mkdir -p "$OUT_DIR"
           # Standard tier: every case, 3 runs, with and without the plugin. The tier's
           # flat $5 ceiling stopped the big suites part way (#648), so CI raises it to
