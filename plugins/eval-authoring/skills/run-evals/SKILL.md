@@ -141,7 +141,9 @@ within-case noise, while the error of a delta also depends on how many cases the
 needs a with-and-without comparison at `thorough` on a suite of about 20 cases or more. The
 wrapper's summary says the same under its table. The `± band (n runs/arm)` it prints beside a
 `thorough` case delta is that one case's 95% noise bar (t quantile x standard error of the
-difference): a delta inside it is noise-level. It does not lift the suite-size rule above.
+difference): a delta inside it is noise-level. A delta from fewer than 5 usable runs in an
+arm (for example after errored runs are dropped) is also marked `provisional`: rerun with
+more runs before quoting it. Neither mark lifts the suite-size rule above.
 
 **Before paying: what can this plan detect?** `node scripts/ts/run-evals/power.ts --runs 5
 --sd 0.25` (or `--from-result <aggregate-result.json>` for the SD pooled over an earlier
