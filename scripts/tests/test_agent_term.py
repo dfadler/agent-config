@@ -14,6 +14,7 @@ import contextlib
 import importlib.util
 import os
 import re
+import select
 import signal
 import stat
 import subprocess
@@ -564,6 +565,39 @@ class TestHistoryGating:
         result = term("read", "hg2", "--raw", "--history", "--lines", "50")
         assert "line-0" in result.stdout
         assert "line-11" in result.stdout
+
+
+class TestSendKeepsPendingOutput:
+    def test_output_pending_during_send_reaches_the_screen(self) -> None:
+        """`keys` must not eat output the child produced before it ran.
+
+        send() drains the PTY while it writes, to avoid a full-buffer
+        deadlock. The first version read those bytes and threw them away, so
+        any output that landed between the daemon's last pump and the next
+        `keys` request vanished from the screen -- the cause of
+        test_history_flag_includes_scrolled_off_content failing intermittently
+        on slow CI runners (earliest lines missing, the amount varying).
+
+        Driven at the Session level because the end-to-end race needs a
+        scheduling stall to hit; here the output is made pending by
+        construction: sleep until the child has printed, send, then pump.
+        """
+        session = agent_term.Session(
+            "pending", ["sh", "-c", "echo child-output; sleep 30"], "/unused"
+        )
+        try:
+            deadline = time.time() + 10
+            while (
+                time.time() < deadline
+                and not select.select([session.fd], [], [], 0.1)[0]
+            ):
+                pass
+            session.send(["x"])
+            while select.select([session.fd], [], [], 0.2)[0]:
+                session.pump()
+            assert "child-output" in session.render()
+        finally:
+            session.terminate()
 
 
 class TestProcessGroupCleanup:

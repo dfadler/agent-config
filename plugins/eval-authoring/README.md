@@ -25,7 +25,7 @@ checks what a script can; the rest needs a paid run.
 | [`scripts/ts/run-evals/`](scripts/ts/run-evals/run-evals.ts) | The wrapper: cost tiers `quick` / `standard` / `thorough`, one CLI invocation per case (each under its own grants), a cumulative cost ceiling, preflight checks, never `--scaffold`. |
 | [`skills/diagnose-scores`](skills/diagnose-scores/SKILL.md) | Finds the result file, runs the script and interprets each verdict (cause, evidence, next step). |
 | [`skills/mine-cases`](skills/mine-cases/SKILL.md) | Drafts cases from real failures (session transcripts, merged PR history), redacted first: [`redact.ts`](scripts/ts/mine-cases/redact.ts) reads a transcript and checks drafts for emails, paths and tokens ([#862](https://github.com/dfadler/agent-config/issues/862)). |
-| [`skills/validate-judge`](skills/validate-judge/SKILL.md) | Paid but tiny. Measures how well one `llm` grader agrees with human PASS/FAIL labels (agreement, kappa, TPR, TNR) by judging each labelled reply as a file in a throwaway probe plugin, via [`validate-judge.ts`](scripts/ts/validate-judge.ts) ([#868](https://github.com/dfadler/agent-config/issues/868)). Runs only on your go-ahead in chat. |
+| [`skills/validate-judge`](skills/validate-judge/SKILL.md) | Paid but tiny. Measures how well an `llm` grader agrees with human pass/fail labels (agreement, kappa, TPR, TNR) through a throwaway probe plugin; [`validate-judge.ts`](scripts/ts/validate-judge.ts) builds it, [`judge-agreement.ts`](scripts/ts/judge-agreement.ts) reports. |
 | [`scripts/ts/judge-agreement.ts`](scripts/ts/judge-agreement.ts) | Free, offline. For every `llm` grader in saved results, the judge's vote split and how often votes were unanimous; with `--labels`, agreement, kappa, TPR and TNR against a person. Cannot re-run a judge ([#864](https://github.com/dfadler/agent-config/issues/864)). |
 | [`scripts/ts/run-evals/power.ts`](scripts/ts/run-evals/power.ts) | Free. Prints the smallest per-case delta a planned run count could tell from noise, given `--sd` or `--from-result`; the same cutoff `diagnose.ts` applies ([#863](https://github.com/dfadler/agent-config/issues/863)). |
 | [`scripts/ts/diagnose/`](scripts/ts/diagnose/diagnose.ts) | Free per-case verdict from an `aggregate-result.json` (delta, variance, run errors, split judge votes). |
@@ -44,7 +44,8 @@ node plugins/eval-authoring/scripts/ts/run-evals/run-evals.ts --tier quick --dry
 node plugins/eval-authoring/scripts/ts/diagnose/diagnose.ts <results-dir>/aggregate-result.json
 ```
 
-Every script takes `--help` (flags, output, exit codes). CI runs the free lint on every
+Every script takes `--help` (flags, output, exit codes) except `check-replies.ts`, whose usage is
+in its header comment. CI runs the free lint on every
 PR (`pnpm run lint-plugin-evals`). Paid runs are a separate, non-gating workflow
 (`.github/workflows/plugin-evals.yml`: manual only, never on `pull_request`; the weekly run is a
 local scheduled task);
@@ -65,7 +66,7 @@ grader per run. `quick` runs only cases tagged `quick` (free graders), once, plu
 `trigger-boundary` cases). `--trigger-boundary` runs the should-not-fire suite instead: each
 negative once with its `pair:` twin, plugin arm only, reported as a fire count with a Wilson
 bound rather than a delta.
-All tiers pass `--threshold 1` (every grader must pass, so one miss fails a case) and a
+`quick`, `standard` and `thorough` pass `--threshold 1` (every grader must pass, so one miss fails a case; `--trigger-boundary` passes 0) and a
 tier-specific cost ceiling (`quick` scales with the number of cases); see [run-evals](skills/run-evals/SKILL.md#what-the-tier-values-mean).
 
 ## Requirements

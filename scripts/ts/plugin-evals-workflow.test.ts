@@ -195,6 +195,55 @@ describe("eval job: check results step", () => {
   });
 });
 
+// The Run evals step, run under `bash -e` like the runner's default shell, with a
+// fake `node` (the wrapper) and a `timeout` shim (macOS has none). A failing
+// wrapper must not end the step before cli-exit is written, or Check is skipped (#906).
+const runStep = (
+  /- name: Run evals\n {8}env:[\s\S]*?run: \|\n([\s\S]*?)\n\n {6}# No secrets in this step/.exec(
+    workflow,
+  )?.[1] ?? ""
+).replace(/^ {10}/gm, "");
+
+const runEvals = (wrapperExit: number) => {
+  const dir = mkdtempSync(join(tmpdir(), "run-"));
+  const bin = join(dir, "bin");
+  mkdirSync(bin);
+  writeFileSync(
+    join(bin, "node"),
+    `#!/bin/bash\nexit ${String(wrapperExit)}\n`,
+    { mode: 0o755 },
+  );
+  writeFileSync(join(bin, "timeout"), `#!/bin/bash\nshift 3\nexec "$@"\n`, {
+    mode: 0o755,
+  });
+  const out = join(dir, "out");
+  const r = spawnSync("bash", ["-e", "-c", runStep], {
+    encoding: "utf8",
+    env: {
+      ...process.env,
+      ["PATH"]: `${bin}:${process.env["PATH"] ?? ""}`,
+      ["OUT_DIR"]: out,
+      ["PLUGIN"]: "p",
+    },
+  });
+  return {
+    status: r.status,
+    cliExit: readFileSync(join(out, "cli-exit"), "utf8").trim(),
+  };
+};
+
+describe("eval job: run evals step", () => {
+  it("writes the wrapper's non-zero exit to cli-exit and still succeeds (#906)", () => {
+    const r = runEvals(1);
+    expect(r.cliExit).toBe("1");
+    expect(r.status).toBe(0);
+  });
+
+  it("writes 0 when the wrapper passes", () => {
+    expect(runEvals(0).cliExit).toBe("0");
+  });
+});
+
 describe("notify job: failure issue", () => {
   it("fires on a failed or cancelled eval (job timeout), not on success (#889)", () => {
     expect(workflow).toMatch(

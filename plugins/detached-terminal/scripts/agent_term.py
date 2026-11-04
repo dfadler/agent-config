@@ -257,12 +257,11 @@ class Session:
             # character can fill the kernel's PTY output buffer while this
             # loop is writing, causing os.write to block and deadlock: the
             # child waits for its stdout to be drained, but we're stuck
-            # waiting for the child to read more stdin.
+            # waiting for the child to read more stdin. The bytes go through
+            # the screen, not the floor: discarding them silently dropped
+            # whatever output the child had already produced.
             if r:
-                try:
-                    os.read(self.fd, 4096)
-                except OSError:
-                    pass
+                self.pump()
             if not w:
                 if time.time() > deadline:
                     raise RuntimeError(

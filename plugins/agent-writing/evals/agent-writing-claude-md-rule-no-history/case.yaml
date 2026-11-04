@@ -1,0 +1,56 @@
+# Run: node plugins/eval-authoring/scripts/ts/run-evals/run-evals.ts plugins/agent-writing --case "agent-writing-claude-md-rule-no-history" (no grant needed; Skill only).
+# Maps to SKILL.md: "No incident logs, build numbers, dates, or words that age" (AW08) and "A rule is one imperative sentence plus a check command" (AW06).
+# good-reply: Run `pnpm biome check .` before every commit and fix every reported error.
+# bad-reply: ## Linting We switched from eslint to biome last week after the Oct 12 CI breakage. Currently the lint command is `pnpm biome check .`.
+# First paid run (standard): "Do not use eslint" is kept out of the pattern because it is an instruction, not history; "replaced", "moved to", "no longer" are history words (AW08).
+# EVAL024 on no_history and short_paste is intended: both are not_contains/length checks where an echo of the prompt's backstory is the failure being graded. keeps_command is cued by the prompt on purpose: it only exists to fail a reply that drops the command.
+schema_version: "1.1"
+name: agent-writing-claude-md-rule-no-history
+description: >
+  Writing mode: the user supplies backstory with the command. The pasted text should carry the
+  rule and command only, no dates, incident or migration story. expected_outcome: PASS when
+  the text is short and holds none of the prompt's history; FAIL when the backstory is carried
+  over. The 400-character cap is an inference about what "one sentence plus a check" yields,
+  not a measured figure. A bare model often drops history too, so a small delta is possible;
+  run the baseline before trusting it.
+tags: [agent-writing, trigger, quick]
+
+execution:
+  prompt: |
+    Our CLAUDE.md needs a lint rule. Context for you: we dropped eslint for biome last week
+    after the Oct 12 CI breakage, and the command is now `pnpm biome check .`. Reply with only
+    the text to paste in, nothing else.
+  max_turns: 4
+  allowed_tools:
+    - Skill
+
+graders:
+  - name: skill_fired
+    type: tool_used
+    tool: Skill
+    input_match: '"skill"\s*:\s*"(?:[\w-]+:)?agent-writing"'
+    min: 1
+
+  # None of the prompt's backstory or aging words survives. Each alternative is in the prompt or
+  # is a word that ages, so an echo of the context fails.
+  - name: no_history
+    type: regex
+    target: last_message
+    pattern: 'Oct(?:ober)?\.?\s*12|last week|breakage|incident|switched|moved to|replaced|no longer|dropped|currently|recently'
+    flags: i
+    match: not_contains
+
+  # Short: the paste is a rule, not a section with rationale. Inference: 400 chars.
+  - name: short_paste
+    type: regex
+    target: last_message
+    pattern: '^[\s\S]{1,400}$'
+    match: contains
+
+  # The command the user asked for survives. The prompt contains it, so an echo passes this;
+  # it exists to fail a reply that drops the command ("Run the linter before every commit.").
+  - name: keeps_command
+    type: regex
+    target: last_message
+    pattern: 'pnpm biome check \.'
+    match: contains

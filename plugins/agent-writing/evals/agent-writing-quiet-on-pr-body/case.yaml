@@ -1,0 +1,27 @@
+# Run: node plugins/eval-authoring/scripts/ts/run-evals/run-evals.ts plugins/agent-writing --trigger-boundary (plugin arm only; no grant needed).
+# Maps to SKILL.md description: "Not for READMEs, docs prose, commit messages or PR text."
+# good-reply: ## Summary Shortens review/SKILL.md from 310 to 180 lines by moving the security checklist to references/security.md. (a PR body, no skill call)
+# bad-reply: (invokes the skill and audits SKILL.md against AW rules instead of writing the PR body)
+schema_version: "1.1"
+name: agent-writing-quiet-on-pr-body
+description: >
+  Near-miss: the change is to a SKILL.md and mentions shortening, but the deliverable is PR
+  text. Trigger-boundary negative, plugin arm only, no delta.
+tags: [agent-writing, trigger-boundary, "pair:agent-writing-claude-md-rule-no-history"]
+
+execution:
+  prompt: |
+    Write the PR description for this change. I shortened plugins/review/skills/review/SKILL.md
+    from 310 lines to 180 by moving the security checklist into references/security.md and
+    cutting the duplicated lint instructions.
+  max_turns: 4
+  allowed_tools:
+    - Skill
+
+graders:
+  - name: agent_writing_not_invoked
+    type: tool_used
+    tool: Skill
+    input_match: '"skill"\s*:\s*"(?:[\w-]+:)?agent-writing"'
+    min: 0
+    max: 0

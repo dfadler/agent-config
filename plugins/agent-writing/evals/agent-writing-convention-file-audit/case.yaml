@@ -1,0 +1,62 @@
+# Run: node plugins/eval-authoring/scripts/ts/run-evals/run-evals.ts plugins/agent-writing --case "agent-writing-convention-file-audit" (no grant needed; Skill only).
+# Maps to SKILL.md: "A rule is one imperative sentence plus a check command; add detail only for a case the sentence would miss." (AW06), and the AW09 and AW10 sentences.
+# good-reply: | AW06 | conventions/error-handling.md | 90 lines for one rule, cut to the sentence and a check | cut | / | AW09 | conventions/error-handling.md:9 | example uses real names Stripe and Shopify, Maria | use <placeholders> | / | AW10 | conventions/error-handling.md:11 | Vercel rollback claim with no vendor link | add link or delete |
+# bad-reply: This file is long, the example should be more generic, and you should link to Vercel's docs for the rollback claim.
+schema_version: "1.1"
+name: agent-writing-convention-file-audit
+description: >
+  A pasted convention file stated to run 90 lines, with real company and person names
+  in its example and an unlinked "I believe" vendor claim, should fire agent-writing.
+  expected_outcome: PASS when the reply ties AW06, AW09 and AW10 to the planted
+  defects; FAIL otherwise.
+tags: [agent-writing, trigger, quick]
+
+execution:
+  prompt: |
+    Please review this conventions file that our agents load. The whole file is 90
+    lines; I pasted the opening, the example and the notes section.
+
+    conventions/error-handling.md:
+    # Error handling
+    Wrap every external call in try/catch, log the error with its context, rethrow
+    a typed error, and never swallow an exception. (Rationale, edge cases and
+    a retry table follow for another 80 lines.)
+
+    ## Example
+    import { createClient } from '@stripe/orders'
+    // e.g. Maria Lopez's checkout flow at Shopify
+
+    ## Notes
+    I believe Vercel automatically rolls back a failed deploy, so no manual
+    cleanup is needed.
+  max_turns: 6
+  allowed_tools:
+    - Skill
+
+graders:
+  - name: skill_fired
+    type: tool_used
+    tool: Skill
+    input_match: '"skill"\s*:\s*"(?:[\w-]+:)?agent-writing"'
+    min: 1
+
+  - name: aw06_rule_file_too_long
+    type: regex
+    target: last_message
+    pattern: 'AW06[^\n]*90|90[^\n]*AW06'
+    flags: i
+    match: contains
+
+  - name: aw09_real_names_in_example
+    type: regex
+    target: last_message
+    pattern: 'AW09[^\n]*(?:stripe|shopify|maria)|(?:stripe|shopify|maria)[^\n]*AW09'
+    flags: i
+    match: contains
+
+  - name: aw10_unlinked_vendor_claim
+    type: regex
+    target: last_message
+    pattern: 'AW10[^\n]*(?:vercel|roll)|(?:vercel|roll)[^\n]*AW10'
+    flags: i
+    match: contains

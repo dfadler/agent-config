@@ -39,8 +39,9 @@ function mk(tag, props, ...kids) { const e = Object.assign(document.createElemen
 
 Q.forEach((q, i) => {
   const fs = mk('fieldset', {}, mk('legend', { textContent: q.label }));
-  if (q.help) fs.append(mk('p', { className: 'help', textContent: q.help }));
-  const name = 'q' + i, dflt = [].concat(q.default ?? []);
+  const name = 'q' + i;
+  if (q.help) { fs.append(mk('p', { className: 'help', id: name + '_help', textContent: q.help })); fs.setAttribute('aria-describedby', name + '_help'); }
+  const dflt = [].concat(q.default ?? []);
   if (q.type === 'single' || q.type === 'multi') {
     const kind = q.type === 'single' ? 'radio' : 'checkbox';
     q.options.forEach(o => fs.append(mk('label', { className: 'opt' },
@@ -53,7 +54,11 @@ Q.forEach((q, i) => {
     fs.append(mk(q.type === 'textarea' ? 'textarea' : 'input',
       q.type === 'textarea' ? { name, value: dflt[0] ?? '' } : { type: 'text', name, value: dflt[0] ?? '' }));
   }
-  if (q.options) fs.append(mk('input', { type: 'text', name: name + '_other', className: 'other', placeholder: 'Other (optional)' }));
+  if (q.options) {
+    const o = mk('input', { type: 'text', name: name + '_other', className: 'other', placeholder: 'Other (optional)' });
+    o.setAttribute('aria-label', 'Other answer for: ' + q.label);
+    fs.append(o);
+  }
   f.append(fs);
 });
 
@@ -70,7 +75,7 @@ function render() {
   out.value = '## Answers\n' + Q.map((q, i) => {
     const a = answers(q, i);
     const body = !a.length ? '(no answer)' : q.type === 'multi' ? a.map(x => '- ' + x).join('\n') : a.join('\n');
-    return `### ${q.id}: ${q.label}\n${body}`;
+    return `### ${q.id}: ${q.label.replace(/\s+/g, ' ')}\n${body}`;
   }).join('\n');
 }
 f.addEventListener('input', render); render();

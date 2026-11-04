@@ -7,7 +7,7 @@
 # login check (and its speed levers). Firing the skill alone is not the outcome; these graders check
 # what the skill adds: a lint call and a --dry-run plan come before any paid run.
 # Pre-registered: with-arm 1.00 if the description fires on a prompt that names the command; the
-# without-arm falls on showed_dry_run_plan (it goes straight to run-evals.ts). A with-arm
+# without-arm falls on ran_second_free_check (it goes straight to run-evals.ts). A with-arm
 # skill_fired of 0 means the description needs a "run the baseline / sweep" clause (branch 3b).
 # good-reply: Lint is clean and claude auth status shows a login; the dry-run plan lists the standard-tier ceiling, so starting the run now.
 # bad-reply: Running node plugins/eval-authoring/scripts/ts/run-evals/run-evals.ts --tier standard now.
@@ -15,9 +15,9 @@ schema_version: "1.1"
 name: run-evals-fires-on-wrapper-command-request
 description: >
   Told to run a standard-tier baseline and handed the wrapper command to use as is, the model
-  still follows the run-evals steps: lint, then a dry-run plan, before any paid run.
-  expected_outcome: PASS when the trace has a lint call and a --dry-run call; FAIL when the model
-  goes straight to the paid command.
+  still follows the run-evals steps: lint, then a dry-run plan or a login check, before any paid
+  run. expected_outcome: PASS when the trace has a lint call and a --dry-run or auth status call;
+  FAIL when the model goes straight to the paid command.
 tags: [eval-authoring, run-evals, trigger]
 
 execution:
@@ -46,10 +46,23 @@ graders:
     input_match: 'lint/cli\.ts'
     min: 1
 
-  # Result: the plan is shown before the paid run. Only the skill's step 3 names --dry-run; the
-  # prompt's own command does not contain it.
-  - name: showed_dry_run_plan
+  # Result: a second free check happens, the dry-run plan or the login check. Only the skill
+  # names either; the prompt's own command contains neither. The sandbox is not logged in, so in
+  # some runs the skill's login check fails first and it hands off before the dry-run (2026-11-04:
+  # dry-run in 1 of 3 with-arm runs, login check in all 3); either one is the skill working.
+  - name: ran_second_free_check
     type: tool_used
     tool: Bash
-    input_match: '--dry-run'
+    input_match: '--dry-run|auth status'
     min: 1
+
+  # Result: no paid run is attempted. The sandbox is never logged in, so the skill hands off
+  # instead of starting it; a denied attempt still shows in the trace. Without this, a reply that
+  # checks the login, skips the dry-run and then tries the paid command would pass the grader
+  # above (CodeRabbit, PR 942). A dry-run call carries --dry-run after the script name.
+  - name: no_paid_run_attempt
+    type: tool_used
+    tool: Bash
+    input_match: 'run-evals\.ts(?!.*--dry-run)'
+    min: 0
+    max: 0
