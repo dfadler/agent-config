@@ -1,0 +1,48 @@
+# Run: claude plugin eval plugins/eval-authoring --case diagnose-scores-regression-to-mean
+# Not run yet: paid, hand-off only. No grant: Skill only.
+# Covers the weak-signal paragraph added in PR 945 (regression to the mean; a grader edited after
+# seeing a run is not independent evidence). Expected delta unknown until a two-arm run; a bare
+# model may already say "re-run it", so names_selection requires the selection-effect reasoning.
+# Sabotage map: delete the added paragraph under `weak-signal` in diagnose-scores/SKILL.md;
+# names_selection should drop.
+# good-reply: That 0.17 is the lowest of your 12 cases, so it was picked because it was low; on a re-run it will tend to land nearer the average (regression to the mean). Re-run before rewriting the skill.
+# bad-reply: Rewrite the skill's description now; a 0.17 means the skill is broken.
+schema_version: "1.1"
+name: diagnose-scores-regression-to-mean
+description: >
+  A user wants to rewrite a skill because one of twelve cases scored 0.17 in a single run.
+  expected_outcome: PASS when the reply says the low score was selected for being low and will
+  likely move toward average on a re-run, so re-run before changing the skill; FAIL when it
+  recommends editing on that number.
+tags: [eval-authoring, diagnose-scores, quick]
+
+execution:
+  prompt: |
+    I ran my eval suite once (3 runs per arm, 12 cases). Eleven cases are around 0.8, but one,
+    triage-quiet-on-typo, came in at 0.17 with the plugin and 0.50 without. I only opened that
+    case because it was the worst one. Should I rewrite the skill's description to fix it?
+  max_turns: 6
+  allowed_tools:
+    - Skill
+
+graders:
+  - name: skill_fired
+    type: tool_used
+    tool: Skill
+    input_match: '"skill"\s*:\s*"(?:[\w-]+:)?diagnose-scores"'
+    min: 1
+    arm: with-only
+
+  - name: names_selection
+    type: regex
+    target: last_message
+    pattern: 'regression to the mean|regress(?:es|ed)? (?:toward|towards|to) (?:the )?(?:average|mean)|selected (?:for|by|because)|picked because'
+    flags: i
+    match: contains
+
+  - name: says_rerun
+    type: regex
+    target: last_message
+    pattern: 're-?run'
+    flags: i
+    match: contains
