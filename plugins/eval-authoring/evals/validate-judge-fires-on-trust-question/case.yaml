@@ -1,7 +1,8 @@
 # Run: node plugins/eval-authoring/scripts/ts/run-evals/run-evals.ts --tier standard --case 'validate-judge-*' plugins/eval-authoring
 # Drafted by the blind-case-writer agent from the committed skill text (#868), then edited.
-# Can fail: asks_for_more_labels fails a reply that endorses the judge from two replies;
+# Can fail: gives_label_count fails a reply that endorses the judge from two replies;
 # states_cost fails a reply that quotes no dollar figure. skill_fired is an unscored indicator.
+# First standard run (3 runs per arm): states_cost 3/3 with, 0/3 without; the skill fired 3/3.
 # good-reply: Two labelled replies can show the grader tells a pass from a fail, but not a rate. For a rate I'd need more replies you've labelled by hand, around 6 to 10. The run costs roughly $0.001 per label, so about $0.002 here. Want me to go ahead?
 # bad-reply: Your has_citation grader looks fine. A reply with a citation passes and one without fails, so it agrees with you about 100% of the time and you can trust the scores.
 schema_version: "1.1"
@@ -9,8 +10,8 @@ name: validate-judge-fires-on-trust-question
 description: >
   A natural question about whether an llm grader agrees with the case's two header replies
   should fire validate-judge and produce a reply that says two labels give no rate, asks for
-  more human-labelled replies and states a cost. expected_outcome: PASS when the reply asks for
-  more labels and names a dollar cost; FAIL when it declares the judge trustworthy from two
+  more human-labelled replies and states a cost. expected_outcome: PASS when the reply gives the
+  6 to 10 label count and names a dollar cost; FAIL when it declares the judge trustworthy from two
   replies. The Skill check is an unscored indicator in a two-arm run.
 tags: [validate-judge, trigger, quick]
 
@@ -32,12 +33,12 @@ graders:
     min: 1
     arm: with-only
 
-  # "more labelled" is not in the prompt.
-  - name: asks_for_more_labels
+  # The skill's "about 6 to 10 labels" figure; the prompt carries no count. A first run's looser
+  # "more ... labelled" pattern missed the with-arm wording and matched the bare model's.
+  - name: gives_label_count
     type: regex
     target: last_message
-    pattern: '(?:more|additional|another|extra)[^.]{0,40}(?:label|repl)'
-    flags: i
+    pattern: '\b6\s*(?:-|–|to)\s*10\b'
     match: contains
 
   # A bare model has no reason to quote a per-label cost.
