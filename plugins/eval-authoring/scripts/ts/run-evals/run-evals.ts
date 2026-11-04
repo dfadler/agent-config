@@ -141,10 +141,11 @@ ${Object.values(TIERS).map((t) => `                         ${t.name}: ${t.descr
                        false-fire rate and description length per skill.
                        Combines with --tier and --changed; --keep-temp keeps
                        the copy. Not combined with --trigger-boundary. Always plugin arm only (--ablation none,
-                       whatever the tier): the injected plugins: list names
-                       the plugin under test, so a baseline arm that honours
-                       it would load the plugin and any delta would mean
-                       nothing; the summary has no without or delta column.
+                       whatever the tier): the CLI's baseline arm ignores
+                       plugins: and loads no plugin, neighbours included, so
+                       a delta would compare the skill with nothing, not
+                       with its neighbours; the summary has no without or
+                       delta column.
                        Neighbour hooks run inside the eval as you, under the
                        copy's trust; node_modules is not copied
   --trigger-boundary   trigger-boundary suite: run the cases tagged
