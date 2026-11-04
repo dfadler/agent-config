@@ -1,0 +1,48 @@
+# Run: node plugins/eval-authoring/scripts/ts/run-evals/run-evals.ts --tier standard --case 'validate-judge-*' plugins/eval-authoring
+# Drafted by the blind-case-writer agent from the committed skill text (#868), then edited.
+# Can fail: asks_for_more_labels fails a reply that endorses the judge from two replies;
+# states_cost fails a reply that quotes no dollar figure. skill_fired is an unscored indicator.
+# good-reply: Two labelled replies can show the grader tells a pass from a fail, but not a rate. For a rate I'd need more replies you've labelled by hand, around 6 to 10. The run costs roughly $0.001 per label, so about $0.002 here. Want me to go ahead?
+# bad-reply: Your has_citation grader looks fine. A reply with a citation passes and one without fails, so it agrees with you about 100% of the time and you can trust the scores.
+schema_version: "1.1"
+name: validate-judge-fires-on-trust-question
+description: >
+  A natural question about whether an llm grader agrees with the case's two header replies
+  should fire validate-judge and produce a reply that says two labels give no rate, asks for
+  more human-labelled replies and states a cost. expected_outcome: PASS when the reply asks for
+  more labels and names a dollar cost; FAIL when it declares the judge trustworthy from two
+  replies. The Skill check is an unscored indicator in a two-arm run.
+tags: [validate-judge, trigger, quick]
+
+execution:
+  prompt: |
+    In my docs-helper plugin there's a case called cites-sources with an llm grader named
+    has_citation. I put one good reply and one bad reply in the case header. Before I start
+    believing the scores from that case, can you check whether the grader actually agrees with
+    those two replies? A hit rate would be nice too.
+  max_turns: 6
+  allowed_tools:
+    - Skill
+
+graders:
+  - name: skill_fired
+    type: tool_used
+    tool: Skill
+    input_match: '"skill"\s*:\s*"(?:[\w-]+:)?validate-judge"'
+    min: 1
+    arm: with-only
+
+  # "more labelled" is not in the prompt.
+  - name: asks_for_more_labels
+    type: regex
+    target: last_message
+    pattern: '(?:more|additional|another|extra)[^.]{0,40}(?:label|repl)'
+    flags: i
+    match: contains
+
+  # A bare model has no reason to quote a per-label cost.
+  - name: states_cost
+    type: regex
+    target: last_message
+    pattern: '\$\s*0?\.\d+'
+    match: contains

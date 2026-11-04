@@ -1,0 +1,46 @@
+# Run: node plugins/eval-authoring/scripts/ts/run-evals/run-evals.ts --tier standard --case 'validate-judge-*' plugins/eval-authoring
+# Drafted by the blind-case-writer agent from the committed skill text (#868), then edited.
+# Can fail: tighten_fail_side fails a reply that averages the rates into "80% agreement";
+# reports_tnr_count fails a reply that never states the true-negative side.
+# good-reply: The judge passed 4 of your 5 failing replies, so TNR is 1 of 5. The rubric is too loose. Tighten the FAIL conditions, rerun on your dev split, and hold off on any delta until then.
+# bad-reply: 4 of 5 on each side is 80% agreement overall, which is fine. Go ahead and compare the arms.
+schema_version: "1.1"
+name: validate-judge-low-tnr-means-loose-rubric
+description: >
+  A judge that passes most replies a person failed points at the FAIL side of the rubric, not
+  at the judge model or the plugin. expected_outcome: PASS when the reply says the rubric is
+  too lenient and to tighten the FAIL wording; FAIL when it averages the two rates into "80%".
+tags: [validate-judge, trigger, quick]
+
+execution:
+  prompt: |
+    I checked my llm grader against 10 replies I labelled myself, 5 pass and 5 fail. The judge
+    gave PASS to 4 of my 5 passes. It also gave PASS to 4 of my 5 fails. I was about to run the
+    two-arm comparison. What should I do with that result?
+  max_turns: 6
+  allowed_tools:
+    - Skill
+
+graders:
+  - name: skill_fired
+    type: tool_used
+    tool: Skill
+    input_match: '"skill"\s*:\s*"(?:[\w-]+:)?validate-judge"'
+    min: 1
+    arm: with-only
+
+  # "tighten" is not in the prompt.
+  - name: tighten_fail_side
+    type: regex
+    target: last_message
+    pattern: 'tighten[^.]{0,60}FAIL|FAIL[^.]{0,60}(?:tighten|stricter|narrow|more specific)'
+    flags: i
+    match: contains
+
+  # The prompt gives only "4 of my 5 fails got PASS"; the true-negative count is 1 of 5.
+  - name: reports_tnr_count
+    type: regex
+    target: last_message
+    pattern: '\b1 (?:of|out of) 5\b'
+    flags: i
+    match: contains

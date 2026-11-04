@@ -57,8 +57,9 @@ close stand-in for the real grader, not a measurement of it.
 
 - Quote the counts with the rates: "TPR 3 of 4, TNR 4 of 4", not "TPR 75%". With under 20 labels a
   rate is a rough guide; one flipped label moves it by 10 points or more.
-- **TNR low** (the judge passes replies a person failed): the rubric is too loose. A delta
-  built on it overstates the plugin. Tighten the FAIL conditions, rerun on `dev`.
+- **TNR low** (the judge passes replies a person failed): the rubric is too loose. Both arms
+  score too high and look alike, so the delta shrinks toward 0 and the case stops telling
+  the plugin from no plugin. Tighten the FAIL conditions, rerun on `dev`.
 - **TPR low** (the judge fails replies a person passed): the rubric is too strict, or the
   PASS condition depends on formatting. Both arms lose score; the delta shrinks toward 0.
 - **Split votes** (some stub cases show PASS and FAIL votes): the rubric is unstable;
