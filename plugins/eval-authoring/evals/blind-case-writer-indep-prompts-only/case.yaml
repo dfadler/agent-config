@@ -4,17 +4,31 @@
 # skill alone, never run.
 # Sabotage: delete the agent's "Mode 2: prompts only" paragraph ("return only the prompts: 5 that
 # should fire the target and 5 near-misses, each with one line on why") and the agent would draft
-# full case.yaml files under Mode 1, so no_case_files and five_and_five_with_reasons fail.
-# good-reply: Should fire: 1. "can you write me a standup from this git log?" - plain request for the skill's output. ... Near-misses: 1. "Explain how git log formats commit subjects" - shares git log vocabulary but wants an explanation. ...
+# full case.yaml files under Mode 1, so no_case_files fails (the group, list and judge graders too).
+# Count and per-prompt reasons are not graded: a free count over varied reply formats would
+# false-fail, and one judge criterion per property kept the earlier stacked rubric from failing
+# good replies (run: 0.75, 0.75, 1.00 with a five-part rubric).
+# good-reply: Should fire:
+#  1. "can you write me a standup from this git log?" - plain request for the skill's output.
+#  2. "here are yesterday's commits, summarize for standup" - names the input and the output.
+#  3. "need my daily update from these commits" - natural phrasing, no trigger words.
+#  4. "turn this git log into done/doing/blocked lines" - the skill's own format.
+#  5. "standup in 5 min, what did I ship yesterday per git log?" - indirect request.
+#  Near-misses:
+#  1. "Explain how git log formats commit subjects" - shares git log vocabulary but wants an explanation.
+#  2. "Write a commit message for my staged standup page changes" - commits and standup, but writing a message.
+#  3. "How do I squash yesterday's commits?" - shares commits, wants a git how-to.
+#  4. "Draft an agenda for our standup meeting" - standup, but an agenda.
+#  5. "Update my git log alias to show authors" - update and git log, but a config change.
 # bad-reply: Here are the cases. evals/standup-fires/case.yaml: schema_version: "1.1" name: standup-fires graders: - type: tool_used ...
 schema_version: "1.1"
 name: blind-case-writer-indep-prompts-only
 description: >
   Asked only for prompts that should and should not trigger a pasted skill, the blind-case-writer
   agent returns prompts with reasons and no case files. expected_outcome: independent draft,
-  unmeasured. PASS when the agent is dispatched, the reply has no case.yaml content, and a judge
-  finds about five should-fire and five near-miss prompts, each with a reason; FAIL if case
-  files are drafted or the prompts are not split into the two groups.
+  unmeasured. PASS when the agent is dispatched, the reply has no case.yaml content, has a
+  should-fire group and a near-miss group with at least eight listed items, and no near-miss is
+  a standup request; FAIL otherwise.
 tags: [eval-authoring, blind-case-writer, agent, trigger]
 
 execution:
@@ -61,14 +75,35 @@ graders:
     path: '**/*.yaml'
     exists: false
 
-  # Semantic: the split and the near-miss quality can't be pattern-matched.
-  - name: five_and_five_with_reasons
+  # Free: both groups are labelled.
+  - name: should_fire_group
+    type: regex
+    target: last_message
+    pattern: 'should[- ]?(?:fire|trigger|activate|invoke)'
+    flags: i
+    match: contains
+
+  - name: near_miss_group
+    type: regex
+    target: last_message
+    pattern: 'near[- ]?miss'
+    flags: i
+    match: contains
+
+  # Free: at least eight list items (bullets, numbers or table rows) in the reply.
+  - name: eight_listed_items
+    type: regex
+    target: last_message
+    pattern: '(?:^[ \t]*(?:[-•|]|\*{0,2}\d{1,2}[.)]\**|\*[ \t])[ \t]*\S[^\n]*\n(?:[^\n]*\n)*?){7}^[ \t]*(?:[-•|]|\*{0,2}\d{1,2}[.)]\**|\*[ \t])[ \t]*\S'
+    flags: m
+    match: contains
+
+  # Semantic, one property: whether a near-miss is really a standup request needs reading.
+  - name: near_misses_are_not_standups
     type: llm
     criteria: >
-      PASS if the reply has two groups of prompts, ones that should fire the skill and
-      near-misses that should not, with between 4 and 6 prompts in each group, each prompt
-      followed by a short reason, and the near-misses reuse words from the skill (commits,
-      git log, standup, update) while asking for something other than a standup update.
-      FAIL if either group is missing, a group has fewer than 4 prompts, prompts have no
-      reasons, or a near-miss is really a request the skill would handle.
-      Do not fail for style, length or formatting.
+      PASS if every prompt listed as a near-miss asks for something other than a standup
+      update written from commits or a git log.
+      FAIL if any prompt listed as a near-miss is itself a request for a standup update from
+      commits or a git log.
+      Do not fail for style, length, formatting, the number of prompts or missing reasons.
