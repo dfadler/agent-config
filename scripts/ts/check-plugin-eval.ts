@@ -54,7 +54,8 @@ Inconclusive (exit 7, not a regression): CLI exit 2, \`partial: true\`, any
 \`skippedPaidGraders\`, any \`arms.with[].error\` or \`arms.without[].error\`, an implausible result
 (no cases, a case with no with-arm runs, wrong \`schemaVersion\`, a score-0 run with
 no grader detail, all runs 0: a usage limit looks like this), or an unreadable result.
-Regression (exit 1): a valid run where the CLI exited non-zero.
+Regression (exit 1): a valid run where the CLI exited non-zero, unless the delta
+gate is active (${String(MIN_GATE_CASES)}+ cases with a delta) and met: then the mean delta decides.
 A missing delta means no signal. Exit 2: bad arguments.
 
   -h, --help       Show this message and exit.
@@ -119,15 +120,20 @@ const reliabilityLine = (r: AggregateResult): string => {
 const deltaGate = (
   d: Diagnosis,
   floor: number,
-): { readonly breach?: string; readonly warn?: string } => {
+): {
+  readonly gated: boolean;
+  readonly breach?: string;
+  readonly warn?: string;
+} => {
   const deltas = d.cases.flatMap((c) => (c.delta === undefined ? [] : [c.delta]));
-  if (deltas.length === 0) return {};
+  const gated = deltas.length >= MIN_GATE_CASES;
+  if (deltas.length === 0) return { gated };
   const m = mean(deltas);
-  if (m >= floor) return {};
+  if (m >= floor) return { gated };
   const msg = `mean delta ${m.toFixed(2)} over ${String(deltas.length)} cases < floor ${String(floor)}`;
-  return deltas.length < MIN_GATE_CASES
-    ? { warn: `warning: ${msg} (advisory: under ${String(MIN_GATE_CASES)} cases)\n` }
-    : { breach: msg };
+  return gated
+    ? { gated, breach: msg }
+    : { gated, warn: `warning: ${msg} (advisory: under ${String(MIN_GATE_CASES)} cases)\n` };
 };
 
 /** Cases with no delta (plugin-arm-only): the delta gate cannot see them (#738). */
@@ -209,7 +215,7 @@ const decide = (
     cases: parsed.flatMap((p) => (p.r.ok ? p.r.result.cases : [])),
   };
   const diagnosis = diagnose(pooled);
-  const gate = floor === undefined ? {} : deltaGate(diagnosis, floor);
+  const gate = floor === undefined ? { gated: false } : deltaGate(diagnosis, floor);
   const warns =
     verdictWarnings(diagnosis).join("") +
     (gate.warn ?? "") +
@@ -217,6 +223,13 @@ const decide = (
     reliabilityLine(pooled);
   if (gate.breach !== undefined) {
     return err(cliError(EXIT_FAILURE, `${warns}regression: ${gate.breach}`));
+  }
+  // Once the delta gate is active and met, the pooled mean delta decides: a case
+  // under the per-case threshold on a few runs is noise, so it only warns (#906).
+  if (gate.gated && cliExit !== 0) {
+    return ok(
+      `${warns}pass: mean delta meets floor ${String(floor)}; CLI exit ${String(cliExit)} (cases under threshold ${threshold}) not gated\n`,
+    );
   }
   return cliExit === 0
     ? ok(`${warns}pass: threshold ${threshold} met\n`)
