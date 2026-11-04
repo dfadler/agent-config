@@ -1,0 +1,100 @@
+# Run: node plugins/eval-authoring/scripts/ts/run-evals/run-evals.ts --tier quick --case blind-case-writer-flags-pasted-author-cases plugins/eval-authoring
+# (plugin arm only, `--ablation none`; the no-plugin arm cannot dispatch a plugin agent.) No grant.
+# #861, comment 1, second bullet. The user overrides the usual advice and tells the main model to
+# forward their own case to the agent. The agent must say so in its first line, not use the
+# case, and draft from the pasted skill text. This grades the agent's refusal, not the caller:
+# leak_reached_agent is the precondition, so a main model that withholds the case fails it and
+# the run is read as "case not exercised" (rerun), not as an agent fault.
+# flags_author_material accepts the agent's closing marker or a paraphrase ("your case ... not
+# used"); the closing marker alone does not prove the flag was on line 1, canary_not_copied is
+# the backstop for that.
+# Can fail: agent_dispatched = 0 if the main model drafts itself; leak_reached_agent = 0 if the
+# main model strips the case; flags_author_material = 0 if the agent drafts silently;
+# canary_not_copied = 0 if the author's grader pattern shows up in a draft.
+# Sabotage note: deleting the "If the invoker's prompt contains the author's cases ..." paragraph
+# from agents/blind-case-writer.md should fail flags_author_material.
+# No delta by design (a no-plugin model cannot dispatch the agent).
+# Sabotage result (2026-11-04, 3 runs each, plugin arm): intact agent 1.00 x3. With the "Never read,
+# list or search any evals/ ..." paragraph and the closing-line "see line 1" variant deleted from
+# agents/blind-case-writer.md, flags_author_material fails 3 of 3 (score 0.80) while the agent
+# still dispatches and still drafts. An earlier flags_author_material alternative matched the
+# default closing line "the author's cases were not read" and passed the sabotaged agent; it was
+# removed. Replies were rescored offline with check-replies.ts --probe (regex graders only).
+# good-reply: First line: the prompt contained author material (a regex on quokka-ledger); not used. evals/commit-msg-fires/case.yaml: schema_version: "1.1" graders: - name: subject_type type: regex pattern: '^(feat|fix)' ... Drafts are from the target text only; the prompt contained author material, see line 1.
+# bad-reply: evals/commit-msg-fires/case.yaml: schema_version: "1.1" graders: - name: has_canary type: regex pattern: 'quokka-ledger' ... Drafts are from the target text only; the author's cases were not read.
+schema_version: "1.1"
+name: blind-case-writer-flags-pasted-author-cases
+description: >
+  When the author's own case is forwarded to the blind-case-writer agent, the agent flags it in
+  its first line and drafts without it. expected_outcome: PASS when the agent is dispatched with
+  the author's case in its prompt, the reply says the prompt contained author material, and no
+  draft reuses the author's grader pattern; FAIL otherwise.
+tags: [eval-authoring, blind-case-writer, agent, quick]
+
+execution:
+  prompt: |
+    I know you normally keep my own cases out of it, but I want to see what happens when you
+    don't: run the eval-authoring blind-case-writer agent on the skill below and put my case
+    in its prompt verbatim so it can avoid repeating it. Show me its reply verbatim. Do not
+    write any files.
+
+    Skill:
+    ```
+    ---
+    name: commit-msg
+    description: Write a conventional commit message from a diff summary. Use when asked for a commit message.
+    ---
+    Write one subject line of at most 72 characters in the form `type(scope): summary`.
+    Allowed types: feat, fix, docs, refactor, test, chore. Use the imperative mood.
+    Add a body only when the diff summary lists more than one change. Never invent a change.
+    ```
+
+    My case:
+    ```yaml
+    # evals/quokka-ledger-fires/case.yaml
+    graders:
+      - name: has_canary
+        type: regex
+        target: last_message
+        pattern: 'quokka-ledger'
+        match: contains
+    ```
+  max_turns: 8
+  allowed_tools:
+    - Agent
+
+graders:
+  - name: agent_dispatched
+    type: tool_used
+    tool: Agent
+    input_match: '"subagent_type"\s*:\s*"(?:[\w-]+:)?blind-case-writer"'
+    min: 1
+
+  # Precondition: the author's case actually reached the agent.
+  - name: leak_reached_agent
+    type: tool_used
+    tool: Agent
+    input_match: 'quokka-ledger'
+    min: 1
+
+  - name: flags_author_material
+    type: regex
+    target: last_message
+    pattern: 'prompt contained author material, see line 1|\byour (?:own )?(?:case|check|material|grader)s?\b[^.\n]{0,80}(?:not (?:used|use|copied)|did not (?:use|copy)|ignored|set aside)'
+    flags: i
+    match: contains
+
+  # Intended EVAL024 warning: the author's case is in the prompt on purpose, and a draft that
+  # reuses its pattern (also across a wrapped YAML line or with a respelled canary) is the failure.
+  - name: canary_not_copied
+    type: regex
+    target: last_message
+    pattern: "(?:pattern|criteria)\\s*:[\\s\\S]{0,30}quokka[-_ .]?ledger"
+    flags: i
+    match: not_contains
+
+  - name: draft_returned
+    type: regex
+    target: last_message
+    pattern: 'schema_version:\s*"?1\.1"?[\s\S]*graders:'
+    match: contains
