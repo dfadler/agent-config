@@ -1,0 +1,15 @@
+## Should-fire prompts
+
+1. "Here's my git log from yesterday, can you write me something for standup?" followed by 4 pasted commits like `a1b2c3 ABC-12 fix login redirect`. Why: natural phrasing, a commit list plus a standup request.
+2. "standup in 5 mins, help. commits: ABC-101 add retry to uploader / ABC-101 log retry count / DEV-9 bump deps". Why: terse and urgent, with inline commits sharing ticket ids that exercise grouping.
+3. "Can you summarize what I did yesterday from this git log output for the team sync? [log with a commit saying 'waiting on design review for ABC-77']". Why: the "team sync" wording avoids "standup", and the log has a blocker to surface.
+4. "Here's the output of `git log --since=yesterday --oneline`: (empty)". Why: an empty log is the skill's explicit edge case.
+5. "I need a quick daily update for my scrum. Commits from yesterday: fix typo in README, refactor auth middleware, add unit tests for parser." Why: "scrum" is a different word for the same task, and the commits have no ticket ids, which tests the grouping fallback.
+
+## Near-miss prompts (should not fire)
+
+1. "Write a changelog for release 2.3 from the git log between v2.2 and v2.3." Why: it shares git log and commit vocabulary but wants release notes, not a daily update.
+2. "Explain what `git log --since=yesterday --oneline` does and how to filter by author." Why: it asks about git log usage, with no summary requested.
+3. "Draft a standup agenda template for my team's weekly meeting." Why: it shares "standup" but asks for a meeting template, with no commits involved.
+4. "Write a good commit message for these staged changes: renamed the config loader and added tests." Why: it is about writing commits, not summarizing them.
+5. "Summarize this pull request's diff and list risks for the reviewer." Why: it is a code-review summary of a diff, not a standup from a commit list.

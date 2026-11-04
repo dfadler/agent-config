@@ -1,0 +1,115 @@
+I couldn't read the `author-cases` format references. The first glob found nothing, and the second was denied. The grader field names below (`graders`, `type`, `pattern`, `criteria`) and the `prompt` field are my inference from the agent brief, not checked against those files. The human should confirm them against the real schema.
+
+The target text was pasted, so line numbers below count from the first line of the pasted block, with the opening ``` fence not counted. Line 1 is `---`.
+
+`evals/standup-three-lines/case.yaml`
+```yaml
+schema_version: "1.1"
+name: standup-three-lines
+# Target sentence: "Write the update as exactly three lines, labelled Done, Doing and Blocked."
+# good-reply: three lines starting "Done:", "Doing:", "Blocked:".
+# bad-reply: a bulleted changelog with headings, or a paragraph with no labels.
+prompt: |
+  can you write my standup from this? here's yesterday's git log:
+  a1b2c3 ABC-123 add retry to payment client
+  d4e5f6 ABC-123 fix retry backoff bug
+  0719ab ABC-200 update README for onboarding
+graders:
+  - type: regex
+    pattern: '(?m)^\s*Done\b.*\n\s*Doing\b.*\n\s*Blocked\b.*\s*$'
+  - type: regex
+    # FAIL if there are more than three non-empty lines
+    pattern: '\A\s*([^\n]+\n){2}[^\n]+\s*\z'
+```
+
+`evals/standup-group-by-ticket/case.yaml`
+```yaml
+schema_version: "1.1"
+name: standup-group-by-ticket
+# Target sentence: "one sentence covering the commit subjects, grouped by ticket id (like ABC-123)."
+# good-reply: Done line is one sentence that mentions ABC-123 once with both of its fixes combined, then ABC-200.
+# bad-reply: Done line lists every commit hash separately, or omits ticket ids.
+prompt: |
+  Standup update please. Commits from yesterday:
+  ABC-123 add retry to payment client
+  ABC-200 update onboarding README
+  ABC-123 fix retry backoff bug
+  ABC-200 add screenshots to README
+graders:
+  - type: regex
+    pattern: '(?s)Done:.*ABC-123'
+  - type: regex
+    pattern: '(?s)Done:.*ABC-200'
+  - type: llm
+    criteria: |
+      PASS if the Done line is a single sentence and ABC-123 and ABC-200 each appear once, with their commits combined under them.
+      FAIL if either ticket id is repeated for each commit, if the line is several sentences, or if a ticket id is missing.
+```
+
+`evals/standup-blocked-detection/case.yaml`
+```yaml
+schema_version: "1.1"
+name: standup-blocked-detection
+# Target sentence: "Blocked: anything the commits say is waiting on someone else, or "Nothing"."
+# good-reply: Blocked line names the wait on the design team's API spec. A second reply with no waiting commits says "Blocked: Nothing".
+# bad-reply: Blocked line says Nothing despite a commit saying it is waiting on someone, or invents a blocker.
+prompt: |
+  Here's my git log from yesterday, write the standup:
+  9f8e7d XYZ-45 stub export endpoint, waiting on design team for API spec
+  3c2b1a XYZ-45 add export unit tests
+graders:
+  - type: regex
+    pattern: '(?i)Blocked:.*(design|spec)'
+  - type: regex
+    # FAIL if Blocked says Nothing
+    pattern: '(?i)Blocked:\s*(?!Nothing)'
+```
+
+`evals/standup-empty-log/case.yaml`
+```yaml
+schema_version: "1.1"
+name: standup-empty-log
+# Target sentence: "If the log is empty, reply "No commits yesterday"."
+# good-reply: "No commits yesterday"
+# bad-reply: a made-up Done/Doing/Blocked update.
+prompt: |
+  I need a standup update from my git log for yesterday. Here is the log:
+
+  (nothing, git log came back empty)
+graders:
+  - type: regex
+    pattern: 'No commits yesterday'
+  - type: regex
+    # FAIL if the reply also has the three-line format
+    pattern: '^(?![\s\S]*Doing:)[\s\S]*$'
+```
+
+`evals/standup-near-miss-changelog/case.yaml`
+```yaml
+schema_version: "1.1"
+name: standup-near-miss-changelog
+# Near-miss: shares "git commits" and "summary" but wants release notes, not a standup.
+# Target sentence: description line "Use when asked for a standup update from a commit list or git log."
+# good-reply: release-notes style output without Done/Doing/Blocked labels.
+# bad-reply: "Done: ... Doing: ... Blocked: Nothing".
+prompt: |
+  Summarize these git commits as customer-facing release notes for v2.4:
+  a1b2c3 ABC-123 add retry to payment client
+  d4e5f6 ABC-200 faster invoice export
+graders:
+  - type: regex
+    # FAIL if the standup labels appear
+    pattern: '^(?![\s\S]*Blocked:)[\s\S]*$'
+```
+
+## Undecided by the text
+- pasted:6 | "exactly three lines" does not say whether a wrapped line or a blank line between lines counts as a line | I assumed three non-empty lines, one per label.
+- pasted:8 | "one sentence covering the commit subjects, grouped by ticket id" does not say how to handle commits with no ticket id | I did not test this.
+- pasted:8 | The text does not say whether to list the ticket ids or just group by them | I assumed the ids appear in the sentence.
+- pasted:9 | The commits carry no information about today's work, and the text does not say whether to infer it, ask the user, or leave a placeholder | I did not grade the Doing content.
+- pasted:10 | "waiting on someone else" is undefined for ambiguous cases, such as a commit saying "WIP" or "needs review" | I used an explicit "waiting on design team" example.
+- pasted:12 | "Empty" is not defined for a log that is whitespace-only or has only merge commits. The text also does not say whether "yesterday" is checked against commit dates or whether the log is simply trusted. | I assumed a log with no commit lines is empty, and that the log is trusted.
+- pasted:3 | The description requires a commit list or git log as input, but the text does not say what to do if the user asks for a standup without supplying one | I did not test this.
+- pasted:6 | The text does not say whether the "No commits yesterday" reply must be exactly that string with no other text | I only require it to appear, with no Doing label.
+
+Drafts are from the target text only; the author's cases were not read.

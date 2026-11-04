@@ -11,6 +11,10 @@ it("case-reviewer.md runs the lint with the opt-in EVAL009 enabled", () => {
   expect(body).toMatch(/lint\/cli\.ts --enable EVAL009 --format json/);
 });
 
+it("has no Edit or Write in its tools allowlist", () => {
+  expect(/^tools:\s*(.*)$/m.exec(body)?.[1]).not.toMatch(/\b(Edit|Write)\b/);
+});
+
 it.each([
   ["source link", /platform claim with no source link/],
   ["sabotage note", /which\s+sentence of the skill, if deleted/],
