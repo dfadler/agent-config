@@ -1,0 +1,85 @@
+# Run: node plugins/eval-authoring/scripts/ts/run-evals/run-evals.ts --tier quick plugins/eval-authoring
+# (one run, plugin arm only, `--ablation none`; the no-plugin arm cannot dispatch a plugin agent.)
+# No grant: allowed_tools is Agent only. file_exists is weak here for that reason (the parent has
+# no Write either way); the signal is the reply carrying draft text with a located gap list.
+# independent draft, unmeasured: written from agents/blind-case-writer.md and the author-cases
+# skill alone, never run.
+# Skill text planted with gaps: the "Doing" line has no source in a commit log, and the text does
+# not say what to do with commits that have no ticket id.
+# Sabotage: delete the agent's Output paragraph ("Fenced `case.yaml` blocks ... ## Undecided by the
+# text: one line per place the target text did not settle ...") and draft_is_case_yaml and
+# undecided_lines_located should fail.
+# good-reply: Dispatched the case writer on the pasted text. Draft: evals/standup-summary-fires-natural/case.yaml schema_version: "1.1" name: standup-summary-fires-natural ... Undecided by the text: pasted:8 | the text does not say where "Doing" comes from, commits only show finished work | I assumed it is inferred from the newest commit subjects.
+# bad-reply: Here are three evals for your skill: it should output Done, Doing and Blocked lines. I wrote them to evals/standup-summary/case.yaml.
+schema_version: "1.1"
+name: blind-case-writer-indep-draft-no-file
+description: >
+  Asked for independent eval cases for an uncommitted skill pasted in chat, the blind-case-writer
+  agent returns draft case.yaml text and a located list of what the skill text left undecided,
+  and writes no file. expected_outcome: independent draft, unmeasured. PASS when the agent is
+  dispatched, the reply carries a draft case with schema_version 1.1, a line-referenced undecided
+  entry, a named gap about where "Doing" comes from, and no file exists; FAIL otherwise.
+tags: [eval-authoring, blind-case-writer, agent]
+
+execution:
+  prompt: |
+    I wrote a small skill but haven't committed it yet, and I'd like a reader who hasn't seen
+    my thinking to draft eval cases for it from the text alone. Please get that done and paste
+    back exactly what the reader returned, including anything it says the text left open.
+
+    ```
+    ---
+    name: standup-summary
+    description: Turn yesterday's git commits into a short standup update. Use when asked for a standup update from a commit list or git log.
+    ---
+
+    Write the update as exactly three lines, labelled Done, Doing and Blocked.
+
+    - Done: one sentence covering the commit subjects, grouped by ticket id (like ABC-123).
+    - Doing: what the author is working on today.
+    - Blocked: anything the commits say is waiting on someone else, or "Nothing".
+
+    If the log is empty, reply "No commits yesterday".
+    ```
+  max_turns: 10
+  allowed_tools:
+    - Agent
+
+graders:
+  - name: agent_dispatched
+    type: tool_used
+    tool: Agent
+    input_match: 'blind-case-writer'
+    min: 1
+
+  # Free: a draft case is present in the relayed text.
+  - name: draft_is_case_yaml
+    type: regex
+    target: last_message
+    pattern: 'schema_version:\s*"?1\.1"?'
+    match: contains
+
+  # Free: at least one gap entry in the `<file>:<line> | <open> | <assumed>` shape, with a line ref.
+  - name: undecided_lines_located
+    type: regex
+    target: last_message
+    pattern: '(?:pasted|[\w./-]+):\s*\d+\s*\|[^|\n]+\|[^\n]+'
+    match: contains
+
+  # Free: no case file was created in the run.
+  - name: no_file_written
+    type: file_exists
+    path: '**/case.yaml'
+    exists: false
+
+  # Semantic: the gap is real (the text never says where Doing comes from), so a judge is needed.
+  - name: names_doing_gap
+    type: llm
+    criteria: >
+      PASS if the reply's list of what the skill text left undecided includes an entry saying
+      the text does not specify how the Doing line is obtained or what it is based on (commits
+      describe finished work), or that it does not say what to do with commits that carry no
+      ticket id.
+      FAIL if the reply has no such list, the list says None, or its entries concern only
+      matters unrelated to the Doing line and ticket-id grouping.
+      Do not fail for style, length or formatting.

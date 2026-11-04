@@ -1,0 +1,74 @@
+# Run: node plugins/eval-authoring/scripts/ts/run-evals/run-evals.ts --tier quick plugins/eval-authoring
+# (one run, plugin arm only, `--ablation none`.) No grant: allowed_tools is Agent only.
+# independent draft, unmeasured: written from agents/blind-case-writer.md and the author-cases
+# skill alone, never run.
+# Sabotage: delete the agent's "Mode 2: prompts only" paragraph ("return only the prompts: 5 that
+# should fire the target and 5 near-misses, each with one line on why") and the agent would draft
+# full case.yaml files under Mode 1, so no_case_files and five_and_five_with_reasons fail.
+# good-reply: Should fire: 1. "can you write me a standup from this git log?" - plain request for the skill's output. ... Near-misses: 1. "Explain how git log formats commit subjects" - shares git log vocabulary but wants an explanation. ...
+# bad-reply: Here are the cases. evals/standup-fires/case.yaml: schema_version: "1.1" name: standup-fires graders: - type: tool_used ...
+schema_version: "1.1"
+name: blind-case-writer-indep-prompts-only
+description: >
+  Asked only for prompts that should and should not trigger a pasted skill, the blind-case-writer
+  agent returns prompts with reasons and no case files. expected_outcome: independent draft,
+  unmeasured. PASS when the agent is dispatched, the reply has no case.yaml content, and a judge
+  finds about five should-fire and five near-miss prompts, each with a reason; FAIL if case
+  files are drafted or the prompts are not split into the two groups.
+tags: [eval-authoring, blind-case-writer, agent, trigger]
+
+execution:
+  prompt: |
+    I don't want full eval cases yet. For the skill below, what are some prompts a person might
+    really type that should bring it up, and some that sound close but shouldn't? Have a fresh
+    reader who hasn't seen my notes come up with them, and give me their list as they wrote it.
+
+    ```
+    ---
+    name: standup-summary
+    description: Turn yesterday's git commits into a short standup update. Use when asked for a standup update from a commit list or git log.
+    ---
+
+    Write the update as exactly three lines, labelled Done, Doing and Blocked.
+
+    - Done: one sentence covering the commit subjects, grouped by ticket id (like ABC-123).
+    - Doing: what the author is working on today.
+    - Blocked: anything the commits say is waiting on someone else, or "Nothing".
+
+    If the log is empty, reply "No commits yesterday".
+    ```
+  max_turns: 10
+  allowed_tools:
+    - Agent
+
+graders:
+  - name: agent_dispatched
+    type: tool_used
+    tool: Agent
+    input_match: 'blind-case-writer'
+    min: 1
+
+  # Free: the reply is prompts, not case files.
+  - name: no_case_files
+    type: regex
+    target: last_message
+    pattern: 'schema_version|^\s*graders:|type:\s*(?:regex|tool_used|llm)'
+    flags: m
+    match: not_contains
+
+  - name: no_file_written
+    type: file_exists
+    path: '**/*.yaml'
+    exists: false
+
+  # Semantic: the split and the near-miss quality can't be pattern-matched.
+  - name: five_and_five_with_reasons
+    type: llm
+    criteria: >
+      PASS if the reply has two groups of prompts, ones that should fire the skill and
+      near-misses that should not, with between 4 and 6 prompts in each group, each prompt
+      followed by a short reason, and the near-misses reuse words from the skill (commits,
+      git log, standup, update) while asking for something other than a standup update.
+      FAIL if either group is missing, a group has fewer than 4 prompts, prompts have no
+      reasons, or a near-miss is really a request the skill would handle.
+      Do not fail for style, length or formatting.
