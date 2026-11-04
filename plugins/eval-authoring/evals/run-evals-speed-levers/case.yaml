@@ -63,6 +63,6 @@ graders:
   - name: warns_delta_lost
     type: regex
     target: last_message
-    pattern: '(?<!(?:n[''’]t|\bnot\b|\bnever\b|\bno\b)[^.;:,\n]{0,15})\b(?:lose|loses|lost|drops?|dropped)\b[^.\n]{0,30}(?:delta|Δ)|\bno (?:delta|Δ) (?:is|will|can|column|comparison|number|figure|score)|can(?:.t|not) (?:claim|quote|report)[^.\n]{0,20}(?:delta|Δ)|(?:delta\b|Δ)(?:(?!n[''’]t\b|\bnot\b|\bnever\b)[^.\n]){0,40}\b(?:unavailable|missing|gone|lost|dropped|disappears?)\b|(?:delta|Δ)(?: column| number| figure)?(?: is| are| will be)? (?:not|n[''’]t) (?:available|reported|shown|computed|measured|valid)'
+    pattern: '(?<!(?:n[''’]t|\bnot\b|\bnever\b|\bno\b)[^.;:,\n]{0,15})\b(?:lose|loses|lost|drops?|dropped)\b[^.\n]{0,30}(?:delta|Δ)|\bno (?:delta|Δ) (?:is|will|can|column|comparison|number|figure|score)|(?:can(?:.t|not)|don.t|do not|never|shouldn.t|should not) (?:claim|quote|report|cite)\b[^.\n]{0,30}(?:delta|Δ)|(?:delta\b|Δ)(?:(?!n[''’]t\b|\bnot\b|\bnever\b)[^.\n]){0,40}\b(?:unavailable|missing|gone|lost|dropped|disappears?)\b|(?:delta|Δ)(?: column| number| figure)?(?: is| are| will be)? (?:not|n[''’]t) (?:available|reported|shown|computed|measured|valid)'
     flags: i
     match: contains
