@@ -3,8 +3,8 @@ name: node-version
 description: |
   Use when a command must run on the project's Node version, or fails for a Node-version
   reason: `nvm: command not found`, `node` resolving to the wrong version, an `.nvmrc` or
-  `engines` mismatch, a script that exits 0 and does nothing, switching or upgrading Node,
-  Node setup in CI. Returns the version check and the exact commands. Not for installing
+  `engines` mismatch, a script that exits 0 and does nothing, switching versions, moving a
+  repo to a new Node major (upgrade the pin), Node setup in CI. Returns the version check and the exact commands. Not for installing
   packages (use `pnpm-usage`) or Node API questions.
 metadata:
   version: "1.0.0"

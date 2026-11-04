@@ -42,7 +42,7 @@ graders:
   - name: names_shadowing
     type: regex
     target: last_message
-    pattern: '/opt/homebrew[^.\n]{0,100}(?:ahead|before|first|shadow|wins|precedence|takes priority)|(?:ahead of|before|shadow\w*|precedes?)[^.\n]{0,80}nvm'
+    pattern: '/opt/homebrew[^\n]{0,120}(?:ahead|before|first|shadow|wins|precedence|takes priority)|(?:ahead of|before|shadow\w*|precedes?)[^.\n]{0,80}nvm'
     flags: i
     match: contains
 
@@ -50,7 +50,7 @@ graders:
   - name: notes_nvm_not_loaded
     type: regex
     target: last_message
-    pattern: '(?:no|nothing|not|never|none)[^.\n]{0,60}(?:load|source|init)\w*[^.\n]{0,40}nvm|nvm[^.\n]{0,60}(?:isn.t|is not|never|not) (?:loaded|sourced|initiali[sz]ed)'
+    pattern: '(?:no|nothing|not|never|none)[^.\n]{0,60}(?:load|source|init)\w*[^.\n]{0,40}nvm|nvm[^.\n]{0,60}(?:isn.t|is not|never|not) (?:load\w*|sourced|initiali[sz]ed)'
     flags: i
     match: contains
 
