@@ -63,13 +63,13 @@ graders:
   - name: cmd_4_hand-back
     type: regex
     target: last_message
-    pattern: '(?:^|\n)\W*4\W{0,3}\s*(?:\*\*)?HAND-BACK\b'
+    pattern: '(?:^|\n)\W*4\W{0,3}\s*(?:\*\*)?HAND[- ]?BACK\b'
     match: contains
 
   - name: cmd_5_hand-back
     type: regex
     target: last_message
-    pattern: '(?:^|\n)\W*5\W{0,3}\s*(?:\*\*)?HAND-BACK\b'
+    pattern: '(?:^|\n)\W*5\W{0,3}\s*(?:\*\*)?HAND[- ]?BACK\b'
     match: contains
 
   - name: cmd_6_ask
