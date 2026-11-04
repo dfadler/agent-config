@@ -3,7 +3,8 @@ name: llm-target
 execution:
   prompt: Do the thing.
 graders:
-  - type: llm
+  - name: g
+    type: llm
     target: last_message
     criteria: >
       PASS if the reply says it is done.

@@ -1,0 +1,10 @@
+schema_version: "1.1"
+name: case-yaml
+execution:
+  prompt: Do the thing.
+  env:
+    FOO: bar
+graders:
+  - name: done
+    type: regex
+    pattern: done

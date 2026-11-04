@@ -4,5 +4,6 @@ execution:
   prompt: Do the thing.
   max_turns: 5
 graders:
-  - type: regex
+  - name: g
+    type: regex
     pattern: done

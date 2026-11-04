@@ -1,0 +1,8 @@
+schema_version: "1.1"
+name: md-and-yaml
+execution:
+  prompt: Do the thing.
+graders:
+  - name: in-yaml
+    type: regex
+    pattern: done

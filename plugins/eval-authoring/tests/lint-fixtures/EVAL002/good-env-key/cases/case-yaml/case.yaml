@@ -1,0 +1,11 @@
+schema_version: "1.1"
+name: case-yaml
+execution:
+  prompt: Do the thing.
+  env:
+    EVAL_MODE: fast
+    EVAL_X1_2: y
+graders:
+  - name: done
+    type: regex
+    pattern: done

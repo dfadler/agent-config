@@ -398,7 +398,7 @@ const buildGrader = (
     ctx.keys.push({
       name: e.key,
       origin: "grader",
-      // An unknown type is EVAL003's to report; do not also flag every key.
+      // The CLI rejects an unknown type at load; do not also flag every key as unknown.
       status: type === undefined || known.has(e.key) ? "known" : "unknown",
       loc: e.loc,
     });

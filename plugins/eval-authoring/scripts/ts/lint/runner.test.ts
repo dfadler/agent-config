@@ -68,7 +68,7 @@ describe("discoverRules", () => {
   it("finds the structural rules", async () => {
     const r = await discoverRules();
     expect(r.ok && r.rules.map((x) => x.id)).toEqual(
-      expect.arrayContaining(["EVAL002", "EVAL003"]),
+      expect.arrayContaining(["EVAL002", "EVAL004"]),
     );
   });
 });
