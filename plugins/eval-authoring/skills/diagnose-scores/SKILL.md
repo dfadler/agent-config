@@ -77,7 +77,8 @@ interprets the verdict.
   A case you are looking at because it scored unusually low or high was selected by that
   score, and on a re-run it will tend to land closer to average (regression to the mean). Re-run it
   (paid: cases x runs x arms, hand to [run-evals](../run-evals/SKILL.md)) before changing the
-  skill or the case on that score alone. A case whose grader was edited after seeing a run is
+  skill or the case on that score alone, unless both arms have SD 0: identical re-runs cannot
+  move the verdict, so use the larger-effect or sharper-grader lever above. A case whose grader was edited after seeing a run is
   selected too: say the later number is not independent evidence the edit worked.
 - **`both-arms-pass-all` / `both-arms-fail-all`:** a case that cannot fail (or has almost no headroom, both means at least 0.95: check for a leaked answer, then fix or drop it), or never passes
   (check graders and grants).

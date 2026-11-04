@@ -52,6 +52,6 @@ graders:
   - name: names_not_independent
     type: regex
     target: last_message
-    pattern: 'not independent|independent (?:evidence|confirmation|test|check|sample)|(?:tune[sd]?|fit|fitted|adapted) (?:the |it |your )?(?:grader|regex )?to|over-?fit|selected (?:by|after|because)|fresh (?:outputs|replies|runs?)|(?:after|once) (?:you |i )?(?:saw|read|looked)'
+    pattern: '(?:not|isn.t|n.t|no longer) (?:an? )?independent|(?:need|want|get|run|use|collect) (?:an? )?(?:fresh|independent)|(?:tune[sd]?|fit|fitted|adapted) (?:the |it |your )?(?:grader|regex )?to|over-?fit|selected (?:by|after|because)|fresh (?:outputs|replies|runs?)|(?:after|once) (?:you |i )?(?:saw|read|looked)'
     flags: i
     match: contains
