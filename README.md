@@ -27,6 +27,9 @@ automatically, with no per-project copy to keep in sync.
     block to paste into chat.
   - `detached-terminal/` — run and drive an interactive terminal (TUI, REPL,
     alternate-screen app) on a headless PTY without stealing focus. Requires `pyte`.
+  - `docker/` — Dockerfile and Compose rules cited to docs.docker.com, a read-only
+    diagnosis order for failing builds and containers, and which `docker` commands
+    need a go-ahead or must be handed back (prune, `down -v`).
   - `eval-authoring/` — author, lint, run and diagnose `claude plugin eval` cases: a
     free lint (rules in `plugins/eval-authoring/docs/lint-rules.md`) with an edit
     hook, five skills, three read-only agents, and a cost-tier run wrapper. Needs a current Node (see `.nvmrc`).
