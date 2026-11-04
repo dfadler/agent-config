@@ -1,8 +1,10 @@
 // The smallest per-case delta a plan could tell from noise, before any money is spent (#863).
 // Pure arithmetic over a planned run count and a noise estimate; makes no model calls.
 import { readFileSync } from "node:fs";
-import { readAggregateResult } from "../parser/index.ts";
+import { join } from "node:path";
+import { readAggregateResult, type AggregateResult } from "../parser/index.ts";
 import { deltaBar, diagnose, type ArmStats } from "../diagnose/verdict.ts";
+import { candidateResultDirs } from "./outcome.ts";
 
 const EXIT_OK = 0;
 const EXIT_FAILURE = 1;
@@ -43,9 +45,9 @@ export const smallestDetectableDelta = (
 ): number | undefined =>
   runs < 2 ? undefined : deltaBar(arm(runs, sd), arm(runs, sd), seFloor).bar;
 
-/** Pooled SD (weighted by degrees of freedom) over every arm with 2 or more usable runs; undefined when none. */
-export const pooledSd = (result: Parameters<typeof diagnose>[0]): number | undefined => {
-  const arms = diagnose(result).cases.flatMap((c) => [c.with, c.without]);
+/** Pooled SD (weighted by degrees of freedom) over every arm of `results` with 2 or more usable runs; undefined when none. */
+export const pooledSd = (results: readonly AggregateResult[]): number | undefined => {
+  const arms = results.flatMap((r) => diagnose(r).cases.flatMap((c) => [c.with, c.without]));
   const usable = arms.flatMap((a) =>
     a.stdDev !== undefined && a.usedRuns >= 2 ? [{ df: a.usedRuns - 1, sd: a.stdDev }] : [],
   );
@@ -53,9 +55,60 @@ export const pooledSd = (result: Parameters<typeof diagnose>[0]): number | undef
   return df === 0 ? undefined : Math.sqrt(usable.reduce((n, a) => n + a.df * a.sd ** 2, 0) / df);
 };
 
+/** `--sd` text as a number in [0, 1]; undefined for anything else. */
+export const parseSd = (text: string): number | undefined => {
+  const n = Number(text);
+  return text.trim() !== "" && Number.isFinite(n) && n >= 0 && n <= 1 ? n : undefined;
+};
+
 export interface Io {
   readonly readFile: (path: string) => string | undefined;
 }
+interface ResultsIo extends Io {
+  readonly listDir: (path: string) => readonly string[];
+}
+
+/**
+ * The pooled SD of the newest wrapper run under `resultsDir` (`run-<time>/<NN>-<case>/aggregate-result.json`,
+ * one result per case), and that run's directory name; the next-newest run when a newer one has no
+ * readable result with an SD. Undefined when none does.
+ */
+export const newestRunSd = (
+  io: ResultsIo,
+  resultsDir: string,
+): { readonly sd: number; readonly source: string } | undefined =>
+  io
+    .listDir(resultsDir)
+    .filter((e) => e.startsWith("run-"))
+    .toSorted()
+    .toReversed()
+    .flatMap((run) => {
+      const runDir = join(resultsDir, run);
+      const results = io.listDir(runDir).flatMap((inv) => {
+        const text = candidateResultDirs(join(runDir, inv), io.listDir(join(runDir, inv)))
+          .toReversed()
+          .map((d) => io.readFile(join(d, "aggregate-result.json")))
+          .find((t) => t !== undefined);
+        const parsed = text === undefined ? undefined : readAggregateResult(text);
+        return parsed?.ok === true ? [parsed.result] : [];
+      });
+      const sd = pooledSd(results);
+      return sd === undefined ? [] : [{ sd, source: `results/${run}` }];
+    })[0];
+
+/**
+ * The `--dry-run` line for a two-arm plan of `runs` per arm: the cutoff when `sd` is known, else
+ * one line saying what it needs. Never invents an SD.
+ */
+export const detectableLine = (
+  runs: number,
+  known: { readonly sd: number; readonly source: string } | undefined,
+): string => {
+  const delta = known === undefined ? undefined : smallestDetectableDelta(runs, known.sd);
+  return known === undefined || delta === undefined
+    ? `smallest detectable delta: not shown; it needs an SD. Pass --sd S or run once first, or run: node scripts/ts/run-evals/power.ts --runs ${String(runs)} --sd S\n`
+    : `smallest detectable delta at ${String(runs)} runs: ${delta >= 1 ? "none (it would need to be " + delta.toFixed(2) + ")" : delta.toFixed(2)} (SD ${known.sd.toFixed(2)} from ${known.source})\n`;
+};
 export interface Outcome {
   readonly code: number;
   readonly stdout: string;
@@ -91,14 +144,13 @@ export const main = (argv: readonly string[], io: Io): Outcome => {
   }
   const sd = ((): number | string => {
     if (sdText !== undefined) {
-      const n = Number(sdText);
-      return sdText.trim() !== "" && Number.isFinite(n) && n >= 0 && n <= 1 ? n : "--sd needs a number in [0, 1]";
+      return parseSd(sdText) ?? "--sd needs a number in [0, 1]";
     }
     const text = io.readFile(resultPath ?? "");
     if (text === undefined) return `cannot read ${resultPath ?? ""}`;
     const parsed = readAggregateResult(text);
     if (!parsed.ok) return `${resultPath ?? ""}: ${parsed.reason}`;
-    return pooledSd(parsed.result) ?? `${resultPath ?? ""}: no arm has two usable runs, so no SD can be estimated`;
+    return pooledSd([parsed.result]) ?? `${resultPath ?? ""}: no arm has two usable runs, so no SD can be estimated`;
   })();
   if (typeof sd === "string") {
     return sdText === undefined

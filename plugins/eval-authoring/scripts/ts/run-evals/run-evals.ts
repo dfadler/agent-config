@@ -42,6 +42,7 @@ import {
   type Invocation,
 } from "./plan.ts";
 import { runPreflight } from "./preflight.ts";
+import { detectableLine, newestRunSd, parseSd } from "./power.ts";
 import { boundaryPlan, boundaryReport, type BoundaryReport } from "./boundary.ts";
 import { caseRow, maskHome, redact, renderBlock, renderSummary, withBlock } from "./summary.ts";
 import {
@@ -169,7 +170,13 @@ ${Object.values(TIERS).map((t) => `                         ${t.name}: ${t.descr
                        each run's final reply and tool calls, redacted, at
                        <dir>/run-<time>/replies/<NN>-<case>/<case>/<arm>-<run>.md
   --skip-unavailable   exit 0 when plugin eval is in early access or down
-  --dry-run            print the commands and exit; runs nothing
+  --dry-run            print the commands and exit; runs nothing. For a two-arm
+                       tier it also prints the smallest per-case delta the plan
+                       can detect (power.ts), when an SD is known: from --sd,
+                       else pooled from the newest run under <eval-dir>/results;
+                       with neither it says so and shows the power.ts command
+  --sd <S>             with --dry-run: per-run score standard deviation, 0 to 1,
+                       for the detectable-delta line. There is no default
   --pr <n>             after the run, write the results summary into a marked
                        block (<!-- run-evals:start --> ... <!-- run-evals:end -->)
                        of PR <n>'s body with "gh pr edit", replacing the block
@@ -214,6 +221,8 @@ interface Options {
   readonly reporting: Reporting;
   readonly skipUnavailable: boolean;
   readonly dryRun: boolean;
+  /** `--sd`: the SD the dry run's detectable-delta line uses; undefined when not given. */
+  readonly sd: number | undefined;
   readonly only: string | undefined;
   /** `--changed`: the ref, "" for the default; undefined when off. */
   readonly changed: string | undefined;
@@ -242,6 +251,7 @@ const VALUE_FLAGS: readonly string[] = [
   "--case",
   "--pr",
   "--neighbours",
+  "--sd",
 ];
 const BOOL_FLAGS: readonly string[] = [
   "--publish-report",
@@ -314,6 +324,14 @@ export const parseArgs = (argv: readonly string[]): Parsed => {
   if (pr !== undefined && bools.has("--dry-run")) {
     return { kind: "error", message: "--pr never runs with --dry-run (a dry run publishes nothing)" };
   }
+  const sdText = values.get("--sd");
+  const sd = sdText === undefined ? undefined : parseSd(sdText);
+  if (sdText !== undefined && sd === undefined) {
+    return { kind: "error", message: `--sd must be a number from 0 to 1, got '${sdText}'` };
+  }
+  if (sdText !== undefined && !bools.has("--dry-run")) {
+    return { kind: "error", message: "--sd only applies with --dry-run" };
+  }
   if (pr === undefined && bools.has("--yes")) {
     return { kind: "error", message: "--yes only applies with --pr" };
   }
@@ -369,6 +387,7 @@ export const parseArgs = (argv: readonly string[]): Parsed => {
       },
       skipUnavailable: bools.has("--skip-unavailable"),
       dryRun: bools.has("--dry-run"),
+      sd,
       only: values.get("--case"),
       changed: values.get("--changed"),
       changedAllowEmpty: bools.has("--changed-allow-empty"),
@@ -862,6 +881,14 @@ const run = async (
     io.out(
       `note: each invocation shows the full ceiling; a real run gives later invocations only the budget left after earlier results\n`,
     );
+    // Only a two-arm tier measures a delta; quick, --neighbours and --trigger-boundary run the plugin arm alone.
+    if (options.tier.ablation === "cli-default") {
+      const known =
+        options.sd === undefined
+          ? newestRunSd(io, join(suite.evalDir, "results"))
+          : { sd: options.sd, source: "--sd" };
+      io.out(detectableLine(options.tier.runs, known));
+    }
     if (boundary !== undefined) {
       io.out(
         `note: --trigger-boundary: one run per prompt, plugin arm only, --threshold 0; the bound is reported only if a should-fire twin fires in the same run\n`,

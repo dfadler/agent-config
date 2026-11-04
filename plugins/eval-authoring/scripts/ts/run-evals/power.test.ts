@@ -33,7 +33,7 @@ describe("pooledSd", () => {
     const parsed = readAggregateResult(result([1, 0.5, 0], [0.5, 0.5, 0.5]));
     if (!parsed.ok) throw new Error(parsed.reason);
     // (2 x 0.25 + 2 x 0) / 4 = 0.125 -> 0.3536.
-    expect(pooledSd(parsed.result)).toBeCloseTo(0.3536, 3);
+    expect(pooledSd([parsed.result])).toBeCloseTo(0.3536, 3);
   });
 });
 

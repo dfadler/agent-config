@@ -821,3 +821,63 @@ describe("quick tier ceiling scales with the cases selected", () => {
     expect(await ceilingLine(8, ["--max-cost-usd", "9"])).toContain("$9 for the whole run (--max-cost-usd override)");
   });
 });
+
+describe("--dry-run smallest detectable delta (#863)", () => {
+  const grader = [{ name: "g", passed: true, weight: 1, scored: true }];
+  const arm = (scores: readonly number[]) => scores.map((score) => ({ score, error: null, graders: grader }));
+  const earlier = JSON.stringify({
+    schemaVersion: 1,
+    partial: false,
+    cases: [{ name: "a", aggregates: {}, arms: { with: arm([1, 0.5, 0]), without: arm([0.5, 0.5, 0.5]) } }],
+  });
+  const dry = async (opts: FakeIoOptions, extra: string[] = []) => {
+    const s = setup(opts);
+    const code = await main([s.root, "--dry-run", ...extra], { io: s.io, pluginsDir: "/p" });
+    return { code, text: s.out.join(""), s };
+  };
+  it("prints the cutoff with its SD source from the newest earlier run", async () => {
+    const root = makePlugin([{ name: "a" }]);
+    const results = join(root, "evals", "results");
+    const fake = fakeIo({
+      onPath: { claude: ["/bin/claude"], git: ["/bin/git"] },
+      dirs: {
+        [results]: ["run-2025-12-31T00-00-00-000Z", "run-2026-01-01T00-00-00-000Z"],
+        [join(results, "run-2026-01-01T00-00-00-000Z")]: ["01-a"],
+        [join(results, "run-2026-01-01T00-00-00-000Z", "01-a")]: [],
+      },
+      files: { [join(results, "run-2026-01-01T00-00-00-000Z", "01-a", "aggregate-result.json")]: earlier },
+    });
+    expect(await main([root, "--dry-run", "--tier", "thorough"], { io: fake.io, pluginsDir: "/p" })).toBe(EXIT_OK);
+    expect(fake.out.join("")).toContain(
+      "smallest detectable delta at 5 runs: 0.62 (SD 0.35 from results/run-2026-01-01T00-00-00-000Z)\n",
+    );
+  });
+
+  it("uses --sd when given, with no earlier run", async () => {
+    const { code, text } = await dry({}, ["--sd", "0.25", "--tier", "thorough"]);
+    expect(code).toBe(EXIT_OK);
+    expect(text).toContain("smallest detectable delta at 5 runs: 0.44 (SD 0.25 from --sd)\n");
+    // Standard (3 runs) at SD 0.4: the cutoff is past the 0-to-1 score range.
+    expect((await dry({}, ["--sd", "0.4"])).text).toContain("at 3 runs: none (it would need to be 1.41)");
+  });
+
+  it("with no SD source, says it needs one and shows the power.ts command, inventing none", async () => {
+    const { code, text } = await dry({});
+    expect(code).toBe(EXIT_OK);
+    expect(text).toContain("not shown; it needs an SD. Pass --sd S or run once first");
+    expect(text).toContain("power.ts --runs 3 --sd S");
+    expect(text).not.toContain("SD 0.");
+  });
+
+  it("prints nothing about it for a plugin-arm-only tier", async () => {
+    const { text } = await dry({}, ["--tier", "quick", "--sd", "0.25"]);
+    expect(text).not.toContain("smallest detectable delta");
+  });
+
+  it("rejects a bad --sd, and --sd without --dry-run, as an error", () => {
+    expect(parseArgs(["p", "--dry-run", "--sd", "2"])).toMatchObject({ kind: "error" });
+    expect(parseArgs(["p", "--dry-run", "--sd", "abc"])).toMatchObject({ kind: "error" });
+    expect(parseArgs(["p", "--sd", "0.2"])).toMatchObject({ kind: "error" });
+    expect(parseArgs(["p", "--dry-run", "--sd", "0.2"])).toMatchObject({ kind: "options" });
+  });
+});

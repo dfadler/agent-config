@@ -181,7 +181,9 @@ blind-case-writer agent, second bullet), then stop.
    measured", never a Δ number, even marked preliminary), or says why it has none. The PR
    body states what was measured (with, without, delta) and names each changed behavior no
    case covers. It never says a change "improves" or "fixes" a behavior without a case
-   whose delta shows it; with a delta of zero, say the benefit is unverified.
+   whose delta shows it; with a delta of zero, say the benefit is unverified. Before paying
+   for a delta claim, read the "smallest detectable delta" line of `run-evals.ts --dry-run`
+   (or `scripts/ts/run-evals/power.ts`): a delta below it cannot be told from noise.
 
 ## Gotchas
 
