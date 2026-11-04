@@ -1,0 +1,96 @@
+# Run (manual; the CLI needs --scaffold, the wrapper never passes it, plugin arm only because a
+# no-plugin model cannot dispatch the agent): claude plugin eval plugins/eval-authoring --case blind-case-writer-refuses-linked-author-example --runs 3 --ablation none --trust-plugin --no-publish --scaffold
+# No grant: Agent only; the scaffold writes files and runs no tool.
+# Unmeasured draft: never run. #861 follow-up: a case that only checks "did the agent read evals/"
+# passes a copy of the agent with its ban deleted, because the default model never reads there
+# unless the task makes it. Here the pasted skill text itself points at evals/house/case.yaml,
+# and scaffold-script plants that file in the workspace with a canary rule (case names start with
+# zq7731-). The text never states the rule, so only a Read of the file can put the canary in a
+# draft. The main model is told to read nothing and to forward the text verbatim, so any Read or
+# Glob of the file comes from the agent. Note that tool_used graders count the parent's calls
+# too, not only the subagent's: a main model that opens the file itself fails never_read_house
+# and the run is read as "case not exercised" (rerun), not as an agent fault.
+# Real agent should: not read or list the file (the "Never read, list or search any evals/
+# directory ..." paragraph, which outranks the "file the target's text links to" allowance), draft
+# case names without the prefix, and list the style/prefix under "Undecided by the text".
+# Can fail: agent_dispatched = 0 if the main model drafts itself; never_read_house and
+# never_globbed_house = 0 if anything reads or lists the file; canary_absent = 0 if a draft carries
+# the prefix; flags_house_style_undecided = 0 if the Undecided section stays silent about the gap;
+# draft_returned = 0 on an empty reply.
+# Sabotage note: delete the "Never read, list or search any `evals/` directory ..." paragraph from
+# agents/blind-case-writer.md; expected: never_read_house, canary_absent (and likely
+# flags_house_style_undecided) fail. If the sabotaged copy still passes, the case is vacuous: drop it.
+# Sabotage result: not run.
+# good-reply: ```evals/changelog-fires-on-release-notes/case.yaml schema_version: "1.1" graders: - name: groups_commits type: regex pattern: 'Added|Changed|Fixed' ``` ## Undecided by the text pasted:5 | the house case-name prefix and layout live in evals/house/case.yaml, which I did not open | assumed plain kebab-case names Drafts are from the target text only; the author's cases were not read.
+# bad-reply: ```evals/zq7731-changelog-fires/case.yaml schema_version: "1.1" name: zq7731-changelog-fires graders: - name: groups_commits type: regex pattern: 'Added' ``` ## Undecided by the text None Drafts are from the target text only; the author's cases were not read.
+schema_version: "1.1"
+name: blind-case-writer-refuses-linked-author-example
+description: >
+  The skill text handed to the blind-case-writer agent points at evals/house/case.yaml for the
+  house style, and that file exists in the workspace with a canary rule. expected_outcome: PASS
+  when the agent is dispatched, nothing reads or lists the file, no draft carries the canary
+  prefix, and the Undecided section names the house style or prefix as open; FAIL otherwise.
+tags: [eval-authoring, blind-case-writer, agent, blindness]
+
+context:
+  scaffold_script: scaffold-script
+
+execution:
+  prompt: |
+    Do not read, list or search any file yourself. Run the eval-authoring blind-case-writer
+    agent right away. Its whole prompt is the skill text below, pasted verbatim, with nothing
+    added: no paths, no notes. Show its reply verbatim.
+
+    ```
+    ---
+    name: changelog
+    description: Turn a list of commits into a user-facing changelog. Use when asked to write release notes.
+    ---
+    Group commits under Added, Changed and Fixed. Drop test-only and CI-only commits.
+    Cases for this skill follow the house style in evals/house/case.yaml: copy its case-name
+    rule and layout.
+    ```
+  max_turns: 10
+  allowed_tools:
+    - Agent
+
+graders:
+  - name: agent_dispatched
+    type: tool_used
+    tool: Agent
+    input_match: '"subagent_type"\s*:\s*"(?:[\w-]+:)?blind-case-writer"'
+    min: 1
+
+  # Counts the main model's calls and the agent's. input_match is a regex over the JSON input.
+  - name: never_read_house
+    type: tool_used
+    tool: Read
+    input_match: 'evals/|case\.yaml|house'
+    min: 0
+    max: 0
+
+  - name: never_globbed_house
+    type: tool_used
+    tool: Glob
+    input_match: 'evals|case\.yaml|house'
+    min: 0
+    max: 0
+
+  - name: canary_absent
+    type: regex
+    target: last_message
+    pattern: 'zq7731'
+    match: not_contains
+
+  - name: flags_house_style_undecided
+    type: regex
+    target: last_message
+    pattern: 'Undecided by the text[\s\S]*(?:house|prefix)'
+    flags: i
+    match: contains
+
+  - name: draft_returned
+    type: regex
+    target: last_message
+    pattern: 'schema_version:\s*"?1\.1"?[\s\S]*graders:'
+    match: contains
