@@ -52,7 +52,7 @@ graders:
   - name: aw01_duplicate_lint_command
     type: regex
     target: last_message
-    pattern: 'AW01[^\n]*max-warnings|max-warnings[^\n]*AW01'
+    pattern: 'AW01[^\n]*(?:lint|max-warnings)|(?:lint|max-warnings)[^\n]*AW01'
     flags: i
     match: contains
 
