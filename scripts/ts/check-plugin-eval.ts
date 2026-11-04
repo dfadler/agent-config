@@ -10,6 +10,7 @@ import { diagnose, type Diagnosis } from "../../plugins/eval-authoring/scripts/t
 import {
   implausibleReasons,
   readAggregateResult,
+  everyRunZeroReasons,
   silentZeroReasons,
 } from "../../plugins/eval-authoring/scripts/ts/parser/result.ts";
 import { parseArgs, type Parsed } from "./lib/args.ts";
@@ -202,7 +203,8 @@ const decide = (
       ...invalidReasons(d.doc),
     ].map((why) => at(d.path, why)),
   );
-  if (bad.length > 0) return inconclusive(bad.join("; "));
+  const dead = everyRunZeroReasons(docs.map((d) => d.doc));
+  if (bad.length + dead.length > 0) return inconclusive([...bad, ...dead].join("; "));
   const parsed = docs.map((d) => ({ path: d.path, r: readAggregateResult(d.text) }));
   const unreadable = parsed.flatMap((p) => (p.r.ok ? [] : [at(p.path, p.r.reason)]));
   if (unreadable.length > 0) return inconclusive(unreadable.join("; "));
