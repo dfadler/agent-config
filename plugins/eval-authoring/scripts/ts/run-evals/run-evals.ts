@@ -62,7 +62,7 @@ import { replyFiles, runCount, safeName } from "./traces.ts";
 import { MIN_CLAUDE_VERSION, MIN_GIT_VERSION, formatVersion } from "./versions.ts";
 import { manifestOf } from "./plan.ts";
 import { checkNeighbours, checkStageable, parseNeighbours, stageNeighbours } from "./stage.ts";
-import { routablesOf, triggerRows } from "./trigger.ts";
+import { firesGraderNames, routablesOf, triggerRows } from "./trigger.ts";
 
 export const USAGE = `Usage: run-evals.ts [options] <plugin-path>
 
@@ -1007,6 +1007,7 @@ const run = async (
   io.err(
     `run-evals: tier ${options.tier.name}, ablation ${options.tier.ablation}: exit ${String(exit)}\n`,
   );
+  const routables = routablesOf(io, target);
   const markdown = renderSummary({
     plugin: basename(target),
     tier: options.tier.name,
@@ -1020,11 +1021,11 @@ const run = async (
     subset,
     neighbours: options.neighbours,
     boundary: boundaryResult,
-    trigger: triggerRows(suite, routablesOf(io, target), manifestOf(target).name, results),
+    trigger: triggerRows(suite, routables, manifestOf(target).name, results),
     cases: done.map((d, i) => ({
       caseName: d.caseName,
       exit: d.exit,
-      row: caseRow(d.caseName, progress.texts[i], io.readFile),
+      row: caseRow(d.caseName, progress.texts[i], io.readFile, firesGraderNames(suite, routables, manifestOf(target).name, d.caseName)),
     })),
   });
   if (options.pr === undefined) {

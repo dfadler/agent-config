@@ -155,6 +155,22 @@ cap the calls (the `arm: both` here is correct for a two-arm `smoke` guard; in a
     arm: both
 ```
 
+## Grader roles
+
+A case has no `role:` key (the CLI rejects unknown grader keys), so the role of a
+`tool_used` grader on `Skill` or `Agent` is read from its bounds, never its name:
+
+| Role | Bounds | Counted in |
+|---|---|---|
+| fires | `min >= 1` (`min` defaults to 1) and `max` not 0 | the fire rate, and "Skill never fired" in the run summary |
+| must-not-fire | `max: 0` | the false-fire rate (a failed grader is a hit) |
+| none | `min: 0` with no `max`, or `max` of 1 or more | neither rate; EVAL029 flags a `Skill` check like this |
+
+Name graders for people (`skill_fired`, `stays_quiet`, anything): the summary and trigger
+table never look at the name. A `tool_used` grader on any other tool (`Write`, `Bash`) is an
+outcome or step check and never reads as "fires", whatever its `min`. Which skill a fire or
+must-not-fire grader is about comes from its `input_match`.
+
 ## Judge and limits
 
 - Default judge is the background-task model; `--judge-model sonnet` is the plugin-evals

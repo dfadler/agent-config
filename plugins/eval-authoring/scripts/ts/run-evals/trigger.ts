@@ -12,6 +12,8 @@
 import { join } from "node:path";
 import { comparable } from "../diagnose/verdict.ts";
 import {
+  isMustFire,
+  isMustNotFire,
   parseYaml,
   readAggregateResult,
   splitFrontmatter,
@@ -77,14 +79,26 @@ export const triggerGraders = (
     const grader = g.name.value;
     if (g.type !== "tool_used" || grader === undefined) return [];
     if (g.tool.value !== "Skill" && g.tool.value !== "Agent") return [];
-    const role: Role | undefined =
-      g.max.value === 0 ? "must-not-fire" : g.min.value >= 1 ? "fires" : undefined;
+    const role: Role | undefined = isMustNotFire(g) ? "must-not-fire" : isMustFire(g) ? "fires" : undefined;
     const names = routables
       .map((r) => r.name)
       .filter((n) => matchesCall(g.inputMatch.value, n, plugin))
       .toSorted();
     return role === undefined || names.length === 0 ? [] : [{ grader, role, names }];
   });
+
+/** The names of case `caseName`'s `fires` graders, by role, for a summary that flags a skill that never fired. */
+export const firesGraderNames = (
+  suite: EvalSuite,
+  routables: readonly Routable[],
+  plugin: string,
+  caseName: string,
+): readonly string[] =>
+  suite.cases
+    .filter((c) => c.name.value === caseName)
+    .flatMap((c) => triggerGraders(c, routables, plugin))
+    .filter((g) => g.role === "fires")
+    .map((g) => g.grader);
 
 /**
  * In the plugin arm of a result: the runs that gave grader `grader` of case

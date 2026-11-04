@@ -5,7 +5,7 @@ import { describe, expect, it } from "vitest";
 import { readSuite } from "../parser/index.ts";
 import { nodeIo } from "./io.ts";
 import { renderSummary } from "./summary.ts";
-import { armTally, routablesOf, triggerGraders, triggerRows } from "./trigger.ts";
+import { armTally, firesGraderNames, routablesOf, triggerGraders, triggerRows } from "./trigger.ts";
 
 const write = (path: string, text: string): void => {
   mkdirSync(join(path, ".."), { recursive: true });
@@ -45,6 +45,14 @@ const plugin = () => {
   write(join(root, "evals", "a-should", "case.yaml"), caseYaml("a-should", [grader("skill_not_fired", "alpha", "min: 1")]));
   write(join(root, "evals", "a-quiet", "case.yaml"), caseYaml("a-quiet", [grader("skill_fired", "alpha", "max: 0\n    min: 0")]));
   write(join(root, "evals", "b-should", "case.yaml"), caseYaml("b-should", [grader("zzz", "beta", "min: 1")]));
+  write(
+    join(root, "evals", "outcome", "case.yaml"),
+    caseYaml("outcome", [
+      // Same input_match as a fire check: only the tool keeps it from reading as "fires".
+      grader("wrote_the_file", "alpha", "min: 1").replace("tool: Skill", "tool: Write"),
+      grader("counts_only", "alpha", "min: 0\n    max: 2"),
+    ]),
+  );
   write(join(root, "evals", "other", "case.yaml"), caseYaml("other", [grader("unrelated", "gamma", "min: 1")]));
   return root;
 };
@@ -80,6 +88,27 @@ describe("triggerGraders", () => {
     expect(of("a-quiet")).toEqual([{ grader: "skill_fired", role: "must-not-fire", names: ["alpha"] }]);
     expect(of("b-should")).toEqual([{ grader: "zzz", role: "fires", names: ["beta"] }]);
     expect(of("other")).toEqual([]);
+  });
+
+  it("gives an outcome check on a non-Skill tool, or a Skill check bounded both ways away from a fire, no role", () => {
+    const root = plugin();
+    const suite = readSuite(root, {});
+    const routables = routablesOf(nodeIo(process.env), root);
+    const c = suite.cases.find((x) => x.name.value === "outcome");
+    expect(c === undefined ? undefined : triggerGraders(c, routables, "pl")).toEqual([]);
+  });
+});
+
+describe("firesGraderNames", () => {
+  it("names a case's fires graders only, not must-not-fire, outcome or unknown cases", () => {
+    const root = plugin();
+    const suite = readSuite(root, {});
+    const routables = routablesOf(nodeIo(process.env), root);
+    const names = (n: string) => firesGraderNames(suite, routables, "pl", n);
+    expect(names("a-should")).toEqual(["skill_not_fired"]);
+    expect(names("a-quiet")).toEqual([]);
+    expect(names("outcome")).toEqual([]);
+    expect(names("nope")).toEqual([]);
   });
 });
 

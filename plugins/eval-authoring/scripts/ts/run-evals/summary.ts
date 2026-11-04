@@ -148,16 +148,17 @@ export interface CaseRow {
   readonly band?: number;
   /** Graders that failed in the plugin arm. */
   readonly failed: readonly FailedGrader[];
-  /** Plugin-arm runs where skill_fired failed, and how many runs had that grader. */
+  /** Plugin-arm results of the case's `fires` graders that failed, and how many results there were. */
   readonly skillMissed: number;
   readonly skillRuns: number;
 }
 
-/** Read the one case row from an invocation's `aggregate-result.json` text; undefined when unreadable. The reply of a failed run comes from its trace via `readFile`; without one it is left out. */
+/** Read the one case row from an invocation's `aggregate-result.json` text; undefined when unreadable. The reply of a failed run comes from its trace via `readFile`; without one it is left out. `firesGraders` names the case's `fires`-role graders (`firesGraderNames`), so the skill-never-fired count does not depend on what the grader is called. */
 export const caseRow = (
   caseName: string,
   text: string | undefined,
   readFile: (path: string) => string | undefined = () => undefined,
+  firesGraders: readonly string[] = [],
 ): CaseRow | undefined => {
   const c = list(parse(text)?.["cases"]).find(
     (x) => isRec(x) && x["name"] === caseName,
@@ -167,7 +168,7 @@ export const caseRow = (
   const arms = isRec(c["arms"]) ? c["arms"] : {};
   const runs = list(arms["with"]);
   const skillGraders = runs.flatMap((r) =>
-    isRec(r) ? list(r["graders"]).filter((g) => isRec(g) && g["name"] === "skill_fired") : [],
+    isRec(r) ? list(r["graders"]).filter((g) => isRec(g) && firesGraders.includes(String(g["name"]))) : [],
   );
   const parsed = text === undefined ? undefined : readAggregateResult(text);
   const v = parsed?.ok === true ? diagnose(parsed.result).cases.find((x) => x.name === caseName) : undefined;
@@ -382,10 +383,10 @@ export const renderSummary = (s: SummaryInput): string => {
       ? []
       : [
           "",
-          "Skill never fired (skill_fired is not scored, so the score can still look fine):",
+          "Skill never fired (a fires check may not be scored, so the score can still look fine):",
           "",
           ...unfired.map(
-            (c) => `- \`${c.caseName}\`: skill_fired failed in ${String(c.row.skillMissed)} of ${String(c.row.skillRuns)} runs`,
+            (c) => `- \`${c.caseName}\`: fires check failed in ${String(c.row.skillMissed)} of ${String(c.row.skillRuns)} runs`,
           ),
         ]),
     ...(failures.length === 0

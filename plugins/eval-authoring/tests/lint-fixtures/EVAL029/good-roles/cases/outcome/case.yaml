@@ -1,0 +1,13 @@
+schema_version: "1.1"
+name: outcome
+tags: [trigger]
+execution:
+  prompt: Run the test suite with npm test.
+  allowed_tools:
+    - Skill
+    - Write
+graders:
+  - name: wrote_the_file
+    type: tool_used
+    tool: Write
+    min: 1
