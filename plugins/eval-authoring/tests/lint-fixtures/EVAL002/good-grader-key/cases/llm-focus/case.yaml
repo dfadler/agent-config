@@ -3,10 +3,12 @@ name: llm-focus
 execution:
   prompt: Do the thing.
 graders:
-  - type: regex
+  - name: has-done
+    type: regex
     target: last_message
     pattern: done
-  - type: llm
+  - name: says-done
+    type: llm
     focus: last_message
     criteria: >
       PASS if the reply says it is done.

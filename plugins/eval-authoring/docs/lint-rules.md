@@ -24,7 +24,7 @@ the authority; the severity is the default.
 
 | ID | Sev | Why it matters | Fix |
 |---|---|---|---|
-| EVAL002 | error | The CLI ignores or rejects keys it does not know, so a typo silently drops a check; an `env` key not matching `EVAL_[A-Z0-9_]*` loads, then fails the run. | Use only documented keys, put run fields (`max_turns`, `allowed_tools`...) under `execution:`, start `case.yaml` with `schema_version` and `name`, and start every `env` key with `EVAL_`. |
+| EVAL002 | error | The CLI ignores or rejects keys it does not know, so a typo silently drops a check; it refuses a `case.yaml` grader with no `name`; an `env` key not matching `EVAL_[A-Z0-9_]*` loads, then fails the run. | Use only documented keys, put run fields (`max_turns`, `allowed_tools`...) under `execution:`, start `case.yaml` with `schema_version` and `name`, give every `case.yaml` grader a `name` (a `graders/*.md` file is named by its file name), and start every `env` key with `EVAL_`. |
 | EVAL004 | error | A case cannot grant itself `Bash`, `Write`, `Edit`, `WebFetch` or `WebSearch`; without a recorded grant the tool is denied and the case cannot pass. | Add the exact entry to `grants.yaml`, or drop the tool from `allowed_tools`. |
 | EVAL005 | error | A `max: 0` `tool_used` grader on a tool the case never gets can never fail. (The CLI's preflight warns, without aborting, when a `min >= 1` one, explicit or the default, has no grant; probed on 2.1.300, see the audit below.) | Grant the tool, or grade something observable. |
 | EVAL006 | warn | A judge given no explicit pass and fail conditions guesses, and split votes make the score noise. | Write `PASS if ...` and `FAIL if ...` with observable conditions. |

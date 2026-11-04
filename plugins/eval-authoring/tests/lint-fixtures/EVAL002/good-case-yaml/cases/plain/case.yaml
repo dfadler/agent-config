@@ -4,5 +4,6 @@ runs: 2
 execution:
   prompt: Do the thing.
 graders:
-  - type: regex
+  - name: g
+    type: regex
     pattern: done

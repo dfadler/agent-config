@@ -1,4 +1,5 @@
 import type { KeyOrigin } from "../../parser/index.ts";
+import { graderLabel } from "../helpers.ts";
 import { fromDocs } from "../sources.ts";
 import type { Problem, Rule } from "../types.ts";
 
@@ -27,7 +28,7 @@ export const rule: Rule = {
   id: "EVAL002",
   severity: "error",
   title:
-    "Unknown prompt.md or grader key; case.yaml missing schema_version or name; run fields at the top level; env key not matching EVAL_*",
+    "Unknown prompt.md or grader key; case.yaml missing schema_version or name; run fields at the top level; case.yaml grader with no name; env key not matching EVAL_*",
   source: fromDocs("the case.yaml and prompt.md field tables"),
   checkCase: (c, { schema }) => {
     const unknownPromptKeys: readonly Problem[] = c.keys
@@ -59,6 +60,19 @@ export const rule: Rule = {
         fix: `Move '${k.name}' ${home(k.belongsUnder ?? k.origin)}.`,
         loc: k.loc,
       }));
+
+    // The CLI refuses a case.yaml grader with no `name` ('graders.0.name: Required'); a
+    // graders/*.md file takes its name from the file name, so only case.yaml graders are checked.
+    const nameRequired = schema.graderCommonKeys.some((s) => s.name === "name" && s.required);
+    const unnamedGraders: readonly Problem[] = nameRequired
+      ? c.graders
+          .filter((g) => g.origin.source === "case.yaml" && g.name.value === undefined)
+          .map((g) => ({
+            message: `${graderLabel(g)} in case.yaml has no \`name\`; \`claude plugin eval\` refuses to load the case.`,
+            fix: "Add `name:` to the grader.",
+            loc: g.origin.loc,
+          }))
+      : [];
 
     // The CLI accepts any env key at load and fails the run later ("any other key fails the
     // run"), so this is the one value check the CLI leaves to run time.
@@ -108,6 +122,7 @@ export const rule: Rule = {
       ...unknownPromptKeys,
       ...unknownGraderKeys,
       ...misplaced,
+      ...unnamedGraders,
       ...badEnv,
     ];
   },

@@ -64,7 +64,8 @@ const SCHEMA: SchemaTable = {
   caseYamlExecutionKeys: [str("prompt"), ...RUN_SETTINGS],
   caseYamlContextKeys: [str("scaffold_script"), str("history_file"), list("add_dirs")],
   graderCommonKeys: [
-    str("name"),
+    // Required in case.yaml only; a graders/*.md file takes its name from the file name.
+    str("name", true),
     str("type", true),
     num("weight", { def: 1 }),
     {
