@@ -50,6 +50,7 @@ Full reasoning for each verdict, plus the duplication check and follow-up list:
 | `prefer-real-chrome.md` | Opt-in include (advisory; the deny rule it names is the enforced form) |
 | `user-evidence-over-spec.md` | Opt-in include (must fire before the premise is trusted; no skill trigger fits) |
 | `context-preservation.md` | Opt-in include (threshold rule; mechanics in the `subagent-orchestration` skill) |
+| `background-tasks.md` | Opt-in include (failure is not noticing a task left running; no skill trigger fits; workflow habit, not a safety baseline) |
 | `visual-verification.md` (removed) | Merged into skill `screen-capture:capture` |
 | `concurrency.md` (removed) | Merged into skill `git-worktree-usage` |
 | `shell-script-hygiene.md` (removed) | Now the `shell-script-hygiene` skill |
