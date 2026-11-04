@@ -1,0 +1,89 @@
+# Run: node plugins/eval-authoring/scripts/ts/run-evals/run-evals.ts --tier quick plugins/eval-authoring
+# (`--ablation none`: the no-plugin arm cannot dispatch a plugin agent.) No grant: the case is
+# pasted in the prompt, so the agent has no directory to probe and traces by hand.
+# Independent draft, unmeasured: written from agents/grader-red-team.md alone.
+# Sabotage: delete the agent's step 2 bullet "the keyword present but negated, hedged or
+# quoted" (and step 4's by-hand tracing) and the finding on reply_says_safe should not name a
+# negated reply; delete the "Output" line shape and finding_line_shape fails.
+# good-reply: grader-red-team found one weak grader. dep-upgrade-lodash:reply_says_safe | by hand | wrong reply: "Not safe to upgrade, it removes a method" | passes because the pattern safe also matches the negated "Not safe" | Fix: anchor on an affirmative phrase such as upgrade is safe or no breaking changes.
+# bad-reply: Clean
+schema_version: "1.1"
+name: grader-red-team-indep-weak-regex
+description: >
+  The grader-red-team agent, given a case pasted in the prompt whose only reply grader is
+  a bare keyword regex, names that grader as weak. expected_outcome (independent draft,
+  unmeasured): PASS when the agent is dispatched and the reply gives a finding line for
+  reply_says_safe that shows a negated reply passing; FAIL when the agent is not
+  dispatched, answers Clean, or names no grader.
+tags: [eval-authoring, grader-red-team, agent, quick]
+
+execution:
+  prompt: |
+    Before I pay for a run, red-team the graders of this eval case with the eval-authoring
+    grader-red-team agent. Pass it the case text below as is, then give me the agent's
+    findings word for word.
+
+    ````yaml
+    # good-reply: Yes. 4.17.21 is a patch release, so the upgrade is safe and nothing breaks.
+    schema_version: "1.1"
+    name: dep-upgrade-lodash
+    description: >
+      expected_outcome: PASS when the reply says the lodash patch upgrade is safe.
+    tags: [dep-upgrade]
+    execution:
+      prompt: |
+        Can I upgrade lodash from 4.17.20 to 4.17.21 without changing my code? One line.
+      max_turns: 4
+      allowed_tools:
+        - Skill
+    graders:
+      - name: skill_fired
+        type: tool_used
+        tool: Skill
+        input_match: '"skill"\s*:\s*"(?:[\w-]+:)?dep-upgrade"'
+        min: 1
+      - name: reply_says_safe
+        type: regex
+        target: last_message
+        pattern: 'safe'
+        flags: i
+        match: contains
+    ````
+  max_turns: 12
+  allowed_tools:
+    - Agent
+
+graders:
+  # Steps: the plugin's agent was dispatched, not imitated.
+  - name: agent_dispatched
+    type: tool_used
+    tool: Agent
+    input_match: '"subagent_type"\s*:\s*"(?:[\w-]+:)?grader-red-team"'
+    min: 1
+
+  # Result: a finding line in the agent's output shape that names the weak grader. The grader
+  # name is in the prompt, so the pattern also needs the "wrong reply:" field, which the
+  # prompt does not contain.
+  - name: finding_line_shape
+    type: regex
+    target: last_message
+    pattern: 'reply_says_safe[^\n]*\|[^\n]*wrong reply:'
+    flags: i
+    match: contains
+
+  # Result: the wrong reply is a negation or hedge of "safe". Half weight: wording regex.
+  - name: negated_reply_shown
+    type: regex
+    target: last_message
+    pattern: 'wrong reply:[^\n]*(?:not safe|unsafe|isn.t safe|not (?:\w+ ){0,3}safe|never safe|n.t (?:\w+ ){0,3}safe)'
+    flags: i
+    match: contains
+    weight: 0.5
+
+  # Result: the agent must not wave the case through.
+  - name: not_clean
+    type: regex
+    target: last_message
+    pattern: '^\W*Clean\b'
+    flags: m
+    match: not_contains

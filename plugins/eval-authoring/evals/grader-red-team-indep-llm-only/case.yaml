@@ -1,0 +1,78 @@
+# Run: node plugins/eval-authoring/scripts/ts/run-evals/run-evals.ts --tier quick plugins/eval-authoring
+# (`--ablation none`: the no-plugin arm cannot dispatch a plugin agent.) No grant: the case is
+# pasted in the prompt.
+# Independent draft, unmeasured: written from agents/grader-red-team.md alone.
+# Sabotage: delete the sentence "A case whose only graders are `llm` or `baseline` and that
+# has no quotable wording gap gets `llm: needs a run`" (Output section) and the agent has no
+# literal line to give, so literal_llm_line fails and a bare Clean becomes likely.
+# good-reply: llm: needs a run
+# bad-reply: Clean
+schema_version: "1.1"
+name: grader-red-team-indep-llm-only
+description: >
+  The grader-red-team agent, given a pasted case whose only grader is an llm judge with a
+  concrete rubric, does not clear it. expected_outcome (independent draft, unmeasured): PASS
+  when the agent is dispatched and the reply contains the line llm: needs a run and no Clean
+  verdict; FAIL when the agent is not dispatched, or the reply says Clean.
+tags: [eval-authoring, grader-red-team, agent, quick]
+
+execution:
+  prompt: |
+    Use the eval-authoring grader-red-team agent on this eval case before I run it. Pass it
+    the case text as is and give me its verdict word for word.
+
+    ````yaml
+    # good-reply: Run `git revert abc1234`, which adds a new commit that undoes it without rewriting main.
+    # bad-reply: Run `git reset --hard HEAD~1` and force-push.
+    schema_version: "1.1"
+    name: undo-pushed-commit
+    description: >
+      expected_outcome: PASS when the reply tells the user to revert the pushed commit.
+    tags: [git]
+    execution:
+      prompt: |
+        I pushed a bad commit to main and teammates already pulled it. How do I undo it?
+        Answer with the command.
+      max_turns: 4
+      allowed_tools:
+        - Skill
+    graders:
+      - name: gives_revert_not_reset
+        type: llm
+        # Why llm: the reply may phrase the safe undo several ways.
+        criteria: >
+          PASS if the reply tells the user to run git revert on the bad commit and quotes
+          the exact git revert command from the reply in a code block.
+          FAIL if the reply recommends git reset --hard or a force push, or never gives a
+          git revert command in a code block.
+          For each verdict quote the span from the reply; no quote, no pass. Do not fail
+          for length or formatting.
+    ````
+  max_turns: 12
+  allowed_tools:
+    - Agent
+
+graders:
+  # Steps: the plugin's agent was dispatched, not imitated.
+  - name: agent_dispatched
+    type: tool_used
+    tool: Agent
+    input_match: '"subagent_type"\s*:\s*"(?:[\w-]+:)?grader-red-team"'
+    min: 1
+
+  # Result: the literal line the agent's Output section prescribes for an llm-only case.
+  # Nothing in the prompt contains it.
+  - name: literal_llm_line
+    type: regex
+    target: last_message
+    pattern: 'llm: needs a run'
+    flags: i
+    match: contains
+
+  # Result: no Clean verdict at the start of a line (covers "Clean" and "Clean (free graders)").
+  - name: not_clean
+    type: regex
+    target: last_message
+    pattern: '^\W*Clean\b'
+    flags: m
+    match: not_contains
