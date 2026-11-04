@@ -38,7 +38,9 @@ permissions:
   contents: read
 
 env:
-  CLAUDE_CODE_VERSION: 2.1.283
+  # 2.1.283 did not call the Skill tool on several eval-authoring cases that 2.1.300 fires
+  # on (#963); keep this at or above the version the local runs use.
+  CLAUDE_CODE_VERSION: 2.1.300
 
 jobs:
   plan:
