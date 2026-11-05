@@ -1,0 +1,44 @@
+# Drafted by the blind-case-writer agent from the committed run-evals SKILL.md alone (#884, PR 979).
+# Target sentence: "directory names of siblings under `plugins/`, each with a
+#   `.claude-plugin/plugin.json`; a value that is not such a directory, such as a manifest
+#   `name` that differs from it, is refused with exit 2".
+# Measured 2026-11-05 (standard, 3 runs): with the new SKILL.md 1.00, without the plugin 0.00; the old
+#   SKILL.md text also scored 1.00, so this guards the --neighbours guidance and does not isolate the PR 979 edit.
+# good-reply: Run the wrapper with --neighbours ledger-kit (the folder name under plugins/, not the manifest name "ledger"); it runs only your trigger cases with ledger-kit loaded beside your plugin.
+# bad-reply: Add the ledger plugin as a second plugin when you run the eval, e.g. --plugin-dir plugins/ledger-kit, and see whether its skills fire instead of yours.
+schema_version: "1.1"
+name: neighbours-takes-directory-name
+description: >
+  A user wants to know whether a sibling plugin's skills steal prompts from theirs, and the
+  sibling's manifest name differs from its folder. expected_outcome: PASS when the reply gives
+  the --neighbours option with the folder name; FAIL when it gives the manifest name or no
+  such option. No delta expected from the Skill indicator; the regex is the scored result.
+tags: [run-evals, trigger, quick]
+
+execution:
+  prompt: |
+    I have plugins/billing-tools with one skill, invoice-helper. Right next to it is
+    plugins/ledger-kit, whose plugin.json name is just "ledger". I'm worried ledger's skills
+    are grabbing prompts that should go to mine. How do I measure that with the eval wrapper,
+    and what exactly do I pass for the other plugin?
+  max_turns: 6
+  allowed_tools:
+    - Skill
+
+graders:
+  # Indicator only in a two-arm run (tool_used: Skill is unscored).
+  - name: skill_fired
+    type: tool_used
+    tool: Skill
+    input_match: '"skill"\s*:\s*"(?:[\w-]+:)?run-evals"'
+    min: 1
+
+  # Result: the option exists and takes the folder name. A bare model does not know the
+  # flag; one that does but passes the manifest name ("ledger") fails. The pattern
+  # matches "ledger-kit" only after the flag, so an echo of the prompt does not pass.
+  - name: passes_directory_name
+    type: regex
+    target: last_message
+    pattern: '--neighbours[ =]+(?:plugins/)?ledger-kit\b'
+    flags: i
+    match: contains

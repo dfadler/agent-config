@@ -1,0 +1,32 @@
+# Drafted by the blind-case-writer agent from the committed run-evals SKILL.md alone (#884, PR 979).
+# Target: the run-evals description ("... Not for writing cases (author-cases)"). The prompt shares
+#   the neighbour / overlapping-skills vocabulary of the --neighbours guidance but wants a
+#   description rewrite, not a run.
+# A trigger-boundary negative: counted by `run-evals --trigger-boundary`, plugin arm only.
+# good-reply: Here is a narrower description: "Reconcile your own books against a bank statement you paste. Not for statements already tied out; ..."
+# bad-reply: Lint the plugin, then run the wrapper with --neighbours ledger-kit and report the exit code.
+schema_version: "1.1"
+name: neighbours-quiet-on-description-rewrite
+description: >
+  A request to edit a skill description so it stops overlapping a sibling's must not fire
+  run-evals. A trigger-boundary negative, plugin arm only, so no delta.
+  expected_outcome: PASS when run-evals is not invoked.
+tags: [run-evals, trigger-boundary, "pair:neighbours-takes-directory-name"]
+
+execution:
+  prompt: |
+    The ledger-kit plugin next door has a skill that says "Reconcile bank statements". Mine
+    says "Reconcile statements and bank records. Use when asked to reconcile." People say they
+    overlap. Rewrite my description so the two don't compete for the same prompts.
+  max_turns: 4
+  allowed_tools:
+    - Skill
+
+graders:
+  # min: 0 is explicit (tool_used defaults min to 1). No arm: this runs plugin-arm only.
+  - name: run_evals_not_invoked
+    type: tool_used
+    tool: Skill
+    input_match: '"skill"\s*:\s*"(?:[\w-]+:)?run-evals"'
+    min: 0
+    max: 0
