@@ -46,11 +46,13 @@ nvm is a sourced shell function, not an executable
 Run `nvm use` and the command in one call. This form works whether or not `nvm` is defined:
 
 ```bash
-bash -c '. "${NVM_DIR:-$HOME/.nvm}/nvm.sh" && nvm use >/dev/null && <command>'
+bash -c '. "${NVM_DIR:-$HOME/.nvm}/nvm.sh" && nvm use >/dev/null && "$@"' _ <command> [<args>]
 ```
 
-`nvm use` returns non-zero on failure, so the `&&` stops the chain; `;` would run the
-command on the wrong Node. If nvm lives under `$XDG_CONFIG_HOME/nvm`, set `NVM_DIR` to it.
+The command and its arguments follow the script as separate words, so quotes inside them
+need no escaping (tested with `node -e 'console.log(process.version)'`). `nvm use` returns
+non-zero on failure, so the `&&` stops the chain; `;` would run the command on the wrong
+Node. If nvm lives under `$XDG_CONFIG_HOME/nvm`, set `NVM_DIR` to it.
 
 To persist the version for every Bash command in a session, a `SessionStart`, `Setup`,
 `CwdChanged` or `FileChanged` hook can write exports to `CLAUDE_ENV_FILE`
@@ -61,7 +63,10 @@ empty, so test it before relying on it. Setting it up edits the user's settings:
 `nvm use` with no argument reads `.nvmrc` from the current directory or a parent
 ([nvm README, .nvmrc](https://github.com/nvm-sh/nvm#nvmrc)). If a hook blocks compound
 commands, put the version's bin directory on `PATH` for the one command instead:
-`PATH="${NVM_DIR:-$HOME/.nvm}/versions/node/v<X.Y.Z>/bin:$PATH" <command>`.
+`PATH="${NVM_DIR:-$HOME/.nvm}/versions/node/v<X.Y.Z>/bin:$PATH" <command>`. First check
+that `${NVM_DIR:-$HOME/.nvm}/versions/node/v<X.Y.Z>/bin/node` exists: if the version is not
+installed, `node` resolves to a later `PATH` entry and the command runs on the wrong
+version, so stop and install it with the user's yes (see Fix below).
 
 A major-only `.nvmrc` (`24`): `nvm use 24` picks the highest installed 24.x, while
 `nvm install 24` resolves against the remote index, so it can fetch a newer 24.x than

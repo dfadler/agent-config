@@ -34,9 +34,13 @@ metadata:
    code bug. Re-run it on the pinned version before debugging. Running `.ts` files natively
    needs Node 22.18 or newer ([Node TypeScript docs](https://nodejs.org/api/typescript.html)).
 
-`engines` is advisory for `npm install` only. Tested on npm 11.19.0: a root mismatch warns
-(`EBADENGINE`) on install and is ignored by `npm run` and `node --run`
-([npm docs](https://docs.npmjs.com/cli/v11/configuring-npm/package-json#engines)).
+`engines` is advisory for `npm install` only, while npm's `engine-strict` setting is false
+(the default; [npm config](https://docs.npmjs.com/cli/v11/using-npm/config#engine-strict)).
+Tested on npm 11.19.0 with the default: a root mismatch warns (`EBADENGINE`) on install and
+is ignored by `npm run` and `node --run`
+([npm docs](https://docs.npmjs.com/cli/v11/configuring-npm/package-json#engines)). With
+`engine-strict=true`, npm refuses the install instead, so check `npm config get engine-strict`
+before reading an `EBADENGINE` failure as a warning.
 `devEngines.runtime` errors on a mismatch by default (same page, tested). pnpm fails on a
 root `engines` mismatch even without `engineStrict`, per its
 [docs](https://pnpm.io/package_json) (not tested). Do not treat a clean install as proof
@@ -47,14 +51,17 @@ the version is right.
 Installing, switching or defaulting a version with nvm, and a wrong `node` first on `PATH`,
 belong to `nvm:nvm-usage`. For native-module ABI errors after a switch, Node's own error
 text suggests `npm rebuild` or `npm install`; try the project's rebuild first and delete
-`node_modules` only if that fails. Node-API addons need no rebuild
+`node_modules` only if that fails. An addon built only on Node-API is ABI-stable across
+Node versions and needs no rebuild; one that also uses Node's C++ APIs or an
+ABI-unstable external library can still need one
 ([Node-API docs](https://nodejs.org/api/n-api.html)).
 
 ## Upgrade the pin across a repo
 
 Pick a supported LTS major from the [Node release schedule](https://github.com/nodejs/Release#release-schedule),
-and read its EOL date and latest patch in `schedule.json`: only that file carries EOL
-dates, and a pinned major should be on a patched release
+and read its EOL date in `schedule.json`: only that file carries EOL dates and no patch
+versions. Find the latest patch in the [release index](https://nodejs.org/dist/index.json);
+a pinned major should be on a patched release
 ([security releases](https://nodejs.org/en/blog/vulnerability)). `lts/*`, `node:lts` and
 `nvm --lts` resolve to whichever major is the newest LTS when they run, so they can jump a
 major without a commit. Change every place that names the major, then grep for the old one:

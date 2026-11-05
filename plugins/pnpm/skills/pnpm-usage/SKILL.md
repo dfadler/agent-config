@@ -91,8 +91,11 @@ with `pnpm add`. Do not enable `shamefullyHoist` to hide it.
 
 ## Dependency build scripts
 
-pnpm does not run a dependency's lifecycle scripts unless the project allows it
-([supply-chain security](https://pnpm.io/supply-chain-security)). The allow-list is
+Since pnpm 10, pnpm does not run a dependency's lifecycle scripts unless the project allows
+it ([10.x settings](https://pnpm.io/10.x/settings),
+[supply-chain security](https://pnpm.io/supply-chain-security)); pnpm 9 and earlier run
+them by default, so check the installed major before treating an install as script-safe.
+The allow-list is
 `allowBuilds` (added in pnpm 10.26.0) and, in pnpm 10 only, `onlyBuiltDependencies`, which
 pnpm 11 removed ([pnpm 11 release notes](https://pnpm.io/blog/releases/11.0)). In pnpm 11
 `strictDepBuilds` is true, so an unreviewed build script fails the install with
@@ -125,13 +128,19 @@ number.
 This section owns the CI order for pnpm and Node; `nodejs:node-version` owns only the pin file.
 If the repo already has a setup step (a local composite action or a workflow under
 `.github/`), call or copy that; it wins over the options below. Both take the pnpm version
-from `packageManager`; keep the Node pin in `.nvmrc` rather than a second copy:
+from `packageManager` or `devEngines.packageManager`; keep the Node pin in `.nvmrc` rather
+than a second copy:
 
 - **pnpm 11 or newer: [`pnpm/setup`](https://github.com/pnpm/setup)**, which pnpm's
   [CI page](https://pnpm.io/continuous-integration) recommends; prefer it for a new setup
   on those versions. One step installs pnpm and
-  Node (no `actions/setup-node`; it detects `.nvmrc` itself) and runs `pnpm install`. A
-  stale lockfile already fails in CI, but a missing one does not: set `require-lockfile: true`.
+  Node (no `actions/setup-node`) and runs `pnpm install`. It picks the Node version from an
+  explicit `node-version-file` path, else `devEngines.runtime`, else the first of
+  `.node-version`, `.nvmrc`, `.tool-versions`
+  ([README](https://github.com/pnpm/setup#readme)), so set `node-version-file: .nvmrc` when
+  `.nvmrc` is the pin; otherwise a `.node-version` file or `devEngines.runtime` entry
+  silently wins. A stale lockfile already fails in CI, but a missing one does not: set
+  `require-lockfile: true`.
 - **Any pnpm up to 12: [`pnpm/action-setup`](https://github.com/pnpm/action-setup)** before
   [`actions/setup-node`](https://github.com/actions/setup-node) when using its `cache: pnpm`,
   with `node-version-file: .nvmrc`, then `pnpm install --frozen-lockfile`. The action-setup

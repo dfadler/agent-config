@@ -52,9 +52,11 @@ graders:
     pattern: 'uses:\s*actions/setup-node@'
     match: not_contains
 
-  # The prompt does not contain "require-lockfile". Accepts quoted or bare true.
+  # The prompt does not contain "require-lockfile". Accepts quoted or bare true, and only
+  # within 400 characters after the `uses: pnpm/setup@` line, so the setting must sit under
+  # that step (the `with:` block follows it) and not appear elsewhere in the reply.
   - name: requires_lockfile
     type: regex
     target: last_message
-    pattern: 'require-lockfile:\s*["'']?true'
+    pattern: 'uses:\s*pnpm/setup@[\s\S]{0,400}require-lockfile:\s*["'']?true'
     match: contains
