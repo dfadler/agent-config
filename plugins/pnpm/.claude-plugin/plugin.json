@@ -1,0 +1,13 @@
+{
+  "$schema": "https://json.schemastore.org/claude-code-plugin-manifest.json",
+  "name": "pnpm",
+  "version": "0.1.0",
+  "description": "Skill for pnpm projects: packageManager pin, where settings go in pnpm 11, lockfile drift and conflicts, blocked build scripts, strict node_modules, supply-chain settings, CI install.",
+  "author": {
+    "name": "Dustin Fadler",
+    "url": "https://github.com/dfadler"
+  },
+  "homepage": "https://github.com/dfadler/agent-config",
+  "repository": "https://github.com/dfadler/agent-config",
+  "keywords": ["pnpm", "lockfile", "workspaces", "supply-chain"]
+}

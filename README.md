@@ -40,9 +40,13 @@ automatically, with no per-project copy to keep in sync.
     volumes, critical-path analysis, cost/performance opportunities), plus the
     `gha-workflow-authoring` skill: SHA-pinning, `timeout-minutes`, `actionlint`
     and human-merge rules that fire on any `.github/workflows/` edit.
-  - `node-pnpm/` — skills for running on the project's Node version (nvm in
-    non-interactive shells, `.nvmrc` vs `engines`, upgrading the pin) and for pnpm
-    (`packageManager` pin, lockfile, settings location, blocked build scripts).
+  - `nodejs/` — choosing and checking the Node version: `.nvmrc` vs `engines`,
+    version symptoms, upgrading the pin, Node in CI.
+  - `nvm/` — running commands under nvm from an agent shell: `nvm use` not
+    persisting between calls, `nvm` undefined in non-interactive shells, `PATH`
+    shadowing, safe fixes.
+  - `pnpm/` — pnpm projects: `packageManager` pin, where settings go in pnpm 11,
+    lockfile drift and conflicts, blocked build scripts, supply-chain settings.
   - `playwright/` — skill and agent for headless Playwright scripting: `.webm`
     recording, real key presses, Storybook play functions, frame extraction.
     Needs Node and the `playwright` package.
