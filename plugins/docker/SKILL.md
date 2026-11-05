@@ -38,7 +38,7 @@ back stays hand back even when the user says "go ahead".
 <!-- tier-policy:end -->
 
 This section is the one place that decides whether a `docker` command is run, asked about
-or handed back; other sections and the `docker-diagnoser` agent point here. A command no
+or handed back; other sections point here. A command no
 tier lists is Ask first. The tiers gate running: a command or file you only write for the
 user to apply is not run, but you still name its tier and follow Runtime hardening.
 
