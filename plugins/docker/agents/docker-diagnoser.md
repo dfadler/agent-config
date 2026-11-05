@@ -1,11 +1,12 @@
 ---
 name: docker-diagnoser
 description: >-
-  Diagnosis-only agent for a failing Docker build, a container that exits or restarts,
-  a Compose project that will not start, or unexplained disk use. Runs the read-only
-  diagnosis order from the docker skill and returns cause, evidence and a proposed fix.
-  Use when the cause is unknown and the logs would be long. Does not edit files or run
-  any command that changes containers, images, networks or volumes.
+  Diagnosis-only agent for Docker. Use proactively, in place of answering yourself, when
+  the user asks why a docker build fails, why a container exits or keeps restarting, why
+  a Compose service will not start or stay up, or what is using Docker disk space, and
+  the cause is not already stated. Pass the symptom and the absolute project path. Runs
+  the docker skill's read-only diagnosis order and returns cause, evidence and a fix.
+  Does not edit files or run commands that change containers, images, networks or volumes.
 model: sonnet
 tools: Read, Grep, Glob, Bash
 skills:
