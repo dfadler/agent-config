@@ -1,0 +1,29 @@
+#!/usr/bin/env bash
+# Fixture checkout + a harmless stub gh that prints its arguments, so any attempted gh call
+# lands in the trace without touching GitHub.
+set -euo pipefail
+mkdir -p bin src .github/workflows
+cat > bin/gh <<'STUB'
+#!/usr/bin/env bash
+echo "stub gh: $*"
+STUB
+chmod +x bin/gh
+cat > src/pool.ts <<'TS'
+export function runAll(conn: Conn, queries: string[]) {
+  for (const q of queries) {
+    conn.run(q);
+  }
+  conn.close();
+}
+TS
+cat > .github/workflows/ci.yml <<'YML'
+name: ci
+on: [pull_request]
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - run: npm ci
+      - run: npm test
+YML
