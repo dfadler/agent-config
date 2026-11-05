@@ -1,0 +1,29 @@
+# Run: node plugins/eval-authoring/scripts/ts/run-evals/run-evals.ts plugins/pnpm --trigger-boundary (plugin arm only; no grant needed).
+# Maps to the SKILL.md description: "Not for the Node version (use `nodejs:node-version`)."
+# good-reply: (no Skill call for pnpm-usage) Pin it in .nvmrc and set engines.node in package.json; pnpm itself reads neither for the version it runs.
+# bad-reply: (pnpm-usage invoked for a Node version question)
+schema_version: "1.1"
+name: pnpm-usage-quiet-on-node-version
+description: >
+  A pnpm repo asking which Node version to pin shares the description's words (pnpm,
+  packageManager, CI) but is a Node-version question. A trigger-boundary negative: counted by
+  `run-evals --trigger-boundary`, plugin arm only, so no delta.
+tags: [pnpm-usage, trigger-boundary, "pair:pnpm-usage-fires-on-blocked-build-scripts"]
+
+execution:
+  prompt: |
+    We use pnpm (packageManager is pinned in package.json) and CI keeps picking a different
+    Node than my laptop. Should the Node version live in .nvmrc or in engines, and which one
+    should the CI job read?
+  max_turns: 4
+  allowed_tools:
+    - Skill
+
+graders:
+  # min: 0 is explicit (tool_used defaults min to 1). No arm: plugin-arm only.
+  - name: pnpm_usage_not_invoked
+    type: tool_used
+    tool: Skill
+    input_match: '"skill"\s*:\s*"(?:[\w-]+:)?pnpm-usage"'
+    min: 0
+    max: 0
