@@ -25,15 +25,30 @@ metadata:
 ## Run commands under the pinned version
 
 nvm is a sourced shell function, not an executable
-([nvm README](https://github.com/nvm-sh/nvm#verify-installation)). Your shell tool starts a
-fresh non-interactive shell per call that sources no rc file
-([nvm README, Docker section](https://github.com/nvm-sh/nvm#installing-in-docker)), so `nvm`
-is not found and a `nvm use` in one call is gone in the next. Source nvm and run the command
-in the same call:
+([nvm README](https://github.com/nvm-sh/nvm#verify-installation)). Two separate hazards:
+
+- **The switch does not persist.** Each Claude Code Bash command runs in a separate process
+  and environment variables do not carry over
+  ([tools reference](https://code.claude.com/docs/en/tools-reference#bash-tool-behavior)),
+  so `nvm use` in one call is gone in the next. Observed on one machine: `nvm use` printed
+  the pinned version, and `node --version` in the next call showed the default again.
+- **`nvm` may not be defined.** Claude Code captures functions from the startup file at
+  session start (same page), so `nvm` exists only if that file loads it. Non-interactive
+  shells skip profile files
+  ([nvm README, Docker section](https://github.com/nvm-sh/nvm#installing-in-docker)), so
+  `bash -c`, hooks, subagents and CI can report `nvm: command not found`. Check with
+  `command -v nvm`.
+
+Run `nvm use` and the command in one call. This form works whether or not `nvm` is defined:
 
 ```bash
 bash -c '. "${NVM_DIR:-$HOME/.nvm}/nvm.sh" && nvm use >/dev/null && <command>'
 ```
+
+To persist the version for every Bash command in a session, a `SessionStart` hook can write
+the exports to `CLAUDE_ENV_FILE`; the
+[hooks reference](https://code.claude.com/docs/en/hooks#persist-environment-variables) shows
+an nvm example. Setting that up edits the user's settings, so ask first.
 
 `nvm use` with no argument reads `.nvmrc` from the current directory or a parent
 ([nvm README, .nvmrc](https://github.com/nvm-sh/nvm#nvmrc)). If a hook blocks compound
