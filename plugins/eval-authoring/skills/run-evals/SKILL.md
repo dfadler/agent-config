@@ -83,8 +83,9 @@ it, do not rebuild any of that.
    `subset:` line names the tier and the finished count; with `--pr` it warns when the
    block it replaces held a full run. The mapping is a heuristic and can miss cases, so
    run the full tier before a release.
-   To measure routing against competing skills, add `--neighbours <plugin,...>` (siblings
-   under `plugins/`): it runs only the `trigger` cases against a temp copy of the plugin
+   To measure routing against competing skills, add `--neighbours <plugin,...>` (directory
+   names of siblings under `plugins/`; a manifest `name` that differs from the directory
+   is refused with exit 2): it runs only the `trigger` cases against a temp copy of the plugin
    with those plugins loaded beside it through each case's `plugins:` (the CLI has no flag
    for this; committed cases are not edited, and a case with its own `plugins:` is
    refused). The summary then has a Trigger set table: fire rate, false-fire rate and
@@ -92,7 +93,12 @@ it, do not rebuild any of that.
    whatever the tier), because the CLI's baseline arm ignores `plugins:` and loads no
    plugin at all, neighbours included (seen in a paid run, #884): a delta would compare
    the skill with nothing, not with its neighbours, so there is no without or delta column.
-   Neighbour hooks run inside the eval under the copy's trust, and `node_modules` is
+   The table covers only the plugin under test's skills: a neighbour that wins a prompt
+   shows as the plugin's skill not firing, so grade it with a `tool_used` grader on the
+   neighbour's skill, whose id is `<manifest name>:<skill directory name>` (a differing
+   frontmatter `name` is ignored; seen, #884). Neighbour hooks run inside the eval as you,
+   with no separate trust step: a neighbour's SessionStart and UserPromptSubmit hooks
+   fired and the context they injected reached the model (seen, #884). `node_modules` is
    not copied.
    To measure the should-not-fire side of routing, run `--trigger-boundary`: the cases
    tagged `trigger-boundary` plus the should-fire twin each names with a `pair:<case>`
