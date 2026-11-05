@@ -23,16 +23,25 @@ metadata:
 
 ## First
 
-1. Read `packageManager` in `package.json` and run `pnpm --version`. Behavior below depends
-   on the major; check the installed major's docs at [pnpm.io](https://pnpm.io) and
-   `pnpm help <command>` before relying on a flag or setting name.
+1. Read `packageManager` in `package.json`. Behavior below depends on the major; check the
+   installed major's docs at [pnpm.io](https://pnpm.io) and `pnpm help <command>` before
+   relying on a flag or setting name. From pnpm 11.28.10 every command, including
+   `pnpm --version`, applies the project's `packageManager` pin
+   ([release notes](https://pnpm.io/blog/releases/11.28.10)), so run `pnpm --version`
+   outside the project to see the installed pnpm. Fetching an uncached pinned version is an
+   inference from that note, not stated there: ask before running a pnpm command inside the
+   project if the pin differs from the installed version.
 2. A repo with `pnpm-lock.yaml` uses pnpm only. Do not run `npm install` or `yarn`, and do
    not create `package-lock.json` or `yarn.lock`.
 3. `packageManager` names an exact pnpm version. pnpm downloads and runs that version by
    default, controlled by `pmOnFail` in pnpm 11 and `managePackageManagerVersions` in pnpm
    10 ([pnpm 11 release notes](https://pnpm.io/blog/releases/11.0)). Do not
    `npm install -g pnpm@<version>` to fix a mismatch; fix the pin or the shell `PATH`.
-4. pnpm runs on Node, so pin the Node version first (`node-version` skill).
+4. pnpm 12 can be installed without Node.js
+   ([pnpm 12 release notes](https://pnpm.io/blog/releases/12.0)); the notes do not say which
+   commands still need it. Before a task that runs project scripts or tools, pin the Node
+   version first (`node-version` skill). A pnpm 12 task that runs no project JavaScript, such
+   as reading `pnpm why`, does not need that step (inference).
 
 ## Where settings go
 
