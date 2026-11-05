@@ -1,0 +1,39 @@
+# Run: claude plugin eval plugins/collab-retro --case collab-retro-nudge-fires-on-talk-about-miss --runs 3 --trust-plugin --no-publish
+# Shared run/grant facts: docs/contributing.md, "Plugin evals". No grant. The prompt carries the
+# history inline; nothing is run or written.
+# End-to-end case for the incident-nudge phrase added in #966: the opt-in hook logs the phrase
+# at UserPromptSubmit and its Stop hook asks the model once to offer an incident retro. The case
+# opts in with EVAL_COLLAB_RETRO_NUDGE (a case may only set EVAL_* env vars; the hook accepts it).
+# The prompt names neither "retro" nor "incident" and keeps under the hook's 500-character limit.
+# Without the plugin (or without the phrase in PHRASES) the model answers free-form and never
+# mentions a retro, so the arms should differ. A model run decides whether the nudge is followed;
+# the regex itself is unit-tested in incident-nudge-hook.test.ts.
+# Can fail: offers_retro fails if the hook did not fire (phrase missing, env not passed, hook not
+# run in the eval sandbox) or the model ignored the nudge.
+schema_version: "1.1"
+name: collab-retro-nudge-fires-on-talk-about-miss
+description: >
+  After the user asks to talk about why the agent ignored the expected formatting, the nudge
+  hook makes the model offer an incident retro instead of only answering free-form.
+  expected_outcome: PASS when the reply offers a retro or incident record; FAIL otherwise.
+tags: [collab-retro, incident, hook, quick]
+
+execution:
+  prompt: |
+    me: Write the PR description for the retry change using .github/pull_request_template.md.
+    you: This PR makes the client retry failed requests with backoff. Unit tests pass.
+    me: Doesn't look like you used the correct formating
+
+    In a sub session can we talk about why you didn't use the expected formatting? Reply in
+    a few sentences. Do not run commands.
+  max_turns: 4
+  env:
+    EVAL_COLLAB_RETRO_NUDGE: "on"
+
+graders:
+  - name: offers_retro
+    type: regex
+    target: last_message
+    pattern: '\b(retro(spective)?|incident (retro|record|mode))\b'
+    flags: i
+    match: contains

@@ -54,7 +54,8 @@ const asObject = (v: unknown): Record<string, unknown> | undefined =>
     : undefined;
 
 export const run = (d: Deps): number => {
-  if (!OPT_IN.includes(d.env["COLLAB_RETRO_NUDGE"] ?? "")) return 0;
+  // EVAL_COLLAB_RETRO_NUDGE: a plugin eval case can only set EVAL_* env vars.
+  if (![d.env["COLLAB_RETRO_NUDGE"], d.env["EVAL_COLLAB_RETRO_NUDGE"]].some((v) => OPT_IN.includes(v ?? ""))) return 0;
   let input: Record<string, unknown> | undefined;
   try {
     input = asObject(JSON.parse(d.stdin));

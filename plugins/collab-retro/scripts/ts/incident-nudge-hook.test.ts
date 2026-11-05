@@ -33,6 +33,11 @@ describe("collab-retro incident nudge hook", () => {
     expect(existsSync(pendingFile())).toBe(false);
   });
 
+  it("also opts in via EVAL_COLLAB_RETRO_NUDGE, the only env a plugin eval case may set", () => {
+    call(prompt("I told you already"), { COLLAB_RETRO_NUDGE: "", EVAL_COLLAB_RETRO_NUDGE: "on" });
+    expect(existsSync(pendingFile())).toBe(true);
+  });
+
   it("logs one line for a frustration phrase, without the prompt text, and prints nothing", () => {
     const r = call(prompt("I already told you to use pnpm, secret-token-123"));
     expect(r).toEqual({ code: 0, out: "" });
