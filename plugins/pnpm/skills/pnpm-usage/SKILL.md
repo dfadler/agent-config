@@ -7,7 +7,7 @@ description: |
   under strict `node_modules`, pnpm settings such as `overrides`, CI installs. Returns the
   pnpm command and where the setting goes. Not for the Node version (use `nodejs:node-version`).
 metadata:
-  version: "1.1.0"
+  version: "1.2.0"
 ---
 
 # Working in a pnpm project
@@ -139,4 +139,6 @@ from `packageManager`; keep the Node pin in `.nvmrc` rather than a second copy:
   Node and that this pairing still works on pnpm 11 and 12. The setup-node README says the
   package manager should be pre-installed; the order is from its advanced-usage example.
 
-Do not add Corepack to a new setup: the CI page says it runs pnpm through a Node.js shim on every call.
+Do not add Corepack to a new setup: the CI page says it runs pnpm through a Node.js shim on
+every call. If the user asks for it, say that, offer the setup above, and use Corepack only
+if they still want it.
