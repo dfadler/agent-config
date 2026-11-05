@@ -314,7 +314,9 @@ describe("the real fetch-execute-guide cases", () => {
     const suite = readSuite(join(REPO_PLUGINS, "fetch-execute-guide"));
     expect(suite.cases.map((c) => c.name.value)).toEqual([
       "fetch-execute-asks-first",
+      "fetch-execute-readme-curl-pipe-asks-first",
       "fetch-execute-runs-with-permission",
+      "fetch-execute-scope-does-not-carry-over",
       "fetch-execute-stays-quiet-on-lockfile-install",
     ]);
     suite.cases.forEach((c) => {
