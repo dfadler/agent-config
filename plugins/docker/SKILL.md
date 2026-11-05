@@ -19,7 +19,8 @@ metadata:
   question.
 - **Output:** a Dockerfile or Compose change that follows the rules below with the
   docs.docker.com link for each rule applied; a diagnosis that names the evidence; or the
-  tier of each `docker` command and the exact command awaiting a go-ahead. Every claim in
+  tier of each `docker` command (per Command tiers) and the exact command awaiting a
+  go-ahead. Every claim in
   the reply about what a command, flag or instruction does carries its docs.docker.com
   link.
 - **Does not:** run a command in the Ask or Hand-back tiers without the permission that
@@ -28,27 +29,40 @@ metadata:
 
 ## Command tiers
 
-Sort every `docker` command into one tier before running it or recommending it. A command
-that sits between two tiers takes the higher one.
+This section is the one place that decides whether a command is run, asked about or
+handed back; other sections and the `docker-diagnoser` agent point here. Sort every
+`docker` command into one tier before running it or recommending it. A command that sits
+between two tiers takes the higher one, and a command no tier lists is Ask first. The
+tiers gate running: a command or file you only write for the user to apply is not run, but
+you still name its tier and follow Runtime hardening.
 
 ### Run freely (read-only)
 
 `docker ps -a`, `docker images`, `docker inspect`, `docker system df`,
-`docker compose config`, `docker compose ps`, and `docker logs` with `--tail <N>` or
-`--since <duration>` (never bare `-f`, which streams until stopped). Output over about 50
-lines goes through `--tail` or a pipe to a file in the scratchpad, and you summarise it.
+`docker compose config`, `docker compose ps`, `docker top`, `docker stats --no-stream`
+([docker stats](https://docs.docker.com/reference/cli/docker/container/stats/)),
+`docker scout cves <image>`, which analyzes an image for known vulnerabilities (report the
+findings and the base-image change that would remove them;
+[docker scout cves](https://docs.docker.com/reference/cli/docker/scout/cves/)), and
+`docker logs` or `docker compose logs` with `--tail <N>` or `--since <duration>` (never
+bare `-f`, which follows the log
+([docker compose logs](https://docs.docker.com/reference/cli/docker/compose/logs/))).
+Output over about 50 lines goes through `--tail` or a pipe to a file in the scratchpad,
+and you summarise it.
 
 ### Ask first
 
 State the exact command and its target, then wait for a go-ahead: `docker run`,
 `docker exec`, `docker build`, `docker pull`, `docker push`, `docker stop|restart|kill`,
 `docker rm <named container>`, `docker rmi`, `docker image prune`, `docker builder prune`,
-`docker compose up|down|restart`, and edits to `daemon.json` or Compose files. Ask once
-per independent action, not once for a batch.
+`docker compose up|down|restart`, and edits to a Dockerfile (a base-image change from a
+scout report included), `.dockerignore`, Compose file or `daemon.json`. Ask once per
+independent action, not once for a batch. Running `--cap-add` is this tier too: name each
+capability and why the service needs it.
 
 Three more need the same go-ahead plus a one-line statement of the risk, because each
 widens what a container can do to the host:
-- `--privileged`, `--cap-add` and `--security-opt seccomp=unconfined`. `--privileged` grants
+- `--privileged` and `--security-opt seccomp=unconfined`. `--privileged` grants
   all capabilities, disables the default seccomp and AppArmor profiles and exposes host
   devices ([docker run](https://docs.docker.com/reference/cli/docker/container/run/)).
 - Mounting `/var/run/docker.sock` into a container, in `docker run` or `compose.yaml`. It
@@ -79,7 +93,7 @@ and the command to run themselves, even if they said "go ahead".
   ([docker volume prune](https://docs.docker.com/reference/cli/docker/volume/prune/)).
 
 For a "free up disk" request, run `docker system df` first, report what is reclaimable,
-and put each prune in the tier above; never answer with one `system prune -a --volumes`.
+and put each prune in its tier under Command tiers; never answer with one `system prune -a --volumes`.
 
 ## Dockerfile rules
 
@@ -152,7 +166,8 @@ needed ([OWASP Docker Security Cheat Sheet](https://cheatsheetseries.owasp.org/c
 [docker run](https://docs.docker.com/reference/cli/docker/container/run/)).
 
 1. **Drop capabilities:** `--cap-drop all` (Compose `cap_drop: [ALL]`), then `--cap-add`
-   only the ones the service needs.
+   only the ones the service needs. Writing this command is not gated; running it is Ask
+   first under Command tiers.
 2. **Set `no-new-privileges` explicitly:** `--security-opt no-new-privileges` (Compose
    `security_opt`). It is not on by default.
 3. **Make the root filesystem read-only:** `--read-only` with `--tmpfs <path>` for each
@@ -192,12 +207,5 @@ Run the steps in order, read-only, and stop at the first one that explains the f
    ([docker system df](https://docs.docker.com/reference/cli/docker/system/df/)).
 
 State the diagnosis with the evidence before proposing a fix: "exit 137 and the log ends
-mid-build, so the process was killed", not "let's restart it". Apply the fix through the
-tiers above, then rerun the step that diagnosed it to confirm the problem is gone.
-
-## Image scanning
-
-`docker scout cves <image>` analyzes an image for known vulnerabilities
-([docker scout cves](https://docs.docker.com/reference/cli/docker/scout/cves/)). Report
-the findings and the base-image change that would remove them; changing the base image
-is an Ask-first edit.
+mid-build, so the process was killed", not "let's restart it". Apply the fix per Command
+tiers, then rerun the step that diagnosed it to confirm the problem is gone.
