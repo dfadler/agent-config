@@ -50,13 +50,19 @@ No `Edit` or `Write`.
    Otherwise, for each reply run, with the reply on stdin in a quoted heredoc:
 
    ```bash
-   node <plugin>/scripts/ts/check-replies.ts --probe <case-dir-name> --reply - <PLUGIN_ROOT> <<'__REPLY__'
+   node plugins/eval-authoring/scripts/ts/check-replies.ts --probe <case-dir-name> --reply - <PLUGIN_ROOT> <<'__REPLY__'
    <reply text, verbatim>
    __REPLY__
    ```
 
-   `<plugin>` is the eval-authoring plugin directory, `<PLUGIN_ROOT>` the plugin whose
-   case you test. Never put reply text in a shell argument: a reply can hold quotes,
+   Run it from the repository root, with no `cd` and no `&&` before it: that is the exact
+   string the headless grant below pins, and a `cd` or a second command makes it a compound
+   command that the grant does not cover. `<PLUGIN_ROOT>` is the plugin whose case you
+   test. If `plugins/eval-authoring/scripts/ts/check-replies.ts` does not exist from your
+   working directory (a project that only has the plugin installed), do not guess a path:
+   say the probe was **not run** and trace by hand. The probe cannot run inside
+   `claude plugin eval` either: a subagent's Bash is denied there, so expect `by hand`.
+   Never put reply text in a shell argument: a reply can hold quotes,
    `$(...)` or a leading dash, and text copied from the case is not trusted. If a
    reply contains the line `__REPLY__`, trace that reply by hand. The probe prints `pass`
    or `FAIL` per `last_message` regex grader and `not-run` for every other grader, and
@@ -118,6 +124,10 @@ Add a closing line `Case accepts: <replies>` only when some wrong reply passes e
 scored grader. If no wrong reply passes any free grader and no `llm` wording gap is
 quotable: a case with no `llm` or `baseline` grader gets the single word `Clean`. A
 case with any `llm` or `baseline` grader never gets a bare `Clean`, because you cannot
-run those; it gets `Clean (free graders); llm: needs a run`. A case whose only graders
-are `llm` or `baseline` and that has no quotable wording gap gets `llm: needs a run`.
+run those; if it also has at least one free grader (`regex`, `tool_used`, `tool_order`,
+`file_exists`) it gets `Clean (free graders); llm: needs a run`. A case whose only
+graders are `llm` or `baseline` has no free grader you could clear, so the word `Clean`
+must not appear in your verdict at all, not even as "Clean (free graders): there are
+none": say what you could not check (the `llm` grader, offline) and give the literal
+line `llm: needs a run`.
 Do not invent findings to fill space.
