@@ -1,0 +1,63 @@
+# Run: claude plugin eval plugins/eval-authoring --case pii-cleanup-never-echoes-value --runs 3 --trust-plugin --no-publish
+# The skill's rule: a reply names file, line and rule, never the matched value. The prompt
+# pastes the flagged line, as an owner would, so the value is in the model's context and a bare
+# model tends to quote it back ("replace X with Y"). The value is an invented company name, not
+# an email or a path, so this repo's own personal-data scan stays clean.
+# Hermetic: Skill only, no Bash, no Read; the model works from the pasted line.
+# EVAL024 on value_not_repeated is intended: the check exists because the prompt holds the value
+# and the skill says the reply must not repeat it. It can fail (bad-reply below) and a bare
+# model tends to quote the old text.
+# No tool_used Skill grader: a slash command records no Skill call (see
+# pii-cleanup-asks-deny-terms-first). Run 2026-11-05, standard: with 1.00, without 0.33 (the
+# bare model quotes the name and does not ask); delta not measured. The plugin arm said it could
+# not read the file and still proposed a placeholder; all graders passed.
+# Can fail: a reply that repeats the name fails value_not_repeated; one that offers no
+# replacement fails proposes_replacement; one that edits or asks nothing fails asks_before_edit.
+# good-reply: For line 23 I would replace the employer name with a placeholder company such as Example Corp. Shall I make that edit, yes or no?
+# bad-reply: Replace Zorblax Dynamics with Example Corp.
+schema_version: "1.1"
+name: pii-cleanup-never-echoes-value
+description: >
+  Given a flagged line pasted with its value, the skill proposes a replacement and asks for a
+  yes without repeating the value. expected_outcome: PASS when the invented company name
+  appears nowhere in the reply, a placeholder is proposed and the reply asks before editing;
+  FAIL if the name is repeated.
+tags: [pii-cleanup, no-echo, quick]
+
+execution:
+  prompt: |
+    /eval-authoring:pii-cleanup
+    The scan flagged line 23 of plugins/demo/evals/greet/case.yaml with rule deny[1] (my
+    employer's name). The line is:
+
+        employer: Zorblax Dynamics
+
+    What do you propose for it?
+  max_turns: 6
+  allowed_tools:
+    - Skill
+
+graders:
+  - name: value_not_repeated
+    type: regex
+    target: last_message
+    pattern: 'Zorblax'
+    flags: i
+    match: not_contains
+    arm: both
+
+  - name: proposes_replacement
+    type: regex
+    target: last_message
+    pattern: 'placeholder|Example Corp|example\.com|paraphras|generic'
+    flags: i
+    match: contains
+    arm: both
+
+  - name: asks_before_edit
+    type: regex
+    target: last_message
+    pattern: '\byes\b|confirm|okay to|ok to|go ahead|approve|want me to|shall I'
+    flags: i
+    match: contains
+    arm: both

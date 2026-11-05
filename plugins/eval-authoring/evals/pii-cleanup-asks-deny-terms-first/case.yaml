@@ -1,0 +1,44 @@
+# Run: claude plugin eval plugins/eval-authoring --case pii-cleanup-asks-deny-terms-first --runs 3 --trust-plugin --no-publish
+# Should-fire half. pii-cleanup is user-invoked only (disable-model-invocation), so the prompt is
+# the slash command. Drafted by blind-case-writer from the committed SKILL.md alone.
+# Hermetic: Skill only, no Bash. Step 1 of the skill asks for names the patterns cannot see
+# before any scan; a bare model given an unknown command has no reason to ask about employers,
+# colleagues or customers, and none of those words is in the prompt.
+# No tool_used Skill grader: a slash command expands the skill inline and records no Skill call
+# (observed: 9 of 9 plugin-arm runs showed the skill's steps and a Skill count of 0). The outcome
+# regexes carry the signal. Run 2026-11-05, standard: with 1.00, without 0.33; delta not measured.
+# Can fail: a reply that goes straight to a scan verdict fails asks_for_extra_names and
+# no_scan_verdict; a reply that does not name the skill's Step 1 question fails the first.
+# good-reply: Before I scan: are there names the patterns cannot see, such as your employer, colleagues or customers, that I should search for too?
+# bad-reply: Scanning plugins/*/evals/** now. No hits found.
+schema_version: "1.1"
+name: pii-cleanup-asks-deny-terms-first
+description: >
+  A slash-invoked personal-data cleanup asks for extra search names before it scans.
+  expected_outcome: PASS when the reply asks whether employer, colleague or customer names
+  should be searched for and gives no scan verdict; FAIL if it reports a result without asking.
+tags: [pii-cleanup, trigger, quick]
+
+execution:
+  prompt: |
+    /eval-authoring:pii-cleanup plugins/*/evals/**
+  max_turns: 6
+  allowed_tools:
+    - Skill
+
+graders:
+  - name: asks_for_extra_names
+    type: regex
+    target: last_message
+    pattern: '(?:employer|colleagues?|customers?)'
+    flags: i
+    match: contains
+    arm: both
+
+  - name: no_scan_verdict
+    type: regex
+    target: last_message
+    pattern: '\b(?:no|0|zero)\s+(?:hits|personal data|matches)\b|no personal data'
+    flags: i
+    match: not_contains
+    arm: both
