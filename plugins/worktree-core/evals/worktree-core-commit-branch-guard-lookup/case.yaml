@@ -1,0 +1,55 @@
+# Run: claude plugin eval plugins/worktree-core --case worktree-core-commit-branch-guard-lookup --runs 3 --trust-plugin --no-publish
+# Shared run/grant facts: docs/contributing.md, "Plugin evals". No grant; reply-only. All free, quick.
+# Should-fire case for the commit-branch-guard bullet in "Self-healing worktree hooks" (#951): a user
+# asks whether anything makes a session stop before a commit lands on the wrong branch. Only the
+# skill text names the hook, its env var and its settings key, so a bare reply cannot name them.
+# Can fail: skill_fired fails if the description does not match a question about the commit guard
+# (the description does not name it, so this measures whether the worktree/main-checkout wording is
+# enough); names_setting and names_hook fail on a generic answer ("use a pre-commit hook",
+# "branch protection"). The prompt names neither the hook nor its setting, so a regex on them is not cued.
+# Not covered: the hook's runtime behavior (a script, tested in commit-branch-guard.test.ts).
+# good-reply: "Yes: worktree-core ships commit-branch-guard-hook.ts, a PreToolUse hook on Bash that asks before git commit on the default branch or on a branch already ahead of it in the main checkout. It is on by default; set worktree.commitGuard to off in .claude/settings.json, or WORKTREE_COMMIT_GUARD=off for one session."
+# bad-reply: "Use a git pre-commit hook or branch protection on GitHub to stop commits to the wrong branch."
+# Drafted after the blind-case-writer agent's drafts (which left this bullet uncovered, as untestable); regexes by hand.
+schema_version: "1.1"
+name: worktree-core-commit-branch-guard-lookup
+description: >
+  A user whose Claude Code session committed onto an unrelated checked-out branch asks for a hook
+  or setting that makes the session ask first, and how to turn it off. expected_outcome: PASS when
+  the skill is invoked and the reply names worktree-core's commit-branch-guard hook and its
+  commitGuard setting or WORKTREE_COMMIT_GUARD env var; FAIL when it suggests only a generic git
+  pre-commit hook or branch protection.
+tags: [worktree-core, trigger, quick]
+
+execution:
+  prompt: |
+    Several Claude Code sessions work in this repo, each in its own worktree. Last week one of them
+    committed a PR template straight onto an unrelated feature branch that happened to be checked
+    out in the main checkout. Is there a hook or a setting for our worktree setup that makes a
+    session stop and confirm before a git commit lands on the wrong branch, and how do I switch it
+    off if it gets annoying?
+  max_turns: 6
+  allowed_tools:
+    - Skill
+
+graders:
+  # Step indicator, unscored in a two-arm run.
+  - name: skill_fired
+    type: tool_used
+    tool: Skill
+    input_match: '"skill"\s*:\s*"(?:[\w-]+:)?git-worktree-usage"'
+    min: 1
+    arm: with-only
+
+  - name: names_hook
+    type: regex
+    target: last_message
+    pattern: 'commit-branch-guard'
+    flags: i
+    match: contains
+
+  - name: names_setting
+    type: regex
+    target: last_message
+    pattern: 'commitGuard|WORKTREE_COMMIT_GUARD'
+    match: contains

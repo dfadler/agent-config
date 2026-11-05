@@ -13,7 +13,8 @@ description: |
   rebase), CI/coverage gotchas after a merge, conflict-resolution escalation
   levels, and PR-splitting sequencing. Also ships two SessionStart hooks that
   self-heal a project's own symlinked-worktree-directory convention and
-  auto-prune merged worktrees. Use when creating, entering, or cleaning up a
+  auto-prune merged worktrees, and a commit-branch guard hook that asks before
+  a git commit lands on the default or an unrelated checked-out branch. Use when creating, entering, or cleaning up a
   git worktree, including before starting work in an existing worktree that
   another session may be using; deciding how to parallelize agent sessions across a repo;
   hitting a `git stash` collision between sessions; resolving a merge/rebase
