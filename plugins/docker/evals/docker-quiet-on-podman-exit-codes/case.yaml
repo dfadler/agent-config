@@ -8,7 +8,7 @@ description: >
   A Podman container exit-code question shares the docker skill's vocabulary (container
   exits, exit code, ps -a) but must not fire it. A trigger-boundary negative: counted by
   `run-evals --trigger-boundary`, plugin arm only, so no delta.
-tags: [docker, trigger-boundary, "pair:docker-reads-exit-codes"]
+tags: [docker, trigger-boundary, "pair:docker-fires-on-exited-container"]
 
 execution:
   prompt: |

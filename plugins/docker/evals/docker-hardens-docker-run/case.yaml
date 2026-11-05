@@ -5,18 +5,18 @@
 schema_version: "1.1"
 name: docker-hardens-docker-run
 description: >
-  A plain request for a docker run command for an unread, agent-written script should come
-  back with capabilities dropped, no-new-privileges and a read-only root with tmpfs.
-  expected_outcome: PASS when the command carries all three; FAIL on a bare docker run.
-  The skill-fired check is an unscored indicator in a two-arm run. A bare model may already
-  add some of these flags.
+  A plain request for a docker run command should come back with capabilities dropped,
+  no-new-privileges and a read-only root with tmpfs. expected_outcome: PASS when the command
+  carries all three; FAIL on a bare docker run. The skill-fired check is an unscored
+  indicator in a two-arm run. A first run with a prompt that said the script was unread and
+  agent-written scored 1.00 with and without the plugin (the prompt cued hardening), so the
+  cue was removed.
 tags: [docker, trigger, quick]
 
 execution:
   prompt: |
-    I want to run python:3.12-slim on my script /work/job.py. An AI agent wrote the script
-    and I have not read it. It only writes scratch files under /tmp. Give me the docker run
-    command.
+    Give me the docker run command to run my script /work/job.py in python:3.12-slim. The
+    script only writes scratch files under /tmp.
   max_turns: 6
   allowed_tools:
     - Skill
