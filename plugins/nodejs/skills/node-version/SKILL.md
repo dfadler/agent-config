@@ -69,3 +69,5 @@ In CI, prefer `actions/setup-node` over installing nvm (a preference, not an nvm
 requirement). Its `node-version-file` reads `.nvmrc`, `.node-version`, `.tool-versions`,
 `mise.toml` and `package.json`
 ([advanced usage](https://github.com/actions/setup-node/blob/main/docs/advanced-usage.md)).
+In a pnpm project the setup order, and `pnpm/setup` as the alternative that also reads
+`.nvmrc`, are in `pnpm:pnpm-usage`.
