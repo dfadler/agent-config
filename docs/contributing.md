@@ -141,7 +141,7 @@ bash scripts/ci.sh check   # lint + structure + typecheck + test + actionlint + 
 | `coverage` | Re-runs the `bats` suites under `kcov` and enforces the coverage floor (Linux only) |
 | `coverage-py` | Re-runs `pytest` under `pytest-cov` and enforces its floor |
 | `lint-ts` / `typecheck-ts` / `test-ts` / `coverage-ts` (`pnpm run lint` / `typecheck` / `test` / `coverage`) | `eslint`, `tsc --noEmit`, Vitest, and its coverage floor over `scripts/ts/` (see [`testing.md`](testing.md)) |
-| `check-skills` (`pnpm run check-skills`) | A skill another skill references must have a `## Contract` (Input/Output), and references must resolve ([`docs/skill-composition.md`](./skill-composition.md)) |
+| `check-skills` (`pnpm run check-skills`) | A skill another skill references must have a `## Contract` (Input/Output), and references must resolve ([`docs/skill-composition.md`](./skill-composition.md)); the `tier-policy` paragraph in `docker` and `linux-administration` must be identical |
 | `fmt` | Rewrites sources to the repo's `shfmt` / `ruff` style |
 | `lint-actions` | `actionlint` over `.github/workflows/` |
 

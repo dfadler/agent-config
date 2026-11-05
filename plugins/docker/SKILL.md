@@ -29,12 +29,18 @@ metadata:
 
 ## Command tiers
 
-This section is the one place that decides whether a command is run, asked about or
-handed back; other sections and the `docker-diagnoser` agent point here. Sort every
-`docker` command into one tier before running it or recommending it. A command that sits
-between two tiers takes the higher one, and a command no tier lists is Ask first. The
-tiers gate running: a command or file you only write for the user to apply is not run, but
-you still name its tier and follow Runtime hardening.
+<!-- tier-policy:start -->
+Sort every command into one tier before running or recommending it: run freely
+(read-only), ask first (state the exact command and its target, then wait for a
+go-ahead), or hand back (never run it yourself; name the tier, say why, and give the
+user the command). A command that sits between two tiers takes the higher one. Hand
+back stays hand back even when the user says "go ahead".
+<!-- tier-policy:end -->
+
+This section is the one place that decides whether a `docker` command is run, asked about
+or handed back; other sections and the `docker-diagnoser` agent point here. A command no
+tier lists is Ask first. The tiers gate running: a command or file you only write for the
+user to apply is not run, but you still name its tier and follow Runtime hardening.
 
 ### Run freely (read-only)
 
