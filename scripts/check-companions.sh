@@ -36,7 +36,7 @@ can also run it directly (also reachable as ./doctor.sh from the repo root).
   --install-deps   Also install a missing pyte dependency (python3 -m pip
                    install --user pyte), when the interpreter allows it, and
                    a missing playwright-cli (npm install -g @playwright/cli,
-                   Node 24 on PATH required).
+                   package.json engines.node required on PATH).
   --fix            Also apply other known fixes for a problem this script
                    detects, instead of only reporting it (currently: adding
                    "git", prettier, eslint, vitest to rtk's own exclude_commands config when rtk's
@@ -1083,16 +1083,19 @@ check_convention_deps() {
 # installs pyte; it never installs the skill, which the user chooses to place
 # globally or per project.
 install_playwright_cli() {
-  local node_major
+  local node_ver range want_maj want_min
   command -v npm >/dev/null 2>&1 || {
     echo "Not installing @playwright/cli: npm is not on PATH." >&2
     return 1
   }
-  node_major="$(node -p 'process.versions.node.split(".")[0]' 2>/dev/null || echo 0)"
-  if [[ "$node_major" -lt 24 ]]; then
-    echo "Not installing @playwright/cli: node on PATH is v$node_major, this repo needs Node 24 (.nvmrc)." >&2
-    echo "  Put Node 24 first on PATH (e.g. nvm use) and re-run." >&2
-    return 1
+  # The floor is package.json engines.node (see engines_floor); no floor, no gate.
+  if read -r range want_maj want_min < <(engines_floor); then
+    node_ver="$(node -p 'process.versions.node' 2>/dev/null || echo 0.0.0)"
+    if ! node_at_least "$node_ver" "$want_maj" "$want_min"; then
+      echo "Not installing @playwright/cli: node on PATH is v$node_ver, this repo needs Node $range (package.json engines.node)." >&2
+      echo "  Put a matching Node first on PATH (e.g. nvm use) and re-run." >&2
+      return 1
+    fi
   fi
   echo "Installing @playwright/cli: npm install -g @playwright/cli@latest"
   npm install -g @playwright/cli@latest || {
@@ -1528,30 +1531,45 @@ check_worktree_hygiene() {
 # --------------------------------------------------------------------------
 # Node floor
 #
-# package.json engines.node (">=MAJOR.MINOR") is the floor for the TypeScript
-# scripts under plugins/*/scripts/ts/ and scripts/ts/. .nvmrc pins only the
-# major, so `nvm use` can land on a 22.x below it. Report only.
+# package.json engines.node (">=MAJOR.MINOR") is the repo's one Node floor: the
+# TypeScript scripts under plugins/*/scripts/ts/ and scripts/ts/, and the
+# playwright-cli install, read it through engines_floor and nothing else names
+# a version. (Not to be confused with Node's own 22.18 minimum for running .ts
+# natively, which the eval-authoring hooks check.) .nvmrc pins only the
+# major, so `nvm use` can land on an older x.y below it. Report only.
 # --------------------------------------------------------------------------
+
+# Prints "RANGE MAJOR MINOR" for package.json engines.node; returns 1 when there
+# is no floor to enforce (no package.json, no jq, no engines.node, other shape).
+engines_floor() {
+  local pkg="$REPO_ROOT/package.json" range
+  [[ -f "$pkg" ]] && command -v jq >/dev/null 2>&1 || return 1
+  range="$(jq -r ".engines.node // empty" "$pkg" 2>/dev/null)" || return 1
+  [[ "$range" =~ ^\>=([0-9]+)\.([0-9]+)(\.[0-9]+)?$ ]] || return 1
+  echo "$range ${BASH_REMATCH[1]} ${BASH_REMATCH[2]}"
+}
+
+# node_at_least VERSION MAJOR MINOR: VERSION ("x.y.z") is >= MAJOR.MINOR.
+node_at_least() {
+  [[ "$1" =~ ^([0-9]+)\.([0-9]+) ]] &&
+    ((BASH_REMATCH[1] > $2 || (BASH_REMATCH[1] == $2 && BASH_REMATCH[2] >= $3)))
+}
+
 check_node_floor() {
-  local pkg="$REPO_ROOT/package.json" range ver want_maj want_min have_maj have_min
+  local pkg="$REPO_ROOT/package.json" range ver want_maj want_min
   [[ -f "$pkg" ]] || return 0
   if ! command -v jq >/dev/null 2>&1; then
     echo "⚠ jq not found -- skipping the Node floor check" >&2
     return 0
   fi
-  range="$(jq -r ".engines.node // empty" "$pkg" 2>/dev/null)" || return 0
-  [[ "$range" =~ ^\>=([0-9]+)\.([0-9]+)(\.[0-9]+)?$ ]] || return 0
-  want_maj="${BASH_REMATCH[1]}"
-  want_min="${BASH_REMATCH[2]}"
+  read -r range want_maj want_min < <(engines_floor) || return 0
   if ! command -v node >/dev/null 2>&1; then
     echo "ℹ node is not on PATH -- the TypeScript scripts need Node $range (package.json engines.node)" >&2
     return 0
   fi
   ver="$(node -p "process.versions.node" 2>/dev/null)" || return 0
-  [[ "$ver" =~ ^([0-9]+)\.([0-9]+) ]] || return 0
-  have_maj="${BASH_REMATCH[1]}"
-  have_min="${BASH_REMATCH[2]}"
-  if ((have_maj > want_maj || (have_maj == want_maj && have_min >= want_min))); then
+  [[ "$ver" =~ ^[0-9]+\.[0-9]+ ]] || return 0
+  if node_at_least "$ver" "$want_maj" "$want_min"; then
     echo "✓ node $ver satisfies package.json engines.node ($range)"
     return 0
   fi
