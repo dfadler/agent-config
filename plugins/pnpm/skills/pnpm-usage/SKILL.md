@@ -122,7 +122,7 @@ number.
 
 ## CI
 
-This section owns the CI order for pnpm and Node; `node-version` owns only the pin file.
+This section owns the CI order for pnpm and Node; `nodejs:node-version` owns only the pin file.
 If the repo already has a setup step (a local composite action or a workflow under
 `.github/`), call or copy that; it wins over the options below. Both take the pnpm version
 from `packageManager`; keep the Node pin in `.nvmrc` rather than a second copy:
