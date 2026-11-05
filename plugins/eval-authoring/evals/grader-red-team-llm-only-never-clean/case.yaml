@@ -64,7 +64,7 @@ graders:
   - name: says_needs_run
     type: regex
     target: last_message
-    pattern: "llm:\\s*needs a run|needs a (?:paid |real )?run|only a (?:paid |real )?run (?:can|would|will)|can(?:no|')?t (?:be )?run (?:that one )?offline|cannot (?:be )?run (?:that one )?offline"
+    pattern: "llm:\\s*needs a run|needs a (?:paid |real )?run|only a (?:paid |real )?run (?:can|would|will)|(?:can(?:no|')?t|couldn(?:'|’)?t|could not|cannot|unable to|not able to)[^.\\n]{0,60}offline|(?:real|paid) judge run"
     flags: i
     match: contains
 

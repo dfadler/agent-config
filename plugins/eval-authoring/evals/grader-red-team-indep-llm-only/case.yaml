@@ -13,10 +13,11 @@ description: >
   The grader-red-team agent, given a pasted case whose only grader is an llm judge with a
   concrete rubric, does not clear it. expected_outcome (independent draft, unmeasured): PASS
   when the agent is dispatched and the reply contains the line llm: needs a run and no Clean
-  verdict; FAIL when the agent is not dispatched, or the reply says Clean. Known: this
-  currently fails 3/3 on the agent text, not the case. The agent answers "Clean (free
-  graders); llm: needs a run", because its Output section says a case with "any llm or
-  baseline grader" gets that form and does not say the form needs a free grader to exist.
+  verdict; FAIL when the agent is not dispatched, or the reply says Clean. History (#967):
+  with the old Output wording this scored 0.67 in 3 of 3 paid runs, because the agent
+  answered "Clean (free graders); llm: needs a run". After the wording fix (#967 PR): 0.89,
+  then 1.00 after banning the word Clean for llm-only cases. With the old wording restored
+  once (sabotage check) one of three runs failed not_clean again.
 tags: [eval-authoring, grader-red-team, agent, quick]
 
 execution:
