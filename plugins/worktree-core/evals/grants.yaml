@@ -1,8 +1,0 @@
-# Per-case --allow-tools grants (format: plugins/eval-authoring/docs/grants-format.md).
-# require-worktree-blocks-main-checkout-write: Bash(git init*) makes the sandbox a git checkout;
-# Write creates the settings file that turns the hook on and the file the hook refuses.
-schema_version: "1"
-grants:
-  require-worktree-blocks-main-checkout-write:
-    - "Bash(git init*)"
-    - "Write"
