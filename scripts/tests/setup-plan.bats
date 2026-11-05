@@ -81,6 +81,7 @@ hook_lines() {
   printf 'register-hook\tPreToolUse\tnode\t["%s"]\tEdit|Write\n' "$WT_HOOKS/require-worktree-hook.ts"
   printf 'register-hook\tSessionStart\tnode\t["%s"]\n' "$WT_HOOKS/check-worktree-symlinks-hook.ts"
   printf 'register-hook\tSessionStart\tnode\t["%s"]\n' "$WT_HOOKS/prune-merged-worktrees-hook.ts"
+  printf 'register-hook\tPreToolUse\tnode\t["%s"]\tBash\n' "$WT_HOOKS/commit-branch-guard-hook.ts"
   printf 'register-hook\tStop\t%s\n' "$MH_HOOK"
   printf 'register-hook\tPreToolUse\tnode\t["%s"]\tEdit|Write\n' "$CLAUDE/skills/scratch-guard/scripts/ts/scratch-guard-hook.ts"
   printf 'register-hook\tSessionStart\tnode\t["%s"]\n' "$CLAUDE/skills/collab-retro/scripts/ts/offer-incident-retro-hook.ts"

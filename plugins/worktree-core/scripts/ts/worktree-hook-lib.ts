@@ -107,10 +107,11 @@ export const hookExitCode = (
 /** The one place a hook entrypoint touches the process. */
 export const runHook = (
   kind: HookKind,
-  body: (ctx: HookCtx) => number,
+  body: (ctx: HookCtx, stdin: string) => number,
 ): void => {
-  const ctx = realCtx(payloadCwd(readStdin()));
-  process.exitCode = hookExitCode(kind, () => body(ctx), ctx.err);
+  const stdin = readStdin();
+  const ctx = realCtx(payloadCwd(stdin));
+  process.exitCode = hookExitCode(kind, () => body(ctx, stdin), ctx.err);
 };
 
 /** Cloud/remote sessions have no worktrees; every hook skips them. */

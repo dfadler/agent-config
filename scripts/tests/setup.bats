@@ -703,7 +703,7 @@ assert 'foreign-stop' in cmds, cmds
   run python3 -c "
 import json
 d = json.load(open('$HOME/.claude/settings.json'))
-hooks = [h for e in d['hooks']['PreToolUse'] for h in e['hooks']]
+hooks = [h for e in d['hooks']['PreToolUse'] if e.get('matcher') == 'Edit|Write' for h in e['hooks']]
 assert hooks == [{'type': 'command', 'command': 'node',
                   'args': ['$HOME/.claude/skills/worktree-core/scripts/ts/require-worktree-hook.ts']}], hooks
 "
@@ -727,7 +727,8 @@ PY
 import json
 d = json.load(open('$HOME/.claude/settings.json'))
 entry = d['hooks']['PreToolUse'][0]
-assert entry['matcher'] == 'Edit|Write' and len(d['hooks']['PreToolUse']) == 1, d
+edit_write = [e for e in d['hooks']['PreToolUse'] if e.get('matcher') == 'Edit|Write']
+assert entry['matcher'] == 'Edit|Write' and len(edit_write) == 1, d
 hooks = entry['hooks']
 assert hooks[0]['command'] == 'foreign-before', hooks
 assert hooks[1] == {'type': 'command', 'command': 'node', 'timeout': 7,
