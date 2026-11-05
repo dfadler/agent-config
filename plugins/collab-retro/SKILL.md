@@ -175,7 +175,7 @@ as a prompt to ask, not to act: offer the retro, and on a yes pre-fill
 `trigger: PR closed` or `trigger: revert`.
 
 An opt-in hook (`COLLAB_RETRO_NUDGE=on`, `scripts/ts/incident-nudge-hook.ts`)
-logs frustration phrases ("I told you", "not what I asked") to a per-session
+logs frustration phrases ("I told you", "not what I asked", "can we talk about why you ...") to a per-session
 pending file and, at most once per session at Stop, asks you to offer a retro.
 Same rule: offer in one sentence, run only on a yes.
 

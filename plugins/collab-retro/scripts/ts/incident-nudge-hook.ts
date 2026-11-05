@@ -38,6 +38,8 @@ export const PHRASES: readonly RegExp[] = [
   /\byou keep (doing|making|ignoring|forgetting)\b/i,
   /\bwhy (did|do) you keep\b/i,
   /\bfor the (second|third|fourth) time\b/i,
+  // Narrowed from a bare "can we talk about", which fires on ordinary requests (#966).
+  /\bcan we talk about (why (you (didn't|did)|did you|didn't you)|what (went wrong|happened))\b/i,
 ];
 
 export const NUDGE = {
@@ -52,7 +54,8 @@ const asObject = (v: unknown): Record<string, unknown> | undefined =>
     : undefined;
 
 export const run = (d: Deps): number => {
-  if (!OPT_IN.includes(d.env["COLLAB_RETRO_NUDGE"] ?? "")) return 0;
+  // EVAL_COLLAB_RETRO_NUDGE: a plugin eval case can only set EVAL_* env vars.
+  if (![d.env["COLLAB_RETRO_NUDGE"], d.env["EVAL_COLLAB_RETRO_NUDGE"]].some((v) => OPT_IN.includes(v ?? ""))) return 0;
   let input: Record<string, unknown> | undefined;
   try {
     input = asObject(JSON.parse(d.stdin));

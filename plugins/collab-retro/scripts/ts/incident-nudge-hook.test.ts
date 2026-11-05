@@ -33,6 +33,11 @@ describe("collab-retro incident nudge hook", () => {
     expect(existsSync(pendingFile())).toBe(false);
   });
 
+  it("also opts in via EVAL_COLLAB_RETRO_NUDGE, the only env a plugin eval case may set", () => {
+    call(prompt("I told you already"), { COLLAB_RETRO_NUDGE: "", EVAL_COLLAB_RETRO_NUDGE: "on" });
+    expect(existsSync(pendingFile())).toBe(true);
+  });
+
   it("logs one line for a frustration phrase, without the prompt text, and prints nothing", () => {
     const r = call(prompt("I already told you to use pnpm, secret-token-123"));
     expect(r).toEqual({ code: 0, out: "" });
@@ -43,6 +48,18 @@ describe("collab-retro incident nudge hook", () => {
   it("ignores neutral and overlong prompts", () => {
     call(prompt("please add a test"));
     call(prompt(`how many times ${"x".repeat(600)}`));
+    expect(existsSync(pendingFile())).toBe(false);
+  });
+
+  it("logs 'can we talk about' only when it asks about a miss (#966)", () => {
+    call(prompt("In a sub session can we talk about why you didn't use the expected formatting?"));
+    expect(readFileSync(pendingFile(), "utf8")).toBe("2026-10-27T00:00:00.000Z can we talk about why you didn't\n");
+  });
+
+  it("does not log 'can we talk about' on ordinary requests (#966)", () => {
+    call(prompt("can we talk about the design?"));
+    call(prompt("Can we talk about the roadmap tomorrow"));
+    call(prompt("Can we talk about why you chose this design?"));
     expect(existsSync(pendingFile())).toBe(false);
   });
 
