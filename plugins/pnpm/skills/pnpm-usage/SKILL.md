@@ -128,7 +128,8 @@ If the repo already has a setup step (a local composite action or a workflow und
 from `packageManager`; keep the Node pin in `.nvmrc` rather than a second copy:
 
 - **pnpm 11 or newer: [`pnpm/setup`](https://github.com/pnpm/setup)**, which pnpm's
-  [CI page](https://pnpm.io/continuous-integration) recommends. One step installs pnpm and
+  [CI page](https://pnpm.io/continuous-integration) recommends; prefer it for a new setup
+  on those versions. One step installs pnpm and
   Node (no `actions/setup-node`; it detects `.nvmrc` itself) and runs `pnpm install`. A
   stale lockfile already fails in CI, but a missing one does not: set `require-lockfile: true`.
 - **Any pnpm up to 12: [`pnpm/action-setup`](https://github.com/pnpm/action-setup)** before
@@ -138,4 +139,4 @@ from `packageManager`; keep the Node pin in `.nvmrc` rather than a second copy:
   Node and that this pairing still works on pnpm 11 and 12. The setup-node README says the
   package manager should be pre-installed; the order is from its advanced-usage example.
 
-Do not use Corepack: the CI page says it runs pnpm through a Node.js shim on every call.
+Do not add Corepack to a new setup: the CI page says it runs pnpm through a Node.js shim on every call.
