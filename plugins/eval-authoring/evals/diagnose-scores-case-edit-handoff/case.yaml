@@ -1,5 +1,6 @@
 # Run: claude plugin eval plugins/eval-authoring --case diagnose-scores-case-edit-handoff
-# Unmeasured: drafted 2026-11-04 by the blind-case-writer agent from the committed skill text; not yet run.
+# Standard tier 2026-11-05, 3 runs per arm, claude-sonnet-5-5: with 1.00 / without 0.00, skill fired 3/3; sabotage check pending.
+# Drafted 2026-11-04 by the blind-case-writer agent from the committed skill text. The 0.00 without arm is by construction (no skill to name author-cases).
 # Paid: hand-off only. No grant: Skill only.
 # Covers the Output sentence added in PR 978: when the next step is a case edit (graders, prompt,
 # mocks), diagnose-scores hands it to author-cases.
