@@ -1,5 +1,4 @@
-# Run (manual): the wrapper never passes --scaffold, so print its command with --dry-run and add
-# --scaffold by hand to the `claude plugin eval` line it prints:
+# Run (manual): the wrapper passes --scaffold only when you give it --scaffold; print its command with --dry-run --scaffold:
 #   node plugins/eval-authoring/scripts/ts/run-evals/run-evals.ts --dry-run --tier quick --case grader-red-team-finds-case-on-disk plugins/eval-authoring
 # (quick tier: one run, plugin arm only, `--ablation none`; the no-plugin arm cannot dispatch a
 # plugin agent.) No grant, no Bash.

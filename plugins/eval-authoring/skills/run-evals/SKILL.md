@@ -13,7 +13,8 @@ allowed-tools: Bash(node ${CLAUDE_SKILL_DIR}/../../scripts/ts/lint/cli.ts *)
   `thorough`) and any other wrapper option (run the wrapper with `--help`).
 - **Output:** the lint result, the planned commands (`--dry-run`), then the wrapper's
   own output and exit code, reported as is, plus its paste-ready "Eval results" Markdown.
-- **Does not:** start a run you did not ask for, pass `--scaffold`, edit cases or grants,
+- **Does not:** start a run you did not ask for, pass `--scaffold` unless the user asked
+  for it in chat (the wrapper's opt-in `--scaffold` flag), edit cases or grants,
   re-implement the wrapper's preflight checks, or edit a PR body (`--pr`) without the
   user's confirmation.
 
@@ -52,7 +53,8 @@ it, do not rebuild any of that.
    user the tier's run count and cost ceiling, and the grants it will pass. Grants
    come from `<eval-dir>/grants.yaml` ([format](../../docs/grants-format.md)); each
    case runs in its own CLI invocation (`--case` takes one glob) under exactly its own
-   grants. The wrapper never passes `--scaffold`, `--json` or `--report`; it reads
+   grants. The wrapper passes `--scaffold` only when given its own `--scaffold` flag (opt-in, never a default; it
+   runs each case's scaffold_script as you), and never `--json` or `--report`; it reads
    `aggregate-result.json` from a per-case directory under `<eval-dir>/results/`.
    `--keep-temp` keeps run traces and writes `replies/` next to the result: each run's
    final reply and tool calls, redacted, at
