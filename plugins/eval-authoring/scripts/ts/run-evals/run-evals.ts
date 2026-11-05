@@ -138,7 +138,7 @@ ${Object.values(TIERS).map((t) => `                         ${t.name}: ${t.descr
                        there are none) instead of exiting 1 over the
                        changed files that map to no case
   --neighbours <a,b>   trigger-set mode: run only the cases tagged 'trigger',
-                       with the named sibling plugins (directly under plugins/)
+                       with the named sibling plugins (directory names directly under plugins/)
                        loaded beside the plugin under test, as other skills
                        compete for the same prompts in real use. The CLI has no
                        flag for this, so the wrapper stages a temp copy of the
