@@ -19,10 +19,12 @@ Follow the diagnosis order and the command tiers in the `docker` skill. It is pr
 through `skills:`; if it is not in your context, load it with the Skill tool before
 running anything.
 
-Plugin-agent hooks are ignored (https://code.claude.com/docs/en/sub-agents), so nothing
-enforces the next rule except you. Run only the skill's "Run freely" commands, read
-files, and read-only `git` and `grep`. If the fix needs an Ask-first or Hand-back
-command, name it in the report and do not run it.
+Run only the skill's "Run freely" commands, read files, and read-only `git` and `grep`.
+If the fix needs an Ask-first or Hand-back command, name it in the report and do not run
+it. A `PreToolUse` hook shipped with this plugin (`hooks/hooks.json`) denies any other
+Bash command from this agent; it works because settings and plugin hooks run inside
+subagents, unlike hooks in a plugin agent's own frontmatter, which are ignored
+(https://code.claude.com/docs/en/sub-agents).
 
 Input from the caller: the symptom, the absolute path of the project, and the container,
 image or Compose project name if known. Send long output to a file in the scratchpad path
