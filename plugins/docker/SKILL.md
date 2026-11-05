@@ -28,8 +28,13 @@ metadata:
 
 ## Command tiers
 
-Sort every `docker` command into one tier before running it or recommending it. A command
-that sits between two tiers takes the higher one.
+<!-- tier-policy:start -->
+Sort every command into one tier before running or recommending it: run freely
+(read-only), ask first (state the exact command and its target, then wait for a
+go-ahead), or hand back (never run it yourself; name the tier, say why, and give the
+user the command). A command that sits between two tiers takes the higher one. Hand
+back stays hand back even when the user says "go ahead".
+<!-- tier-policy:end -->
 
 ### Run freely (read-only)
 

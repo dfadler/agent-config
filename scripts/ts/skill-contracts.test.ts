@@ -144,3 +144,31 @@ test("main prints usage for --help", () => {
   ).toBe(0);
   expect(printed).toMatch(/Usage: check-skill-contracts\.ts/);
 });
+
+const region = (text: string) => `<!-- tier-policy:start -->\n${text}\n<!-- tier-policy:end -->\n`;
+const owners = (docker: string, linux: string): Skill[] => [
+  skill("docker", docker, "docker"),
+  skill("linux-administration", linux, "linux-administration"),
+];
+
+test("identical tier-policy regions in both owners pass", () => {
+  expect(findViolations(owners(`# D\n${region("same")}`, `# L\n${region("same")}`))).toEqual([]);
+});
+
+test("a tier-policy region edited in one owner is reported", () => {
+  expect(findViolations(owners(region("same"), region("changed")))).toEqual([
+    "plugins/linux-administration/skills/linux-administration/SKILL.md: tier-policy region differs from the one in plugins/docker/skills/docker/SKILL.md",
+  ]);
+});
+
+test("an owner with no tier-policy region is reported even when the other has none either", () => {
+  expect(findViolations(owners("# D\n", "# L\n"))).toEqual([
+    "plugins/docker/skills/docker/SKILL.md: missing the tier-policy region (<!-- tier-policy:start --> ... end -->)",
+    "plugins/linux-administration/skills/linux-administration/SKILL.md: missing the tier-policy region (<!-- tier-policy:start --> ... end -->)",
+  ]);
+});
+
+test("an unclosed tier-policy region counts as missing", () => {
+  const open = "<!-- tier-policy:start -->\nsame\n";
+  expect(findViolations(owners(open, region("same")))).toHaveLength(1);
+});
