@@ -1,0 +1,37 @@
+# Run: node plugins/eval-authoring/scripts/ts/run-evals/run-evals.ts plugins/docker --trigger-boundary (plugin arm only; no grant needed).
+# Maps to docker-diagnoser: "Use when the cause is unknown"; here the cause is known and the user wants an edit.
+# good-reply: (shows the corrected Dockerfile line COPY package.json ./ directly)
+# bad-reply: (Agent call to docker:docker-diagnoser to "investigate" a failure whose cause the user already stated)
+schema_version: "1.1"
+name: diagnoser-quiet-on-known-cause-edit
+description: >
+  The user already knows the cause of a failing build (a typo) and wants the file fixed.
+  The vocabulary is a failing docker build, but docker-diagnoser is diagnosis-only and the
+  cause is not unknown, so it must not be dispatched. Trigger-boundary negative, plugin arm
+  only, no delta.
+tags: [docker, agent, trigger-boundary, "pair:diagnoser-dispatch-failing-build"]
+
+execution:
+  prompt: |
+    My docker build fails at the COPY step with "file not found in build context". I
+    already found it: I typed `COPY package.jsn ./` in my Dockerfile. Here's the file:
+
+    FROM node:22-slim
+    WORKDIR /app
+    COPY package.jsn ./
+    RUN npm ci
+    COPY . .
+    CMD ["node", "server.js"]
+
+    Just give me the corrected Dockerfile.
+  max_turns: 4
+  allowed_tools:
+    - Agent
+
+graders:
+  - name: diagnoser_not_dispatched
+    type: tool_used
+    tool: Agent
+    input_match: '"(?:subagent_type|agent)"\s*:\s*"(?:docker:)?docker-diagnoser"'
+    min: 0
+    max: 0

@@ -1,0 +1,28 @@
+# Run: node plugins/eval-authoring/scripts/ts/run-evals/run-evals.ts plugins/docker --trigger-boundary (plugin arm only; no grant needed).
+# Maps to docker-diagnoser description: "a container that exits or restarts"; a policy question is not a diagnosis.
+# good-reply: "always restarts the container even after a manual stop once the daemon restarts; unless-stopped does not restart one you stopped yourself." (answers directly, no Agent call)
+# bad-reply: (Agent call to docker:docker-diagnoser for a conceptual question with no failing container)
+schema_version: "1.1"
+name: diagnoser-quiet-on-restart-policy-question
+description: >
+  A conceptual question about restart policies shares the restart vocabulary but has no
+  failing container, so docker-diagnoser must not be dispatched. Trigger-boundary negative,
+  plugin arm only, no delta.
+tags: [docker, agent, trigger-boundary, "pair:diagnoser-dispatch-compose-restart"]
+
+execution:
+  prompt: |
+    Quick question for my compose file: what's the actual difference between
+    `restart: always` and `restart: unless-stopped` when a container exits or the host
+    reboots? Which should I use for a small web service?
+  max_turns: 4
+  allowed_tools:
+    - Agent
+
+graders:
+  - name: diagnoser_not_dispatched
+    type: tool_used
+    tool: Agent
+    input_match: '"(?:subagent_type|agent)"\s*:\s*"(?:docker:)?docker-diagnoser"'
+    min: 0
+    max: 0
