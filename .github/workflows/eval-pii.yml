@@ -1,0 +1,42 @@
+name: Eval PII
+
+# Fails when a committed eval case or fixture (plugins/*/evals/**) holds a non-reserved email, a
+# home directory that is not a placeholder, or a deny term (#958). The repo is public.
+#
+# Its own file because it alone is handed the PII_DENY_TERMS secret (employer and people names,
+# one per line, never committed): the secret reaches this one step, not the TypeScript job that
+# runs PR-controlled test code. The secret is optional. A fork PR gets none, and so does a repo
+# that has not created it; the check then runs the pattern rules only and says so. The report
+# holds file, line and rule, never a matched value or a deny term.
+#
+# Runs the same command a human does: `pnpm run check-eval-pii` (scripts/ci.sh check-eval-pii).
+
+# Called from ci.yml, whose all-checks sentinel is the only required check for it.
+# Concurrency is inherited from the caller.
+on:
+  workflow_call:
+    secrets:
+      PII_DENY_TERMS:
+        description: Deny terms (employer, people), one per line. Optional.
+        required: false
+
+permissions:
+  contents: read
+
+jobs:
+  run:
+    name: run
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      # Node from .nvmrc, pnpm from `packageManager`, then `pnpm install --frozen-lockfile`.
+      - uses: ./.github/actions/setup-node-pnpm
+
+      - name: Personal data in committed evals
+        env:
+          PII_DENY_TERMS: ${{ secrets.PII_DENY_TERMS }}
+        run: pnpm run check-eval-pii

@@ -220,7 +220,10 @@ only its own run command and why its graders are shaped as they are.
   `node plugins/eval-authoring/scripts/ts/lint/cli.ts --list-rules` prints the current set.
 - **Repo evals in CI.** `bash scripts/ci.sh lint-plugin-evals` (part of `check`, run by the
   TypeScript workflow) lints every plugin's `evals/` for free. It never runs a paid
-  eval; those are run by hand with the `run-evals` wrapper.
+  eval; those are run by hand with the `run-evals` wrapper. `bash scripts/ci.sh check-eval-pii`
+  (the `eval-pii` job in `ci.yml`) fails a committed case or fixture that holds a non-reserved
+  email, a `/Users/<name>` or `/home/<name>` path whose name is not a placeholder (`jdoe`, `jroe`,
+  `me`, `user`), or a term in the `PII_DENY_TERMS` secret. It prints file, line and rule only.
 - **Grader shape.** Prefer free `regex` graders where a literal string is reliable and
   keep an `llm` grader only for a judgment a regex cannot make; rationale in
   [#411](https://github.com/dfadler/agent-config/issues/411).

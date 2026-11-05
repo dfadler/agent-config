@@ -25,9 +25,9 @@ execution:
     what is in the files. Assume no open issue already covers any of this.
 
     ```
-    2026-09-30  -Users-dfadler-Development-globex-api  feedback_worktree_first
-    2026-09-12  -Users-dfadler-Development-acme-web    feedback_no_commits_on_main
-    2026-08-02  -Users-dfadler-Development-acme-web    feedback_prefers_tabs
+    2026-09-30  -Users-jdoe-Development-globex-api  feedback_worktree_first
+    2026-09-12  -Users-jdoe-Development-acme-web    feedback_no_commits_on_main
+    2026-08-02  -Users-jdoe-Development-acme-web    feedback_prefers_tabs
     ```
 
     feedback_worktree_first (globex-api): "Don't edit in the main checkout. The assistant

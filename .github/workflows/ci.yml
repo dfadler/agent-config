@@ -14,6 +14,7 @@ name: CI
 #   typescript  typescript.yml   pnpm run lint / typecheck / set-flags / CLAUDE.md size /
 #                                plugin structure / links / test / coverage
 #   python      python.yml       scripts/ci.sh lint-py / typecheck / test-py / coverage-py
+#   eval-pii    eval-pii.yml     pnpm run check-eval-pii (personal data in plugins/*/evals/**)
 #
 # actionlint.yml (paths-filtered) and issue-bot.yml stay standalone: a
 # paths-filtered workflow cannot be gated here without leaving the required
@@ -50,6 +51,14 @@ jobs:
     permissions:
       contents: read
 
+  # The one called workflow that takes a secret, passed by name (never `secrets: inherit`).
+  eval-pii:
+    uses: ./.github/workflows/eval-pii.yml
+    permissions:
+      contents: read
+    secrets:
+      PII_DENY_TERMS: ${{ secrets.PII_DENY_TERMS }}
+
   # Sentinel required by branch protection. Requiring each job name
   # individually would need a settings update on every rename or addition;
   # this job's name is the only one that ever needs to be required.
@@ -59,7 +68,7 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 10
     if: always()
-    needs: [shell, typescript, python]
+    needs: [shell, typescript, python, eval-pii]
     steps:
       - name: All checks passed
         env:

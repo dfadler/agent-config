@@ -91,10 +91,12 @@ a CI failure here.
   YAML. That's what keeps "CI is green" and "the local check is green" from
   drifting apart, and it's what makes `act`/local reproduction close to free —
   there's no CI-only logic to fall back to Docker for.
-- **Matrix builds, `workflow_call` inputs/secrets** — not yet needed here
-  (the existing `workflow_call` files take no inputs or secrets), but design
-  them carefully when they do show up: explicit `inputs`/`secrets` blocks, never
-  `secrets: inherit` by default.
+- **Matrix builds, `workflow_call` inputs/secrets** — matrices and inputs are
+  not yet needed here. The one secret (`PII_DENY_TERMS`) goes only to
+  `eval-pii.yml`, declared `required: false` and passed by name from `ci.yml`,
+  never `secrets: inherit`; a fork PR gets none and the check still runs its
+  pattern rules. Design any further inputs/secrets the same way: explicit
+  blocks, scoped to the one file that needs them.
 
 ## Security hardening
 

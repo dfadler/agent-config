@@ -12,6 +12,7 @@
     "typecheck": "tsc --noEmit",
     "check-skills": "node scripts/ts/check-skill-contracts.ts .",
     "lint-plugin-evals": "node plugins/eval-authoring/scripts/ts/lint-repo.ts .",
+    "check-eval-pii": "node plugins/eval-authoring/scripts/ts/mine-cases/check-pii.ts",
     "lint-set-flags": "node scripts/ts/check-shell-set-flags.ts",
     "lint-claude-md": "node scripts/ts/check-claude-md-lines.ts claude/CLAUDE.md 350",
     "check-vitest-flags": "node scripts/ts/check-vitest-flags.ts",

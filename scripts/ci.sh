@@ -146,7 +146,7 @@ Python (builds .venv from requirements-dev.txt on demand):
 Node (installs node_modules on demand; the work is a package.json script):
   node-modules      pnpm install --frozen-lockfile
   lint-set-flags lint-claude-md lint-ts typecheck-ts check-skills
-  lint-plugin-evals check-vitest-flags check-vitest-v3-names test-ts
+  lint-plugin-evals check-eval-pii check-vitest-flags check-vitest-v3-names test-ts
   coverage-ts check-links
 Aggregates:
   lint-sh           shellcheck + shfmt + set-flags + CLAUDE.md size
@@ -268,6 +268,7 @@ coverage_py() {
 #   typescript.yml lint-ts, typecheck-ts, lint-set-flags, lint-claude-md, structure,
 #                  check-links, check-skills, lint-plugin-evals,
 #                  check-vitest-flags, check-vitest-v3-names, test-ts, coverage-ts
+#   eval-pii.yml   check-eval-pii (its own file: it alone is handed the PII_DENY_TERMS secret)
 #   actionlint.yml lint-actions
 #
 # Each workflow calls its own subset rather than `check` — shell.yml has no
@@ -276,7 +277,7 @@ coverage_py() {
 check() {
   local t
   for t in lint-sh lint-py structure typecheck test-sh test-py lint-actions coverage coverage-py \
-    lint-ts typecheck-ts check-skills lint-plugin-evals check-vitest-flags check-vitest-v3-names \
+    lint-ts typecheck-ts check-skills lint-plugin-evals check-eval-pii check-vitest-flags check-vitest-v3-names \
     test-ts coverage-ts; do
     echo "==> $t"
     run_target "$t"
@@ -292,7 +293,7 @@ pnpm_name() {
     test-ts) echo test ;;
     coverage-ts) echo coverage ;;
     structure) echo check-plugin-structure ;;
-    lint-set-flags | lint-claude-md | check-skills | lint-plugin-evals | check-vitest-flags | check-vitest-v3-names | check-links) echo "$1" ;;
+    lint-set-flags | lint-claude-md | check-skills | lint-plugin-evals | check-eval-pii | check-vitest-flags | check-vitest-v3-names | check-links) echo "$1" ;;
     *) return 1 ;;
   esac
 }
