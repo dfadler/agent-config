@@ -39,7 +39,7 @@ export const PHRASES: readonly RegExp[] = [
   /\bwhy (did|do) you keep\b/i,
   /\bfor the (second|third|fourth) time\b/i,
   // Narrowed from a bare "can we talk about", which fires on ordinary requests (#966).
-  /\bcan we talk about (why (you|did you|didn't you)|what (went wrong|happened))\b/i,
+  /\bcan we talk about (why (you (didn't|did)|did you|didn't you)|what (went wrong|happened))\b/i,
 ];
 
 export const NUDGE = {

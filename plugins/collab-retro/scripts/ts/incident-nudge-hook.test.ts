@@ -48,12 +48,13 @@ describe("collab-retro incident nudge hook", () => {
 
   it("logs 'can we talk about' only when it asks about a miss (#966)", () => {
     call(prompt("In a sub session can we talk about why you didn't use the expected formatting?"));
-    expect(readFileSync(pendingFile(), "utf8")).toBe("2026-10-27T00:00:00.000Z can we talk about why you\n");
+    expect(readFileSync(pendingFile(), "utf8")).toBe("2026-10-27T00:00:00.000Z can we talk about why you didn't\n");
   });
 
   it("does not log 'can we talk about' on ordinary requests (#966)", () => {
     call(prompt("can we talk about the design?"));
     call(prompt("Can we talk about the roadmap tomorrow"));
+    call(prompt("Can we talk about why you chose this design?"));
     expect(existsSync(pendingFile())).toBe(false);
   });
 
