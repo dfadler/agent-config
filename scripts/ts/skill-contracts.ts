@@ -24,6 +24,20 @@ function contractSection(body: string): string | undefined {
   return next ? rest.slice(0, next.index) : rest;
 }
 
+const TIER_POLICY_REGION = /<!-- tier-policy:start -->([\s\S]*?)<!-- tier-policy:end -->/;
+
+/**
+ * Skills that must carry the shared command-tier policy paragraph. Plugins
+ * install and run in evals independently, so the paragraph cannot live in one
+ * place; it is copied and this list keeps the copies from drifting.
+ */
+const TIER_POLICY_OWNERS = ["docker:docker", "linux-administration:linux-administration"];
+
+/** Text between the tier-policy markers, or undefined when the skill has none. */
+function tierPolicy(body: string): string | undefined {
+  return TIER_POLICY_REGION.exec(body)?.[1]?.trim();
+}
+
 /**
  * Names (as `plugin:skill`) of the skills `skill` points at, either with a
  * relative sibling link or with a namespaced `plugin:skill` mention.
@@ -58,6 +72,8 @@ export function references(
  *   2. A skill that another skill references must document a `## Contract`
  *      section naming its **Input** and its **Output**, so a caller knows the
  *      shape to hand it and the shape to expect back.
+ *   3. The tier-policy region (see `TIER_POLICY_OWNERS`) must exist in each
+ *      listed skill and be identical in every skill that has one.
  */
 export function findViolations(skills: readonly Skill[]): string[] {
   const byId = new Map(skills.map((s) => [`${s.plugin}:${s.name}`, s]));
@@ -86,6 +102,24 @@ export function findViolations(skills: readonly Skill[]): string[] {
       if (!new RegExp(`^[ \\t]*[-*][ \\t]+\\*\\*${label}:\\*\\*[ \\t]*\\S`, "m").test(section)) {
         errors.push(`${skill.path}: "## Contract" is missing a "**${label}:**" line`);
       }
+    }
+  }
+
+  // A listed skill with no region would pass a pure "regions match" check.
+  for (const id of TIER_POLICY_OWNERS) {
+    const owner = byId.get(id);
+    if (owner && tierPolicy(owner.body) === undefined) {
+      errors.push(`${owner.path}: missing the tier-policy region (<!-- tier-policy:start --> ... end -->)`);
+    }
+  }
+  const regions = skills.flatMap((s) => {
+    const text = tierPolicy(s.body);
+    return text === undefined ? [] : [{ path: s.path, text }];
+  });
+  const [reference, ...others] = regions;
+  for (const other of others) {
+    if (reference && other.text !== reference.text) {
+      errors.push(`${other.path}: tier-policy region differs from the one in ${reference.path}`);
     }
   }
   return errors;
