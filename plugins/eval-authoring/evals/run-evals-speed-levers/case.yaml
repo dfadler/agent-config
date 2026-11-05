@@ -9,6 +9,10 @@
 # Unknown until a two-arm run: whether the baseline already knows these levers (a high baseline
 # would mean the case does not discriminate and the section's benefit is unverified; it is an
 # outcome case that should fire, so it is never a regression guard).
+# #968: the three reply graders passed a reply that gave the opposite advice (the bad-reply line);
+# they now need a recommending form with no negation, checked offline with check-replies.ts --probe.
+# good-reply: Narrow the run to the one case you are editing with --case my-case. Add --no-baseline to run the plugin arm only, but skipping the baseline means you lose the delta, so use it only to watch the with score move.
+# bad-reply: Don't bother with --case; it won't help here. Never use --no-baseline either, and there is no lost delta to worry about. Just wait the fifteen minutes.
 schema_version: "1.1"
 name: run-evals-speed-levers
 description: >
@@ -38,17 +42,20 @@ graders:
     min: 1
     arm: with-only
 
+  # #968: each recommendation grader needs a recommending form and no negation between the verb and
+  # the flag, and no negation just before the verb, so "Don't bother with --case" / "Never use
+  # --no-baseline" no longer pass.
   - name: targets_one_case
     type: regex
     target: last_message
-    pattern: '--case\b|\bone case\b|case director'
+    pattern: '(?<!(?:n[''’]t|\bnot\b|\bnever\b|\bavoid\b)[^.;:,\n]{0,20})\b(?:run|use|pass|add|try|target|narrow|limit|restrict|select)\w*\b(?:(?!n[''’]t\b|\bnot\b|\bnever\b|\brather than\b|\binstead of\b)[^.\n]){0,40}(?:--case\b|\bone case\b|\bsingle case\b|case director)'
     flags: i
     match: contains
 
   - name: skips_baseline_arm
     type: regex
     target: last_message
-    pattern: '--no-baseline|--ablation\s+none|plugin[ -]arm only|(?:skip|drop|without)[^.\n]{0,30}(?:baseline|without-plugin|no-plugin) arm|\bquick\b[^.\n]{0,40}(?:tier|plugin)'
+    pattern: '(?<!(?:n[''’]t|\bnot\b|\bnever\b|\bavoid\b)[^.;:,\n]{0,25})(?:--no-baseline|--ablation\s+none|plugin[ -]arm only|(?:skip|drop|without)[^.\n]{0,30}(?:baseline|without-plugin|no-plugin) arm|\bquick\b[^.\n]{0,40}(?:tier|plugin))'
     flags: i
     match: contains
 
@@ -56,6 +63,6 @@ graders:
   - name: warns_delta_lost
     type: regex
     target: last_message
-    pattern: '(?:no|lose|loses|drops?|without|can.t (?:claim|quote|report))[^.\n]{0,30}(?:delta|Δ)|(?:delta|Δ)[^.\n]{0,40}(?:not|n.t|unavailable|missing|gone)'
+    pattern: '(?<!(?:n[''’]t|\bnot\b|\bnever\b|\bno\b)[^.;:,\n]{0,15})\b(?:lose|loses|lost|drops?|dropped)\b[^.\n]{0,30}(?:delta|Δ)|\bno (?:delta|Δ) (?:is|will|can|column|comparison|number|figure|score)|(?:can(?:.t|not)|don.t|do not|never|shouldn.t|should not) (?:claim|quote|report|cite)\b[^.\n]{0,30}(?:delta|Δ)|(?:delta\b|Δ)(?:(?!n[''’]t\b|\bnot\b|\bnever\b)[^.\n]){0,40}\b(?:unavailable|missing|gone|lost|dropped|disappears?)\b|(?:delta|Δ)(?: column| number| figure)?(?: is| are| will be)? (?:not|n[''’]t) (?:available|reported|shown|computed|measured|valid)'
     flags: i
     match: contains
