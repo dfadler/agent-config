@@ -1,0 +1,5 @@
+# Per-case --allow-tools grants (format: plugins/eval-authoring/docs/grants-format.md).
+schema_version: "1"
+grants:
+  scratch-guard-warns-on-tmp-write:
+    - "Write(/tmp/*)"

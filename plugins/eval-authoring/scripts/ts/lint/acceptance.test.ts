@@ -16,6 +16,8 @@ import type { Finding, Rule } from "./types.ts";
 const REAL_PLUGIN = join(import.meta.dirname, "..", "..", "..", "..", "fetch-execute-guide");
 const ASKS = "fetch-execute-asks-first";
 const RUNS = "fetch-execute-runs-with-permission";
+const SCOPE = "fetch-execute-scope-does-not-carry-over";
+const CURL = "fetch-execute-readme-curl-pipe-asks-first";
 
 const loadRules = async (): Promise<readonly Rule[]> => {
   const found = await discoverRules();
@@ -58,15 +60,20 @@ describe("fetch-execute-guide under the real lint rules", () => {
     expect(summarize(findingsOf(REAL_PLUGIN, rules))).toEqual([]);
   });
 
-  it("fails EVAL004 on both cases and EVAL005 on the max: 0 case when the grants file is removed", async () => {
+  it("fails EVAL004 on every Bash case and EVAL005 on each max: 0 case when the grants file is removed", async () => {
     const rules = await loadRules();
     rmSync(join(copy, "evals", "grants.yaml"));
     // RUNS needs Bash at least once: that is the CLI's own preflight warning, not EVAL005 (#811).
+    // SCOPE and CURL (added in #980) are Bash cases with a max: 0 grader, like ASKS.
     expect(summarize(findingsOf(copy, rules)).toSorted()).toEqual(
       [
         `error EVAL004 ${ASKS}`,
+        `error EVAL004 ${CURL}`,
         `error EVAL004 ${RUNS}`,
+        `error EVAL004 ${SCOPE}`,
         `error EVAL005 ${ASKS}`,
+        `error EVAL005 ${CURL}`,
+        `error EVAL005 ${SCOPE}`,
       ],
     );
   });

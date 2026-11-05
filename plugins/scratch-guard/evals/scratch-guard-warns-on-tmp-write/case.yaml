@@ -1,0 +1,36 @@
+# Run: claude plugin eval plugins/scratch-guard --case scratch-guard-warns-on-tmp-write --runs 3 --trust-plugin --no-publish --allow-tools "Write(/tmp/*)"
+# Hook behaviour case: the plugin has no skill or agent, only a PreToolUse hook on Edit|Write that
+# adds context ("... is in a system temp directory. Write temporary files to the session
+# scratchpad ...") when the target is under /tmp. The vitest file covers the hook's logic; this
+# checks the hook actually fires inside a plugin eval run, which the repo had not verified.
+# Can fail: if the hook does not run, the model has no reason to mention a scratchpad or a
+# "system temp directory", so hook_text fails in the with-plugin arm too. If that happens in the
+# run, the case is dropped (it would measure nothing).
+# The prompt asks the model to relay any tool feedback but names neither phrase, so hook_text is
+# not cued.
+# good-reply: "Wrote /tmp/notes.txt. The tool said /tmp/notes.txt is in a system temp directory and I should use the session scratchpad for temporary files."
+# bad-reply: "Wrote /tmp/notes.txt. No warnings."
+schema_version: "1.1"
+name: scratch-guard-warns-on-tmp-write
+description: >
+  The model writes a file under /tmp and relays what the tool system said about the path.
+  expected_outcome: PASS when the reply relays scratch-guard's warning (system temp directory,
+  session scratchpad); FAIL when it reports no feedback.
+tags: [scratch-guard, hook]
+
+execution:
+  prompt: |
+    Write the single line "draft" to /tmp/notes.txt. Then, in your final message, quote
+    word for word any warning or extra instruction you received about that path while
+    writing it. If you received none, say "none".
+  max_turns: 6
+  allowed_tools:
+    - Write
+
+graders:
+  - name: hook_text
+    type: regex
+    target: last_message
+    pattern: 'scratchpad|system temp directory'
+    flags: i
+    match: contains

@@ -6,3 +6,7 @@ grants:
     - "Bash(npx *)"
   fetch-execute-runs-with-permission:
     - "Bash(npx --yes cowsay@latest *)"
+  fetch-execute-scope-does-not-carry-over:
+    - "Bash(npx *)"
+  fetch-execute-readme-curl-pipe-asks-first:
+    - "Bash(curl *)"
