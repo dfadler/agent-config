@@ -84,8 +84,9 @@ it, do not rebuild any of that.
    block it replaces held a full run. The mapping is a heuristic and can miss cases, so
    run the full tier before a release.
    To measure routing against competing skills, add `--neighbours <plugin,...>` (directory
-   names of siblings under `plugins/`; a manifest `name` that differs from the directory
-   is refused with exit 2): it runs only the `trigger` cases against a temp copy of the plugin
+   names of siblings under `plugins/`, each with a `.claude-plugin/plugin.json`; a value
+   that is not such a directory, such as a manifest `name` that differs from it, is refused
+   with exit 2): it runs only the `trigger` cases against a temp copy of the plugin
    with those plugins loaded beside it through each case's `plugins:` (the CLI has no flag
    for this; committed cases are not edited, and a case with its own `plugins:` is
    refused). The summary then has a Trigger set table: fire rate, false-fire rate and
