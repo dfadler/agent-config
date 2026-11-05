@@ -54,6 +54,13 @@ reply terse.
   `## Sequencing` section to the PR body: name every related PR, state what
   happens under each possible merge order, and say explicitly what gets closed
   or superseded rather than leaving it to be inferred from the diff.
+- **A PR that touches `plugins/*/evals/**` needs a body heading named exactly
+  `## Eval results`** (any level 1 to 6, case-insensitive, nothing else on the line;
+  "Evidence" or "Results" fails). Write the run-evals summary under it, or why no run
+  was made; `run-evals --pr <n>` writes the heading itself. The `Eval results check`
+  job reads the body from the event that triggered it, so **re-running a failed job
+  re-reads the old body and fails again**. Fix the body with `gh pr edit`: the edit
+  fires a new run on the new body.
 - Merge via squash: this repo's practice is one commit per PR on the default
   branch, so use `gh pr merge --squash`.
 
@@ -62,6 +69,8 @@ reply terse.
 The task isn't done once a PR is open. Once CI has had a few minutes to produce
 signal, check its status (`gh pr checks`) and any early review comments
 (`gh pr view --comments`), and act on what's actionable before ending the turn.
+CodeRabbit's "draft, review skipped" notice on a draft PR is not actionable: skip it
+(`github-pr:pr-comments`, Skip rule).
 Some projects have a dedicated skill/script for this shepherding pass; use it if
 present, otherwise do the check manually.
 

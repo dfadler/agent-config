@@ -41,5 +41,5 @@ jobs:
             echo "Found an 'Eval results' heading."
             exit 0
           fi
-          echo "::error::This PR changes plugins/*/evals/** but its body has no 'Eval results' heading. Add one with the run-evals summary, or write why no run was made."
+          echo "::error::This PR changes plugins/*/evals/** but its body has no heading named exactly 'Eval results' (a line like '## Eval results'). Add one with the run-evals summary, or write why no run was made. Edit the PR body (gh pr edit) to trigger a new run: re-running this job reuses the old body and fails again."
           exit 1

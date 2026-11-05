@@ -277,6 +277,10 @@ by entry:
   updates in place run over run. These are automation status, not reviewer
   feedback, and don't belong in the classify step even though they're
   technically "a comment on the PR."
+- CodeRabbit's draft notice ("Draft detected" / review skipped because the PR is a
+  draft). Every draft PR gets one; nothing was reviewed, so there is nothing to fix.
+  Skip it in one line and do not spend a turn reporting "no findings". The review runs
+  once the PR is marked ready, which needs the user's go-ahead (`github-pr-workflow`).
 
 ## Step 2 — classify into one of four outcomes
 
