@@ -176,8 +176,12 @@ describe("cacheKey", () => {
     ["model", { model: "m2" }],
     ["judge model", { judgeModel: "j2" }],
     ["CLI version", { claudeVersion: "2.2.0" }],
+    ["--scaffold", { scaffold: true }],
   ])("changes with %s", (_n, change) => {
     expect(cacheKey({ ...parts, ...change })).not.toBe(k);
+  });
+  it("keeps existing keys valid: scaffold false or absent hashes the same", () => {
+    expect(cacheKey({ ...parts, scaffold: false })).toBe(k);
   });
 });
 

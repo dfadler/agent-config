@@ -69,6 +69,8 @@ export interface RunSpec {
   readonly evalDir: string | undefined;
   /** Pass `--trust-plugin`: only for this repo's plugins (see `isRepoPlugin`). */
   readonly trustPlugin: boolean;
+  /** Pass `--scaffold`: runs each case's scaffold_script as the user. Only on the caller's explicit `--scaffold`. */
+  readonly scaffold?: boolean;
   readonly reporting: Reporting;
 }
 
@@ -79,8 +81,9 @@ export const hasGlobMeta = (name: string): boolean => /[*?[\]{}\\]/.test(name);
  * The full argv after `claude` for one invocation (one case). Order matters:
  * target first, then the variadic-looking options (`--case`, `--allow-tools`,
  * `--tag`), then the scalar flags. `--json` and `--report` are never passed:
- * the wrapper reads `aggregate-result.json` from the output directory. `--scaffold` is never passed:
- * it runs author-supplied bash as the user, so it stays a manual opt-in.
+ * the wrapper reads `aggregate-result.json` from the output directory. `--scaffold` is passed only
+ * when the caller asked for it (`spec.scaffold`): it runs author-supplied bash as the user, so it is
+ * never a default.
  */
 export const buildCliArgs = (
   spec: RunSpec,
@@ -108,6 +111,7 @@ export const buildCliArgs = (
     ...(tier.ablation === "none" ? ["--ablation", "none"] : []),
     ...(spec.evalDir === undefined ? [] : ["--eval-dir", spec.evalDir]),
     ...(spec.trustPlugin ? ["--trust-plugin"] : []),
+    ...(spec.scaffold === true ? ["--scaffold"] : []),
     reporting.publishReport ? "--publish-report" : "--no-publish",
     ...(reporting.keepTemp ? ["--keep-temp"] : []),
     ...(reporting.outputDir === undefined

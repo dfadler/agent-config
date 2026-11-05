@@ -50,11 +50,13 @@ export interface KeyParts {
   readonly model: string;
   readonly judgeModel: string;
   readonly claudeVersion: string;
+  /** A `--scaffold` run builds a different workspace, so it must not reuse a no-scaffold arm. Appended only when true, so existing keys stay valid. */
+  readonly scaffold?: boolean;
 }
 
 export const cacheKey = (k: KeyParts): string =>
   createHash("sha256")
-    .update(JSON.stringify([VERSION, k.caseName, k.caseHash, k.sharedHash, [...k.grants].sort(), k.runs, k.threshold, k.model, k.judgeModel, k.claudeVersion]))
+    .update(JSON.stringify([VERSION, k.caseName, k.caseHash, k.sharedHash, [...k.grants].sort(), k.runs, k.threshold, k.model, k.judgeModel, k.claudeVersion, ...(k.scaffold === true ? ["scaffold"] : [])]))
     .digest("hex")
     .slice(0, 16);
 
