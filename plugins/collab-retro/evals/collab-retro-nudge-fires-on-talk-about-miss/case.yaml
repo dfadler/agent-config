@@ -9,7 +9,9 @@
 # mentions a retro, so the arms should differ. A model run decides whether the nudge is followed;
 # the regex itself is unit-tested in incident-nudge-hook.test.ts.
 # Can fail: offers_retro fails if the hook did not fire (phrase missing, env not passed, hook not
-# run in the eval sandbox) or the model ignored the nudge.
+# run in the eval sandbox) or the model ignored the nudge. It needs an offer opener ("would you
+# like", "want me to", ...) before the retro wording, so "A retro is not necessary." fails; a
+# free regex stands in for an llm grader because the nudge fixes the offer's shape.
 schema_version: "1.1"
 name: collab-retro-nudge-fires-on-talk-about-miss
 description: >
@@ -34,6 +36,6 @@ graders:
   - name: offers_retro
     type: regex
     target: last_message
-    pattern: '\b(retro(spective)?|incident (retro|record|mode))\b'
+    pattern: '\b(would you like|do you want|want me to|shall i|should i|may i|can i)\b[^?]{0,200}\b(retro(spective)?|incident (record|mode))\b'
     flags: i
     match: contains
