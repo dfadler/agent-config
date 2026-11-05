@@ -108,6 +108,32 @@ it("fails closed when no file matches, so a broken pathspec cannot pass", () => 
   expect(text).toContain("no files matched");
 });
 
+it("resolves the default pathspec from the repository root, so a subdirectory cwd still matches", () => {
+  const seen: string[][] = [];
+  main([], {}, () => undefined, (specs) => (seen.push([...specs]), ["a/case.yaml"]), () => "fine\n");
+  expect(seen[0]?.[0]).toMatch(/^:\(top,glob\)/);
+});
+
+it("reports an unreadable tracked file as an incomplete scan and still scans the rest", () => {
+  const read = (f: string): string => {
+    if (f === "gone.yaml") throw new Error("ENOENT");
+    return "wrote /Users/alice/x\n";
+  };
+  const run2 = (files: string[]): { code: number; text: string } => {
+    const lines: string[] = [];
+    const code = main([], {}, (s) => lines.push(s), () => files, read);
+    return { code, text: lines.join("\n") };
+  };
+  const both = run2(["gone.yaml", "a/hit.yaml"]);
+  expect(both.code).toBe(1);
+  expect(both.text).toContain("gone.yaml: unreadable");
+  expect(both.text).toContain("a/hit.yaml:1: home-dir");
+  expect(both.text).toContain("scan incomplete");
+  const only = run2(["gone.yaml"]);
+  expect(only.code).toBe(1);
+  expect(only.text).not.toContain("✓");
+});
+
 it("prints usage for -h and exits 0", () => {
   const { code, text } = run({}, {}, ["-h"]);
   expect(code).toBe(0);

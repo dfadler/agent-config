@@ -7,8 +7,10 @@
 # No tool_used Skill grader: a slash command expands the skill inline and records no Skill call
 # (observed: 9 of 9 plugin-arm runs showed the skill's steps and a Skill count of 0). The outcome
 # regexes carry the signal. Run 2026-11-05, standard: with 1.00, without 0.33; delta not measured.
-# Can fail: a reply that goes straight to a scan verdict fails asks_for_extra_names and
-# no_scan_verdict; a reply that does not name the skill's Step 1 question fails the first.
+# Can fail: a reply that goes straight to a scan verdict fails no_scan_verdict (negative or
+# positive: "no hits" and "found 2 hits"); a reply that names employers but only states
+# ("I found two employer names") fails asks_rather_than_states; one that never mentions
+# employers, colleagues or customers fails asks_for_extra_names.
 # good-reply: Before I scan: are there names the patterns cannot see, such as your employer, colleagues or customers, that I should search for too?
 # bad-reply: Scanning plugins/*/evals/** now. No hits found.
 schema_version: "1.1"
@@ -35,10 +37,20 @@ graders:
     match: contains
     arm: both
 
+  # The names are an ask, not a claim: "I found two employer names" must not pass.
+  - name: asks_rather_than_states
+    type: regex
+    target: last_message
+    pattern: '\?|\b(?:send|tell|give|let) me\b'
+    flags: i
+    match: contains
+    arm: both
+
+  # Rejects a scan verdict either way: "no hits" and "found 2 hits" both skip Step 1.
   - name: no_scan_verdict
     type: regex
     target: last_message
-    pattern: '\b(?:no|0|zero)\s+(?:hits|personal data|matches)\b|no personal data'
+    pattern: '\b(?:no|0|zero|found|\d+|one|two|three|several)\s+(?:new\s+)?(?:hits?|personal data|matches)\b|no personal data|\bscan (?:is )?(?:clean|complete)\b'
     flags: i
     match: not_contains
     arm: both

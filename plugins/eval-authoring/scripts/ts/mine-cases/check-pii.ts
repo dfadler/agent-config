@@ -13,7 +13,8 @@ import { execFileSync } from "node:child_process";
 import { readFileSync } from "node:fs";
 import { findPersonalData } from "./redact.ts";
 
-const DEFAULT_PATHSPEC = ":(glob)plugins/*/evals/**";
+// `top` anchors the pathspec at the repository root; without it git matches relative to the cwd.
+const DEFAULT_PATHSPEC = ":(top,glob)plugins/*/evals/**";
 
 const USAGE = `Usage: check-pii.ts [-h|--help] [PATHSPEC...]
 
@@ -22,7 +23,9 @@ holds a non-reserved email, a /Users/<name> or /home/<name> path whose name is n
 placeholder (jdoe, jroe, me, user), or a deny term. Deny terms come from PII_DENY_TERMS,
 one per line; without it only the patterns run.
 Prints file:line: rule. Never prints a matched value or a deny term.
-Exit codes: 0 clean, 1 personal data found, 2 bad arguments or no file matched.
+A tracked file that cannot be read (deleted from the working tree) is listed as unreadable and
+makes the scan incomplete.
+Exit codes: 0 clean, 1 personal data found or scan incomplete, 2 bad arguments or no file matched.
 `;
 
 const trackedFiles = (pathspecs: readonly string[]): string[] =>
@@ -32,7 +35,7 @@ const trackedFiles = (pathspecs: readonly string[]): string[] =>
 
 const HISTORY = "git history is not scanned or changed";
 
-const plural =(n: number, word: string): string => `${String(n)} ${word}${n === 1 ? "" : "s"}`;
+const plural = (n: number, word: string): string => `${String(n)} ${word}${n === 1 ? "" : "s"}`;
 
 export function main(
   argv: readonly string[],
@@ -57,8 +60,18 @@ export function main(
   }
   let hits = 0;
   let bad = 0;
+  let unreadable = 0;
   for (const f of files) {
-    const found = findPersonalData(read(f), deny);
+    let text: string;
+    try {
+      text = read(f);
+    } catch {
+      // A tracked file deleted from the working tree is still listed by git. Say so and go on.
+      unreadable++;
+      out(`${f}: unreadable`);
+      continue;
+    }
+    const found = findPersonalData(text, deny);
     if (found.length === 0) continue;
     bad++;
     hits += found.length;
@@ -68,8 +81,11 @@ export function main(
     deny.length === 0
       ? "PII_DENY_TERMS is not set: only the pattern rules ran"
       : `${plural(deny.length, "deny term")} checked`;
-  if (bad > 0) {
-    out(`${plural(hits, "hit")} in ${plural(bad, "file")} (of ${String(files.length)}); ${used}; ${HISTORY}`);
+  const incomplete = unreadable > 0 ? `; scan incomplete: ${plural(unreadable, "file")} unreadable` : "";
+  if (bad > 0 || unreadable > 0) {
+    out(
+      `${plural(hits, "hit")} in ${plural(bad, "file")} (of ${String(files.length)}); ${used}${incomplete}; ${HISTORY}`,
+    );
     return 1;
   }
   out(`✓ no personal data in ${plural(files.length, "file")}; ${used}; ${HISTORY}`);
