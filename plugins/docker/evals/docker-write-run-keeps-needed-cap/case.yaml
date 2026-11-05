@@ -1,0 +1,68 @@
+# Run: node plugins/eval-authoring/scripts/ts/run-evals/run-evals.ts plugins/docker --case docker-write-run-keeps-needed-cap (no grant needed; Skill only).
+# Drafted by the blind-case-writer agent from the committed SKILL.md, then edited: the cap-add grader no longer demands NET_BIND_SERVICE, because whether a UID 1000 service on port 80 needs a capability is not settled by the skill.
+# Target sentence (SKILL.md Runtime hardening, rule 1): "--cap-drop all ..., then --cap-add only the ones the service needs. Writing this command is not gated; running it is Ask first under Command tiers". Before that edit, --cap-add sat in Ask first while rule 1 told the model to write it.
+# good-reply: docker run -d --name status -p 8080:80 --user 1000:1000 --cap-drop all --cap-add NET_BIND_SERVICE --security-opt no-new-privileges --read-only --tmpfs /tmp ghcr.io/acme/status-page:2.3    The cap-add is for port 80 (https://docs.docker.com/reference/cli/docker/container/run/).
+# bad-reply: docker run -d -p 8080:80 --user 1000 ghcr.io/acme/status-page:2.3
+schema_version: "1.1"
+name: docker-write-run-keeps-needed-cap
+description: >
+  A request to WRITE (not run) a docker run command for a UID 1000 service on port 80 should
+  come back as a command with all capabilities dropped, no-new-privileges, a read-only root
+  with tmpfs, a stated decision on adding a capability back, and a docs.docker.com link.
+  expected_outcome: PASS when all are present; FAIL on a bare docker run. Graders are free
+  regexes. Delta not measured. The case covers the cap-drop and cap-add wording only
+  weakly: a bare model may produce the same command, and a skill that still asked before
+  writing --cap-add would be caught only if the reply withheld the command.
+tags: [docker, trigger, quick]
+
+execution:
+  prompt: |
+    Write me the docker command to start ghcr.io/acme/status-page:2.3 on my box. Don't run
+    anything, I just want the command. The server inside runs as UID 1000 and listens on
+    port 80 inside the container. I want to reach it from the host on 8080. It writes
+    scratch files under /tmp only.
+  max_turns: 4
+  allowed_tools:
+    - Skill
+
+graders:
+  - name: skill_fired
+    type: tool_used
+    tool: Skill
+    input_match: '"skill"\s*:\s*"(?:[\w-]+:)?docker"'
+    min: 1
+
+  - name: drops_all_caps
+    type: regex
+    target: last_message
+    pattern: '--cap-drop[ =]+all'
+    flags: i
+    match: contains
+
+  # The case question: the reply makes a capability decision instead of withholding the command.
+  - name: states_capability_decision
+    type: regex
+    target: last_message
+    pattern: '--cap-add[ =]+\w+|NET_BIND_SERVICE|ip_unprivileged_port_start|no (?:extra |additional )?capabilit'
+    flags: i
+    match: contains
+
+  - name: no_new_privileges_set
+    type: regex
+    target: last_message
+    pattern: '--security-opt[ =]+no-new-privileges'
+    flags: i
+    match: contains
+
+  - name: read_only_with_tmpfs
+    type: regex
+    target: last_message
+    pattern: '--read-only[\s\S]{0,400}--tmpfs|--tmpfs[\s\S]{0,400}--read-only'
+    flags: i
+    match: contains
+
+  - name: cites_docs
+    type: regex
+    target: last_message
+    pattern: 'https://docs\.docker\.com/'
+    match: contains
