@@ -1,0 +1,61 @@
+# Run: node plugins/eval-authoring/scripts/ts/run-evals/run-evals.ts --tier standard --case workflow-authoring-hardens-new-workflow plugins/gha-ci-audit
+# Shared run/grant facts: docs/contributing.md, "Plugin evals". No grant needed (Skill only, reply-only).
+# Result case for gha-workflow-authoring's Rules (the two existing cases only check that the skill
+# fires and that its plan names actionlint and a human merge). The prompt asks for a plain lint
+# workflow and names no hardening rule, so each regex is not cued.
+# Can fail: a reply that writes `actions/checkout@v4` (tag pin), omits `timeout-minutes`, or has no
+# `permissions: contents: read` scores below 1.00. A bare model commonly pins to a tag and skips the
+# timeout, so the arms should differ. The sandbox has no Bash, so a with-plugin reply cannot resolve
+# a real SHA; it should use a placeholder or say it must be resolved, which no_tag_pin accepts.
+# Sabotage map: no_tag_pin <- "SHA-pin every external `uses:`"; has_timeout <- "Set `timeout-minutes`
+# on every job"; least_privilege <- "Least-privilege `permissions:`".
+# good-reply: "name: lint\non: pull_request\npermissions:\n  contents: read\njobs:\n  lint:\n    runs-on: ubuntu-latest\n    timeout-minutes: 10\n    steps:\n      - uses: actions/checkout@<40-char sha> # v4.2.2\n      - run: pnpm lint"
+# bad-reply: "name: lint\non: pull_request\njobs:\n  lint:\n    runs-on: ubuntu-latest\n    steps:\n      - uses: actions/checkout@v4\n      - uses: pnpm/action-setup@v4\n      - run: pnpm lint"
+schema_version: "1.1"
+name: workflow-authoring-hardens-new-workflow
+description: >
+  Asked to write a new lint workflow, the model applies gha-workflow-authoring's rules without being
+  told them. expected_outcome: PASS when the skill is invoked and the workflow has no tag-pinned
+  `uses:`, a `timeout-minutes`, and top-level `contents: read` permissions; FAIL when it pins to a
+  tag or leaves out the timeout or the permissions block.
+tags: [gha-ci-audit, gha-workflow-authoring, quick]
+
+execution:
+  prompt: |
+    Add a new workflow `.github/workflows/lint.yml` that runs `pnpm lint` on every pull request,
+    on Node 22 with pnpm. Reply with the complete file in a yaml block; don't create files or run
+    commands.
+  max_turns: 6
+  allowed_tools:
+    - Skill
+
+graders:
+  # Step indicator, unscored in a two-arm run.
+  - name: skill_fired
+    type: tool_used
+    tool: Skill
+    input_match: '"skill"\s*:\s*"(?:[\w-]+:)?gha-workflow-authoring"'
+    min: 1
+    arm: with-only
+
+  # Result: no external action pinned to a version tag or branch. A placeholder SHA passes.
+  - name: no_tag_pin
+    type: regex
+    target: last_message
+    pattern: 'uses:\s*[\w.-]+/[\w./-]+@(?:v?\d+(?:\.\d+)*|main|master)(?![\w.])'
+    flags: i
+    match: not_contains
+
+  # Result: a job-level timeout.
+  - name: has_timeout
+    type: regex
+    target: last_message
+    pattern: 'timeout-minutes:\s*\d+'
+    match: contains
+
+  # Result: read-only contents permission straight after a `permissions:` key (block or flow form).
+  - name: least_privilege
+    type: regex
+    target: last_message
+    pattern: 'permissions:[\s\\n{]{0,12}contents:\s*read'
+    match: contains
