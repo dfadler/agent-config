@@ -1,0 +1,49 @@
+# Run: claude plugin eval plugins/eval-authoring --case diagnose-scores-case-edit-handoff
+# Standard tier 2026-11-05, 3 runs per arm, claude-sonnet-5-5: with 1.00 / without 0.00, skill fired 3/3.
+# Sabotage check 2026-11-05 (hand-off clause deleted, plugin arm only, 3 runs): skill still fired 3/3, hands_case_edit_to_author_cases failed 3/3, score 0.50. The sentence is what produces the mention.
+# Drafted 2026-11-04 by the blind-case-writer agent from the committed skill text. The 0.00 without arm is by construction (no skill to name author-cases).
+# Paid: hand-off only. No grant: Skill only.
+# Covers the Output sentence added in PR 978: when the next step is a case edit (graders, prompt,
+# mocks), diagnose-scores hands it to author-cases.
+# Sabotage map: delete "hand it to [author-cases]" from the Output paragraph of
+# diagnose-scores/SKILL.md; hands_case_edit_to_author_cases should drop in the with arm.
+# good-reply: Cause: the grader mentions_file is satisfied by the prompt itself, so it passes in both arms. Evidence: vacuous-graders; mentions_file passed in every run of both arms. Next step: change its pattern to something the prompt does not contain; that is a case edit, so hand it to author-cases.
+# bad-reply: The skill is failing to help. Next step: rewrite the skill's instructions and re-run the whole suite.
+schema_version: "1.1"
+name: diagnose-scores-case-edit-handoff
+description: >
+  Pasted diagnosis output where the fix is a grader edit, not a re-run.
+  expected_outcome: PASS when the reply says the fix is a case edit and names author-cases as
+  the hand-off; FAIL when it blames the skill or only recommends a re-run.
+tags: [eval-authoring, diagnose-scores]
+
+execution:
+  prompt: |
+    I ran the diagnosis script on my release-notes plugin and got this. Where do I
+    start?
+
+      case: lists-flags
+      verdict: no-discrimination (delta 0.000, with 1.00, without 1.00)
+      finding: vacuous-graders: mentions_file passes in every run of both arms
+      grader mentions_file: regex on last_message, pattern 'config.json'
+      prompt text: "Update config.json so the retries key is 5 and tell me what changed."
+  max_turns: 6
+  allowed_tools:
+    - Skill
+
+graders:
+  # Unscored indicator in a two-arm run.
+  - name: skill_fired
+    type: tool_used
+    tool: Skill
+    input_match: '"skill"\s*:\s*"(?:[\w-]+:)?diagnose-scores"'
+    min: 1
+    arm: with-only
+
+  # Result: the case-edit hand-off. A bare model does not know the sibling skill's name.
+  - name: hands_case_edit_to_author_cases
+    type: regex
+    target: last_message
+    pattern: 'author-cases'
+    flags: i
+    match: contains

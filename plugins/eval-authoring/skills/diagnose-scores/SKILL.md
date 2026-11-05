@@ -147,8 +147,9 @@ answered the same every time, look at the transcript instead.
 
 Per case that is not `discriminates`: **Cause** (one line), **Evidence** (verdict, finding,
 and the file, grader or error text you read), **Next step** (smallest change naming the file
-to edit, or the one question that settles it). No preamble. When the next step is a re-run,
-say it is paid (cases x runs x arms) and hand it to [run-evals](../run-evals/SKILL.md).
+to edit, or the one question that settles it). No preamble. When the next step is a case edit
+(graders, prompt, mocks), hand it to [author-cases](../author-cases/SKILL.md); when it is a
+re-run, say it is paid (cases x runs x arms) and hand it to [run-evals](../run-evals/SKILL.md).
 
 ## Sample answer
 
