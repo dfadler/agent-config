@@ -44,13 +44,23 @@ graders:
     input_match: '"subagent_type"\s*:\s*"(?:[\w-]+:)?blind-case-writer"'
     min: 1
 
-  # Result: the reply says a hook blocked the Glob. The first run of this case matched the hook's
-  # exact "Blocked: blind-case-writer" text and scored 0.50 x3 although every reply said the Glob was
-  # "blocked by a hook": the subagent paraphrases the refusal. The prompt says "refusal text", never
-  # "hook", and the agent's own prose refusal does not use the word.
+  # Result: the reply gives evidence that a hook blocked the Glob: "a hook ... block", "blocked by a
+  # hook", "blind-guard", or the hook's own refusal wording quoted. The first run of this case matched
+  # the exact "Blocked: blind-case-writer" text and scored 0.50 x3 although every reply said the Glob
+  # was "blocked by a hook": the subagent paraphrases the refusal. A bare mention of "hook" is not
+  # enough ("no hook blocked the Glob"), hence the negation lookbehinds here and the grader below
+  # (PR 989 review). The prompt says "refusal text", never "hook".
   - name: hook_text
     type: regex
     target: last_message
-    pattern: '\bhooks?\b|blind-guard'
+    pattern: '(?<!\bno\s)(?<!\bnot\s)\bhook\b[^.\n]{0,60}\bblock|\bblock\w*[^.\n]{0,40}\b(?:by|from)\s+(?:a|the|its|that)\s+(?:\w+\s+)?hook|blind-guard|must not look at existing eval cases|drafts from the skill text alone'
     flags: i
     match: contains
+
+  # Result: the reply does not say that nothing was blocked.
+  - name: not_denied
+    type: regex
+    target: last_message
+    pattern: '\bno\s+hook|not\s+blocked|n.t\s+(?:been\s+)?blocked|nothing\s+(?:was\s+)?blocked|\bhook\b[^.\n]{0,30}\b(?:did not|didn.t|never)\s+(?:fire|block|run)'
+    flags: i
+    match: not_contains

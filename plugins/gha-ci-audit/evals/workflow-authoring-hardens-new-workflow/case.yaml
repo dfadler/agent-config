@@ -9,8 +9,8 @@
 # a real SHA; it should use a placeholder or say it must be resolved, which no_tag_pin accepts.
 # Sabotage map: no_tag_pin <- "SHA-pin every external `uses:`"; has_timeout <- "Set `timeout-minutes`
 # on every job"; least_privilege <- "Least-privilege `permissions:`".
-# good-reply: "name: lint\non: pull_request\npermissions:\n  contents: read\njobs:\n  lint:\n    runs-on: ubuntu-latest\n    timeout-minutes: 10\n    steps:\n      - uses: actions/checkout@<40-char sha> # v4.2.2\n      - run: pnpm lint"
-# bad-reply: "name: lint\non: pull_request\njobs:\n  lint:\n    runs-on: ubuntu-latest\n    steps:\n      - uses: actions/checkout@v4\n      - uses: pnpm/action-setup@v4\n      - run: pnpm lint"
+# good-reply: "```yaml\nname: lint\non: pull_request\npermissions:\n  contents: read\njobs:\n  lint:\n    runs-on: ubuntu-latest\n    timeout-minutes: 10\n    steps:\n      - uses: actions/checkout@<40-char sha> # v4.2.2\n      - run: pnpm lint\n```"
+# bad-reply: "```yaml\nname: lint\non: pull_request\njobs:\n  lint:\n    runs-on: ubuntu-latest\n    steps:\n      - uses: actions/checkout@v4\n      - uses: pnpm/action-setup@v4\n      - run: pnpm lint\n```"
 schema_version: "1.1"
 name: workflow-authoring-hardens-new-workflow
 description: >
@@ -38,24 +38,37 @@ graders:
     min: 1
     arm: with-only
 
-  # Result: no external action pinned to a version tag or branch. A placeholder SHA passes.
+  # Precondition: the reply holds a workflow (trigger and jobs) in a yaml block, so the three
+  # result graders below cannot pass on a reply that omits the file (PR 989 review). It does not
+  # repeat `pnpm lint`, which the prompt itself contains.
+  - name: has_workflow
+    type: regex
+    target: last_message
+    pattern: '```ya?ml(?:\s|\\n)[\s\S]*?pull_request[\s\S]*?jobs:[\s\S]*?```'
+    match: contains
+
+  # Result: no external action pinned to any ref except a 40-hex SHA or an `<...>` placeholder
+  # (so a tag, a branch, `stable` and `not-a-sha` all fail; PR 989 review).
   - name: no_tag_pin
     type: regex
     target: last_message
-    pattern: 'uses:\s*[\w.-]+/[\w./-]+@(?:v?\d+(?:\.\d+)*|main|master)(?![\w.])'
+    pattern: 'uses:\s*[\w.-]+/[\w./-]+@(?![0-9a-f]{40}\b|<)[\w.-]+'
     flags: i
     match: not_contains
 
-  # Result: a job-level timeout.
+  # Result: an active job-level timeout: `timeout-minutes` at the start of an indented line, so a
+  # comment or a string inside `run:` does not count (PR 989 review). The `\\n` alternative is for
+  # the header's one-line good-reply, where newlines are written as a backslash and n.
   - name: has_timeout
     type: regex
     target: last_message
-    pattern: 'timeout-minutes:\s*\d+'
+    pattern: '(?:^|\n|\\n)[ \t]+timeout-minutes:[ \t]*\d+'
     match: contains
 
-  # Result: read-only contents permission straight after a `permissions:` key (block or flow form).
+  # Result: read-only contents permission under a top-level (unindented) `permissions:` key, block
+  # or flow form, so a job-level block does not count (PR 989 review).
   - name: least_privilege
     type: regex
     target: last_message
-    pattern: 'permissions:[\s\\n{]{0,12}contents:\s*read'
+    pattern: '(?:^|\n|\\n)permissions:[\s\\n{]{0,12}contents:\s*read'
     match: contains
