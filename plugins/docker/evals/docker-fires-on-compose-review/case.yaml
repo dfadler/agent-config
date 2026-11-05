@@ -1,0 +1,74 @@
+# Run: node plugins/eval-authoring/scripts/ts/run-evals/run-evals.ts plugins/docker --case docker-fires-on-compose-review (no grant needed; Skill only).
+# Maps to SKILL.md: "short-form depends_on only waits for the dependency to start; use the long form with condition: service_healthy" and "Bind published ports to loopback unless the service must be public".
+# good-reply: The api races the db because short-form depends_on only waits for start. Give db a healthcheck (pg_isready) and use depends_on with condition: service_healthy. Publish the db as 127.0.0.1:5432:5432, or not at all. Drop the obsolete top-level `version:` key and move the password into a Compose secret. Check with `docker compose config`. https://docs.docker.com/reference/compose-file/services/#depends_on
+# bad-reply: Add `restart: on-failure` to the api service so it retries until postgres is up.
+schema_version: "1.1"
+name: docker-fires-on-compose-review
+description: >
+  A compose file with a boot-order race, a public db port and a version key should fire the
+  docker skill. expected_outcome: PASS when the reply uses service_healthy, loopback-binds a
+  port and tells the user to run docker compose config; FAIL otherwise.
+tags: [docker, trigger, quick]
+
+execution:
+  prompt: |
+    My api sometimes crashes on boot because the db isn't ready yet. Look over my compose file?
+
+    version: "3.8"
+    services:
+      api:
+        build: .
+        ports:
+          - "8080:8080"
+        depends_on:
+          - db
+      db:
+        image: postgres:16
+        ports:
+          - "5432:5432"
+        environment:
+          POSTGRES_PASSWORD: hunter2
+  max_turns: 6
+  allowed_tools:
+    - Skill
+
+graders:
+  - name: skill_fired
+    type: tool_used
+    tool: Skill
+    input_match: '"skill"\s*:\s*"(?:[\w-]+:)?docker"'
+    min: 1
+
+  - name: waits_for_health
+    type: regex
+    target: last_message
+    pattern: 'condition:\s*service_healthy'
+    match: contains
+
+  - name: loopback_binding
+    type: regex
+    target: last_message
+    pattern: '127\.0\.0\.1:(?:5432|8080)'
+    match: contains
+
+  # Skill-added: the top-level version key is obsolete (SKILL.md Compose rule 1). The prompt
+  # contains `version: "3.8"`, so the pattern needs an obsolescence word beside it.
+  - name: drops_version_key
+    type: regex
+    target: last_message
+    pattern: 'version[^\n]{0,80}(?:obsolete|informative|unnecessary|no longer|remove|drop)|(?:remove|drop|delete)[^\n]{0,40}version'
+    flags: i
+    match: contains
+
+  # Skill-added: cites the Compose file reference, not just any docker page.
+  - name: cites_compose_docs
+    type: regex
+    target: last_message
+    pattern: 'https://docs\.docker\.com/(?:reference/compose-file|compose)/'
+    match: contains
+
+  - name: validates_with_config
+    type: regex
+    target: last_message
+    pattern: 'docker compose config'
+    match: contains

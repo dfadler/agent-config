@@ -1,0 +1,27 @@
+# Run: node plugins/eval-authoring/scripts/ts/run-evals/run-evals.ts plugins/docker --trigger-boundary (plugin arm only; no grant needed).
+# Target sentence (description): "Not for Kubernetes, Podman, ..." Shares container exit, exit code and ps -a vocabulary.
+# good-reply: (no Skill call) Podman exit 137 is SIGKILL; 125 usually means podman itself failed.
+# bad-reply: (Skill call to docker)
+schema_version: "1.1"
+name: docker-quiet-on-podman-exit-codes
+description: >
+  A Podman container exit-code question shares the docker skill's vocabulary (container
+  exits, exit code, ps -a) but must not fire it. A trigger-boundary negative: counted by
+  `run-evals --trigger-boundary`, plugin arm only, so no delta.
+tags: [docker, trigger-boundary, "pair:docker-fires-on-exited-container"]
+
+execution:
+  prompt: |
+    podman ps -a shows my container as Exited (137) and another one as Exited (125). What do
+    those exit codes mean?
+  max_turns: 4
+  allowed_tools:
+    - Skill
+
+graders:
+  - name: docker_skill_not_invoked
+    type: tool_used
+    tool: Skill
+    input_match: '"skill"\s*:\s*"(?:[\w-]+:)?docker"'
+    min: 0
+    max: 0

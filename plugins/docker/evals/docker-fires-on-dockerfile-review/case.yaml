@@ -1,0 +1,63 @@
+# Run: node plugins/eval-authoring/scripts/ts/run-evals/run-evals.ts plugins/docker --case docker-fires-on-dockerfile-review (no grant needed; Skill only).
+# Maps to SKILL.md: "Never pass a secret through ARG or ENV ... RUN --mount=type=secret" and "say how the digest gets updated (Dependabot's docker ecosystem or a Docker Scout policy)".
+# good-reply: Problems: `node:latest` is mutable, so pin `node:22-slim@sha256:<digest>` and let Dependabot's docker ecosystem update it. NPM_TOKEN in ARG/ENV stays in the image, so use `RUN --mount=type=secret,id=npm npm ci`. Run apt-get update and install in one RUN, copy package.json before the source, use COPY not ADD, exec-form CMD, a non-root USER. Sources: https://docs.docker.com/build/building/best-practices/ and https://docs.docker.com/build/building/secrets/
+# bad-reply: This looks fine overall. Maybe use a smaller base image like alpine and add a .dockerignore.
+schema_version: "1.1"
+name: docker-fires-on-dockerfile-review
+description: >
+  A buggy Dockerfile pasted inline should fire the docker skill. expected_outcome: PASS when
+  the reply moves the token to a build secret mount, says how a pinned digest stays updated,
+  and cites docs.docker.com; FAIL otherwise. skill_fired is an unscored indicator in a two-arm run.
+tags: [docker, trigger, quick]
+
+execution:
+  prompt: |
+    Can you review this Dockerfile before I ship it?
+
+    FROM node:latest
+    RUN apt-get update
+    RUN apt-get install -y curl build-essential
+    WORKDIR /app
+    COPY . .
+    RUN npm install
+    ARG NPM_TOKEN
+    ENV NPM_TOKEN=$NPM_TOKEN
+    ADD config.json /app/config.json
+    EXPOSE 3000
+    CMD npm start
+  max_turns: 6
+  allowed_tools:
+    - Skill
+
+graders:
+  - name: skill_fired
+    type: tool_used
+    tool: Skill
+    input_match: '"skill"\s*:\s*"(?:[\w-]+:)?docker"'
+    min: 1
+
+  - name: secret_moved_to_mount
+    type: regex
+    target: last_message
+    pattern: 'RUN --mount=type=secret,id=\w+'
+    match: contains
+
+  - name: pins_digest
+    type: regex
+    target: last_message
+    pattern: '@sha256|pin[^\n]{0,60}digest|digest[^\n]{0,60}pin'
+    flags: i
+    match: contains
+
+  - name: digest_update_path
+    type: regex
+    target: last_message
+    pattern: 'dependabot|docker scout'
+    flags: i
+    match: contains
+
+  - name: cites_docker_docs
+    type: regex
+    target: last_message
+    pattern: 'https://docs\.docker\.com/build/building/(?:secrets|best-practices)'
+    match: contains

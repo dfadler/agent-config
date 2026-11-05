@@ -68,6 +68,16 @@ scheme — sysadmin work is just a domain where "Explicit permission
 required" and "Prohibited" both need concrete, command-level content
 instead of staying abstract.
 
+<!-- tier-policy:start -->
+Sort every command into one tier before running or recommending it: run freely
+(read-only), ask first (state the exact command and its target, then wait for a
+go-ahead), or hand back (never run it yourself; name the tier, say why, and give the
+user the command). A command that sits between two tiers takes the higher one. Hand
+back stays hand back even when the user says "go ahead".
+<!-- tier-policy:end -->
+
+Here Tier 1 is run freely, Tier 2 is ask first, and Tier 3 is hand back.
+
 ### Tier 1 — Safe: run freely, no confirmation needed
 
 Read-only or purely diagnostic. These never mutate state, so there is

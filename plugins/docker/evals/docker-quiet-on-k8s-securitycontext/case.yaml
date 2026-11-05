@@ -1,0 +1,27 @@
+# Run: node plugins/eval-authoring/scripts/ts/run-evals/run-evals.ts plugins/docker --trigger-boundary (plugin arm only; no grant needed).
+# Target sentence (description): "Not for Kubernetes, Podman, ..." Hardening vocabulary shared with the docker run case.
+# good-reply: (no Skill call) securityContext: { allowPrivilegeEscalation: false, readOnlyRootFilesystem: true, capabilities: { drop: [ALL] } }
+# bad-reply: (Skill call to docker)
+schema_version: "1.1"
+name: docker-quiet-on-k8s-securitycontext
+description: >
+  Hardening vocabulary (drop capabilities, read-only root, no privilege escalation) for a
+  Kubernetes pod must not fire the docker skill. A trigger-boundary negative: counted by
+  `run-evals --trigger-boundary`, plugin arm only, so no delta.
+tags: [docker, trigger-boundary, "pair:docker-hardens-docker-run"]
+
+execution:
+  prompt: |
+    Write the securityContext for my Kubernetes pod spec: drop all capabilities, read-only
+    root filesystem, and no privilege escalation.
+  max_turns: 4
+  allowed_tools:
+    - Skill
+
+graders:
+  - name: docker_skill_not_invoked
+    type: tool_used
+    tool: Skill
+    input_match: '"skill"\s*:\s*"(?:[\w-]+:)?docker"'
+    min: 0
+    max: 0
