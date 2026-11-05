@@ -46,13 +46,26 @@ State the exact command and its target, then wait for a go-ahead: `docker run`,
 `docker compose up|down|restart`, and edits to `daemon.json` or Compose files. Ask once
 per independent action, not once for a batch.
 
+Three more need the same go-ahead plus a one-line statement of the risk, because each
+widens what a container can do to the host:
+- `--privileged`, `--cap-add` and `--security-opt seccomp=unconfined`. `--privileged` grants
+  all capabilities, disables the default seccomp and AppArmor profiles and exposes host
+  devices ([docker run](https://docs.docker.com/reference/cli/docker/container/run/)).
+- Mounting `/var/run/docker.sock` into a container, in `docker run` or `compose.yaml`. It
+  gives full control of the host daemon, and docker-group membership is root-equivalent
+  ([docker run](https://docs.docker.com/reference/cli/docker/container/run/),
+  [post-install](https://docs.docker.com/engine/install/linux-postinstall/)).
+- Running `docker-bench-security`. Its documented container command uses `--net host
+  --pid host --userns host` and mounts the socket
+  ([README](https://github.com/docker/docker-bench-security/blob/master/README.md)).
+
 ### Hand back (never run it yourself)
 
 Anything that can delete volume data: `docker volume rm|prune`, `docker system prune`
 with `--volumes`, `docker compose down -v` (or `--volumes`), and `docker rm -v`, which
 removes the container's anonymous volumes
-([docker container rm](https://docs.docker.com/reference/cli/docker/container/rm/)). Also `--privileged`, a bind mount of
-`/var/run/docker.sock`, and a bind mount of `/`. Tell the user which tier applies, why,
+([docker container rm](https://docs.docker.com/reference/cli/docker/container/rm/)). Also a bind mount of
+`/`. Tell the user which tier applies, why,
 and the command to run themselves, even if they said "go ahead".
 
 - `down -v` removes the named volumes declared in the Compose file and the anonymous
@@ -97,7 +110,10 @@ and put each prune in the tier above; never answer with one `system prune -a --v
    [CMD](https://docs.docker.com/build/building/best-practices/#cmd)).
 8. **Never pass a secret through `ARG` or `ENV`:** both persist in the final image. Use
    `RUN --mount=type=secret,id=<name>` and `docker build --secret id=<name>,src=<path>`
-   ([build secrets](https://docs.docker.com/build/building/secrets/)).
+   ([build secrets](https://docs.docker.com/build/building/secrets/)). Max-mode provenance
+   attestations embed build-arg values, and `docker/build-push-action` uses max mode on
+   public GitHub repositories, so a secret passed as a build arg can be published
+   ([attestations](https://docs.docker.com/build/ci/github-actions/attestations/)).
 9. **Mount package-manager caches** with `RUN --mount=type=cache,target=<dir>` instead of
    a layer that keeps them. The build must still work with an empty cache
    ([cache mounts](https://docs.docker.com/reference/dockerfile/#run---mounttypecache)).
@@ -128,14 +144,43 @@ breaks. Do not call a rule satisfied without reading the line.
    interpolated model and fails on an invalid file
    ([docker compose config](https://docs.docker.com/reference/cli/docker/compose/config/)).
 
+## Runtime hardening
+
+Apply these to a `docker run` command or a Compose service you write, and say which you
+left out and why. Some images fail under them; add back only what a failure shows is
+needed ([OWASP Docker Security Cheat Sheet](https://cheatsheetseries.owasp.org/cheatsheets/Docker_Security_Cheat_Sheet.html),
+[docker run](https://docs.docker.com/reference/cli/docker/container/run/)).
+
+1. **Drop capabilities:** `--cap-drop all` (Compose `cap_drop: [ALL]`), then `--cap-add`
+   only the ones the service needs.
+2. **Set `no-new-privileges` explicitly:** `--security-opt no-new-privileges` (Compose
+   `security_opt`). It is not on by default.
+3. **Make the root filesystem read-only:** `--read-only` with `--tmpfs <path>` for each
+   path the service writes (Compose `read_only: true` and `tmpfs`).
+4. **Prefer rootless mode** for an untrusted or agent-driven workload: the daemon and
+   containers run without root inside a user namespace. With `userns-remap` the daemon
+   still runs as root
+   ([rootless](https://docs.docker.com/engine/security/rootless/),
+   [userns-remap](https://docs.docker.com/engine/security/userns-remap/)).
+
+Version-specific: build attestations need Buildx 0.10 or later and BuildKit 0.11 or later,
+and on the classic Engine image store with the `docker` driver they fail with
+"Attestation is not supported for the docker driver"; enable the containerd image store or
+use a `docker-container` builder
+([attestations](https://docs.docker.com/build/metadata/attestations/)).
+
 ## Diagnosing a failing build or container
 
 Run the steps in order, read-only, and stop at the first one that explains the failure.
 
 1. Failing build: read the output of the failing instruction, not the whole log, and
    find the Dockerfile line that produced it.
-2. Container that exits or restarts: `docker ps -a` for the status and exit code.
-   Exit code 137 means the process received SIGKILL
+2. Container that exits or restarts: `docker ps -a` for the status and exit code, and
+   read the code before the logs. `docker run` reserves 125 (the Docker daemon failed),
+   126 (the command cannot be invoked) and 127 (the command was not found); any other code
+   is the container command's own, though a command can itself exit 125 to 127
+   ([exit status](https://docs.docker.com/engine/containers/run/)). Exit code 137 means the
+   process received SIGKILL
    ([docker container ls](https://docs.docker.com/reference/cli/docker/container/ls/)).
 3. `docker logs --tail 100 <container>`; widen with `--since <duration>` only if that
    does not explain it
