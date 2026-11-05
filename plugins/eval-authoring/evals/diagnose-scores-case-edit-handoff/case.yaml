@@ -1,5 +1,6 @@
 # Run: claude plugin eval plugins/eval-authoring --case diagnose-scores-case-edit-handoff
-# Standard tier 2026-11-05, 3 runs per arm, claude-sonnet-5-5: with 1.00 / without 0.00, skill fired 3/3; sabotage check pending.
+# Standard tier 2026-11-05, 3 runs per arm, claude-sonnet-5-5: with 1.00 / without 0.00, skill fired 3/3.
+# Sabotage check 2026-11-05 (hand-off clause deleted, plugin arm only, 3 runs): skill still fired 3/3, hands_case_edit_to_author_cases failed 3/3, score 0.50. The sentence is what produces the mention.
 # Drafted 2026-11-04 by the blind-case-writer agent from the committed skill text. The 0.00 without arm is by construction (no skill to name author-cases).
 # Paid: hand-off only. No grant: Skill only.
 # Covers the Output sentence added in PR 978: when the next step is a case edit (graders, prompt,
