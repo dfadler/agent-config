@@ -5,6 +5,7 @@
 // Safe to re-run: only touches symlinks that point into this repo; skips
 // anything that has already been removed. Every path is derived from the
 // `home` and `repoRoot` arguments, so tests run against a temp directory.
+import { spawnSync } from "node:child_process";
 import {
   existsSync,
   lstatSync,
@@ -27,7 +28,10 @@ import { EXIT_FAILURE, EXIT_OK, EXIT_USAGE } from "./lib/exit-codes.ts";
 export const MANAGED_BEGIN = "# >>> agent-config managed begin <<<";
 export const MANAGED_END = "# >>> agent-config managed end <<<";
 
-export const USAGE = `Usage: ./teardown.sh [--commands] [--plugins] [--claude-md]
+// The value setup.sh gives core.hooksPath; teardown unsets it only when it matches.
+const HOOKS_PATH = "scripts/hooks";
+
+export const USAGE = `Usage: ./teardown.sh [--commands] [--plugins] [--claude-md] [--git-hooks]
 
 Removes this repo's symlinks from ~/.claude and restores ~/.claude/CLAUDE.md
 from ~/.claude/CLAUDE.personal.md (the inverse of setup.sh). With no flags,
@@ -37,6 +41,7 @@ flags are combinable.
   --commands    Only unlink ~/.claude/commands/* entries pointing into this repo.
   --plugins     Only unlink ~/.claude/skills/* entries pointing into this repo's plugins/.
   --claude-md   Only restore ~/.claude/CLAUDE.md / CLAUDE.personal.md.
+  --git-hooks   Only unset this checkout's git core.hooksPath, and only if it is scripts/hooks.
   -h, --help    Show this message and exit.
 `;
 
@@ -179,25 +184,42 @@ export const deregisterPluginHooks = (home: string, repoRoot: string, log: Log):
   return EXIT_OK;
 };
 
+/**
+ * Undo setup.sh's `git config core.hooksPath scripts/hooks` in `repoRoot`,
+ * only when it still has exactly that value (anything else is the user's).
+ * Never throws: a missing git or a non-git `repoRoot` just means nothing to do.
+ */
+export const unsetHooksPath = (repoRoot: string, log: Log): void => {
+  const git = (...args: string[]) =>
+    spawnSync("git", ["-C", repoRoot, ...args], { encoding: "utf8" });
+  const got = git("config", "--get", "core.hooksPath");
+  if (got.status !== 0 || got.stdout.trim() !== HOOKS_PATH) return;
+  if (git("config", "--unset", "core.hooksPath").status === 0) {
+    log(`Unset core.hooksPath (${HOOKS_PATH})`);
+  }
+};
+
 export interface Options {
   readonly commands: boolean;
   readonly plugins: boolean;
   readonly claudeMd: boolean;
+  readonly gitHooks: boolean;
 }
 
 /** `Options`, or the offending argument. No flags selects everything. */
 export const parseArgs = (argv: readonly string[]): Options | { readonly bad: string } | "help" => {
-  let o = { commands: false, plugins: false, claudeMd: false };
+  let o = { commands: false, plugins: false, claudeMd: false, gitHooks: false };
   for (const a of argv) {
     if (a === "-h" || a === "--help") return "help";
     else if (a === "--commands") o = { ...o, commands: true };
     else if (a === "--plugins") o = { ...o, plugins: true };
     else if (a === "--claude-md") o = { ...o, claudeMd: true };
+    else if (a === "--git-hooks") o = { ...o, gitHooks: true };
     else return { bad: a };
   }
-  return o.commands || o.plugins || o.claudeMd
+  return o.commands || o.plugins || o.claudeMd || o.gitHooks
     ? o
-    : { commands: true, plugins: true, claudeMd: true };
+    : { commands: true, plugins: true, claudeMd: true, gitHooks: true };
 };
 
 /** The whole teardown; returns the exit code. */
@@ -215,6 +237,7 @@ export const teardown = (
     ? (unlinkDirContents(join(home, ".claude", "skills"), join(repoRoot, "plugins"), log),
       deregisterPluginHooks(home, repoRoot, log))
     : EXIT_OK;
+  if (opts.gitHooks) unsetHooksPath(repoRoot, log);
   log("Done.");
   return rc;
 };

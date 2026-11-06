@@ -34,6 +34,8 @@
 #   deregister-hook   <event> <cmd> [args-json]   args-json omitted for a shell-form <cmd>
 #   migrate-hook      <event> <shell-cmd> <cmd> <args-json>   rewrite shell form to exec form
 #   default-setting   <file> <key> <json>    set a dotted key only if absent
+#   git-hooks-path    <repo> <path>          git config core.hooksPath <path> in <repo>
+#                                            (only when unset; skipped with pii-cleanup)
 #   skip-plugin       <name> <reason>        informational: plugin left out
 #   skip-command      <dest> <reason> <name> informational: command left out
 #   warn-foreign-symlink <dest> <target>     informational: not ours, left alone
@@ -328,6 +330,18 @@ plan_settings() {
   fi
 }
 
+# Point this checkout's core.hooksPath at scripts/hooks (the opt-in pii-cleanup
+# pre-commit hook). Planned only in a git checkout that ships the hook, and
+# only while core.hooksPath is unset: a different value is the user's, and
+# doctor warns about it. Gated on pii-cleanup so --skip=pii-cleanup leaves it off.
+plan_git_hooks_path() {
+  is_skipped pii-cleanup && return 0
+  git -C "$REPO_ROOT" rev-parse --git-dir >/dev/null 2>&1 || return 0
+  [[ -f "$REPO_ROOT/scripts/hooks/pre-commit" ]] || return 0
+  [[ -z "$(git -C "$REPO_ROOT" config --get core.hooksPath 2>/dev/null)" ]] || return 0
+  printf 'git-hooks-path\t%s\tscripts/hooks\n' "$REPO_ROOT"
+}
+
 # The whole install plan, in the order it must be applied.
 plan_install() {
   plan_skipped_plugins
@@ -340,5 +354,6 @@ plan_install() {
   plan_mkdir "$HOME/.claude/skills"
   plan_plugin_links
   plan_hooks
+  plan_git_hooks_path
   plan_settings
 }

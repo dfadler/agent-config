@@ -25,7 +25,9 @@ Usage: ./setup.sh [--install-deps] [--skip=<feature,...>] [--include=<feature,..
 
 Symlinks this repo's config into ~/.claude, then checks that the runtime
 dependencies the linked skills need are importable by the interpreter that
-will actually run them.
+will actually run them. In a git checkout it also sets core.hooksPath to
+scripts/hooks (the pii-cleanup pre-commit hook) when that is unset; --skip=
+pii-cleanup leaves it off, and a different existing value is never replaced.
 
 With neither --skip nor --include, every command and every plugin is
 installed — the same all-or-nothing behavior this script has always had.
@@ -371,6 +373,10 @@ apply_plan() {
         ;;
       default-setting)
         ensure_setting_default "$a" "$b" "$c"
+        ;;
+      git-hooks-path)
+        git -C "$a" config core.hooksPath "$b"
+        echo "Set core.hooksPath to $b in $a (pre-commit PII check)"
         ;;
       *)
         echo "Unknown plan verb: $verb" >&2

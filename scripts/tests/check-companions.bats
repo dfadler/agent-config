@@ -90,6 +90,69 @@ run_companions() {
   refute_output_contains "not fully configured"
 }
 
+# --- pre-commit hook wiring (core.hooksPath) --------------------------------
+
+hooks_fixture() {
+  # --fix also runs the rtk check, which fails when rtk has no config yet; give it a satisfied one.
+  shim_rtk
+  printf '[hooks]\nexclude_commands = ["git", "prettier", "eslint", "vitest"]\n' >"$FAKE_RTK_CONFIG"
+  git -C "$FAKE_REPO" init -q
+  mkdir -p "$FAKE_REPO/scripts/hooks"
+  touch "$FAKE_REPO/scripts/hooks/pre-commit"
+}
+
+@test "warns when core.hooksPath is unset, and leaves it unset" {
+  hooks_fixture
+  run_companions
+  assert_success
+  assert_output_contains "core.hooksPath is not set"
+  assert_output_contains "Run './doctor.sh --fix'"
+  run git -C "$FAKE_REPO" config --get core.hooksPath
+  [ "$status" -eq 1 ]
+}
+
+@test "--fix sets core.hooksPath when unset" {
+  hooks_fixture
+  run_companions --fix
+  assert_success
+  assert_output_contains "Set core.hooksPath to scripts/hooks"
+  [ "$(git -C "$FAKE_REPO" config --get core.hooksPath)" = "scripts/hooks" ]
+}
+
+@test "confirms core.hooksPath when it is already scripts/hooks" {
+  hooks_fixture
+  git -C "$FAKE_REPO" config core.hooksPath scripts/hooks
+  run_companions
+  assert_success
+  assert_output_contains "core.hooksPath is scripts/hooks"
+  refute_output_contains "core.hooksPath is not set"
+}
+
+@test "a different core.hooksPath is warned about and never overwritten, even with --fix" {
+  hooks_fixture
+  git -C "$FAKE_REPO" config core.hooksPath .husky
+  run_companions --fix
+  assert_success
+  assert_output_contains "core.hooksPath is .husky"
+  assert_output_contains "left alone"
+  [ "$(git -C "$FAKE_REPO" config --get core.hooksPath)" = ".husky" ]
+}
+
+@test "core.hooksPath check is silent without the hook file or outside a git checkout" {
+  shim_rtk
+  printf '[hooks]\nexclude_commands = ["git", "prettier", "eslint", "vitest"]\n' >"$FAKE_RTK_CONFIG"
+  git -C "$FAKE_REPO" init -q
+  run_companions --fix
+  refute_output_contains "core.hooksPath"
+  run git -C "$FAKE_REPO" config --get core.hooksPath
+  [ "$status" -eq 1 ]
+  rm -rf "$FAKE_REPO/.git"
+  mkdir -p "$FAKE_REPO/scripts/hooks"
+  touch "$FAKE_REPO/scripts/hooks/pre-commit"
+  run_companions --fix
+  refute_output_contains "core.hooksPath"
+}
+
 # --- runtime dependency check (#88) ----------------------------------------
 #
 # detached-terminal's agent_term.py runs under whatever python3 is first on

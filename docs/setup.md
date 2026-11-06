@@ -52,6 +52,11 @@ Hooks are registered in exec form (`"command": "node", "args": [path]`, no shell
 [hooks docs](https://code.claude.com/docs/en/hooks#exec-form-and-shell-form)). Setup
 rewrites an earlier shell-form `node "path"` entry in place on its next run; doctor reports
 any that remain and `--fix` migrates them. `teardown.sh` removes every form.
+Setup also runs `git config core.hooksPath scripts/hooks` for this checkout (the
+`pii-cleanup` pre-commit hook), only when the value is unset and not with
+`--skip=pii-cleanup`. Doctor reports it, `--fix` sets it when unset, and neither ever
+overwrites a different value. It is written to the shared `.git/config`, so it covers
+every worktree of the checkout.
 
 Run from inside a project, doctor also reports (never edits) that project's
 `.claude/settings.local.json` allow rules that are too broad (`git push|stash|checkout *`,
@@ -86,7 +91,8 @@ plugin's directory name (`worktree-core`, `accessibility-skills`, from
 `plugins/`). `./setup.sh --list-features` prints the exact names available on this
 checkout without linking anything. `./setup.sh --plan` (alias `--dry-run`) prints what
 a run would do, one tab-separated action per line, without changing anything; the line
-format is documented at the top of `scripts/setup-plan-lib.sh`.
+format is documented at the top of `scripts/setup-plan-lib.sh` (a `git-hooks-path` line
+is the core.hooksPath step above).
 
 To leave specific features out and keep everything else, pass `--skip` with a
 comma-separated list:
@@ -193,6 +199,10 @@ created in `~/.claude` and restores `~/.claude/CLAUDE.md` from
 `CLAUDE.md` before setup.sh migrated it), it is moved back to `CLAUDE.md`. If it's
 empty (the placeholder setup.sh created when there was nothing to migrate), it is
 removed and `CLAUDE.md` is left absent.
+
+It also unsets this checkout's `core.hooksPath` when it is still exactly `scripts/hooks`
+(any other value is yours and stays). `--git-hooks` does only that; `--commands`,
+`--plugins` and `--claude-md` never touch git.
 
 Only symlinks that point into this repo are removed. Foreign symlinks — including any
 other skills-dir plugins under `~/.claude/skills/` — are left untouched.
