@@ -1,0 +1,74 @@
+# Run: node plugins/eval-authoring/scripts/ts/run-evals/run-evals.ts --tier standard --case run-evals-tier-run-counts-and-ceilings plugins/eval-authoring
+# No grant; reply-only. Covers run-evals step 1 and "What the tier values mean": standard is the
+# default (3 runs, both arms, $5 ceiling), thorough is 5 runs ($15), quick is one plugin-arm run
+# with a ceiling of the larger of $1 and $0.25 per case. Figures checked against
+# scripts/ts/run-evals/tiers.ts. The prompt gives no number; a bare model has no source for them.
+# Measured 2026-11-06 (standard, 3 runs): with 1.00, without 0.00 (the bare model gave no figures).
+# Sabotage (done): `$5`/`$15` changed to `$9`/`$30` in the skill; one quick run scored 0.67 with both
+# dollar graders failing. Reverted.
+# good-reply: Standard is the default: every case, 3 runs, with and without the plugin, stopping at a $5 ceiling. Thorough is 5 runs and stops at $15. Quick runs only the quick-tagged cases once, plugin arm only, with a ceiling of the larger of $1 and $0.25 per case.
+# bad-reply: I don't know this tool's tiers. Typically a cheap run costs a few dollars and a thorough one a few tens of dollars, so set your own cap.
+schema_version: "1.1"
+name: run-evals-tier-run-counts-and-ceilings
+description: >
+  Asked what each cost tier runs and the most it can spend, the reply gives standard as the
+  default at 3 runs and a $5 ceiling, and thorough at 5 runs and $15.
+  expected_outcome: PASS when the reply pairs standard with $5, thorough with $15 and names
+  standard as the default; FAIL when it gives other figures or none.
+tags: [eval-authoring, run-evals, quick]
+
+execution:
+  prompt: |
+    I'm about to pay for evals on a plugin with 12 cases and I'm on a budget. Before I say go:
+    which tier is the default, how many runs per case does each tier make, and what is the most
+    each one can cost before it stops itself? Don't create files or run any commands.
+  max_turns: 8
+  allowed_tools:
+    - Skill
+    - Read
+    - Glob
+    - Grep
+
+graders:
+  - name: skill_fired
+    type: tool_used
+    tool: Skill
+    input_match: '"skill"\s*:\s*"(?:[\w-]+:)?run-evals"'
+    min: 1
+    arm: with-only
+
+  - name: standard_five_dollars
+    type: regex
+    target: last_message
+    pattern: 'standard[^\n]{0,120}\$\s?5(?:\.00)?(?!\d|\.\d)|\$\s?5(?:\.00)?(?!\d|\.\d)[^\n]{0,120}standard'
+    flags: i
+    match: contains
+
+  - name: thorough_fifteen_dollars
+    type: regex
+    target: last_message
+    pattern: 'thorough[^\n]{0,120}\$\s?15(?:\.00)?(?!\d|\.\d)|\$\s?15(?:\.00)?(?!\d|\.\d)[^\n]{0,120}thorough'
+    flags: i
+    match: contains
+
+  # Run counts: standard 3, thorough 5, on the same line as the tier name.
+  - name: standard_three_runs
+    type: regex
+    target: last_message
+    pattern: 'standard[^\n]{0,120}\b(?:3|three)\b[^\n]{0,20}runs?|standard[^\n]{0,60}\b(?:3|three)\b'
+    flags: i
+    match: contains
+
+  - name: thorough_five_runs
+    type: regex
+    target: last_message
+    pattern: 'thorough[^\n]{0,120}\b(?:5|five)\b[^\n]{0,20}runs?|thorough[^\n]{0,60}\b(?:5|five)\b'
+    flags: i
+    match: contains
+
+  - name: standard_is_default
+    type: regex
+    target: last_message
+    pattern: 'standard(?![^.\n]{0,20}(?:n[''’]t|\bnot)\b)[^.\n]{0,40}(?:is |as )?(?:the )?default|default[^.\n]{0,40}\bstandard\b'
+    flags: i
+    match: contains
