@@ -43,6 +43,9 @@ automatically, with no per-project copy to keep in sync.
     volumes, critical-path analysis, cost/performance opportunities), plus the
     `gha-workflow-authoring` skill: SHA-pinning, `timeout-minutes`, `actionlint`
     and human-merge rules that fire on any `.github/workflows/` edit.
+  - `account-balancer/` — picks which of several Claude accounts to spend on by reading
+    each one's weekly usage and reset time; recommends only, never switches. Needs a current
+    Node (see `.nvmrc`).
   - `nodejs/` — choosing and checking the Node version: `.nvmrc` vs `engines`,
     version symptoms, upgrading the pin, Node in CI.
   - `nvm/` — running commands under nvm from an agent shell: `nvm use` not

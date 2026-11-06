@@ -1,0 +1,13 @@
+{
+  "$schema": "https://json.schemastore.org/claude-code-plugin-manifest.json",
+  "name": "account-balancer",
+  "version": "0.1.0",
+  "description": "Skill for choosing which of several Claude accounts to spend on: reads each account's weekly usage and reset time and favors the one with the most budget per hour until reset.",
+  "author": {
+    "name": "Dustin Fadler",
+    "url": "https://github.com/dfadler"
+  },
+  "homepage": "https://github.com/dfadler/agent-config",
+  "repository": "https://github.com/dfadler/agent-config",
+  "keywords": ["claude", "usage", "accounts", "limits"]
+}
