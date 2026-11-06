@@ -274,6 +274,20 @@ describe("core.hooksPath", () => {
     expect(lines).toEqual(["Done."]);
   });
 
+  it("leaves a value that differs only by edge whitespace alone", () => {
+    initRepo(" scripts/hooks ");
+    run();
+    expect(git("config", "--get", "core.hooksPath").stdout).toBe(" scripts/hooks \n");
+    expect(lines).toEqual(["Done."]);
+  });
+
+  it("leaves a value that merely contains scripts/hooks alone", () => {
+    initRepo("vendor/scripts/hooks");
+    run();
+    expect(hooksPath()).toBe("vendor/scripts/hooks");
+    expect(lines).toEqual(["Done."]);
+  });
+
   it("tolerates a repo root that is not a git checkout", () => {
     expect(run()).toBe(0);
     expect(lines).toEqual(["Done."]);

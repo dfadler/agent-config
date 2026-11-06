@@ -192,10 +192,12 @@ export const deregisterPluginHooks = (home: string, repoRoot: string, log: Log):
 export const unsetHooksPath = (repoRoot: string, log: Log): void => {
   const git = (...args: string[]) =>
     spawnSync("git", ["-C", repoRoot, ...args], { encoding: "utf8" });
-  // --local on both calls: setup wrote the repo's own config, so a global or system value is never read or unset.
-  const got = git("config", "--local", "--get", "core.hooksPath");
-  if (got.status !== 0 || got.stdout.trim() !== HOOKS_PATH) return;
-  if (git("config", "--local", "--unset", "core.hooksPath").status === 0) {
+  // One call, so the value check and the unset cannot be split by a concurrent edit: git removes the
+  // key only if its value matches the anchored pattern (exactly scripts/hooks, no trimming, no
+  // substring match) and exits non-zero otherwise. --local: setup wrote the repo's own config, so a
+  // global or system value is never touched.
+  const pattern = `^${HOOKS_PATH.replace(/[.*+?^${}()|[\]\\/]/g, "\\$&")}$`;
+  if (git("config", "--local", "--unset", "core.hooksPath", pattern).status === 0) {
     log(`Unset core.hooksPath (${HOOKS_PATH})`);
   }
 };

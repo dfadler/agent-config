@@ -67,6 +67,13 @@ it("still flags a real owner when prose follows a Windows home path", () => {
   expect(text).toContain("a/case.yaml:1: home-dir");
 });
 
+it("takes a Windows owner with a space through the next separator, so `user jane` is not the placeholder `user`", () => {
+  const { code, text } = one("wrote C:\\Users\\user jane\\Documents\\x.txt\n");
+  expect(code).toBe(1);
+  expect(text).toContain("a/case.yaml:1: home-dir");
+  expect(text).not.toContain("jane");
+});
+
 it("reads a staged file whose name looks like an index stage prefix", () => {
   const dir = mkdtempSync(join(tmpdir(), "pii-stage0-"));
   try {

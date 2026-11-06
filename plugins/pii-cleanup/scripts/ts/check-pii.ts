@@ -42,7 +42,12 @@ const PERSONAL: Readonly<Record<string, readonly [string, (m: string) => boolean
   email: ["email", (m) => /\.[a-z]{2,}$/i.test(m) && !RESERVED_EMAIL.test(m) && !/^(?:git|jdoe|jroe|me|user)@/i.test(m)],
   "abs-path": ["home-dir", (m) => isOwned(owner(/^\/(?:Users|home)\/([^/]+)/, m))],
   "file-url": ["home-dir", (m) => isOwned(owner(/^file:\/\/\/(?:[A-Za-z]:\/)?(?:Users|home)\/([^/]+)/i, m))],
-  "windows-path": ["home-dir", (m) => isOwned(owner(/^[A-Za-z]:\\Users\\([^\\\s]+)/i, m))],
+  // A name may hold a space (`C:\Users\user jane\x`): take it through the next `\` when one follows,
+  // else only up to the first space, so trailing prose (`C:\Users\me to see`) is not part of the owner.
+  "windows-path": [
+    "home-dir",
+    (m) => isOwned(owner(/^[A-Za-z]:\\Users\\([^\\]+)\\/i, m) ?? owner(/^[A-Za-z]:\\Users\\([^\\\s]+)/i, m)),
+  ],
   "project-dir": ["home-dir", (m) => isOwned(owner(/^-(?:Users|home)-([^-]+)/, m))],
 };
 
