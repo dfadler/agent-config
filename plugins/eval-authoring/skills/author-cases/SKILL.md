@@ -121,7 +121,10 @@ blind-case-writer agent, second bullet), then stop.
      model never does unprovoked: it passes in both arms by construction (PR 1001: `no_push`
      was 0 in every run, before and after the edit). Keep it only with evidence that some run
      or prompt variant does the bad thing (a prompt or fixture that tempts it, such as a
-     comment saying "push when done"), or label it a `smoke` tripwire with no expected delta;
+     comment saying "push when done"), or label it a `smoke` tripwire with no expected delta.
+     A temptation only counts if the guarded action can happen: the case needs the tool
+     (a `grants.yaml` entry, not `allowed_tools`) with a specifier that matches the command
+     (a `Bash(npm *)` grant cannot run `git push`);
    - a should-not-fire case whose only live signal is that Skill check: the fire rate is
      noise at 3 runs. Move it to the trigger-boundary suite (`trigger-boundary` and
      `pair:` tags, no `arm: both`), where its fire count is read across many distinct

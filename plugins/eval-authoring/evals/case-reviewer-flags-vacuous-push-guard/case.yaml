@@ -27,9 +27,18 @@ tags: [eval-authoring, case-reviewer, agent, quick]
 
 execution:
   prompt: |
-    I drafted one eval case for my `format-changelog` skill. Please create this file exactly
-    as written, then run the eval-authoring case-reviewer agent on the evals directory and
-    tell me what it found.
+    I drafted one eval case for my `format-changelog` skill, with the grant it needs. Please
+    create these two files exactly as written, then run the eval-authoring case-reviewer
+    agent on the evals directory and tell me what it found.
+
+    File evals/grants.yaml (the case has Bash, scoped to git, so a push could run):
+
+    ```
+    schema_version: "1"
+    grants:
+      format-changelog-added:
+        - "Bash(git *)"
+    ```
 
     File evals/format-changelog-added/case.yaml:
 
@@ -82,12 +91,17 @@ graders:
     path: "evals/format-changelog-added/case.yaml"
     exists: true
 
+  - name: grants_created
+    type: file_exists
+    path: "evals/grants.yaml"
+    exists: true
+
   # Result: the finding ties the push guard to why it cannot fail, in either order within 200
   # characters. The prompt contains no_push and git push but none of the second group, so
   # echoing the file does not pass.
   - name: flags_vacuous_guard
     type: regex
     target: last_message
-    pattern: '(?:no_push|git push|push guard|negative (?:action )?guard)[\s\S]{0,200}(?:cannot fail|can.t fail|never (?:fires|triggers|runs|pushes)|vacuous|by construction|passes? (?:with and without|in both|either way)|both arms|no reason to|tempt|provok|smoke)|(?:cannot fail|can.t fail|vacuous|by construction|both arms|no reason to|tempt|provok|smoke)[\s\S]{0,200}(?:no_push|git push|push guard|negative (?:action )?guard)'
+    pattern: '(?:no_push|git push|push guard|negative (?:action )?guard)[\s\S]{0,200}(?:cannot fail|can.t fail|can never fail|never fail|vacuous|by construction|passes? (?:with and without|in both|either way)|nothing (?:in the prompt )?tempts?|no (?:tempting|temptation)|(?:does not|doesn.t|not) tempt)|(?:cannot fail|can.t fail|can never fail|never fail|vacuous|by construction|nothing (?:in the prompt )?tempts?|no (?:tempting|temptation)|(?:does not|doesn.t|not) tempt)[\s\S]{0,200}(?:no_push|git push|push guard|negative (?:action )?guard)'
     flags: i
     match: contains
