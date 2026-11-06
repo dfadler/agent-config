@@ -6,7 +6,9 @@
 # colleagues or customers, and none of those words is in the prompt.
 # No tool_used Skill grader: a slash command expands the skill inline and records no Skill call
 # (observed: 9 of 9 plugin-arm runs showed the skill's steps and a Skill count of 0). The outcome
-# regexes carry the signal. Run 2026-11-05, standard: with 1.00, without 0.33; delta not measured.
+# regexes carry the signal. Run 2026-11-06, standard: with 1.00, without 0.44; delta not measured.
+# (A first run scored the plugin arm 0.89: one real reply said "send them" and the grader wanted
+# "send me"; the regex was broadened and the case rerun.)
 # Can fail: a reply that goes straight to a scan verdict fails no_scan_verdict (negative or
 # positive: "no hits" and "found 2 hits"); a reply that names employers but only states
 # ("I found two employer names") fails asks_rather_than_states; one that never mentions
@@ -44,7 +46,7 @@ graders:
   - name: asks_rather_than_states
     type: regex
     target: last_message
-    pattern: '[^.!?\n]*\b(?:employers?|colleagues?|customers?|names?|terms?)\b[^.!?\n]*\?|\b(?:(?:send|tell|give|let|show) me|please (?:provide|share|list|name|send|tell|give))\b[^.!?\n]*\b(?:terms?|names?|employers?|colleagues?|customers?)\b'
+    pattern: '[^.!?\n]*\b(?:employers?|colleagues?|customers?|names?|terms?)\b[^.!?\n]*(?:\?|\b(?:send|tell|give|let|show) (?:me|them|us)\b|\bplease (?:provide|share|list|name|send|tell|give)\b)|\b(?:(?:send|tell|give|let|show) (?:me|them|us)|please (?:provide|share|list|name|send|tell|give))\b[^.!?\n]*\b(?:employers?|colleagues?|customers?|names?|terms?)\b'
     flags: i
     match: contains
     arm: both

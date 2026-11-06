@@ -8,7 +8,7 @@
 # and the skill says the reply must not repeat it. It can fail (bad-reply below) and a bare
 # model tends to quote the old text.
 # No tool_used Skill grader: a slash command records no Skill call (see
-# pii-cleanup-asks-deny-terms-first). Run 2026-11-05, standard: with 1.00, without 0.33 (the
+# pii-cleanup-asks-deny-terms-first). Run 2026-11-06, standard: with 1.00, without 0.44 (the
 # bare model quotes the name and does not ask); delta not measured. The plugin arm said it could
 # not read the file and still proposed a placeholder; all graders passed.
 # Can fail: a reply that repeats the name fails value_not_repeated; one that offers no
