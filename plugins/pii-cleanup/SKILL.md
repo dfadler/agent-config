@@ -52,7 +52,7 @@ For each hit:
    it until the whole match is in view. Fix the full match, not just its first line.
 2. Propose a replacement and say why: a placeholder name (`jdoe`), `example.com`, or a
    paraphrase of the sentence. Fix the fixture or text; never widen the checker's placeholders.
-3. Ask for a yes. Edit only on a yes, and only the lines of that hit. On a no, leave the file as it is and
+3. Ask for a yes. Edit only on a yes, and only the lines of that hit's full match. On a no, leave the file as it is and
    list the hit as open.
 
 The Edit call necessarily contains the old text; that is the one place it may appear.

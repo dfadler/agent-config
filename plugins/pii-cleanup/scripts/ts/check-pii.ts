@@ -42,7 +42,7 @@ const PERSONAL: Readonly<Record<string, readonly [string, (m: string) => boolean
   email: ["email", (m) => /\.[a-z]{2,}$/i.test(m) && !RESERVED_EMAIL.test(m) && !/^(?:git|jdoe|jroe|me|user)@/i.test(m)],
   "abs-path": ["home-dir", (m) => isOwned(owner(/^\/(?:Users|home)\/([^/]+)/, m))],
   "file-url": ["home-dir", (m) => isOwned(owner(/^file:\/\/\/(?:[A-Za-z]:\/)?(?:Users|home)\/([^/]+)/i, m))],
-  "windows-path": ["home-dir", (m) => isOwned(owner(/^[A-Za-z]:\\Users\\([^\\]+)/i, m))],
+  "windows-path": ["home-dir", (m) => isOwned(owner(/^[A-Za-z]:\\Users\\([^\\\s]+)/i, m))],
   "project-dir": ["home-dir", (m) => isOwned(owner(/^-(?:Users|home)-([^-]+)/, m))],
 };
 
@@ -107,8 +107,11 @@ const trackedFiles = (pathspecs: readonly string[]): string[] => nul(git(["ls-fi
 export const stagedFiles = (pathspecs: readonly string[], cwd?: string): string[] =>
   nul(git(["diff", "--cached", "--name-only", "-z", "--diff-filter=ACMR", "--", ...pathspecs], cwd));
 
-/** The staged blob of `file` (for a symlink, its link text). The working copy may differ. */
-export const readStaged = (file: string, cwd?: string): string => git(["show", `:${file}`], cwd);
+/**
+ * The staged blob of `file` (for a symlink, its link text). The working copy may differ.
+ * `:0:` names index stage 0 outright, so a path that starts like a stage prefix is not misread.
+ */
+export const readStaged = (file: string, cwd?: string): string => git(["show", `:0:${file}`], cwd);
 
 /**
  * What git tracks for `file`: its content, or for a symlink the link text, which is what git stores.

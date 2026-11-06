@@ -52,12 +52,31 @@ it.each([
   "~/.claude/settings.json",
   "dir -Users-me-web and -Users-jdoe-app",
   "file:///Users/jdoe/x and C:\\Users\\me\\x",
+  "open C:\\Users\\me to see the folder",
   "why-it-didn.t:\\s*\\**\\s*scope",
   "key: aw15_description_without_trigger-and-a-very-long-slug-name-here-2",
 ])("passes %s", (body) => {
   const { code, text } = one(`${body}\n`);
   expect(code).toBe(0);
   expect(text).toContain("no personal data");
+});
+
+it("still flags a real owner when prose follows a Windows home path", () => {
+  const { code, text } = one("open C:\\Users\\alice to see the folder\n");
+  expect(code).toBe(1);
+  expect(text).toContain("a/case.yaml:1: home-dir");
+});
+
+it("reads a staged file whose name looks like an index stage prefix", () => {
+  const dir = mkdtempSync(join(tmpdir(), "pii-stage0-"));
+  try {
+    execFileSync("git", ["init", "-q"], { cwd: dir });
+    writeFileSync(join(dir, "0:a.yaml"), "wrote /Users/alice/x\n");
+    execFileSync("git", ["add", "--", "0:a.yaml"], { cwd: dir });
+    expect(readStaged("0:a.yaml", dir)).toContain("/Users/alice/x");
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+  }
 });
 
 it("reports each file and line once per rule", () => {
