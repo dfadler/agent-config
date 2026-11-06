@@ -1,0 +1,68 @@
+# Run: node plugins/eval-authoring/scripts/ts/run-evals/run-evals.ts --tier standard --case run-evals-trigger-boundary-bound-withheld plugins/eval-authoring
+# No grant; reply-only. Covers run-evals step 4, `--trigger-boundary`: the over-trigger bound is
+# withheld (and the run exits 7) unless at least one should-fire twin fired in the same run, because
+# zero fires among negatives means nothing if the skill never fires at all. Checked against
+# scripts/ts/run-evals/boundary.ts and run-evals.ts. The prompt does not give the reason.
+# Measured 2026-11-06 (standard, 3 runs): first run with 0.44, without 0.33; the skill fired 1 of 3 (the
+# prompt said "the wrapper") and no_low_rate_claim failed a correct reply that computed an honest ~20%
+# bound. Then the prompt said "run-evals wrapper" and no_low_rate_claim was narrowed to claims under 10%
+# (edited after seeing replies; disclose). Rerun: with 1.00 (skill fired 3 of 3), without 0.56. Only
+# names_twin_reason separates the arms; the two polarity graders are guards.
+# Sabotage (done): the "withheld unless a twin fired" clause was changed to "always printed"; one quick
+# run scored 0.75, names_twin_reason failed. Reverted.
+# good-reply: Exit 7 here is the bound being withheld: no should-fire twin fired in that run, so zero fires among the negatives could just mean the skill never fires. You can't claim a low over-trigger rate yet; fix the twin's trigger or rerun, then report the fire count and the bound.
+# bad-reply: Zero fires out of 14 is great: the over-trigger rate is under 10%, so put that in the PR. Exit 7 is probably just the cost ceiling.
+schema_version: "1.1"
+name: run-evals-trigger-boundary-bound-withheld
+description: >
+  Given a --trigger-boundary run where no negative fired, exit 7 and no printed bound, the reply
+  says the bound is withheld because no should-fire twin fired and refuses the low-rate claim.
+  expected_outcome: PASS when the reply names the unfired twin as the reason and writes no
+  over-trigger rate; FAIL when it endorses the low rate or blames the cost ceiling.
+tags: [eval-authoring, run-evals, quick]
+
+execution:
+  prompt: |
+    I ran the run-evals wrapper with --trigger-boundary on my plugin. 0 of the 14 negative prompts fired
+    my skill, but the summary printed no upper bound for the over-trigger rate and the run
+    exited with code 7. Can I put a number on how rarely my skill over-triggers in my PR? What
+    went wrong?
+    Don't create files or run any commands.
+  max_turns: 8
+  allowed_tools:
+    - Skill
+    - Read
+    - Glob
+    - Grep
+
+graders:
+  - name: skill_fired
+    type: tool_used
+    tool: Skill
+    input_match: '"skill"\s*:\s*"(?:[\w-]+:)?run-evals"'
+    min: 1
+    arm: with-only
+
+  # Result: the reason is that no should-fire twin fired in the run.
+  - name: names_twin_reason
+    type: regex
+    target: last_message
+    pattern: '(?:no|none|not|never|zero)\b[^.\n]{0,50}(?:twin|should-fire|positive|paired)[^.\n]{0,50}fir(?:e|ed|es)|(?:twin|should-fire|positive)[^.\n]{0,60}(?:did(?:n.t| not) fire|never fired|not fire|failed to fire|no fires)'
+    flags: i
+    match: contains
+
+  # Polarity: the claim itself is not endorsed. A refusal that quotes it follows a negation.
+  - name: no_low_rate_claim
+    type: regex
+    target: last_message
+    pattern: '(?<!(?:\bnot|n[''’]t|\bnever|\bno|\bcannot|\bwithout|\bneed|\bclaim|\bwrite|\bget|\bshow|\bprove)\b[^.\n;]{0,60})(?:under|below|<|less than|at most|≤)\s*(?:\d|10)(?:\.\d+)?\s*(?:%|percent)'
+    flags: i
+    match: not_contains
+
+  # Polarity: the exit 7 is not blamed on the cost ceiling or credentials.
+  - name: no_cost_ceiling_blame
+    type: regex
+    target: last_message
+    pattern: '(?:because|due to|caused by|probably|likely|just|simply)\b[^.\n]{0,30}(?:cost ceiling|budget|credential)'
+    flags: i
+    match: not_contains

@@ -1,0 +1,59 @@
+# Run: node plugins/eval-authoring/scripts/ts/run-evals/run-evals.ts --tier standard --case run-evals-neighbours-no-delta-column plugins/eval-authoring
+# No grant; reply-only. Covers run-evals step 4, `--neighbours`: always plugin arm only (the CLI's
+# baseline arm ignores `plugins:`), so there is no without or delta column; a neighbour that wins a
+# prompt shows only as the plugin's skill not firing, and is graded with a `tool_used` on the
+# neighbour's skill id `<manifest name>:<skill directory name>` (seen in #884). The sibling case
+# neighbours-takes-directory-name covers what to pass; this one covers how to read the result.
+# Measured 2026-11-06 (standard, 3 runs): with 1.00, without 0.00.
+# Sabotage (done): the plugin-arm-only sentence and the `<manifest name>:<skill directory name>` id were
+# rewritten in the skill; one quick run scored 0.67, names_skill_id_form failed, says_no_delta_column
+# still passed (the skill's other "baseline arm ignores plugins:" text survived), so that grader is
+# not isolated by this sabotage. Reverted.
+# good-reply: There is no delta for a --neighbours run: it runs the plugin arm only, because the baseline arm ignores plugins: and loads nothing, so you get a Trigger set table without a without or delta column. A prompt that format-kit wins shows as your skill not firing; to see it, add a tool_used grader on its skill id, which is the manifest name, a colon, then the skill directory name.
+# bad-reply: Compare the with-plugin and without-plugin scores in the usual delta column; a bigger delta means format-kit steals fewer prompts. Add format-kit as another --plugin-dir.
+schema_version: "1.1"
+name: run-evals-neighbours-no-delta-column
+description: >
+  Asked where to read the with-vs-without delta of a --neighbours run and how to see a sibling's
+  skill win a prompt, the reply says there is no delta (plugin arm only) and gives the
+  `<manifest name>:<skill directory>` id for a tool_used grader.
+  expected_outcome: PASS when it says the run is plugin-arm-only with no delta column and names
+  the manifest-name-colon-skill-directory id; FAIL when it points to a delta column.
+tags: [eval-authoring, run-evals, quick]
+
+execution:
+  prompt: |
+    I ran the eval wrapper with --neighbours format-kit to see whether plugins/format-kit steals
+    prompts from my plugin's skill. Where in the output do I read the usual with-versus-without
+    delta for that run, and how do I make the cases show when format-kit's skill is the one that
+    fired? Don't create files or run any commands.
+  max_turns: 8
+  allowed_tools:
+    - Skill
+    - Read
+    - Glob
+    - Grep
+
+graders:
+  - name: skill_fired
+    type: tool_used
+    tool: Skill
+    input_match: '"skill"\s*:\s*"(?:[\w-]+:)?run-evals"'
+    min: 1
+    arm: with-only
+
+  # Result: no delta for this mode.
+  - name: says_no_delta_column
+    type: regex
+    target: last_message
+    pattern: 'plugin[ -]arm only|(?:no|without a|has no|there is no|isn.t a)\s+(?:without|delta)\b|ablation none|baseline arm ignores'
+    flags: i
+    match: contains
+
+  # Result: the neighbour's skill id is built from the manifest name, not the folder.
+  - name: names_skill_id_form
+    type: regex
+    target: last_message
+    pattern: 'manifest[ `]*name[^.\n]{0,60}(?:colon|:)[^.\n]{0,40}(?:skill|directory)|<[^>\n]*manifest[^>\n]*>:<[^>\n]*(?:skill|dir)[^>\n]*>|plugin\.json[^.\n]{0,40}name[^.\n]{0,60}(?:colon|:)[^.\n]{0,40}(?:skill|directory)'
+    flags: i
+    match: contains

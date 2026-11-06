@@ -1,0 +1,54 @@
+# Run: node plugins/eval-authoring/scripts/ts/run-evals/run-evals.ts --tier standard --case run-evals-ci-trigger-not-pull-request plugins/eval-authoring
+# No grant; reply-only. Covers run-evals "Run in your repo (CI)": the workflow is workflow_dispatch
+# only, the weekly run is a local scheduled task, never pull_request (public repo, paid token;
+# docs/plugin-eval-ci.md line 9). Checked against .github/workflows/plugin-evals.yml `on:`.
+# The prompt asks to gate every PR, which is the tempting wrong answer for a bare model.
+# Measured 2026-11-06 (standard, 3 runs): with 1.00, without 0.50 (the bare model names
+# workflow_dispatch but never declines pull_request, 0 of 3).
+# Sabotage (done): "never `pull_request`" replaced by "also runs on every `pull_request`"; one quick run
+# scored 0.67, declines_pull_request failed. Reverted.
+# good-reply: In agent-config the evals run from a manual workflow_dispatch workflow, not on pull requests: the key is a paid token and the repo is public, so never use pull_request. A weekly run is a local scheduled task instead.
+# bad-reply: Add on: pull_request to the workflow, pass your API key as a repository secret, and the evals will gate every PR.
+schema_version: "1.1"
+name: run-evals-ci-trigger-not-pull-request
+description: >
+  Asked to make the repo's plugin evals gate every pull request, the reply names workflow_dispatch
+  as the trigger and refuses pull_request.
+  expected_outcome: PASS when the reply gives workflow_dispatch and says not to use pull_request;
+  FAIL when it recommends a pull_request trigger.
+tags: [eval-authoring, run-evals, quick]
+
+execution:
+  prompt: |
+    In our agent-config repo I'd like the plugin evals to run in GitHub Actions on every pull
+    request so a bad skill change is caught before merge. What trigger should the workflow use,
+    and is that a good idea? Don't create files or run any commands.
+  max_turns: 8
+  allowed_tools:
+    - Skill
+    - Read
+    - Glob
+    - Grep
+
+graders:
+  - name: skill_fired
+    type: tool_used
+    tool: Skill
+    input_match: '"skill"\s*:\s*"(?:[\w-]+:)?run-evals"'
+    min: 1
+    arm: with-only
+
+  - name: names_dispatch
+    type: regex
+    target: last_message
+    pattern: 'workflow_dispatch'
+    flags: i
+    match: contains
+
+  # Polarity: pull_request appears only after a refusal word.
+  - name: declines_pull_request
+    type: regex
+    target: last_message
+    pattern: '(?:never|(?:don.t|do not|should not|shouldn.t) (?:use|trigger|run)|avoid|instead of|rather than)\b[^.\n]{0,60}pull_request(?!_target)|pull_request(?!_target)[^.\n]{0,60}(?:bad idea|risky|unsafe|not safe|should not)|against[^.\n]{0,30}pull[_ ]request'
+    flags: i
+    match: contains
