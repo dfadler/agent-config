@@ -72,6 +72,10 @@ it("takes a Windows owner with a space through the next separator, so `user jane
   expect(code).toBe(1);
   expect(text).toContain("a/case.yaml:1: home-dir");
   expect(text).not.toContain("jane");
+  // `me smith` starts with the placeholder `me` but is a different owner.
+  const second = one("wrote C:\\Users\\me smith\\doc.txt\n");
+  expect(second.code).toBe(1);
+  expect(second.text).not.toContain("smith");
 });
 
 it("reads a staged file whose name looks like an index stage prefix", () => {
