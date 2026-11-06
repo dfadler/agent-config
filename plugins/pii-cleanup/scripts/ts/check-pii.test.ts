@@ -1,8 +1,9 @@
-import { mkdtempSync, rmSync, symlinkSync, writeFileSync } from "node:fs";
+import { execFileSync } from "node:child_process";
+import { mkdirSync, mkdtempSync, rmSync, symlinkSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { expect, it } from "vitest";
-import { main, readTracked } from "./check-pii.ts";
+import { main, readStaged, readTracked, stagedFiles } from "./check-pii.ts";
 
 // Every value below is invented. alice/acme are deliberately not the placeholders (jdoe, jroe, me, user)
 // that the check allows.
@@ -150,6 +151,36 @@ it("scans a tracked symlink's own text, never the file it points to", () => {
     expect(readTracked(link)).not.toContain("TARGET-CONTENT");
     expect(readTracked(dangling)).toBe("/Users/alice/missing");
     expect(readTracked(target)).toContain("TARGET-CONTENT");
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+  }
+});
+
+it("--staged passes quietly when nothing in scope is staged, and does not hand the flag to git as a pathspec", () => {
+  const seen: string[][] = [];
+  const lines: string[] = [];
+  const code = main(["--staged"], {}, (s) => lines.push(s), (specs) => (seen.push([...specs]), []));
+  expect(code).toBe(0);
+  expect(lines.join("\n")).toContain("no staged files in scope");
+  expect(seen[0]).toHaveLength(1);
+  expect(seen[0]?.[0]).toMatch(/^:\(top,glob\)/);
+});
+
+it("--staged scans what is staged, not the working copy", () => {
+  const dir = mkdtempSync(join(tmpdir(), "pii-staged-"));
+  const git = (...args: string[]): string => execFileSync("git", args, { cwd: dir, encoding: "utf8" });
+  try {
+    git("init", "-q");
+    mkdirSync(join(dir, "plugins/p/evals/c"), { recursive: true });
+    const file = "plugins/p/evals/c/case.yaml";
+    writeFileSync(join(dir, file), "wrote /Users/alice/x\n");
+    writeFileSync(join(dir, "plugins/p/evals/c/unstaged.yaml"), "wrote /Users/bob/x\n");
+    writeFileSync(join(dir, "README.md"), "wrote /Users/carol/x\n");
+    git("add", file, "README.md");
+    writeFileSync(join(dir, file), "clean now\n"); // edited after staging: the staged blob still holds the leak
+    const specs = [":(top,glob)plugins/*/evals/**"];
+    expect(stagedFiles(specs, dir)).toEqual([file]);
+    expect(readStaged(file, dir)).toContain("/Users/alice/x");
   } finally {
     rmSync(dir, { recursive: true, force: true });
   }

@@ -1,4 +1,4 @@
-# Run: claude plugin eval plugins/eval-authoring --case pii-cleanup-quiet-on-plain-request --runs 3 --trust-plugin --no-publish
+# Run: claude plugin eval plugins/pii-cleanup --case pii-cleanup-quiet-on-plain-request --runs 3 --trust-plugin --no-publish
 # Should-not-fire half. pii-cleanup has disable-model-invocation: true, so a plain-language
 # request that shares its vocabulary (personal data, committed files, clean up) cannot make the
 # model call it; the skill is absent from the model's list in both arms. The case is a

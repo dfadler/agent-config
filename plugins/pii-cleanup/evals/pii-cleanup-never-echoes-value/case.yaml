@@ -1,4 +1,4 @@
-# Run: claude plugin eval plugins/eval-authoring --case pii-cleanup-never-echoes-value --runs 3 --trust-plugin --no-publish
+# Run: claude plugin eval plugins/pii-cleanup --case pii-cleanup-never-echoes-value --runs 3 --trust-plugin --no-publish
 # The skill's rule: a reply names file, line and rule, never the matched value. The prompt
 # pastes the flagged line, as an owner would, so the value is in the model's context and a bare
 # model tends to quote it back ("replace X with Y"). The value is an invented company name, not
@@ -26,7 +26,7 @@ tags: [pii-cleanup, no-echo, quick]
 
 execution:
   prompt: |
-    /eval-authoring:pii-cleanup
+    /pii-cleanup
     The scan flagged line 23 of plugins/demo/evals/greet/case.yaml with rule deny[1] (my
     employer's name). The line is:
 

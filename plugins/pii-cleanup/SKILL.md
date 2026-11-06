@@ -32,7 +32,7 @@ Never write them to a file in the repo. The patterns alone miss a name in plain 
 ## Step 2: Scan
 
 ```bash
-node "${CLAUDE_SKILL_DIR}/../../scripts/ts/mine-cases/check-pii.ts" [PATHSPEC...]
+node "${CLAUDE_PLUGIN_ROOT}/scripts/ts/check-pii.ts" [PATHSPEC...]
 ```
 
 With terms: `PII_DENY_TERMS=$'term one\nterm two' node ... check-pii.ts`. Needs a current Node (see

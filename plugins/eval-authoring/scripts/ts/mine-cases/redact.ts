@@ -67,7 +67,7 @@ const RULES: readonly (readonly [string, RegExp, string])[] = [
 
 /** Reserved domains and placeholder homes that drafts use on purpose (never a real person). */
 const ALLOWED: Readonly<Record<string, RegExp>> = {
-  email: /@(?:[\w-]+\.)*(?:example\.(?:com|org|net)|test|invalid|example|localhost)$/i,
+  email: /@(?:example\.(?:com|org|net)|(?:[\w-]+\.)*(?:test|invalid|example|localhost))$/i,
   "abs-path": /^\/(?:Users|home)\/(?:jdoe|me|user)(?:\/|$)/,
   "file-url": /^file:\/\/\/(?:[A-Za-z]:\/)?(?:Users|home)\/(?:jdoe|me|user)(?:\/|$)/i,
   "windows-path": /^[A-Za-z]:\\Users\\(?:jdoe|me|user)(?:\\|$)/i,
@@ -91,58 +91,6 @@ export const findLeaks = (text: string, deny: readonly string[] = []): string[] 
   ).map(([n]) => n),
   ...deny.filter((d) => denyRe(d).test(text)).map((d) => `deny:${d}`),
 ];
-
-/** Names a committed case may use for a person on purpose (jroe is the invented user of the mine-cases fixtures). */
-const PLACEHOLDER = /^(?:jdoe|jroe|me|user)$/i;
-
-/** First capture of `re` in `m`, the owner of a home directory; undefined when `m` is not one. */
-const owner = (re: RegExp, m: string): string | undefined => re.exec(m)?.[1];
-
-/**
- * The narrow gate (#958): of the RULES above, only those that name a person, each with the test
- * that says a match is personal. Paths count only under /Users, /home or C:\Users with a
- * non-placeholder owner, so `/usr/bin`, `/tmp/w` and `${CLAUDE_PLUGIN_ROOT}/x` never match.
- */
-const PERSONAL: Readonly<Record<string, readonly [string, (m: string) => boolean]>> = {
-  // The final label must be alphabetic: `pkg@1.2.3` (npx, lockfiles) is a version, not an address. `git@` is ssh.
-  email: [
-    "email",
-    (m) =>
-      /\.[a-z]{2,}$/i.test(m) &&
-      !ALLOWED["email"]?.test(m) &&
-      !/^(?:git|jdoe|jroe|me|user)@/i.test(m),
-  ],
-  "abs-path": ["home-dir", (m) => isOwned(owner(/^\/(?:Users|home)\/([^/]+)/, m))],
-  "file-url": ["home-dir", (m) => isOwned(owner(/^file:\/\/\/(?:[A-Za-z]:\/)?(?:Users|home)\/([^/]+)/i, m))],
-  "windows-path": ["home-dir", (m) => isOwned(owner(/^[A-Za-z]:\\Users\\([^\\]+)/i, m))],
-  "project-dir": ["home-dir", (m) => isOwned(owner(/^-(?:Users|home)-([^-]+)/, m))],
-};
-
-const isOwned = (name: string | undefined): boolean => name !== undefined && !PLACEHOLDER.test(name);
-
-export type PiiHit = { readonly rule: string; readonly line: number };
-
-/**
- * Where `text` holds personal data, as rule and 1-based line only: a hit never carries the matched
- * value, so a report cannot spread it. A deny term reports as `deny[N]` (its 1-based position).
- */
-export const findPersonalData = (text: string, deny: readonly string[] = []): PiiHit[] => {
-  const lineOf = (index: number): number => text.slice(0, index).split("\n").length;
-  const hits = new Map<string, PiiHit>();
-  const add = (rule: string, index: number): void => {
-    const line = lineOf(index);
-    hits.set(`${rule}:${String(line)}`, { rule, line });
-  };
-  for (const [name, re] of RULES) {
-    const personal = PERSONAL[name];
-    if (personal === undefined) continue;
-    for (const m of text.matchAll(new RegExp(re.source, re.flags))) if (personal[1](m[0])) add(personal[0], m.index);
-  }
-  deny.forEach((d, i) => {
-    for (const m of text.matchAll(denyRe(d))) add(`deny[${String(i + 1)}]`, m.index);
-  });
-  return [...hits.values()].sort((a, b) => a.line - b.line || a.rule.localeCompare(b.rule));
-};
 
 export const redact = (text: string, deny: readonly string[] = []): string => {
   let out = text;

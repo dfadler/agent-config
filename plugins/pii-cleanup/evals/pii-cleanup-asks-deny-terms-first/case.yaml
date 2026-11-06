@@ -1,4 +1,4 @@
-# Run: claude plugin eval plugins/eval-authoring --case pii-cleanup-asks-deny-terms-first --runs 3 --trust-plugin --no-publish
+# Run: claude plugin eval plugins/pii-cleanup --case pii-cleanup-asks-deny-terms-first --runs 3 --trust-plugin --no-publish
 # Should-fire half. pii-cleanup is user-invoked only (disable-model-invocation), so the prompt is
 # the slash command. Drafted by blind-case-writer from the committed SKILL.md alone.
 # Hermetic: Skill only, no Bash. Step 1 of the skill asks for names the patterns cannot see
@@ -23,7 +23,7 @@ tags: [pii-cleanup, trigger, quick]
 
 execution:
   prompt: |
-    /eval-authoring:pii-cleanup plugins/*/evals/**
+    /pii-cleanup plugins/*/evals/**
   max_turns: 6
   allowed_tools:
     - Skill

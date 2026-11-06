@@ -27,9 +27,12 @@ automatically, with no per-project copy to keep in sync.
     block to paste into chat.
   - `detached-terminal/` — run and drive an interactive terminal (TUI, REPL,
     alternate-screen app) on a headless PTY without stealing focus. Requires `pyte`.
+  - `docker/` — Dockerfile and Compose rules cited to docs.docker.com, a read-only
+    diagnosis order for failing builds and containers, which `docker` commands need a
+    go-ahead or must be handed back (prune, `down -v`).
   - `eval-authoring/` — author, lint, run and diagnose `claude plugin eval` cases: a
     free lint (rules in `plugins/eval-authoring/docs/lint-rules.md`) with an edit
-    hook, six skills, three read-only agents, and a cost-tier run wrapper. Needs a current Node (see `.nvmrc`).
+    hook, five skills, three read-only agents, and a cost-tier run wrapper. Needs a current Node (see `.nvmrc`).
   - `fetch-execute-guide/` — skill with the scope and procedure for asking permission
     before fetch-and-execute installs (`npx <pkg>@latest`, `curl | sh`).
   - `gh-attach-image/` — upload local images and videos to GitHub's
@@ -40,6 +43,17 @@ automatically, with no per-project copy to keep in sync.
     volumes, critical-path analysis, cost/performance opportunities), plus the
     `gha-workflow-authoring` skill: SHA-pinning, `timeout-minutes`, `actionlint`
     and human-merge rules that fire on any `.github/workflows/` edit.
+  - `nodejs/` — choosing and checking the Node version: `.nvmrc` vs `engines`,
+    version symptoms, upgrading the pin, Node in CI.
+  - `nvm/` — running commands under nvm from an agent shell: `nvm use` not
+    persisting between calls, `nvm` undefined in non-interactive shells, `PATH`
+    shadowing, safe fixes.
+  - `pnpm/` — pnpm projects: `packageManager` pin, where settings go in pnpm 11,
+    lockfile drift and conflicts, blocked build scripts, supply-chain settings.
+  - `pii-cleanup/` — user-invoked skill that finds personal data (a real home-directory
+    name, a non-reserved email, names you supply) in tracked files and fixes each hit after
+    your yes; reports file, line and rule only and never touches git history. Also ships an
+    opt-in pre-commit hook (`scripts/hooks/pre-commit`). Needs a current Node (see `.nvmrc`).
   - `playwright/` — skill and agent for headless Playwright scripting: `.webm`
     recording, real key presses, Storybook play functions, frame extraction.
     Needs Node and the `playwright` package.
