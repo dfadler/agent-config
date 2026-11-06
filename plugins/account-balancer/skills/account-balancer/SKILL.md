@@ -29,7 +29,7 @@ guess paths. Each non-default directory must already be logged in
 (`CLAUDE_CONFIG_DIR=<dir> claude auth login`, done by the user).
 
 ```bash
-node ${CLAUDE_SKILL_DIR}/scripts/ts/pick-account.ts work=default personal=~/.claude_personal
+node "${CLAUDE_SKILL_DIR}/../../scripts/ts/pick-account.ts" work=default personal=~/.claude_personal
 ```
 
 Add `--json` for machine-readable output. The script runs `claude -p "/usage"` once per
@@ -52,6 +52,9 @@ budget left is spend that is lost if unused, so it ranks high. Then:
 - **An exhausted account** (0% left) ranks last; its reset hour does not matter until then.
 - **Only the weekly all-models window decides.** Per-model windows are shown in the raw
   `/usage` text. If the job uses a model whose own window is nearly full, mention it.
+- **A `note:` line** means an account's reset time was not recognized, so its rate is
+  unknown and the ranking is inconclusive. Say so and show its percent left rather than
+  presenting a firm pick.
 - **Point in time.** Each run is a snapshot; for a long job, re-run it later.
 
 Final line, one sentence, for example: "Start the evals on `personal`, 95% left but resets

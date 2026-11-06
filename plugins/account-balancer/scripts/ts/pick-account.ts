@@ -80,7 +80,8 @@ export const parseReset = (s: string, now: Date): Date | null => {
       return new Date(t);
     }
     let t = wall(y, nowWall.getUTCMonth(), nowWall.getUTCDate());
-    if (t <= now.getTime()) t += 24 * 3600e3;
+    // Next local calendar day, not +24h, so a DST change does not shift the reset hour.
+    if (t <= now.getTime()) t = wall(y, nowWall.getUTCMonth(), nowWall.getUTCDate() + 1);
     return new Date(t);
   } catch {
     return null; // unknown time zone name
@@ -105,10 +106,14 @@ export const summarize = (name: string, output: string, now: Date): Account => {
   };
 };
 
+// A readable account whose reset time did not parse has no rate; count it as 0 so it still
+// outranks an exhausted account (the budget tiebreak below), and `format` warns about it.
+const key = (a: Account): number => a.ratePerHour ?? (a.status === "ok" ? 0 : -1);
+
 /** Most use-it-or-lose-it pressure first; accounts we could not read go last. */
 export const rank = (accounts: Account[]): Account[] =>
   [...accounts].sort(
-    (a, b) => (b.ratePerHour ?? -1) - (a.ratePerHour ?? -1) || (b.budgetLeft ?? -1) - (a.budgetLeft ?? -1),
+    (a, b) => key(b) - key(a) || (b.budgetLeft ?? -1) - (a.budgetLeft ?? -1),
   );
 
 export const format = (ranked: Account[]): string => {
@@ -118,6 +123,9 @@ export const format = (ranked: Account[]): string => {
       ? `${String(i + 1)}. ${a.name}: ${num(a.budgetLeft)}% left, resets in ${num(a.hoursToReset)}h, ${num(a.ratePerHour)}%/h`
       : `${String(i + 1)}. ${a.name}: unavailable (claude not on PATH, not logged in, or /usage output not recognized)`,
   );
+  for (const a of ranked)
+    if (a.status === "ok" && a.hoursToReset === null)
+      lines.push(`note: reset time for ${a.name} was not recognized, so the ranking is inconclusive`);
   return lines.join("\n");
 };
 
@@ -151,7 +159,8 @@ const realDeps = (): Deps => ({
     if (dir === null) delete env["CLAUDE_CONFIG_DIR"];
     else env["CLAUDE_CONFIG_DIR"] = dir.replace(/^~(?=\/)/, homedir());
     const r = spawnSync("claude", ["-p", "/usage"], { encoding: "utf8", env, timeout: 60_000 });
-    return r.stdout;
+    // A missing `claude` or a timeout sets r.error; stdout is then null or partial.
+    return r.error ? "" : r.stdout;
   },
   out: (t) => process.stdout.write(t),
 });

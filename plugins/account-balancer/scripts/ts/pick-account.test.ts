@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { parseReset, parseUsage, rank, run, summarize } from "./pick-account.ts";
+import { format, parseReset, parseUsage, rank, run, summarize } from "./pick-account.ts";
 
 // 2026-11-06 16:00 in Chicago (CST, UTC-6).
 const NOW = new Date("2026-11-06T22:00:00Z");
@@ -33,6 +33,13 @@ describe("parseReset", () => {
       "2026-11-07T21:00:00.000Z",
     );
   });
+  it("keeps the wall-clock hour when tomorrow crosses a DST change", () => {
+    // 2027-03-13 16:00 CST; US clocks spring forward the next morning, so 3pm CDT is 20:00Z.
+    const before = new Date("2027-03-13T22:00:00Z");
+    expect(parseReset("3pm (America/Chicago)", before)?.toISOString()).toBe(
+      "2027-03-14T20:00:00.000Z",
+    );
+  });
   it("rolls a past date into next year", () => {
     expect(parseReset("Jan 2 at 12am (UTC)", NOW)?.toISOString()).toBe("2027-01-02T00:00:00.000Z");
   });
@@ -54,6 +61,14 @@ describe("summarize and rank", () => {
     expect(out).toMatchObject({ status: "unavailable", budgetLeft: null });
     const ok = summarize("ok", usage(99, "Nov 8 at 6pm (America/Chicago)"), NOW);
     expect(rank([out, ok]).map((a) => a.name)).toEqual(["ok", "bad"]);
+  });
+  it("keeps an unparsed-reset account above an exhausted one and warns", () => {
+    const unparsed = summarize("unparsed", usage(60, "next Tuesday"), NOW);
+    const spent = summarize("spent", usage(100, "Nov 8 at 6pm (America/Chicago)"), NOW);
+    expect(unparsed).toMatchObject({ status: "ok", hoursToReset: null, ratePerHour: null });
+    const ranked = rank([spent, unparsed]);
+    expect(ranked.map((a) => a.name)).toEqual(["unparsed", "spent"]);
+    expect(format(ranked)).toMatch(/note: reset time for unparsed was not recognized/);
   });
   it("gives an exhausted account a zero rate", () => {
     expect(summarize("x", usage(100, "Nov 8 at 6pm (America/Chicago)"), NOW).ratePerHour).toBe(0);
