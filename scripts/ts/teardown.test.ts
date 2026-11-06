@@ -96,12 +96,27 @@ describe("constants", () => {
 
 describe("parseArgs", () => {
   it("selects everything with no flags and only the named parts otherwise", () => {
-    expect(parseArgs([])).toEqual({ commands: true, plugins: true, claudeMd: true });
+    expect(parseArgs([])).toEqual({
+      commands: true,
+      plugins: true,
+      claudeMd: true,
+      gitHooks: true,
+    });
     expect(parseArgs(["--plugins", "--claude-md"])).toEqual({
       commands: false,
       plugins: true,
       claudeMd: true,
+      gitHooks: false,
     });
+    expect(parseArgs(["--git-hooks"])).toEqual({
+      commands: false,
+      plugins: false,
+      claudeMd: false,
+      gitHooks: true,
+    });
+  });
+  it("documents --git-hooks in the usage text", () => {
+    expect(USAGE).toContain("--git-hooks");
   });
   it("reports help and unknown arguments", () => {
     expect(parseArgs(["--help"])).toBe("help");
@@ -232,6 +247,75 @@ describe("selective flags", () => {
     expect(readFileSync(claude("CLAUDE.md"), "utf8")).toBe("personal content\n");
     expect(isLink(claude("commands/demo.md"))).toBe(true);
     expect(isLink(claude("skills/demo-plugin"))).toBe(true);
+  });
+});
+
+describe("core.hooksPath", () => {
+  const git = (...args: string[]) =>
+    spawnSync("git", ["-C", repo, ...args], { encoding: "utf8" });
+  const hooksPath = (): string => git("config", "--get", "core.hooksPath").stdout.trim();
+  const initRepo = (value?: string): void => {
+    git("init", "-q");
+    if (value !== undefined) git("config", "core.hooksPath", value);
+  };
+  const unsetMsg = "Unset core.hooksPath (scripts/hooks)";
+
+  it("unsets scripts/hooks and logs one line", () => {
+    initRepo("scripts/hooks");
+    run();
+    expect(hooksPath()).toBe("");
+    expect(lines.filter((l) => l.includes("core.hooksPath"))).toEqual([unsetMsg]);
+  });
+
+  it("leaves any other value alone", () => {
+    initRepo(".husky");
+    run();
+    expect(hooksPath()).toBe(".husky");
+    expect(lines).toEqual(["Done."]);
+  });
+
+  it("leaves a value that differs only by edge whitespace alone", () => {
+    initRepo(" scripts/hooks ");
+    run();
+    expect(git("config", "--get", "core.hooksPath").stdout).toBe(" scripts/hooks \n");
+    expect(lines).toEqual(["Done."]);
+  });
+
+  it("leaves a value that merely contains scripts/hooks alone", () => {
+    initRepo("vendor/scripts/hooks");
+    run();
+    expect(hooksPath()).toBe("vendor/scripts/hooks");
+    expect(lines).toEqual(["Done."]);
+  });
+
+  it("tolerates a repo root that is not a git checkout", () => {
+    expect(run()).toBe(0);
+    expect(lines).toEqual(["Done."]);
+  });
+
+  it("a second run logs only Done.", () => {
+    initRepo("scripts/hooks");
+    run();
+    lines = [];
+    run();
+    expect(lines).toEqual(["Done."]);
+  });
+
+  it("--commands, --plugins and --claude-md leave it set", () => {
+    initRepo("scripts/hooks");
+    installLinks();
+    run(["--commands", "--plugins", "--claude-md"]);
+    expect(isLink(claude("skills/demo-plugin"))).toBe(false);
+    expect(hooksPath()).toBe("scripts/hooks");
+  });
+
+  it("--git-hooks alone leaves symlinks in place", () => {
+    initRepo("scripts/hooks");
+    installLinks();
+    run(["--git-hooks"]);
+    expect(hooksPath()).toBe("");
+    expect(isLink(claude("skills/demo-plugin"))).toBe(true);
+    expect(isLink(claude("commands/demo.md"))).toBe(true);
   });
 });
 

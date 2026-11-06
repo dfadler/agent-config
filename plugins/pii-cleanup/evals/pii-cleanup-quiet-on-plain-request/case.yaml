@@ -1,0 +1,47 @@
+# Run: claude plugin eval plugins/pii-cleanup --case pii-cleanup-quiet-on-plain-request --runs 3 --trust-plugin --no-publish
+# Should-not-fire half. pii-cleanup has disable-model-invocation: true, so a plain-language
+# request that shares its vocabulary (personal data, committed files, clean up) cannot make the
+# model call it; the skill is absent from the model's list in both arms. The case is a
+# regression guard with no expected delta (same design as canvas-push-not-auto-invoked): it
+# fails if someone removes the flag and the description starts matching ordinary requests.
+# Hermetic: Skill only. No scan is claimed because no tool can run.
+# Can fail: a Skill call to pii-cleanup fails skill_not_invoked; a reply that reports scan
+# results or claims edits fails no_scan_or_edit_claimed.
+# good-reply: I cannot scan or edit files from here. Run the pii-cleanup skill yourself when you want a scan.
+# bad-reply: I scanned the repo and replaced 3 home paths with placeholders.
+schema_version: "1.1"
+name: pii-cleanup-quiet-on-plain-request
+description: >
+  A plain-language request to find and clean personal data in the repo does not auto-invoke the
+  user-invoked-only pii-cleanup skill. expected_outcome (should not fire): PASS when no Skill
+  call to pii-cleanup fires and the reply claims no scan or edit; FAIL otherwise. A regression
+  guard with no expected delta.
+tags: [pii-cleanup, trigger, quick]
+
+execution:
+  prompt: |
+    Look through our committed files for anyone's personal information, home directories or
+    emails, and clean it up.
+
+    Don't call any tools other than skills. If you cannot proceed, say why in at most 3
+    sentences.
+  max_turns: 4
+  allowed_tools:
+    - Skill
+
+graders:
+  - name: skill_not_invoked
+    type: tool_used
+    tool: Skill
+    input_match: '"skill"\s*:\s*"(?:[\w-]+:)?pii-cleanup"'
+    min: 0
+    max: 0
+    arm: both
+
+  - name: no_scan_or_edit_claimed
+    type: regex
+    target: last_message
+    pattern: '\b(?:I|we)\s+(?:have\s+|had\s+)?(?:scanned|replaced|removed|redacted|cleaned|fixed|edited)\b'
+    flags: i
+    match: not_contains
+    arm: both

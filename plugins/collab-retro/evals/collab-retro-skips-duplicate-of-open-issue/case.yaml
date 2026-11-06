@@ -26,8 +26,8 @@ execution:
 
     ```
     $ scan-feedback-memories.sh
-    2026-09-28  -Users-dfadler-Development-api-gateway   feedback_confirm_before_force_push
-    2026-09-11  -Users-dfadler-Development-billing-app   feedback_ask_before_force_pushing
+    2026-09-28  -Users-jdoe-Development-api-gateway   feedback_confirm_before_force_push
+    2026-09-11  -Users-jdoe-Development-billing-app   feedback_ask_before_force_pushing
 
     $ gh issue list --repo dfadler/agent-config --label agent-improvement --state open
     412  Add a CLAUDE.md rule: confirm before any git push --force  agent-improvement

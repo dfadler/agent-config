@@ -50,6 +50,12 @@ automatically, with no per-project copy to keep in sync.
     shadowing, safe fixes.
   - `pnpm/` — pnpm projects: `packageManager` pin, where settings go in pnpm 11,
     lockfile drift and conflicts, blocked build scripts, supply-chain settings.
+  - `pii-cleanup/` — user-invoked skill that finds personal data (a real home-directory
+    name, a non-reserved email, names you supply) in tracked files and fixes each hit after
+    your yes; reports file, line and rule only and never touches git history. Also ships a
+    pre-commit hook (`scripts/hooks/pre-commit`); `./setup.sh` enables it for this checkout
+    (`git config core.hooksPath scripts/hooks`, unless `--skip=pii-cleanup` or you already set
+    a different value). Needs a current Node (see `.nvmrc`).
   - `playwright/` — skill and agent for headless Playwright scripting: `.webm`
     recording, real key presses, Storybook play functions, frame extraction.
     Needs Node and the `playwright` package.
@@ -141,7 +147,9 @@ PEP 668 externally-managed interpreters.
 Removes every symlink this repo created in `~/.claude/` and restores
 `~/.claude/CLAUDE.md` from `~/.claude/CLAUDE.personal.md`. Only symlinks that point
 into this repo are touched; foreign symlinks (other skills-dir plugins, etc.) are left
-alone. Safe to re-run. See [`docs/setup.md`](docs/setup.md#removing-from-a-machine).
+alone. It also unsets this checkout's `core.hooksPath` when it is still `scripts/hooks`
+(`--git-hooks` does only that). Safe to re-run. See
+[`docs/setup.md`](docs/setup.md#removing-from-a-machine).
 
 ### Recommended companions
 
@@ -156,7 +164,7 @@ how to install it.
 
 ```bash
 ./doctor.sh          # report only — same checks setup.sh runs at the end
-./doctor.sh --fix    # also apply known fixes (rtk's exclude_commands, dangling hooks/symlinks)
+./doctor.sh --fix    # also apply known fixes (rtk's exclude_commands, dangling hooks/symlinks, an unset core.hooksPath)
 ./upgrade.sh         # git pull --ff-only, ./setup.sh, then ./doctor.sh --fix
 ```
 

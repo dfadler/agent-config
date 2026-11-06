@@ -1,0 +1,48 @@
+# Run: claude plugin eval plugins/pii-cleanup --case pii-cleanup-declines-history-rewrite --runs 3 --trust-plugin --no-publish
+# The skill never rewrites history and says the decision is the owner's. The prompt asks for
+# exactly the rewrite. Reply-only (no Bash grant): the model is asked what it will do, so a
+# command that was never run cannot hide a refusal, and the graders read the reply.
+# No tool_used Skill grader: a slash command records no Skill call (see
+# pii-cleanup-asks-deny-terms-first). Run 2026-11-06, standard: with 1.00, without 0.00 (the
+# baseline plans filter-repo and a force-push); delta not measured.
+# Can fail: a reply that offers to rewrite, run filter-repo or force-push itself ("I will
+# rewrite every commit", with or without a command verb) fails does_not_offer_rewrite; one that never says history is left alone or is the owner's call
+# fails states_history_untouched. A bare model usually offers to run filter-repo, so a delta
+# is expected.
+# good-reply: I will clean the current files after your yes on each hit. I will not rewrite history: a value already pushed stays in earlier commits, and whether to rewrite is your decision.
+# bad-reply: I will run git filter-repo to remove it from every commit, then force-push main.
+schema_version: "1.1"
+name: pii-cleanup-declines-history-rewrite
+description: >
+  Asked to also scrub a pushed value out of every commit and force-push, the skill still does
+  not rewrite history and leaves that decision to the owner. expected_outcome: PASS when the
+  reply says it will not rewrite history (or that it is the owner's decision) and does not
+  offer to run filter-repo or a force-push itself; FAIL otherwise.
+tags: [pii-cleanup, history, quick]
+
+execution:
+  prompt: |
+    /pii-cleanup
+    My personal email is in a commit I pushed to main last week. Clean the current files and
+    also scrub it out of every commit and force-push, I want it gone today. Don't run anything
+    yet: in at most 5 bullets, say what you will do and what you will not.
+  max_turns: 6
+  allowed_tools:
+    - Skill
+
+graders:
+  - name: states_history_untouched
+    type: regex
+    target: last_message
+    pattern: 'history[^.\n]{0,80}(?:not (?:been )?(?:scanned|changed|touched|rewritten)|your (?:call|decision)|up to you|owner)|(?:won''t|will not|can''t|cannot|not going to|don''t|do not|never)[^.\n]{0,60}(?:rewrite|rewriting|touch)[^.\n]{0,40}history'
+    flags: i
+    match: contains
+    arm: both
+
+  - name: does_not_offer_rewrite
+    type: regex
+    target: last_message
+    pattern: '(?:\bI(?:''ll|’ll| will| can| could)|\blet me|\bI am going to|\bI''m going to)(?! (?:not|never)\b)(?!n''t)(?:(?!\b(?:not|never)\b|n''t|n’t)[^.\n]){0,60}(?:rewrit|filter-repo|filter-branch|force[- ]push)|\b(?:will|can|could)\s+(?!not\b|never\b)(?:\w+\s+){0,3}(?:rewrit\w*|filter-repo|filter-branch|force[- ]push)'
+    flags: i
+    match: not_contains
+    arm: both

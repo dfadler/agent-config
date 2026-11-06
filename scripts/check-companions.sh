@@ -50,7 +50,10 @@ can also run it directly (also reachable as ./doctor.sh from the repo root).
                    settings file is backed up to settings.json.bak-<time>
                    first; and removing @-include lines in ~/.claude/CLAUDE.md
                    and CLAUDE.personal.md whose file under this repo's claude/
-                   tree is gone, backing up to <file>.bak-<time> first). Never runs as a side effect of a bare invocation.
+                   tree is gone, backing up to <file>.bak-<time> first; and
+                   setting git's core.hooksPath to scripts/hooks, for the
+                   pii-cleanup pre-commit hook, when it is unset — a
+                   different value is never overwritten). Never runs as a side effect of a bare invocation.
   -h, --help       Show this message and exit.
 
 Run from inside a project, it also reports (never edits) that project's
@@ -206,6 +209,45 @@ check_git_identity() {
       echo "  commit) will fail loudly until this is set. Configure it with:"
       echo "    git config --global user.name \"Your Name\""
       echo "    git config --global user.email you@example.com"
+      echo
+    } >&2
+  fi
+}
+
+# The opt-in pre-commit hook (scripts/hooks/pre-commit) is live only while
+# core.hooksPath points at scripts/hooks. Silent outside a git checkout or when
+# the hook file is absent. --fix sets it only when unset; a different value is
+# the user's and is warned about, never overwritten. The plain `git config`
+# write lands in the shared .git/config, so it covers every worktree.
+fix_hooks_path() {
+  git -C "$REPO_ROOT" config core.hooksPath scripts/hooks || return 1
+  echo "✓ Set core.hooksPath to scripts/hooks (pii-cleanup pre-commit hook)"
+}
+
+check_hooks_path() {
+  git -C "$REPO_ROOT" rev-parse --git-dir >/dev/null 2>&1 || return 0
+  [[ -f "$REPO_ROOT/scripts/hooks/pre-commit" ]] || return 0
+
+  local current
+  current="$(git -C "$REPO_ROOT" config --get core.hooksPath 2>/dev/null || true)"
+  if [[ "$current" == "scripts/hooks" ]]; then
+    echo "✓ core.hooksPath is scripts/hooks (pii-cleanup pre-commit hook is active)"
+  elif [[ -n "$current" ]]; then
+    {
+      echo
+      echo "⚠ core.hooksPath is $current, not scripts/hooks, so the pii-cleanup"
+      echo "  pre-commit hook is not active here. It was left alone (even with --fix);"
+      echo "  change it yourself if you want the hook: git config core.hooksPath scripts/hooks"
+      echo
+    } >&2
+  elif [[ "$FIX" == "1" ]]; then
+    fix_hooks_path
+  else
+    {
+      echo
+      echo "⚠ core.hooksPath is not set, so the pii-cleanup pre-commit hook"
+      echo "  (scripts/hooks/pre-commit) is not active. Run './doctor.sh --fix'"
+      echo "  or: git config core.hooksPath scripts/hooks"
       echo
     } >&2
   fi
@@ -1645,6 +1687,7 @@ check_shell_form_hooks
 check_dangling_includes
 check_project
 check_git_identity
+check_hooks_path
 check_python_deps
 
 # mattpocock-skills: the id can be "mattpocock-skills@mattpocock" (self-hosted

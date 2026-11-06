@@ -1,0 +1,61 @@
+# Run: claude plugin eval plugins/pii-cleanup --case pii-cleanup-asks-deny-terms-first --runs 3 --trust-plugin --no-publish
+# Should-fire half. pii-cleanup is user-invoked only (disable-model-invocation), so the prompt is
+# the slash command. Drafted by blind-case-writer from the committed SKILL.md alone.
+# Hermetic: Skill only, no Bash. Step 1 of the skill asks for names the patterns cannot see
+# before any scan; a bare model given an unknown command has no reason to ask about employers,
+# colleagues or customers, and none of those words is in the prompt.
+# No tool_used Skill grader: a slash command expands the skill inline and records no Skill call
+# (observed: 9 of 9 plugin-arm runs showed the skill's steps and a Skill count of 0). The outcome
+# regexes carry the signal. Run 2026-11-06, standard: with 1.00, without 0.44; delta not measured.
+# (A first run scored the plugin arm 0.89: one real reply said "send them" and the grader wanted
+# "send me"; the regex was broadened and the case rerun.)
+# Can fail: a reply that goes straight to a scan verdict fails no_scan_verdict (negative or
+# positive: "no hits" and "found 2 hits"); a reply that names employers but only states
+# ("I found two employer names") fails asks_rather_than_states; one that never mentions
+# employers, colleagues or customers fails asks_for_extra_names.
+# good-reply: Before I scan: are there names the patterns cannot see, such as your employer, colleagues or customers, that I should search for too?
+# bad-reply: Scanning plugins/*/evals/** now. No hits found.
+schema_version: "1.1"
+name: pii-cleanup-asks-deny-terms-first
+description: >
+  A slash-invoked personal-data cleanup asks for extra search names before it scans.
+  expected_outcome: PASS when the reply asks whether employer, colleague or customer names
+  should be searched for and gives no scan verdict; FAIL if it reports a result without asking.
+tags: [pii-cleanup, trigger, quick]
+
+execution:
+  prompt: |
+    /pii-cleanup plugins/*/evals/**
+  max_turns: 6
+  allowed_tools:
+    - Skill
+
+graders:
+  - name: asks_for_extra_names
+    type: regex
+    target: last_message
+    pattern: '(?:employer|colleagues?|customers?)'
+    flags: i
+    match: contains
+    arm: both
+
+  # The names are an ask, not a claim: "I found two employer names. Ready?" must not pass. The
+  # question, or a "send/tell me" / "please provide" request, must be one sentence about the
+  # names or terms. A regex cannot list every request form, so read a failing reply before
+  # treating it as a skill miss, and use an llm grader if this keeps needing patches.
+  - name: asks_rather_than_states
+    type: regex
+    target: last_message
+    pattern: '[^.!?\n]*\b(?:employers?|colleagues?|customers?|names?|terms?)\b[^.!?\n]*(?:\?|\b(?:send|tell|give|let|show) (?:me|them|us)\b|\bplease (?:provide|share|list|name|send|tell|give)\b)|\b(?:(?:send|tell|give|let|show) (?:me|them|us)|please (?:provide|share|list|name|send|tell|give))\b[^.!?\n]*\b(?:employers?|colleagues?|customers?|names?|terms?)\b'
+    flags: i
+    match: contains
+    arm: both
+
+  # Rejects a scan verdict either way: "no hits" and "found 2 hits" both skip Step 1.
+  - name: no_scan_verdict
+    type: regex
+    target: last_message
+    pattern: '\b(?:no|0|zero|found|\d+|one|two|three|several)\s+(?:new\s+)?(?:hits?|personal data|matches)\b|no personal data|\bscan (?:is )?(?:clean|complete)\b|\bfound\s+(?:\w+\s+){0,3}(?:names?|employers?|colleagues?|customers?)\b'
+    flags: i
+    match: not_contains
+    arm: both
