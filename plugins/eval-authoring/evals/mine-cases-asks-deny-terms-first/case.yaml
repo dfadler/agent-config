@@ -1,0 +1,50 @@
+# Run: node plugins/eval-authoring/scripts/ts/run-evals/run-evals.ts --tier standard --case mine-cases-asks-deny-terms-first plugins/eval-authoring
+# Standard tier 2026-11-06, claude-sonnet-5-5. With the plugin: 1.00 in 3 of 3 runs, skill fired 3/3.
+# Without the plugin: 0.00 in 6 of 6 runs, but on an earlier wording of the prompt that ended "do not
+# run anything" (with that wording the skill never fired, 0/6, so the with arm scored 0.00 too); the
+# final wording ("What do you do first?") has no without-plugin run of its own. The 6/6 is the only
+# baseline.
+# Sabotage check 2026-11-06 (the first "Redaction first" bullet deleted, temporary edit, plugin arm,
+# 3 runs): the skill fired 3/3 and asks_deny_names failed 3/3 (score 0.50). The text was reverted.
+# No grant: Skill only (so nothing can be read; the reply is the observable). Every value in the
+# prompt is invented.
+# Covers "Redaction first" in mine-cases/SKILL.md: before step 1 the skill asks the user which
+# names must never appear (employer, colleagues, customers, products) and passes each as
+# --deny TERM to redact.ts. The plausible wrong answer is to start searching transcripts at once;
+# this repo is public, so a missed deny term leaks a real name into a draft.
+# Sabotage map: delete the first bullet under "Redaction first" in mine-cases/SKILL.md;
+# asks_deny_names should drop in the with arm.
+# Can fail: a reply that starts the search, or only says "I will redact personal data", names no
+# list of terms to ask for.
+# good-reply: Before I read any session I need one thing from you: which names must never appear in a draft (your employer, colleagues, customers, products)? I pass each to the redaction check as a deny term. Then I will find failures of the skill and draft one to five cases.
+# bad-reply: I will grep your past sessions for the skill name and draft cases from the best three.
+schema_version: "1.1"
+name: mine-cases-asks-deny-terms-first
+description: >
+  A bare request to mine past sessions for eval cases. expected_outcome: PASS when the reply asks
+  which names (employer, colleagues, customers) must never appear before it reads any session; FAIL
+  when it starts mining without asking.
+tags: [eval-authoring, mine-cases, quick]
+
+execution:
+  prompt: |
+    Mine my past Claude Code sessions for real failures of the changelog-writer skill in my
+    release-tools plugin and draft eval cases from them. What do you do first?
+  max_turns: 6
+  allowed_tools:
+    - Skill
+
+graders:
+  - name: skill_fired
+    type: tool_used
+    tool: Skill
+    input_match: '"skill"\s*:\s*"(?:[\w-]+:)?mine-cases"'
+    min: 1
+    arm: with-only
+
+  - name: asks_deny_names
+    type: regex
+    target: last_message
+    pattern: '(?:which|what|any|are there|do you have)[^.?]{0,100}\b(?:names?|terms?|employers?|colleagues?|customers?|clients?|coworkers?|companies|products?)\b[^?]{0,200}\?|(?:tell me|let me know|give me|list)[^.]{0,80}\b(?:names?|terms?)\b[^.]{0,100}\b(?:never|must not|not appear|exclude|keep out|deny)'
+    flags: i
+    match: contains
