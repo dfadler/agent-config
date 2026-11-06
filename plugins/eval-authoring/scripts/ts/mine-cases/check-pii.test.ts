@@ -1,5 +1,8 @@
+import { mkdtempSync, rmSync, symlinkSync, writeFileSync } from "node:fs";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
 import { expect, it } from "vitest";
-import { main } from "./check-pii.ts";
+import { main, readTracked } from "./check-pii.ts";
 
 // Every value below is invented. alice/acme are deliberately not the placeholders (jdoe, jroe, me, user)
 // that the check allows.
@@ -132,6 +135,24 @@ it("reports an unreadable tracked file as an incomplete scan and still scans the
   const only = run2(["gone.yaml"]);
   expect(only.code).toBe(1);
   expect(only.text).not.toContain("✓");
+});
+
+it("scans a tracked symlink's own text, never the file it points to", () => {
+  const dir = mkdtempSync(join(tmpdir(), "pii-link-"));
+  try {
+    const target = join(dir, "target.txt");
+    writeFileSync(target, "TARGET-CONTENT wrote /Users/bob/x\n");
+    const link = join(dir, "link");
+    symlinkSync(target, link);
+    const dangling = join(dir, "dangling");
+    symlinkSync("/Users/alice/missing", dangling);
+    expect(readTracked(link)).toBe(target);
+    expect(readTracked(link)).not.toContain("TARGET-CONTENT");
+    expect(readTracked(dangling)).toBe("/Users/alice/missing");
+    expect(readTracked(target)).toContain("TARGET-CONTENT");
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+  }
 });
 
 it("prints usage for -h and exits 0", () => {

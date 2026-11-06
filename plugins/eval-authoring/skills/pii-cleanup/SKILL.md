@@ -47,10 +47,12 @@ files plant fake users on purpose, so expect false positives there and say so.
 
 For each hit:
 
-1. Read only that line of the file.
+1. Read only that line of the file. For a `deny[N]` hit, a multi-word term matches across line
+   breaks and the report names only the line where the match starts, so also read the lines after
+   it until the whole match is in view. Fix the full match, not just its first line.
 2. Propose a replacement and say why: a placeholder name (`jdoe`), `example.com`, or a
    paraphrase of the sentence. Fix the fixture or text; never widen the checker's placeholders.
-3. Ask for a yes. Edit only on a yes, and only that line. On a no, leave the file as it is and
+3. Ask for a yes. Edit only on a yes, and only the lines of that hit. On a no, leave the file as it is and
    list the hit as open.
 
 The Edit call necessarily contains the old text; that is the one place it may appear.

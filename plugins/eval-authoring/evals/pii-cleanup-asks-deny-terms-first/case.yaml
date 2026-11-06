@@ -37,13 +37,14 @@ graders:
     match: contains
     arm: both
 
-  # The names are an ask, not a claim: "I found two employer names" must not pass. A regex cannot
-  # list every request form; a reply that asks without "?", "send/tell me" or "please provide"
-  # would fail here, so read a failing reply before treating it as a skill miss.
+  # The names are an ask, not a claim: "I found two employer names. Ready?" must not pass. The
+  # question, or a "send/tell me" / "please provide" request, must be one sentence about the
+  # names or terms. A regex cannot list every request form, so read a failing reply before
+  # treating it as a skill miss, and use an llm grader if this keeps needing patches.
   - name: asks_rather_than_states
     type: regex
     target: last_message
-    pattern: '\?|\b(?:send|tell|give|let|show) me\b|\bplease (?:provide|share|list|name|send|tell|give)\b'
+    pattern: '[^.!?\n]*\b(?:employers?|colleagues?|customers?|names?|terms?)\b[^.!?\n]*\?|\b(?:(?:send|tell|give|let|show) me|please (?:provide|share|list|name|send|tell|give))\b[^.!?\n]*\b(?:terms?|names?|employers?|colleagues?|customers?)\b'
     flags: i
     match: contains
     arm: both

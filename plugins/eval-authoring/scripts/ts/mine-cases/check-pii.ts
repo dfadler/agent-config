@@ -10,7 +10,7 @@
  * holds file, line and rule only, never the matched value or a deny term.
  */
 import { execFileSync } from "node:child_process";
-import { readFileSync } from "node:fs";
+import { lstatSync, readFileSync, readlinkSync } from "node:fs";
 import { findPersonalData } from "./redact.ts";
 
 // `top` anchors the pathspec at the repository root; without it git matches relative to the cwd.
@@ -33,6 +33,13 @@ const trackedFiles = (pathspecs: readonly string[]): string[] =>
     .split("\0")
     .filter((f) => f !== "");
 
+/**
+ * What git tracks for `file`: its content, or for a symlink the link text, which is what git stores.
+ * A link is never followed, so a target outside the repository is neither scanned nor opened.
+ */
+export const readTracked = (file: string): string =>
+  lstatSync(file).isSymbolicLink() ? readlinkSync(file) : readFileSync(file, "utf8");
+
 const HISTORY = "git history is not scanned or changed";
 
 const plural = (n: number, word: string): string => `${String(n)} ${word}${n === 1 ? "" : "s"}`;
@@ -42,7 +49,7 @@ export function main(
   env: Readonly<Record<string, string | undefined>>,
   out: (s: string) => void,
   listFiles: (pathspecs: readonly string[]) => readonly string[] = trackedFiles,
-  read: (file: string) => string = (f) => readFileSync(f, "utf8"),
+  read: (file: string) => string = readTracked,
 ): number {
   if (argv.includes("-h") || argv.includes("--help")) {
     out(USAGE);
