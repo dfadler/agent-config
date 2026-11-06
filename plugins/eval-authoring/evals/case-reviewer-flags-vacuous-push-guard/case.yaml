@@ -1,0 +1,93 @@
+# Run: node plugins/eval-authoring/scripts/ts/run-evals/run-evals.ts --tier quick plugins/eval-authoring
+# (quick tier: one run, plugin arm only, `--ablation none`; the no-plugin arm cannot dispatch a
+# plugin agent.) Grant: Write, in grants.yaml.
+# Planted defect: a negative action guard (`tool_used` Bash `git push`, `max: 0`) on a
+# changelog-formatting skill. Nothing in the prompt or workspace tempts a push and no run is
+# recorded where it fired, so the guard passes in both arms by construction (PR 1001's no_push).
+# The lint does not see it. The reviewer has to say the guard cannot fail.
+# Target sentence: case-reviewer.md judgment item 4, "flag a negative action guard ... on an
+# action the base model has no reason to take". Delete that sentence and rerun: the finding
+# should disappear or weaken (the older "Can fail" wording may still catch it; that is the
+# baseline question this case exists to answer).
+# Can fail: reviewer_dispatched fails if the model reviews the file itself; flags_vacuous_guard
+# fails if the reviewer answers Clean, or praises the guard.
+# The reviewer has no Bash grant, so its lint pass reports "not run"; the finding must come from reading.
+# Unmeasured: never run. Run the before round on main's case-reviewer.md and the after round on
+# this branch with the same grader; do not edit the grader between rounds.
+# good-reply: case.yaml | can it fail | the no_push guard on git push has no tempting prompt or fixture, so it passes with and without the plugin and cannot fail | Fix: add a prompt that tempts a push, or label it smoke with no delta expected.
+# bad-reply: The no_push check is a sensible safety net; keep it. Clean.
+schema_version: "1.1"
+name: case-reviewer-flags-vacuous-push-guard
+description: >
+  The case-reviewer agent reports that a negative action guard on an action the base model has
+  no reason to take cannot fail. expected_outcome: PASS when the agent is dispatched and the
+  reply says the git push guard cannot fail, passes in both arms or needs a tempting prompt;
+  FAIL when it is not dispatched, answers Clean, or praises the guard.
+tags: [eval-authoring, case-reviewer, agent, quick]
+
+execution:
+  prompt: |
+    I drafted one eval case for my `format-changelog` skill. Please create this file exactly
+    as written, then run the eval-authoring case-reviewer agent on the evals directory and
+    tell me what it found.
+
+    File evals/format-changelog-added/case.yaml:
+
+    ```
+    schema_version: "1.1"
+    name: format-changelog-added
+    description: >
+      A pasted changelog entry is reformatted Keep a Changelog style. expected_outcome: PASS
+      when the reply has an Added heading and no push is attempted; FAIL otherwise.
+    tags: [format-changelog, quick]
+    execution:
+      prompt: |
+        Reformat this changelog entry as Keep a Changelog style:
+        "fixed login bug, added dark mode"
+      max_turns: 4
+      allowed_tools: [Skill]
+    graders:
+      - name: has_added_heading
+        type: regex
+        target: last_message
+        pattern: '### Added'
+        match: contains
+      - name: no_push
+        type: tool_used
+        tool: Bash
+        input_match: 'git push'
+        min: 0
+        max: 0
+        arm: both
+    ```
+  max_turns: 12
+  allowed_tools:
+    - Agent
+    - Write
+    - Read
+    - Glob
+    - Grep
+
+graders:
+  # Steps: the plugin's agent was dispatched, not imitated.
+  - name: reviewer_dispatched
+    type: tool_used
+    tool: Agent
+    input_match: '"subagent_type"\s*:\s*"(?:[\w-]+:)?case-reviewer"'
+    min: 1
+
+  # Precondition: the model wrote the file the reviewer needs.
+  - name: files_created
+    type: file_exists
+    path: "evals/format-changelog-added/case.yaml"
+    exists: true
+
+  # Result: the finding ties the push guard to why it cannot fail, in either order within 200
+  # characters. The prompt contains no_push and git push but none of the second group, so
+  # echoing the file does not pass.
+  - name: flags_vacuous_guard
+    type: regex
+    target: last_message
+    pattern: '(?:no_push|git push|push guard|negative (?:action )?guard)[\s\S]{0,200}(?:cannot fail|can.t fail|never (?:fires|triggers|runs|pushes)|vacuous|by construction|passes? (?:with and without|in both|either way)|both arms|no reason to|tempt|provok|smoke)|(?:cannot fail|can.t fail|vacuous|by construction|both arms|no reason to|tempt|provok|smoke)[\s\S]{0,200}(?:no_push|git push|push guard|negative (?:action )?guard)'
+    flags: i
+    match: contains
