@@ -1,0 +1,63 @@
+# Run: node plugins/eval-authoring/scripts/ts/run-evals/run-evals.ts --tier standard --case diagnose-scores-weak-signal-identical-runs plugins/eval-authoring
+# No grant: Skill only; the prompt forbids running anything.
+# Covers the weak-signal bullet and the "Verdict cutoffs" section of diagnose-scores/SKILL.md: a
+# delta inside the t cutoff is noise (4.30 x the 0.05 SE floor, about 0.22, at 3 runs per arm) even
+# when both arms have SD 0, and then more runs are pointless because identical runs cannot change
+# the verdict; the lever is more cases or a sharper grader. The plausible wrong answers are "the
+# arms are perfectly consistent, so the drop is real" and "run 5 more to confirm".
+# Standard tier 2026-11-06, 3 runs per arm: with 1.00 / without 0.67, skill fired 3/3. The 0.67 is
+# says_within_cutoff failing 3/3 without the plugin; a first draft also graded "more runs are
+# pointless" (says_more_runs_pointless), which the bare model passed 3/3, so that grader was dropped
+# as vacuous: the "more runs are pointless when both arms have SD 0" sentence is therefore NOT
+# covered by this case. does_not_confirm_regression is a guard that passes in both arms.
+# Sabotage check 2026-11-06 (weak-signal bullet and "Verdict cutoffs" section deleted, temporary edit,
+# plugin arm, 3 runs): says_within_cutoff failed 3/3 (score 0.56; the skill fired 2/3). The text was
+# reverted.
+# Can fail: a reply that calls -0.15 a confirmed regression, or never names the cutoff or verdict, fails.
+# good-reply: Neither yet. A delta of -0.15 at 3 runs per arm is inside the t cutoff (about 0.22 once the 0.05 floor applies), so the verdict is weak-signal, not negative-delta. Both arms have SD 0, so five more runs would give identical numbers and cannot change that verdict. Read the replies, then add more cases or sharpen the grader before rewriting the skill.
+# bad-reply: The runs are identical, so the drop is real. Run it 5 more times to confirm, then rewrite the skill.
+schema_version: "1.1"
+name: diagnose-scores-weak-signal-identical-runs
+description: >
+  A small negative delta where both arms scored identically in every run. expected_outcome: PASS
+  when the reply calls it within the noise cutoff (weak-signal) and does not call the drop a
+  confirmed regression; FAIL when it treats the consistency as proof.
+tags: [eval-authoring, diagnose-scores, quick]
+
+execution:
+  prompt: |
+    Here is the diagnose script output for one case (no files to open):
+
+    tone-check:
+      delta: -0.15; with: 0.85 (sd 0) over 3/3 runs; without: 1 (sd 0) over 3/3 runs;
+      scored graders: 2
+
+    The with arm scored the same in all three runs, so I think this is a genuine loss. Should I run
+    it 5 more times, or rewrite the skill now? Answer in your reply.
+  max_turns: 6
+  allowed_tools:
+    - Skill
+
+graders:
+  - name: skill_fired
+    type: tool_used
+    tool: Skill
+    input_match: '"skill"\s*:\s*"(?:[\w-]+:)?diagnose-scores"'
+    min: 1
+    arm: with-only
+
+  # The verdict and the cutoff are the skill's own vocabulary; a bare model calls this "real".
+  - name: says_within_cutoff
+    type: regex
+    target: last_message
+    pattern: 'weak-signal|(?:within|inside|below|under) (?:the |a )?(?:t[ -]?)?cutoff|(?:t|noise) cutoff|0\.2[0-2]\b|4\.30'
+    flags: i
+    match: contains
+
+  # expected_outcome FAIL branch: calling the consistent drop confirmed.
+  - name: does_not_confirm_regression
+    type: regex
+    target: last_message
+    pattern: '(?:drop|regression|delta|difference)\s+(?:is|looks|seems)\s+(?:real|genuine|confirmed)|confirm(?:s|ed)?\s+(?:the |a )?(?:regression|drop)|yes,?\s+(?:the |it.s )?(?:real|a regression)'
+    flags: i
+    match: not_contains

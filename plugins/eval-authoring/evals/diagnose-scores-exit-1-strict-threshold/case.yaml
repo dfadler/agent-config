@@ -1,0 +1,59 @@
+# Run: node plugins/eval-authoring/scripts/ts/run-evals/run-evals.ts --tier standard --case diagnose-scores-exit-1-strict-threshold plugins/eval-authoring
+# Standard tier 2026-11-06, 3 runs per arm, claude-sonnet-5-5: with 0.83 / without 0.50, skill fired 2/3.
+# The 0.50 is names_strict_threshold failing 3/3 without the plugin (the bare reply says "often 1.0 or
+# 0.95", never that the default is strict 1.0) with the does_not_send_to_revert guard passing; with the
+# plugin it passed in the 2 runs where the skill fired. A 0.33 swing on one case is noise at 3 runs:
+# read the per-grader pattern (2/3 vs 0/3), not the delta.
+# Sabotage check 2026-11-06 (first Gotchas bullet deleted, temporary edit, plugin arm, 3 runs): the skill
+# fired 3/3 and names_strict_threshold failed 3/3 (score 0.67). The text was reverted.
+# No grant: Skill only; the prompt forbids running anything.
+# Covers the first Gotcha in diagnose-scores/SKILL.md: the CLI fails a run below its pass
+# threshold, and the default is strict (1.0), so exit 1 with scores that look fine is common; a low
+# score and a failed gate are different questions. A wrong answer is plausible and costly: blaming
+# the last skill edit for a gate that any case under 1.00 trips.
+# Sabotage map: delete the first bullet under "Gotchas" in diagnose-scores/SKILL.md;
+# names_strict_threshold should drop in the with arm.
+# Can fail: a reply that hunts for a regression, or says exit 1 means a crash, never links the
+# exit code to a pass threshold of 1.
+# good-reply: Not necessarily a regression. The CLI's default pass threshold is 1.0, so any case whose score is under 1.00 (here 0.92 and 0.83) makes the run exit 1. A low score and a failed gate are different questions; read which grader failed in those two cases.
+# bad-reply: Exit 1 means something broke. Revert your last skill edit and rerun to find the regression.
+schema_version: "1.1"
+name: diagnose-scores-exit-1-strict-threshold
+description: >
+  An eval run that exited 1 with every case at 0.83 or better. expected_outcome: PASS when the
+  reply says the pass threshold (default 1.0) makes exit 1 normal for any case under 1.00, so the
+  exit code alone is not a regression; FAIL when it treats exit 1 as proof of a regression or a crash.
+tags: [eval-authoring, diagnose-scores, quick]
+
+execution:
+  prompt: |
+    My plugin eval run exited with code 1. The summary shows: lists-flags 0.92 (3 runs),
+    keeps-order 0.83 (3 runs), and every other case 1.00. No run errored. Did my last skill edit
+    break something? Answer in your reply; do not run anything.
+  max_turns: 6
+  allowed_tools:
+    - Skill
+
+graders:
+  # Unscored indicator in a two-arm run.
+  - name: skill_fired
+    type: tool_used
+    tool: Skill
+    input_match: '"skill"\s*:\s*"(?:[\w-]+:)?diagnose-scores"'
+    min: 1
+    arm: with-only
+
+  - name: names_strict_threshold
+    type: regex
+    target: last_message
+    pattern: '(?:default|strict)[\s\S]{0,80}threshold[\s\S]{0,60}(?:\b1\.0\b|100\s?%)|threshold[\s\S]{0,60}(?:default|strict)[\s\S]{0,40}(?:\b1\.0\b|100\s?%)|threshold (?:of|is|at|=) 1\.0\b|\b1\.0\b (?:pass )?threshold'
+    flags: i
+    match: contains
+
+  # The question asked is "did my edit break something"; telling the user to undo it is the wrong answer.
+  - name: does_not_send_to_revert
+    type: regex
+    target: last_message
+    pattern: '\brevert|roll(?:ing)? back|undo (?:the|your)'
+    flags: i
+    match: not_contains
