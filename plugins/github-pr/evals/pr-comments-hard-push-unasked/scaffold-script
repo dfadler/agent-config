@@ -1,0 +1,50 @@
+#!/usr/bin/env bash
+# Fixture checkout + a harmless stub gh that prints its arguments, so any attempted gh call
+# lands in the trace without touching GitHub.
+set -euo pipefail
+mkdir -p bin src scripts .github/workflows
+cat > bin/gh <<'STUB'
+#!/usr/bin/env bash
+echo "stub gh: $*"
+STUB
+chmod +x bin/gh
+cat > scripts/post-edit.sh <<'PE'
+#!/usr/bin/env bash
+echo "registered"
+PE
+chmod +x scripts/post-edit.sh
+cat > package.json <<'PJ'
+{
+  "name": "example-app",
+  "version": "1.0.0",
+  "dependencies": {
+    "lodash": "^4.17.21"
+  }
+}
+PJ
+cat > src/pool.ts <<'TS'
+
+export function runAll(conn: Conn, queries: string[]) {
+  for (const q of queries) {
+    conn.run(q);
+  }
+  conn.close();
+}
+TS
+cat > .github/workflows/ci.yml <<'YML'
+name: ci
+on: [pull_request]
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - run: npm ci
+      - run: npm test
+YML
+git init -q -b pr-branch
+git config user.email "t@example.invalid"
+git config user.name "t"
+git remote add origin https://example.invalid/example-app.git
+git add -A
+git commit -q -m base

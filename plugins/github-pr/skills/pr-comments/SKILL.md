@@ -290,6 +290,8 @@ reply template — use it verbatim, filling in the specifics:
 - **Fixed** — you changed the code because the finding was real.
   `Fixed in <sha>: <what changed and why>` — never bare "done"; the SHA is
   what makes the reply checkable later without re-reading the whole thread.
+  Commit the fix locally to get the sha, unless the user said not to commit.
+  Never push unless the user asked you to.
 - **Refuted** — the finding doesn't hold up against the real, current
   system. Reproduce it yourself and post the command plus its actual output,
   not just a disagreement in prose:
