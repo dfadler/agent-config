@@ -13,7 +13,7 @@ and `detached-terminal`'s Python PTY holder; see [`contributing.md`](contributin
 
 This repo currently ships many plugins under `plugins/`:
 `accessibility-skills`, `detached-terminal`, `eval-authoring`,
-`fetch-execute-guide`, `gh-attach-image`, `gh-untrusted`, `gha-ci-audit`, `pii-cleanup`, `playwright`, `screen-capture`, `second-brain`,
+`fetch-execute-guide`, `gh-attach-image`, `gh-untrusted`, `gha-ci-audit`, `nodejs`, `nvm`, `pii-cleanup`, `playwright`, `pnpm`, `screen-capture`, `second-brain`,
 `typescript-gotchas`, `vite`, `vitest`, and `worktree-core`. Seven single-skill plugins (`accessibility-skills`,
 `detached-terminal`, `fetch-execute-guide`, `gh-attach-image`, `gh-untrusted`, `pii-cleanup`, `typescript-gotchas`) keep
 `SKILL.md` at the plugin root and load under a bare name.

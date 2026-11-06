@@ -1,0 +1,32 @@
+# Run: node plugins/eval-authoring/scripts/ts/run-evals/run-evals.ts plugins/docker --trigger-boundary (plugin arm only; no grant needed).
+# Maps to SKILL.md description: "Not for ... Docker steps in GitHub Actions workflows." Shares build, cache and push vocabulary; routed to gha-workflow-authoring.
+# good-reply: - uses: docker/build-push-action@<40-char-sha> # v6 with cache-from: type=gha and cache-to: type=gha,mode=max (no docker skill call)
+# bad-reply: (invokes the docker skill and answers with Dockerfile layer-ordering rules)
+schema_version: "1.1"
+name: docker-quiet-on-gha-docker-action
+description: >
+  A docker/build-push-action workflow step must not fire docker. Trigger-boundary negative:
+  plugin arm only, no delta.
+tags: [docker, trigger-boundary, "pair:docker-fires-on-dockerfile-review"]
+
+execution:
+  prompt: |
+    In my GitHub Actions workflow, I use docker/build-push-action to build and push to GHCR on
+    every push to main. Pin the docker/* actions to commit SHAs and add the buildx layer cache
+    with type=gha. Here is the step:
+
+        - uses: docker/build-push-action@v6
+          with:
+            push: true
+            tags: ghcr.io/acme/api:latest
+  max_turns: 4
+  allowed_tools:
+    - Skill
+
+graders:
+  - name: docker_not_invoked
+    type: tool_used
+    tool: Skill
+    input_match: '"skill"\s*:\s*"(?:[\w-]+:)?docker"'
+    min: 0
+    max: 0

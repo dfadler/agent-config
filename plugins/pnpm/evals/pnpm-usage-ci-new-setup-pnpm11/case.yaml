@@ -1,0 +1,63 @@
+# Run: node plugins/eval-authoring/scripts/ts/run-evals/run-evals.ts plugins/pnpm --case pnpm-usage-ci-new-setup-pnpm11 (Skill only; no grant needed).
+# Deleting this sentence from SKILL.md should make the case fail: "pnpm 11 or newer: pnpm/setup ... One step installs pnpm and Node (no actions/setup-node; it detects .nvmrc itself) and runs pnpm install. ... set require-lockfile: true." (the CI section)
+# good-reply: A workflow with `uses: pnpm/setup@v3` and `with:\n  require-lockfile: true` as the only pnpm/Node setup step (no actions/setup-node), then `run: pnpm test` and `run: pnpm build`; notes that Node comes from .nvmrc and the pnpm version from packageManager.
+# bad-reply: A workflow with `uses: pnpm/action-setup@v4`, then `uses: actions/setup-node@v4` with `node-version-file: .nvmrc` and `cache: pnpm`, then `run: pnpm install --frozen-lockfile`, `run: pnpm test`, `run: pnpm build`.
+schema_version: "1.1"
+name: pnpm-usage-ci-new-setup-pnpm11
+description: >
+  A pnpm 11 repo with an .nvmrc and no CI should get a workflow built on a single
+  pnpm/setup step with require-lockfile, and no separate actions/setup-node step.
+  expected_outcome: PASS when the reply's workflow uses pnpm/setup, sets require-lockfile
+  to true and has no actions/setup-node step; FAIL otherwise. The Skill check is an
+  unscored indicator in a two-arm run; the three regex graders carry the score.
+tags: [pnpm-usage, ci, trigger, quick]
+
+execution:
+  prompt: |
+    We just moved our repo to pnpm and I need CI. There's nothing under .github/ yet.
+    Facts about the repo:
+
+    - package.json has "packageManager": "pnpm@11.28.2"
+    - .nvmrc contains `22`
+    - pnpm-lock.yaml is committed
+    - scripts: "test": "vitest run", "build": "tsc -p ."
+
+    Write me a GitHub Actions workflow that installs dependencies and runs the tests
+    and the build on every pull request. Give me the full file.
+  max_turns: 6
+  allowed_tools:
+    - Skill
+
+graders:
+  # Indicator only in a two-arm run: the prompt never names the skill.
+  - name: skill_fired
+    type: tool_used
+    tool: Skill
+    input_match: '"skill"\s*:\s*"(?:[\w-]+:)?pnpm-usage"'
+    min: 1
+
+  # The prompt never contains "pnpm/setup". `pnpm/action-setup@` does not match, so the
+  # common default (action-setup + setup-node) fails here.
+  - name: uses_pnpm_setup
+    type: regex
+    target: last_message
+    pattern: 'uses:\s*pnpm/setup@'
+    match: contains
+
+  # Anchored to the `uses:` form so a sentence like "no actions/setup-node needed" does not
+  # false-fail.
+  - name: no_setup_node_step
+    type: regex
+    target: last_message
+    pattern: 'uses:\s*actions/setup-node@'
+    match: not_contains
+
+  # The prompt does not contain "require-lockfile". Accepts quoted or bare true. The setting
+  # must follow `uses: pnpm/setup@` within 400 characters with no new list item (`- uses:`,
+  # `- name:`, `- run:`) in between, so it sits in that step's `with:` block and not in the
+  # next step.
+  - name: requires_lockfile
+    type: regex
+    target: last_message
+    pattern: 'uses:\s*pnpm/setup@(?:(?!\n\s*-\s+(?:uses|name|run):)[\s\S]){0,400}require-lockfile:\s*["'']?true'
+    match: contains

@@ -1,0 +1,26 @@
+# Run: node plugins/eval-authoring/scripts/ts/run-evals/run-evals.ts plugins/docker --trigger-boundary (plugin arm only; no grant needed).
+# Maps to SKILL.md Contract "Does not: cover ... Docker Desktop installation". Shares "Docker", "disk" vocabulary with the disk-cleanup case.
+# good-reply: Download Docker Desktop for Apple silicon, drag it to Applications, then Settings > Resources > Disk image size (no skill call)
+# bad-reply: (invokes the docker skill and answers with docker system df and prune tiers)
+schema_version: "1.1"
+name: docker-quiet-on-desktop-install
+description: >
+  A Docker Desktop install and settings question must not fire docker. Trigger-boundary
+  negative: plugin arm only, no delta.
+tags: [docker, trigger-boundary, "pair:docker-fires-on-disk-cleanup"]
+
+execution:
+  prompt: |
+    I'm setting up a new M-series MacBook. How do I install Docker Desktop and where do I
+    raise its virtual disk size limit in the settings?
+  max_turns: 4
+  allowed_tools:
+    - Skill
+
+graders:
+  - name: docker_not_invoked
+    type: tool_used
+    tool: Skill
+    input_match: '"skill"\s*:\s*"(?:[\w-]+:)?docker"'
+    min: 0
+    max: 0

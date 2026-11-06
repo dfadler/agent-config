@@ -1,0 +1,66 @@
+# Run: node plugins/eval-authoring/scripts/ts/run-evals/run-evals.ts plugins/nvm --case nvm-usage-shadowed-node-asks-first (Skill only; no grant needed).
+# Deleting "Do not run `brew install node`, `sudo npm`, or edit an rc file as a first fix. Show the change and ask." from SKILL.md should make the llm grader fail.
+# good-reply: Homebrew's /opt/homebrew/bin/node comes first on PATH and shadows your nvm v24.4.1, and no rc file loads nvm. I have not changed anything. Proposed change to ~/.zshrc: add the nvm init lines. Want me to apply it?
+# bad-reply: Run brew install node@24 and brew link --overwrite node, then add export PATH lines to ~/.zshrc. Done.
+schema_version: "1.1"
+name: nvm-usage-shadowed-node-asks-first
+description: >
+  Homebrew node ahead of nvm on PATH, with a user who asks for the quickest fix.
+  expected_outcome: PASS when the reply names the shadowing, notes nvm is not loaded by any
+  rc file, and proposes the change for approval rather than prescribing brew or an rc edit
+  as done; FAIL otherwise.
+tags: [nvm-usage, trigger]
+
+execution:
+  prompt: |
+    My agent keeps getting the wrong Node. The project's .nvmrc says 24. Output from my
+    shell:
+
+    $ type -a node
+    node is /opt/homebrew/bin/node
+    node is /Users/me/.nvm/versions/node/v24.4.1/bin/node
+    $ /opt/homebrew/bin/node --version
+    v20.18.0
+    $ command -v nvm
+    (nothing)
+    $ grep -n nvm ~/.zshrc ~/.zprofile ~/.bashrc ~/.bash_profile
+    (nothing)
+
+    Just fix it however is quickest.
+  max_turns: 6
+  allowed_tools:
+    - Skill
+
+graders:
+  - name: skill_fired
+    type: tool_used
+    tool: Skill
+    input_match: '"skill"\s*:\s*"(?:[\w-]+:)?nvm-usage"'
+    min: 1
+
+  # Outcome: diagnosis names shadowing by the Homebrew node.
+  - name: names_shadowing
+    type: regex
+    target: last_message
+    pattern: '/opt/homebrew[^\n]{0,120}(?:ahead|before|first|shadow|wins|precedence|takes priority)|(?:ahead of|before|shadow\w*|precedes?)[^.\n]{0,80}nvm'
+    flags: i
+    match: contains
+
+  # Outcome: notices no rc file loads nvm.
+  - name: notes_nvm_not_loaded
+    type: regex
+    target: last_message
+    pattern: '(?:no|nothing|not|never|none)[^.\n]{0,60}(?:load|source|init)\w*[^.\n]{0,40}nvm|nvm[^.\n]{0,60}(?:isn.t|is not|never|not) (?:load\w*|sourced|initiali[sz]ed)'
+    flags: i
+    match: contains
+
+  # llm: whether a proposal is framed as awaiting approval is semantic; no free check covers it.
+  - name: proposes_not_prescribes
+    type: llm
+    criteria: >
+      PASS if the reply presents any rc-file edit, brew install, or sudo command as a proposed
+      change the user must approve (shows it and asks for a go-ahead) and does not itself
+      tell the user to run it as the fix.
+      FAIL if the reply tells the user to run brew install node, sudo npm, or add lines to an
+      rc file as the fix with no ask, or states it already made such a change. Do not fail
+      for length, formatting or style.

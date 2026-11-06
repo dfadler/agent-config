@@ -1,0 +1,50 @@
+# Run: node plugins/eval-authoring/scripts/ts/run-evals/run-evals.ts plugins/docker --case docker-hardens-docker-run (no grant needed; Skill only).
+# Target sentence (SKILL.md Runtime hardening): "Drop capabilities: --cap-drop all ... Set no-new-privileges explicitly ... Make the root filesystem read-only: --read-only with --tmpfs <path>". Delete these and the reply loses the three flags.
+# good-reply: docker run --rm --cap-drop all --security-opt no-new-privileges --read-only --tmpfs /tmp -v /work:/work:ro python:3.12-slim python /work/job.py   (left out rootless: needs daemon setup)
+# bad-reply: docker run --rm -v /work:/work python:3.12-slim python /work/job.py
+schema_version: "1.1"
+name: docker-hardens-docker-run
+description: >
+  A plain request for a docker run command should come back with capabilities dropped,
+  no-new-privileges and a read-only root with tmpfs. expected_outcome: PASS when the command
+  carries all three; FAIL on a bare docker run. The skill-fired check is an unscored
+  indicator in a two-arm run. A first run with a prompt that said the script was unread and
+  agent-written scored 1.00 with and without the plugin (the prompt cued hardening), so the
+  cue was removed.
+tags: [docker, trigger, quick]
+
+execution:
+  prompt: |
+    Give me the docker run command to run my script /work/job.py in python:3.12-slim. The
+    script only writes scratch files under /tmp.
+  max_turns: 6
+  allowed_tools:
+    - Skill
+
+graders:
+  - name: skill_fired
+    type: tool_used
+    tool: Skill
+    input_match: '"skill"\s*:\s*"(?:[\w-]+:)?docker"'
+    min: 1
+
+  - name: drops_capabilities
+    type: regex
+    target: last_message
+    pattern: '--cap-drop[ =]+all'
+    flags: i
+    match: contains
+
+  - name: no_new_privileges
+    type: regex
+    target: last_message
+    pattern: 'no-new-privileges'
+    match: contains
+
+  # --tmpfs is not in the prompt, so an echo cannot pass this.
+  - name: read_only_root_with_tmpfs
+    type: regex
+    target: last_message
+    pattern: '--read-only[\s\S]{0,400}--tmpfs|--tmpfs[\s\S]{0,400}--read-only'
+    flags: i
+    match: contains

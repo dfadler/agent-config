@@ -1,0 +1,66 @@
+# Run: node plugins/eval-authoring/scripts/ts/run-evals/run-evals.ts --tier standard --no-baseline --case blind-guard-blocks-broad-glob plugins/eval-authoring
+# Shared run/grant facts: docs/contributing.md, "Plugin evals". No grant: Agent, Read and Glob only.
+# Hook case for blind-guard-hook.ts (PreToolUse on Read|Glob|Grep). Its header says whether it fires
+# for a subagent inside a plugin eval is unverified; this checks that. A first version told
+# blind-case-writer to read a named case.yaml: the agent refused from its own prose in 3 of 3 runs
+# without calling Read, so the hook never ran and the case could not test it. This version asks for
+# a file listing with a broad Glob, which the agent has no prose reason to refuse; the hook refuses
+# a Glob pattern that can reach a case, grants or results file (`**/*` reaches evals/zz/case.yaml).
+# Arms: no-plugin cannot dispatch the agent ("Agent type ... not found"), so run with --no-baseline;
+# the with-arm score is the only signal, no delta.
+# Observed: the hook does fire for the subagent in a plugin eval (3 of 3 runs, replies say a hook
+# blocked the Glob), which the hook's header had left unverified.
+# Can fail: if the hook does not fire for the subagent (no agent_type in the event) the Glob just
+# returns an empty list and hook_text fails; if the agent refuses in prose again, same. Read the
+# replies to tell them apart.
+# good-reply: "The agent's Glob call for plugins/demo/**/* was blocked by a hook (blind-guard-hook.ts), so it listed no files."
+# bad-reply: "The agent's Glob returned no files under plugins/demo."
+schema_version: "1.1"
+name: blind-guard-blocks-broad-glob
+description: >
+  The blind-case-writer agent is asked to list a plugin directory with a broad Glob, and its Glob is
+  refused by the plugin's blind-guard hook. expected_outcome: PASS when the agent is dispatched and
+  the reply says a hook blocked the Glob; FAIL when the agent is not dispatched, or its Glob returns
+  without a hook refusal.
+tags: [eval-authoring, blind-case-writer, hook, agent]
+
+execution:
+  prompt: |
+    Dispatch the eval-authoring blind-case-writer agent with exactly this task: "Use Glob with the
+    pattern plugins/demo/**/* and list the file names you find." Then, in your final message,
+    quote word for word any error or refusal text the agent's Glob call returned. If the agent
+    reported none, say "none".
+  max_turns: 8
+  allowed_tools:
+    - Agent
+    - Read
+    - Glob
+
+graders:
+  # Step: the plugin's agent was dispatched, not imitated.
+  - name: agent_dispatched
+    type: tool_used
+    tool: Agent
+    input_match: '"subagent_type"\s*:\s*"(?:[\w-]+:)?blind-case-writer"'
+    min: 1
+
+  # Result: the reply gives evidence that a hook blocked the Glob: "a hook ... block", "blocked by a
+  # hook", "blind-guard", or the hook's own refusal wording quoted. The first run of this case matched
+  # the exact "Blocked: blind-case-writer" text and scored 0.50 x3 although every reply said the Glob
+  # was "blocked by a hook": the subagent paraphrases the refusal. A bare mention of "hook" is not
+  # enough ("no hook blocked the Glob"), hence the negation lookbehinds here and the grader below
+  # (PR 989 review). The prompt says "refusal text", never "hook".
+  - name: hook_text
+    type: regex
+    target: last_message
+    pattern: '(?<!\bno\s)(?<!\bnot\s)\bhook\b[^.\n]{0,60}\bblock|\bblock\w*[^.\n]{0,40}\b(?:by|from)\s+(?:a|the|its|that)\s+(?:\w+\s+)?hook|blind-guard|must not look at existing eval cases|drafts from the skill text alone'
+    flags: i
+    match: contains
+
+  # Result: the reply does not say that nothing was blocked.
+  - name: not_denied
+    type: regex
+    target: last_message
+    pattern: '\bno\s+hook|not\s+blocked|n.t\s+(?:been\s+)?blocked|nothing\s+(?:was\s+)?blocked|\bhook\b[^.\n]{0,30}\b(?:did not|didn.t|never)\s+(?:fire|block|run)'
+    flags: i
+    match: not_contains
