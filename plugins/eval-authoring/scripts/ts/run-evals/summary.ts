@@ -3,7 +3,7 @@
  * it in a PR body. Pure: no I/O, so it is tested from recorded result text.
  */
 import { isAbsolute } from "node:path";
-import { readAggregateResult } from "../parser/index.ts";
+import { PROBE_TAG, readAggregateResult, SMOKE_TAG } from "../parser/index.ts";
 import { deltaBar, diagnose } from "../diagnose/verdict.ts";
 import type { BoundaryReport } from "./boundary.ts";
 
@@ -246,8 +246,36 @@ export interface SummaryInput {
     readonly caseName: string;
     readonly exit: number;
     readonly row: CaseRow | undefined;
+    /** The case's tags, for the ceiling line (`probe` and `smoke` label a ceiling result as expected). */
+    readonly tags?: readonly string[] | undefined;
   }[];
 }
+
+/** A case at or above this in both arms cannot tell the plugin from no plugin. */
+export const CEILING = 0.95;
+
+/** The ceiling line: cases at or above `CEILING` in both arms, split into those tagged `probe` or `smoke` (held as labelled) and those that are not (no headroom). Empty when none, or in a one-arm run. */
+const ceilingLines = (s: SummaryInput, oneArm: boolean): readonly string[] => {
+  if (oneArm) return [];
+  const both = s.cases.filter((c) => c.row?.with !== undefined && c.row.without !== undefined);
+  const flat = both.filter((c) => (c.row?.with ?? 0) >= CEILING && (c.row?.without ?? 0) >= CEILING);
+  if (flat.length === 0) return [];
+  const label = (c: (typeof flat)[number]): string | undefined =>
+    [PROBE_TAG, SMOKE_TAG].find((t) => c.tags?.includes(t));
+  const held = flat.flatMap((c) => {
+    const t = label(c);
+    return t === undefined ? [] : [`\`${cell(c.caseName)}\` (${t})`];
+  });
+  const unlabelled = flat.filter((c) => label(c) === undefined).map((c) => `\`${cell(c.caseName)}\``);
+  return [
+    "",
+    `Ceiling: ${String(flat.length)} of ${String(both.length)} cases at or above ${String(CEILING)} in both arms, no delta.` +
+      (held.length === 0 ? "" : ` Held as labelled: ${held.join(", ")}.`) +
+      (unlabelled.length === 0
+        ? ""
+        : ` Unlabelled, so they cannot tell the plugin from no plugin: ${unlabelled.join(", ")}. Rewrite them with a harder prompt, tag them \`probe\` if holding is the point, or drop them.`),
+  ];
+};
 
 /** Below this many cases a suite's delta is too noisy to call (see author-cases guidance). */
 export const DELTA_CASE_FLOOR = 20;
@@ -390,6 +418,7 @@ export const renderSummary = (s: SummaryInput): string => {
     ...(s.tier === "thorough" || oneArm
       ? []
       : ["", `Delta not measured at tier \`${s.tier}\`: report arm scores only, not a delta, in a PR (even marked preliminary). Re-run at \`thorough\` for a delta.`]),
+    ...ceilingLines(s, oneArm),
     ...triggerLines(s),
     ...boundaryLines(s.boundary),
     ...(unfired.length === 0
