@@ -1,0 +1,57 @@
+# Run: node plugins/eval-authoring/scripts/ts/run-evals/run-evals.ts plugins/agent-writing --case "agent-writing-affirmative-guardrail-pair" (no grant needed; Skill only).
+# Maps to SKILL.md: AW23 affirmative-guidance: bare style bans become targets; a hard guardrail stays and gets a positive pair.
+# good-reply: ## Rules - Write one-line comments. - Spell out variable names in full. - Never run `DROP TABLE` against production; ship a reviewed migration instead.
+# bad-reply: ## Rules - Don't write long comments. - Don't abbreviate variable names. - Never run `DROP TABLE` against production.
+# No expected delta is assumed: a bare model may already do all of this. The first paid run decides whether the case is kept.
+# EVAL024 on style_bans_gone and guardrail_kept is intended: the prompt holds the bans, so an echo of them is the failure graded (style_bans_gone) or is satisfied only together with guardrail_paired (guardrail_kept).
+schema_version: "1.1"
+name: agent-writing-affirmative-guardrail-pair
+description: >
+  Writing mode: a pasted section mixes two style bans with one destructive-action guardrail, and
+  the prompt does not mention affirmative phrasing. expected_outcome: PASS when the style bans
+  become targets, the DROP TABLE prohibition survives, and it names what to do instead; FAIL when
+  a style ban survives, the guardrail is dropped, or it stays a bare ban.
+tags: [agent-writing, trigger, quick]
+
+execution:
+  prompt: |
+    Tighten this section of our CLAUDE.md. Reply with only the text to paste in, nothing else.
+
+    ## Rules
+    - Don't write long comments.
+    - Don't abbreviate variable names.
+    - Never run `DROP TABLE` against production.
+  max_turns: 4
+  allowed_tools:
+    - Skill
+
+graders:
+  - name: skill_fired
+    type: tool_used
+    tool: Skill
+    input_match: '"skill"\s*:\s*"(?:[\w-]+:)?agent-writing"'
+    min: 1
+
+  # The two style bans are restated as targets. The ban wording is in the prompt, so an echo fails.
+  - name: style_bans_gone
+    type: regex
+    target: last_message
+    pattern: "(?:don['’]?t|do not|avoid|never)\\s+(?:write\\s+(?:long|lengthy)|abbreviat|use\\s+abbreviat)"
+    flags: i
+    match: not_contains
+
+  # The destructive-action ban survives: the guardrail is not rewritten away.
+  - name: guardrail_kept
+    type: regex
+    target: last_message
+    pattern: "(?:never|do not|don['’]?t|must not)[^\\n]*DROP TABLE"
+    flags: i
+    match: contains
+
+  # The guardrail names what to do instead, on its own line. The prompt gives no replacement.
+  - name: guardrail_paired
+    type: regex
+    target: last_message
+    pattern: 'DROP TABLE[^\n]*(?:instead|migration|rename|archive|soft[- ]delete|ask|review)'
+    flags: i
+    match: contains

@@ -1,0 +1,53 @@
+# Run: node plugins/eval-authoring/scripts/ts/run-evals/run-evals.ts plugins/agent-writing --case "agent-writing-affirmative-audit" (no grant needed; Skill only).
+# Maps to SKILL.md: AW23 affirmative-guidance ("State the target behaviour, not only the ban"), audit mode.
+# good-reply: | AW23 | CLAUDE.md:2 | "Don't write long comments" names no target | Write one-line comments | / | AW23 | CLAUDE.md:3 | "Avoid abbreviations" names no target | Spell out variable names |
+# bad-reply: | AW23 | CLAUDE.md:2 | "Don't write long comments" | ... | / | AW23 | CLAUDE.md:4 | "Run pnpm test before every commit" is too positive | ... |
+# Rule ids exist only in the skill, so with the unchanged skill both finding graders fail by construction; the case measures that the section is read and applied. leaves_affirmative_alone passes before the section by construction and exists to fail an over-reaching rule.
+schema_version: "1.1"
+name: agent-writing-affirmative-audit
+description: >
+  Audit mode: a pasted CLAUDE.md section holds two bare prohibitions and one instruction that
+  already names its target. expected_outcome: PASS when both bare bans are reported under AW23
+  and the pnpm test line is not; FAIL when a ban is missed or the affirmative line is flagged.
+tags: [agent-writing, trigger, quick]
+
+execution:
+  prompt: |
+    Can you check this CLAUDE.md section for problems?
+
+    ## Style
+    - Don't write long comments.
+    - Avoid abbreviations in variable names.
+    - Run `pnpm test` before every commit.
+  max_turns: 6
+  allowed_tools:
+    - Skill
+
+graders:
+  - name: skill_fired
+    type: tool_used
+    tool: Skill
+    input_match: '"skill"\s*:\s*"(?:[\w-]+:)?agent-writing"'
+    min: 1
+
+  - name: aw23_long_comments
+    type: regex
+    target: last_message
+    pattern: 'AW23[^\n]*long comments|long comments[^\n]*AW23'
+    flags: i
+    match: contains
+
+  - name: aw23_abbreviations
+    type: regex
+    target: last_message
+    pattern: 'AW23[^\n]*abbreviat|abbreviat[^\n]*AW23'
+    flags: i
+    match: contains
+
+  # The pnpm test line already says what to do; reporting it under AW23 is a false finding.
+  - name: leaves_affirmative_alone
+    type: regex
+    target: last_message
+    pattern: 'AW23[^\n]*pnpm test|pnpm test[^\n]*AW23'
+    flags: i
+    match: not_contains
