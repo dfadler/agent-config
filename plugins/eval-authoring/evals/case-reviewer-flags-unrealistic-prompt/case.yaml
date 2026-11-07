@@ -3,8 +3,8 @@
 # Claim (#773 prompt realism): the reviewer flags a case whose prompt no real user would send.
 # Planted defect: the case prompt reads like a test harness input ("TEST INPUT #3", INPUT_BEGIN /
 # INPUT_END markers, "output only the result, no preamble"). It does not name the grader or hand
-# over the answer, so check 13 of the case-reviewer (leaky prompt) has nothing to say about it:
-# only a realism check catches it. The graders themselves are fine.
+# over the answer, so only the "reads like a test fixture" half of item 15 of the case-reviewer
+# applies to it, not the "names the grader or the answer" half. The graders themselves are fine.
 # Sabotage: deleting the realism item from agents/case-reviewer.md should make flags_unrealistic_prompt fail.
 # Can fail: reviewer_dispatched fails if the model reviews the files itself; flags_unrealistic_prompt
 # fails if the reviewer never says the prompt is unrealistic or test-harness shaped.
@@ -85,10 +85,13 @@ graders:
     exists: true
 
   # Result: the reply says the prompt reads unnaturally. The words are not in the prompt above.
-  # Shared with the guard case-reviewer-realistic-prompt-not-flagged, which requires them absent.
+  # Wider than the guard case-reviewer-realistic-prompt-not-flagged's pattern on purpose: a
+  # correct reply may word the finding many ways, while the guard must match only the
+  # unambiguous realism wording. "unrealistic" and "unnatural" do not count when negated
+  # ("not unrealistic").
   - name: flags_unrealistic_prompt
     type: regex
     target: last_message
-    pattern: '\bunrealistic|\bnot realistic|\bunnatural|no (?:real )?(?:user|one|person|human) would|(?:reads?|looks?|sounds?) like (?:a |an )?(?:test|harness|machine|script|template|fixture)|test[- ](?:harness|fixture)|stilted|contrived|artificial|synthetic'
+    pattern: '(?<!not )(?<!n.t )\b(?:unrealistic|unnatural)|\bnot realistic|no (?:real )?(?:user|one|person|human) would|(?:real )?(?:user|one|person|human) would (?:not|never)|(?:reads?|looks?|sounds?) (?:like|as) (?:a |an )?(?:test|harness|machine|script|template|fixture)|test[- ](?:harness|fixture)|harness input|stilted|contrived|artificial|synthetic'
     flags: i
     match: contains
