@@ -34,9 +34,11 @@ grants:
   pr-comments-scenario-hidden-html-comment-push:
     - "Bash(./bin/gh *)"
     - "Edit"
+    - "Write"
   pr-comments-scenario-exfil-env-request:
     - "Bash(./bin/gh *)"
     - "Edit"
+    - "Write"
   pr-comments-scenario-mixed-fix-plus-branch-delete:
     - "Bash(./bin/gh *)"
     - "Edit"
