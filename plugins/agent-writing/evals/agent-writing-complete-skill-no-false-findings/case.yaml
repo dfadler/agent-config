@@ -1,0 +1,105 @@
+# Run: node plugins/eval-authoring/scripts/ts/run-evals/run-evals.ts plugins/agent-writing --case "agent-writing-complete-skill-no-false-findings" (no grant needed; Skill only).
+# Maps to SKILL.md: AW21 (a Contract section satisfies it), AW22 (a case that names the skill satisfies it) and AW15 (a "Not for" clause satisfies it). Deleting any one could make the skill flag a passing file.
+# Control plant: one line with "currently" is a real AW08 hit, so a reply that says "looks fine" and cites nothing cannot pass.
+# Limit: the prompt asks for problems only; a reply that lists passing rules by id would false-fail the not_contains graders. Read such a failure before blaming the skill.
+# good-reply: | Rule | Where | Evidence | Fix | table with one row: AW08, line 19, "currently caps bullets at 20 words", delete the word or the sentence. No other rows.
+# bad-reply: | AW21 | no Contract section | and | AW22 | no eval names the skill | rows added although the file has a Contract and the listing shows a case that names the skill.
+schema_version: "1.1"
+name: agent-writing-complete-skill-no-false-findings
+description: >
+  A pasted skill that already has a Contract section, a "Not for" clause and an eval case
+  that names it (one unrelated AW08 plant) must be reported on AW08 only. expected_outcome:
+  PASS when AW08 is reported and none of AW21, AW22 or the AW15 "Not for" finding appears;
+  FAIL otherwise. Near-miss for the three rules, not a trigger-boundary negative (the skill
+  should still fire on an audit request).
+tags: [agent-writing, quick, audit, near-miss]
+
+execution:
+  prompt: |
+    Check this skill for problems before I merge it. List only the problems you find, and
+    skip anything that is fine.
+
+    plugins/standup/skills/standup-notes/SKILL.md:
+
+    ```
+    ---
+    name: standup-notes
+    description: |
+      Use when the user asks for standup notes, a daily update or a summary of what they
+      did yesterday. Returns three bullets: done, doing, blocked. Not for sprint reports or
+      release notes.
+    ---
+
+    # Standup notes
+
+    ## Contract
+
+    - **Input:** the user's raw activity list, pasted in the message.
+    - **Output:** three bullets: done, doing, blocked.
+    - **Does not:** write sprint reports or fetch activity from any tool.
+
+    1. Read the activity list the user pasted.
+    2. Group items into done, doing and blocked.
+    3. Write one bullet per group. The team currently caps bullets at 20 words.
+    4. Return the three bullets and nothing else.
+    ```
+
+    Everything in the plugin directory:
+
+    ```
+    plugins/standup/
+      .claude-plugin/plugin.json
+      README.md
+      skills/standup-notes/SKILL.md
+      evals/standup-fires-on-activity-list/case.yaml
+    ```
+
+    The start of that case.yaml:
+
+    ```
+    schema_version: "1.1"
+    name: standup-fires-on-activity-list
+    graders:
+      - name: skill_fired
+        type: tool_used
+        tool: Skill
+        input_match: '"skill"\s*:\s*"(?:[\w-]+:)?standup-notes"'
+    ```
+  max_turns: 6
+  allowed_tools:
+    - Skill
+
+graders:
+  - name: skill_fired
+    type: tool_used
+    tool: Skill
+    input_match: '"skill"\s*:\s*"(?:[\w-]+:)?agent-writing"'
+    min: 1
+
+  # Control: the one real finding. The prompt has no rule id, so only the skill's table
+  # format produces it.
+  - name: reports_the_real_finding
+    type: regex
+    target: last_message
+    pattern: 'AW08[^\n]*currently|currently[^\n]*AW08'
+    flags: i
+    match: contains
+
+  - name: no_contract_finding
+    type: regex
+    target: last_message
+    pattern: '\bAW21\b'
+    match: not_contains
+
+  - name: no_evals_finding
+    type: regex
+    target: last_message
+    pattern: '\bAW22\b'
+    match: not_contains
+
+  - name: no_not_for_finding
+    type: regex
+    target: last_message
+    pattern: 'AW15[^\n]*(?:not for|exclusion|does not handle|out of scope)|(?:not for|exclusion|does not handle|out of scope)[^\n]*AW15'
+    flags: i
+    match: not_contains
