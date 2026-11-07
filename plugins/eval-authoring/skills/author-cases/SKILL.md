@@ -117,6 +117,14 @@ blind-case-writer agent, second bullet), then stop.
    - every scored grader passes in the no-plugin arm by construction (`tool_used: Skill`
      `max: 0`, `arm: both`) or is cued by the prompt (a regex on a word the prompt contains,
      e.g. "run the tests with npm test" graded on `npm test`);
+   - a negative action guard (`tool_used` `max: 0`, e.g. `git push`) on something the base
+     model never does unprovoked: it passes in both arms by construction (PR 1001: `no_push`
+     was 0 in every run, before and after the edit). Keep it only with evidence that some run
+     or prompt variant does the bad thing (a prompt or fixture that tempts it, such as a
+     comment saying "push when done"), or label it a `smoke` tripwire with no expected delta.
+     A temptation only counts if the guarded action can happen: the case needs the tool
+     (a `grants.yaml` entry, not `allowed_tools`) with a specifier that matches the command
+     (a `Bash(npm *)` grant cannot run `git push`);
    - a should-not-fire case whose only live signal is that Skill check: the fire rate is
      noise at 3 runs. Move it to the trigger-boundary suite (`trigger-boundary` and
      `pair:` tags, no `arm: both`), where its fire count is read across many distinct
@@ -164,6 +172,11 @@ blind-case-writer agent, second bullet), then stop.
    the case; a sabotage result that still passes (kept in the case header) means drop,
    unless the rewrite changes what the graders check (then the old result is superseded
    and the case is unmeasured until it is rerun).
+   A skill edit that adds a rule needs a case that scores lower on the pre-edit skill text
+   (red, then green). Without one, say in the PR that the rule is unmeasured policy; do not
+   present guards that pass on both texts as evidence. Do not edit a grader between the
+   before and after runs: the rounds stop being comparable, so rerun the before round or
+   mark them non-comparable. At 3 runs per arm, 2/3 versus 3/3 is noise, not a change.
    Call a case a "regression guard" only if it should not fire the
    skill (delta 0 by design) and its `expected_outcome` says so.
 8. **Lint.** `node ${CLAUDE_SKILL_DIR}/../../scripts/ts/lint/cli.ts <plugin-path>` (a current Node,

@@ -27,3 +27,5 @@ grants:
     - "Write"
   case-reviewer-realistic-prompt-not-flagged:
     - "Write"
+  case-reviewer-flags-vacuous-push-guard:
+    - "Write"
