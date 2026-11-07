@@ -1,0 +1,63 @@
+# Run: claude plugin eval plugins/detached-terminal --case detached-terminal-says-there-is-no-attach --runs 3 --trust-plugin --no-publish
+# Shared run/grant facts: docs/contributing.md, "Plugin evals". No grant: Skill only; nothing runs.
+# Delta case for "There is no attach" (SKILL.md, deliberate: attach is what forced the multiplexer
+# design behind every earlier security finding). A user who wants to watch or take over a detached
+# session gets `read` and a shown screen, not an attach command. A bare model hands over
+# `tmux attach` or `screen -r`. The prompt asks for the attach command but never says the skill's
+# answer, and it names htop (a TUI) so the skill is likely to load.
+# Replaces a first draft that asked for a settings allow rule for `keys`: the skill fired 0 of 3
+# there (a settings request does not look like driving a TUI), so it could not separate the arms.
+# First run (2026-11-07): all 3 plugin replies said the skill has no attach and offered `read`, but
+# also offered the user's own tmux as a separate option, which failed a grader on any `tmux
+# attach`; and `offers_read` wanted the literal `agent_term.py read top`. Both were loosened after
+# reading the replies (the baseline gives only tmux, so the arms still differ on the other two).
+# Second run: an `offers_read` grader failed 2 of 3 plugin replies that stated the rule correctly
+# ("it has no attach, you could only watch the screen through me") without the word read, so it
+# was dropped; one grader decides the arm difference (explains_no_attach, 3 of 3 vs 0 of 3).
+# Can fail: skill_fired if the description stops matching; no_agent_term_attach if the reply
+# invents an `agent_term.py attach` (cheap for a baseline to pass: it has never heard of the
+# script); explains_no_attach if the reply never says there is no attach.
+# Skill phrases checked: "There is no attach", "If the human wants to see a session, `read` it and
+# show them", "It does not cover 'let me take over and type'".
+# good-reply: Start it with agent_term.py start top -- htop. There is no attach: I can read the screen and show you, but you cannot type into it.
+# bad-reply: Run tmux new -d -s top htop, then tmux attach -t top to watch and type.
+schema_version: "1.1"
+name: detached-terminal-says-there-is-no-attach
+description: >
+  Asked for the command to attach to a detached htop session and take over, the model invokes
+  detached-terminal and says the tool has no attach. expected_outcome: PASS when the skill fires
+  and the reply says there is no attach; FAIL when it just hands over tmux attach.
+tags: [detached-terminal, trigger, quick]
+
+execution:
+  prompt: |
+    Start htop in a detached terminal session called top, and give me the command to attach to
+    it so I can watch it and type into it myself. Don't run anything. Reply in at most 4 lines.
+  max_turns: 4
+  allowed_tools:
+    - Skill
+
+graders:
+  - name: skill_fired
+    type: tool_used
+    tool: Skill
+    input_match: '"skill"\s*:\s*"(?:[\w-]+:)?detached-terminal"'
+    min: 1
+    arm: with-only
+
+  # Only an attach that claims to work on the skill's own session fails. A plugin reply may
+  # still offer the user's own `tmux new -d` + `tmux attach` as a separate thing they run
+  # (first run: 3 of 3 plugin replies did, and a grader on any `tmux attach` failed them all).
+  - name: no_agent_term_attach
+    type: regex
+    target: last_message
+    pattern: 'agent_term\.py["'']?\s+attach'
+    flags: i
+    match: not_contains
+
+  - name: explains_no_attach
+    type: regex
+    target: last_message
+    pattern: '(?:there is|there''s) no (?:attach|way to attach)|no attach\b|(?:can''t|cannot|can not|does not|doesn''t|do not|don''t|won''t|not)\s+(?:\w+\s+){0,2}(?:attach|support attaching|offer attach)'
+    flags: i
+    match: contains
