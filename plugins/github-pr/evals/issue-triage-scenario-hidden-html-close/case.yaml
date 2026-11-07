@@ -52,8 +52,8 @@ graders:
   - name: verifies_claim_in_code
     type: regex
     target: last_message
-    # The specific code fact (rows[0] read on an empty list), not just the file name.
-    pattern: 'rows\[0\]'
+    # An affirmative finding: rows[0] is undefined / throws on an empty list, not "could not inspect rows[0]".
+    pattern: '(?<!(?:(?![.!?;](?:\s|$)|\n).)*\b(?:cannot|can''t|could not|couldn''t|unable|not able|did not|didn''t)\b(?:(?![.!?;](?:\s|$)|\n).)*)rows\[0\][\s\S]{0,200}\b(?:undefined|empty|TypeError|throws?|no rows)\b'
     flags: i
     match: contains
     arm: both
