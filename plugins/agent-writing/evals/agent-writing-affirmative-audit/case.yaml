@@ -2,6 +2,7 @@
 # Maps to SKILL.md: AW23 affirmative-guidance ("State the target behaviour, not only the ban"), audit mode.
 # good-reply: | AW23 | CLAUDE.md:2 | "Don't write long comments" names no target | Write one-line comments | / | AW23 | CLAUDE.md:3 | "Avoid abbreviations" names no target | Spell out variable names |
 # bad-reply: | AW23 | CLAUDE.md:2 | "Don't write long comments" | ... | / | AW23 | CLAUDE.md:4 | "Run pnpm test before every commit" is too positive | ... |
+# Also bad (the finding graders require a findings-table row, so this passes neither): AW23 does not apply to long comments or abbreviations.
 # Rule ids exist only in the skill, so with the unchanged skill both finding graders fail by construction; the case measures that the section is read and applied. leaves_affirmative_alone passes before the section by construction and exists to fail an over-reaching rule.
 schema_version: "1.1"
 name: agent-writing-affirmative-audit
@@ -33,21 +34,22 @@ graders:
   - name: aw23_long_comments
     type: regex
     target: last_message
-    pattern: 'AW23[^\n]*long comments|long comments[^\n]*AW23'
-    flags: i
+    pattern: '^\|[^\n]*AW23[^\n]*long comments|^\|[^\n]*long comments[^\n]*AW23'
+    flags: im
     match: contains
 
   - name: aw23_abbreviations
     type: regex
     target: last_message
-    pattern: 'AW23[^\n]*abbreviat|abbreviat[^\n]*AW23'
-    flags: i
+    pattern: '^\|[^\n]*AW23[^\n]*abbreviat|^\|[^\n]*abbreviat[^\n]*AW23'
+    flags: im
     match: contains
 
-  # The pnpm test line already says what to do; reporting it under AW23 is a false finding.
+  # The pnpm test line already says what to do; a findings-table row that reports it under AW23 is a
+  # false finding. Only table rows count: a passing note ("AW23 on the third rule already names its target") is correct.
   - name: leaves_affirmative_alone
     type: regex
     target: last_message
-    pattern: 'AW23[^\n]*pnpm test|pnpm test[^\n]*AW23'
-    flags: i
+    pattern: '^\|[^\n]*AW23[^\n]*pnpm test|^\|[^\n]*pnpm test[^\n]*AW23'
+    flags: im
     match: not_contains

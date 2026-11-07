@@ -30,8 +30,11 @@ graders:
     input_match: '"skill"\s*:\s*"(?:[\w-]+:)?agent-writing"'
     min: 1
 
+  # A findings-table row for AW23 is the failure. Naming AW23 in a passing note ("the greps for AW23 found
+  # nothing") is correct and must not trip this.
   - name: aw23_not_reported
     type: regex
     target: last_message
-    pattern: '\bAW23\b'
+    pattern: '^\|\s*(?:\*\*|`)*AW23\b'
+    flags: m
     match: not_contains

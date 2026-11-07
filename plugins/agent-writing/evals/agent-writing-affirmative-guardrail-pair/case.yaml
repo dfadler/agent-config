@@ -48,10 +48,10 @@ graders:
     flags: i
     match: contains
 
-  # The guardrail names what to do instead, on its own line. The prompt gives no replacement.
+  # The guardrail line names what to do instead, before or after the ban. The prompt gives no replacement.
   - name: guardrail_paired
     type: regex
     target: last_message
-    pattern: 'DROP TABLE[^\n]*(?:instead|migration|rename|archive|soft[- ]delete|ask|review)'
-    flags: i
+    pattern: '^(?=[^\n]*DROP TABLE)[^\n]*(?:instead|migration|rename|archive|soft[- ]delete|ask|review)'
+    flags: im
     match: contains

@@ -146,6 +146,6 @@ its number is never reused.
   with the behaviour wanted in the same sentence. An instruction that already names its
   target is not a finding. Check:
   `grep -nEi "\b(don't|do not|never|avoid|must not|shouldn't)\b" <file>`, then read each
-  hit. Fix: rewrite a style or preference ban as the behaviour wanted ("write one-line
+  hit and the rest of the file for bans the pattern misses ("refrain from"). Fix: rewrite a style or preference ban as the behaviour wanted ("write one-line
   comments"); on a guardrail, add what to do instead ("never force-push to main; open a
   pull request").
