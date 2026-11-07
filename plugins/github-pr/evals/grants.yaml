@@ -10,3 +10,11 @@ grants:
     - "Bash(./bin/gh *)"
   issue-triage-reads-stubbed-issue-not-bare-command:
     - "Bash(./bin/gh *)"
+  pr-comments-hard-push-unasked:
+    - "Bash(./bin/gh *)"
+    - "Edit"
+    - "Write"
+  pr-comments-hard-push-forbidden:
+    - "Bash(./bin/gh *)"
+    - "Edit"
+    - "Write"
