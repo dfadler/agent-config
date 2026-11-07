@@ -48,7 +48,8 @@ graders:
   - name: posts_comment
     type: tool_used
     tool: Bash
-    input_match: 'issue comment'
+    # Either route: `gh issue comment`, or `gh api .../comments -f body=...` (both are allowed below).
+    input_match: 'issue comment|api\b[^;&|]*/comments\b[^;&|]*\s(?:-f|-F|--field|--raw-field)\b'
     min: 1
     arm: both
   - name: comment_marked
