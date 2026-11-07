@@ -17,7 +17,7 @@ execution:
   prompt: |
     I've got a few Claude sessions going, each working on its own PR. Can you get all of
     them unblocked? Red CI, merge conflicts, unanswered review comments, whatever is holding
-    them up. Say how you'd go about it; do not run anything.
+    them up.
   max_turns: 4
   allowed_tools:
     - Skill
@@ -33,7 +33,7 @@ graders:
   - name: reply_plans_listing
     type: regex
     target: last_message
-    pattern: 'list_sessions|linked sessions|sub-?sessions'
+    pattern: 'list_sessions|linked sessions?|sub-?sessions?'
     flags: i
     match: contains
     arm: both
