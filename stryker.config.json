@@ -1,7 +1,10 @@
 {
   "packageManager": "pnpm",
   "testRunner": "vitest",
-  "plugins": ["@stryker-mutator/vitest-runner"],
+  "plugins": [
+    "@stryker-mutator/vitest-runner",
+    "@stryker-mutator/typescript-checker"
+  ],
   "mutate": [
     "scripts/ts/**/*.ts",
     "plugins/*/scripts/ts/**/*.ts",

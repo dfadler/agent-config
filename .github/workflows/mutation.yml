@@ -1,0 +1,110 @@
+name: Mutation testing
+
+# Scheduled StrykerJS run over the TypeScript scripts (#995). Reports which
+# mutants the Vitest suite does not kill; it is a signal about test quality, not
+# a gate.
+#
+# STANDALONE and NON-GATING on purpose, like vitest-soak.yml: it is not called
+# from ci.yml, never feeds the `all-checks` sentinel, and only runs on a
+# schedule or by hand. It does not open issues; read the artifact or the job
+# summary. A run per PR would cost minutes per changed file with no pass/fail
+# threshold (equivalent mutants make a perfect score unreachable).
+#
+# Incremental: the previous result file is restored from the Actions cache and
+# only changed mutants and tests re-run. Incremental mode ignores changes outside
+# mutated and test files (dependencies, env, config), so the first scheduled run
+# of each month adds --force to re-run everything and stop the result drifting
+# (https://stryker-mutator.io/docs/stryker-js/incremental/). Run it locally with
+# `pnpm run mutate --mutate <file>`; see docs/testing.md.
+#
+# The TypeScript checker (--checkers typescript) is on here and off locally: it
+# discards mutants that do not compile, at about 6.5 minutes of startup.
+# The whole-tree run time was not measured when this was written; adjust
+# timeout-minutes after the first scheduled run.
+
+on:
+  schedule:
+    # Mondays 03:41 UTC; an off-the-hour minute avoids the top-of-hour queue.
+    - cron: "41 3 * * 1"
+  workflow_dispatch:
+    inputs:
+      mutate:
+        description: Files or globs to mutate (default is every TypeScript source in the config)
+        type: string
+        default: ""
+      force:
+        description: Re-run every mutant, ignoring the cached incremental result
+        type: boolean
+        default: false
+
+# One run at a time; a manual dispatch queues behind a running one rather than
+# cancelling a half-finished run.
+concurrency:
+  group: ${{ github.workflow }}
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+
+jobs:
+  mutate:
+    name: mutate
+    runs-on: ubuntu-latest
+    timeout-minutes: 90
+    permissions:
+      contents: read
+    env:
+      MUTATE: ${{ inputs.mutate }}
+      FORCE: ${{ inputs.force && 'true' || 'false' }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - uses: ./.github/actions/setup-node-pnpm
+
+      - name: Restore incremental result
+        uses: actions/cache/restore@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: reports/stryker-incremental.json
+          key: stryker-incremental-v1-${{ github.run_id }}
+          restore-keys: |
+            stryker-incremental-v1-
+
+      - name: Mutate
+        run: |
+          args=(
+            --checkers typescript
+            --concurrency 2
+            --reporters "clear-text,json,html"
+          )
+          if [ -n "$MUTATE" ]; then
+            args+=(--mutate "$MUTATE")
+          fi
+          # First Monday of the month: full re-run to stop incremental drift.
+          if [ "$FORCE" = "true" ] || { [ "$GITHUB_EVENT_NAME" = "schedule" ] && [ "$(date -u +%d)" -le 7 ]; }; then
+            args+=(--force)
+          fi
+          {
+            echo "### Mutation testing"
+            echo
+            echo "- args: \`${args[*]}\`"
+          } >> "$GITHUB_STEP_SUMMARY"
+          # No `--` before the args: pnpm 11 would pass it on to stryker as a literal.
+          pnpm run mutate "${args[@]}"
+
+      - name: Save incremental result
+        if: ${{ !cancelled() }}
+        uses: actions/cache/save@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: reports/stryker-incremental.json
+          key: stryker-incremental-v1-${{ github.run_id }}
+
+      - name: Upload report
+        if: ${{ !cancelled() }}
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: stryker-report-${{ github.run_id }}
+          path: reports/mutation/
+          if-no-files-found: warn
+          retention-days: 30
