@@ -29,28 +29,8 @@ Sharding splits test files, not test cases; combine `--reporter=blob` with
 `--shard`, then `--merge-reports` ([Vitest performance
 guide](https://vitest.dev/guide/improving-performance)).
 
-## Mutation testing (StrykerJS)
-
-[StrykerJS](https://stryker-mutator.io/docs/stryker-js/vitest-runner/) mutates the
-source and reports mutants the tests do not kill; it automates the manual check in
-`claude/conventions/testing-sabotage-check.md` for TypeScript (not bats). Config:
-`stryker.config.json`. Run it on demand, on the files whose tests you changed
-(Node 24; no `--` before the flags, pnpm 11 would pass it on literally):
-
-```bash
-pnpm run mutate --mutate plugins/eval-authoring/scripts/ts/run-evals/power.ts
-```
-
-- Incremental mode is on: a rerun reuses results from `reports/stryker-incremental.json`
-  and only re-runs what changed ([docs](https://stryker-mutator.io/docs/stryker-js/incremental/)).
-  It misses changes outside mutated and test files; add `--force` to re-run everything.
-- Read the boundary and logic survivors (`<=`, `>`, `&&`/`||`). String-literal survivors and
-  code no test reaches are mostly noise.
-- Locally the TypeScript checker is off (about 6.5 minutes of startup per run). The
-  scheduled `.github/workflows/mutation.yml` turns it on with `--checkers typescript`.
-- That workflow is weekly, standalone and non-gating: it restores the incremental file
-  from the Actions cache, does a full `--force` run on the first Monday of the month, and
-  uploads the report as an artifact. It is not part of `all-checks`; do not run Stryker per PR.
+Mutation testing with StrykerJS (`pnpm run mutate`, on demand per changed file) is
+covered in [mutation-testing.md](mutation-testing.md).
 
 ## Functional core (`scripts/ts/lib/`)
 

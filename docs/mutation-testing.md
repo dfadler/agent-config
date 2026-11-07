@@ -1,0 +1,26 @@
+# Mutation testing (StrykerJS)
+
+[StrykerJS](https://stryker-mutator.io/docs/stryker-js/vitest-runner/) mutates the
+source and reports mutants the tests do not kill. It automates the manual check in
+`claude/conventions/testing-sabotage-check.md` for the TypeScript scripts (not bats).
+Config: `stryker.config.json`. Background and trial numbers: issue #995 and PR #1014.
+
+Run it on demand, on the files whose tests you changed (Node 24). Use `pnpm`, not
+`npx`, and put no `--` before the flags: pnpm 11 passes it on to Stryker, which then
+fails with "too many arguments for 'run'".
+
+```bash
+pnpm run mutate --mutate plugins/eval-authoring/scripts/ts/run-evals/power.ts
+```
+
+- Incremental mode is on: a rerun reuses results from `reports/stryker-incremental.json`
+  and only re-runs what changed ([docs](https://stryker-mutator.io/docs/stryker-js/incremental/)).
+  It misses changes outside mutated and test files; add `--force` to re-run everything.
+- Read the boundary and logic survivors (`<=`, `>`, `&&`/`||`). String-literal survivors and
+  code no test reaches are mostly noise.
+- Locally the TypeScript checker is off. The scheduled workflow turns it on with
+  `--checkers typescript`; it discards mutants that do not compile, at the cost of a slower run.
+- `.github/workflows/mutation.yml` is weekly (and manual), standalone and non-gating: it
+  restores the incremental file from the Actions cache, does a full `--force` run on the
+  first Monday of the month, and uploads the report as an artifact. It is not part of
+  `all-checks`; do not run Stryker per PR.

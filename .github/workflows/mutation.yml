@@ -15,7 +15,7 @@ name: Mutation testing
 # mutated and test files (dependencies, env, config), so the first scheduled run
 # of each month adds --force to re-run everything and stop the result drifting
 # (https://stryker-mutator.io/docs/stryker-js/incremental/). Run it locally with
-# `pnpm run mutate --mutate <file>`; see docs/testing.md.
+# `pnpm run mutate --mutate <file>`; see docs/mutation-testing.md.
 #
 # The TypeScript checker (--checkers typescript) is on here and off locally: it
 # discards mutants that do not compile, at about 6.5 minutes of startup.
