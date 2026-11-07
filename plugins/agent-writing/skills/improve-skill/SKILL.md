@@ -15,7 +15,10 @@ metadata:
 ## Contract
 
 - **Input:** a path to a skill directory, a plugin root or an agent file, or a name that
-  resolves to one. Ask only when the request names nothing that resolves.
+  resolves to one. Ask only when the request names nothing that resolves. When the user
+  pastes the file text and nothing else is readable, that text is the whole scope: skip the
+  searches in the Scope step, line 1 is the first pasted line, and list each convention
+  that needs another file (SC3) under "could not verify".
 - **Output:** a findings table (id, `file:line`, evidence, fix), a list of problems no rule
   covers, then one question asking which findings to fix. After the answer, the edited files
   and a verify report: findings fixed, findings left, findings that could not be checked.
