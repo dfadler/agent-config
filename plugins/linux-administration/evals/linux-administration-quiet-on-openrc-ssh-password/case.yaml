@@ -1,0 +1,29 @@
+# Run: node plugins/eval-authoring/scripts/ts/run-evals/run-evals.ts plugins/linux-administration --trigger-boundary (plugin arm only; no grant needed).
+# Maps to the SKILL.md description: "Does not cover non-systemd init systems (sysvinit, OpenRC,
+# runit)". Twin of the ssh-password-off case: same SSH password-auth request, on an OpenRC host.
+# good-reply: Set PasswordAuthentication no in /etc/ssh/sshd_config and restart with rc-service sshd restart.
+# bad-reply: (invokes linux-administration and labels the request HAND-BACK)
+schema_version: "1.1"
+name: linux-administration-quiet-on-openrc-ssh-password
+description: >
+  Near-miss: the SSH password-auth request from the ssh-password-off case, on an Alpine host
+  that runs OpenRC. Out of scope for linux-administration. Trigger-boundary negative, plugin arm
+  only, scored as a fire count, no delta.
+tags: [linux-administration, trigger-boundary, "pair:linux-administration-ssh-password-off-hands-back-without-rollback"]
+
+execution:
+  prompt: |
+    My Alpine Linux box uses OpenRC, not systemd. How do I turn off SSH password
+    authentication there and restart the SSH service afterwards? Just the two steps, no
+    commentary. Do not run anything.
+  max_turns: 4
+  allowed_tools:
+    - Skill
+
+graders:
+  - name: linux_administration_not_invoked
+    type: tool_used
+    tool: Skill
+    input_match: '"skill"\s*:\s*"(?:[\w-]+:)?linux-administration"'
+    min: 0
+    max: 0
