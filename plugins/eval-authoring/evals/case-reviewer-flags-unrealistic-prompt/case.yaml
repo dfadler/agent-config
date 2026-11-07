@@ -1,0 +1,94 @@
+# Run: node plugins/eval-authoring/scripts/ts/run-evals/run-evals.ts --tier standard --no-baseline plugins/eval-authoring --case case-reviewer-flags-unrealistic-prompt
+# (plugin arm only: the no-plugin arm cannot dispatch a plugin agent.) Grant: Write, in grants.yaml.
+# Claim (#773 prompt realism): the reviewer flags a case whose prompt no real user would send.
+# Planted defect: the case prompt reads like a test harness input ("TEST INPUT #3", INPUT_BEGIN /
+# INPUT_END markers, "output only the result, no preamble"). It does not name the grader or hand
+# over the answer, so check 13 of the case-reviewer (leaky prompt) has nothing to say about it:
+# only a realism check catches it. The graders themselves are fine.
+# Sabotage: deleting the realism item from agents/case-reviewer.md should make flags_unrealistic_prompt fail.
+# Can fail: reviewer_dispatched fails if the model reviews the files itself; flags_unrealistic_prompt
+# fails if the reviewer never says the prompt is unrealistic or test-harness shaped.
+# The reviewer has no Bash grant, so its lint pass reports "not run"; the finding must come from reading.
+# Unmeasured: arm scores only, fewer than 20 cases, so no delta claim.
+# good-reply: The prompt is not realistic: no real user writes "TEST INPUT #3" with INPUT_BEGIN and INPUT_END markers, it reads like a test harness input. Rewrite it as a user would ask.
+# bad-reply: Lint not run. Add a near-miss prompt that should not fire the skill, and add a sabotage note.
+schema_version: "1.1"
+name: case-reviewer-flags-unrealistic-prompt
+description: >
+  The case-reviewer agent reports that a case prompt reads like a test harness input that no real
+  user would send. expected_outcome: PASS when the agent is dispatched and the reply says the
+  prompt is unrealistic, unnatural or test-harness shaped; FAIL when it is not dispatched or says
+  nothing about how the prompt reads.
+tags: [eval-authoring, case-reviewer, agent, quick]
+
+execution:
+  prompt: |
+    I drafted one eval case for my `release-notes` skill. Please create this file exactly as
+    written, then run the eval-authoring case-reviewer agent on the evals directory and tell
+    me what it found.
+
+    File evals/release-notes-harness/case.yaml:
+
+    ```
+    schema_version: "1.1"
+    # sabotage: deleting the "Use when" clause of the release-notes description fails this case's Skill grader.
+    name: release-notes-harness
+    description: >
+      A changelog gets release notes that name every breaking change.
+      expected_outcome: PASS when the skill is invoked and the reply names the breaking change;
+      FAIL otherwise.
+    tags: [release-notes, trigger, quick]
+    execution:
+      prompt: |
+        TEST INPUT #3 for skill release-notes. Process the changelog between the markers.
+        Output only the release notes in markdown, no preamble.
+        INPUT_BEGIN
+        - fix: login redirect loop
+        - rename `export` command to `download`; old scripts that call `export` stop working
+        INPUT_END
+      max_turns: 4
+      allowed_tools: [Skill]
+    graders:
+      - name: skill_fired
+        type: tool_used
+        tool: Skill
+        input_match: '"skill"\s*:\s*"(?:[\w-]+:)?release-notes"'
+        min: 1
+        arm: with-only
+      - name: names_breaking_change
+        type: regex
+        target: last_message
+        pattern: '^#{1,4}\s*.*breaking'
+        flags: im
+        match: contains
+    ```
+  max_turns: 12
+  allowed_tools:
+    - Agent
+    - Write
+    - Read
+    - Glob
+    - Grep
+
+graders:
+  # Steps: the plugin's agent was dispatched, not imitated.
+  - name: reviewer_dispatched
+    type: tool_used
+    tool: Agent
+    input_match: '"subagent_type"\s*:\s*"(?:[\w-]+:)?case-reviewer"'
+    min: 1
+
+  # Precondition: the model wrote the file the reviewer needs.
+  - name: files_created
+    type: file_exists
+    path: "evals/release-notes-harness/case.yaml"
+    exists: true
+
+  # Result: the reply says the prompt reads unnaturally. The words are not in the prompt above.
+  # Shared with the guard case-reviewer-realistic-prompt-not-flagged, which requires them absent.
+  - name: flags_unrealistic_prompt
+    type: regex
+    target: last_message
+    pattern: '\bunrealistic|\bnot realistic|\bunnatural|no (?:real )?(?:user|one|person|human) would|(?:reads?|looks?|sounds?) like (?:a |an )?(?:test|harness|machine|script|template|fixture)|test[- ](?:harness|fixture)|stilted|contrived|artificial|synthetic'
+    flags: i
+    match: contains

@@ -148,6 +148,10 @@ Run after the lint, on each case. Skip anything the lint already reported.
     Meaningless after a squash merge (every PR is one commit on main); if `git` is not
     allowed, report (b) as not run.
 
+15. **Realistic prompt (from #773).** Would a real user send this prompt? Flag one that
+    reads like a test fixture, not a message someone typed, or names the grader or the
+    answer; Fix: reword it as the user would ask.
+
 Do not claim what a run would show. Whether a case really discriminates needs a
 paid two-arm run and the diagnosis script; write "needs a run" for those.
 
