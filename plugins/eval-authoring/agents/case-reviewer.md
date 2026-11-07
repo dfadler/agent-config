@@ -100,10 +100,6 @@ Run after the lint, on each case. Skip anything the lint already reported.
    only the Skill check (EVAL009 has no exception); flag one whose only grader is the Skill
    check. Only a should-not-fire guard or a stated regression guard may rely on the Skill
    check alone, and it should say "no delta expected".
-   Also flag a negative action guard (`tool_used` with `max: 0`, e.g. `git push`) on an
-   action the base model has no reason to take, with no tempting prompt or fixture and no
-   recorded run where it fired: it cannot fail. Fix: add the temptation, or label it
-   `smoke` with "no delta expected".
 5. **Tells the plugin from no plugin.** Is the property tested something the skill
    adds, or something the model does by default? A default behavior gives a Delta
    near zero in a two-arm run. If the case deliberately tests a default (only a

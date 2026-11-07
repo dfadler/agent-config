@@ -5,10 +5,10 @@
 # changelog-formatting skill. Nothing in the prompt or workspace tempts a push and no run is
 # recorded where it fired, so the guard passes in both arms by construction (PR 1001's no_push).
 # The lint does not see it. The reviewer has to say the guard cannot fail.
-# Target sentence: case-reviewer.md judgment item 4, "flag a negative action guard ... on an
-# action the base model has no reason to take". Delete that sentence and rerun: the finding
-# should disappear or weaken (the older "Can fail" wording may still catch it; that is the
-# baseline question this case exists to answer).
+# Target sentence: case-reviewer.md judgment item 4 ("Can fail"), "Would at least one scored
+# grader fail if the skill were absent or broken?". A reviewer sentence aimed only at this guard
+# shape was tried and dropped: main's text scored the same (3/3 each) without it (PR 1002).
+# This case is a regression guard for that existing finding: delta 0 by design, no expected delta.
 # Can fail: reviewer_dispatched fails if the model reviews the file itself; names_missing_temptation
 # fails if the reviewer answers Clean, praises the guard, or gives only a permission reason.
 # The reviewer has no Bash grant, so its lint pass reports "not run"; the finding must come from reading.
