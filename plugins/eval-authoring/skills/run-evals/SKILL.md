@@ -100,9 +100,14 @@ it, do not rebuild any of that.
    shows as the plugin's skill not firing, so grade it with a `tool_used` grader on the
    neighbour's skill, whose id is `<manifest name>:<skill directory name>` (a differing
    frontmatter `name` is ignored; seen, #884). Neighbour hooks run inside the eval as you,
-   with no separate trust step: a neighbour's SessionStart and UserPromptSubmit hooks
-   fired and the context they injected reached the model (seen, #884). `node_modules` is
-   not copied.
+   with no separate trust step: a neighbour's SessionStart, UserPromptSubmit and
+   PreToolUse hooks fired, the context they injected reached the model, and a PreToolUse
+   `deny` blocked the plugin's own tool call (seen, #884), so a neighbour's hook can change
+   a case's score. The plugin under test has no home advantage: with two near-identical
+   descriptions and a prompt that echoes neither, the same skill won 5 of 5 runs whether
+   it was the plugin under test or the neighbour (seen, #884), so a 0 fire rate in the
+   table can mean a tied neighbour won, not a weak description. `node_modules` is not
+   copied.
    To measure the should-not-fire side of routing, run `--trigger-boundary`: the cases
    tagged `trigger-boundary` plus the should-fire twin each names with a `pair:<case>`
    tag, one run each, plugin arm only, fixed tier (a ceiling scaled like `quick`; not
