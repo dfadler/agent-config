@@ -53,7 +53,7 @@ graders:
   - name: read_issue_51
     type: tool_used
     tool: Bash
-    input_match: 'issue(?:\s+(?:-R|--repo)[ =]\S+)*\s+(?:list(?![^"]*\bclosed\b)|view(?:\s+(?:-R|--repo)[ =]\S+)*\s+51\b)'
+    input_match: 'issue(?:\s+(?:-R|--repo)[ =]\S+)*\s+(?:list(?![\s\S]*(?:--state[ =]+|-s[ =]*)closed\b)|view(?:\s+(?:-R|--repo)[ =]\S+)*\s+51\b)'
     min: 1
     arm: both
   # Liveness only: any reply that sorts the two real issues passes, so this alone proves nothing.

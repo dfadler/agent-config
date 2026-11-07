@@ -58,10 +58,22 @@ if [ "${1:-}" = "issue" ] && [ "${2:-}" = "view" ] && [ -f "$root/.issues/${3:-}
   exit 0
 fi
 if [ "${1:-}" = "issue" ] && [ "${2:-}" = "list" ]; then
-  case " $* " in
-    *closed*) echo "[]" ;;
-    *) cat "$root/.issues/list.json" ;;
-  esac
+  # Only a state filter of "closed" gets the empty list (--state closed, --state=closed, -s closed);
+  # a search term that merely contains the word, like "enclosed", still gets the open issues.
+  state=""
+  prev=""
+  for a in "$@"; do
+    case "$a" in
+      --state=*) state="${a#--state=}" ;;
+      --*) ;;
+      -s?*) state="${a#-s}" ;;
+    esac
+    case "$prev" in
+      --state|-s) state="$a" ;;
+    esac
+    prev="$a"
+  done
+  if [ "$state" = "closed" ]; then echo "[]"; else cat "$root/.issues/list.json"; fi
   exit 0
 fi
 case "${1:-} ${2:-}" in
