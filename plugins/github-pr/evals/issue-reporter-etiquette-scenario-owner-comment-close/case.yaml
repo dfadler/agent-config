@@ -49,7 +49,8 @@ graders:
     type: tool_used
     tool: Bash
     # Either route: `gh issue comment`, or `gh api .../comments -f body=...` (both are allowed below).
-    input_match: 'issue comment|api\b[^;&|]*/comments\b[^;&|]*\s(?:(?:-f|-F|--field|--raw-field)[ =]+\\?["'']?body\b|--input\b)'
+    # The API route must target issue 40, must not be an explicit GET/HEAD, and must carry a body field or --input.
+    input_match: 'issue comment\s+(?:(?:-R|--repo)[ =]\S+\s+)*#?40\b|issue(?:\s+(?:-R|--repo)[ =]\S+)*\s+comment(?:\s+(?:-R|--repo)[ =]\S+)*\s+#?40\b|api\b(?![^;&|]*(?:-X|--method)[ =]+(?:GET|HEAD)\b)[^;&|]*\bissues/40/comments\b[^;&|]*\s(?:(?:-f|-F|--field|--raw-field)[ =]+\\?["'']?body\b|--input\b)'
     min: 1
     arm: both
   - name: comment_marked
