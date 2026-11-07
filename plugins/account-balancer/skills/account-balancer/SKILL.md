@@ -33,8 +33,25 @@ node "${CLAUDE_SKILL_DIR}/../../scripts/ts/pick-account.ts" work=default persona
 ```
 
 Add `--json` for machine-readable output. The script runs `claude -p "/usage"` once per
-account, which printed plan usage without a model call when tried on one account. Run it
-with the repo's Node (`.nvmrc`, 24) and `claude` on `PATH`.
+account. Run it with the repo's Node (`.nvmrc`, 24) and `claude` on `PATH`.
+
+What is documented and what is not (checked 2026-11-06):
+
+- Documented: [`/usage`](https://code.claude.com/docs/en/commands) shows "plan usage limits";
+  [`CLAUDE_CONFIG_DIR`](https://code.claude.com/docs/en/env-vars) selects the configuration
+  directory and each directory has its own login
+  ([authentication](https://code.claude.com/docs/en/authentication), "Log in with multiple
+  accounts").
+- Not documented, observed once on one account: that `/usage` works under `-p`, that it makes
+  no model call, and the `Current week (all models): N% used · resets ...` line shape the
+  parser reads. A CLI update can change them; if every account turns `unavailable`, suspect
+  the output shape first.
+- Credentials: the script removes `ANTHROPIC_*`, `CLAUDE_CODE_OAUTH_*`, `CLAUDE_CODE_USE_*` and
+  any `*_API_KEY`, `*_TOKEN` or `*SECRET` variable from each probe's environment, because
+  Claude Code ranks several of them above a `/login` subscription
+  ([authentication precedence](https://code.claude.com/docs/en/authentication)). It does not
+  read, print or store any credential. An `apiKeyHelper` set in a settings file is outside its
+  reach.
 
 If an account shows `unavailable`, the cause is one of: `claude` not on `PATH`, that
 directory not logged in, or `/usage` text in a shape the parser does not know. Run
@@ -52,9 +69,9 @@ budget left is spend that is lost if unused, so it ranks high. Then:
 - **An exhausted account** (0% left) ranks last; its reset hour does not matter until then.
 - **Only the weekly all-models window decides.** Per-model windows are shown in the raw
   `/usage` text. If the job uses a model whose own window is nearly full, mention it.
-- **An unrecognized reset time** means that account's rate is unknown and the ranking is
-  inconclusive. Text output adds a `note:` line; with `--json` the same account has
-  `status: "ok"` and `hoursToReset: null`. Either way, say so and show its percent left
+- **An unrecognized or already-past reset time** (stale output) means that account's rate is
+  unknown and the ranking is inconclusive. Text output adds a `note:` line; with `--json` the
+  same account has `status: "ok"` and `hoursToReset: null`. Either way, say so and show its percent left
   rather than presenting a firm pick.
 - **Point in time.** Each run is a snapshot; for a long job, re-run it later.
 

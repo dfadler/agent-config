@@ -1,5 +1,6 @@
+import { homedir } from "node:os";
 import { describe, expect, it } from "vitest";
-import { format, parseReset, parseUsage, rank, run, summarize } from "./pick-account.ts";
+import { format, parseReset, parseUsage, probeEnv, rank, run, summarize } from "./pick-account.ts";
 
 // 2026-11-06 16:00 in Chicago (CST, UTC-6).
 const NOW = new Date("2026-11-06T22:00:00Z");
@@ -70,8 +71,47 @@ describe("summarize and rank", () => {
     expect(ranked.map((a) => a.name)).toEqual(["unparsed", "spent"]);
     expect(format(ranked)).toMatch(/note: reset time for unparsed was not recognized/);
   });
+  it("treats a reset time already in the past as inconclusive, not as the top rank", () => {
+    // 2pm today in Chicago, but it is 4pm: stale output, so the true window is unknown.
+    const stale = summarize("stale", usage(60, "Nov 6 at 2pm (America/Chicago)"), NOW);
+    expect(stale).toMatchObject({ status: "ok", hoursToReset: null, ratePerHour: null, budgetLeft: 40 });
+    const steady = summarize("steady", usage(60, "Nov 12 at 6pm (America/Chicago)"), NOW);
+    expect(rank([stale, steady]).map((a) => a.name)).toEqual(["steady", "stale"]);
+    expect(format(rank([stale, steady]))).toMatch(
+      /note: reset time for stale was not recognized or is in the past/,
+    );
+  });
   it("gives an exhausted account a zero rate", () => {
     expect(summarize("x", usage(100, "Nov 8 at 6pm (America/Chicago)"), NOW).ratePerHour).toBe(0);
+  });
+});
+
+describe("probeEnv", () => {
+  const base = {
+    PATH: "/usr/bin",
+    HOME: "/home/u",
+    ANTHROPIC_API_KEY: "k",
+    ANTHROPIC_AUTH_TOKEN: "t",
+    ANTHROPIC_BASE_URL: "https://proxy.invalid",
+    CLAUDE_CODE_OAUTH_TOKEN: "o",
+    CLAUDE_CODE_USE_BEDROCK: "1",
+    CLAUDE_CODE_USE_VERTEX: "1",
+    CLAUDE_CODE_USE_FOUNDRY: "1",
+    GITHUB_TOKEN: "g",
+    SOME_API_KEY: "s",
+    CLAUDE_CONFIG_DIR: "/other",
+  };
+  it("drops every credential and provider override so the dir's own login decides", () => {
+    const env = probeEnv(base, "/acct/a");
+    for (const k of Object.keys(base))
+      if (k !== "PATH" && k !== "HOME" && k !== "CLAUDE_CONFIG_DIR") expect(env).not.toHaveProperty(k);
+    expect(env).toMatchObject({ PATH: "/usr/bin", HOME: "/home/u", CLAUDE_CONFIG_DIR: "/acct/a" });
+  });
+  it("unsets CLAUDE_CONFIG_DIR for the default account and expands a leading ~", () => {
+    expect(probeEnv(base, null)).not.toHaveProperty("CLAUDE_CONFIG_DIR");
+    expect(probeEnv(base, "~/.claude_personal")["CLAUDE_CONFIG_DIR"]).toBe(
+      `${homedir()}/.claude_personal`,
+    );
   });
 });
 

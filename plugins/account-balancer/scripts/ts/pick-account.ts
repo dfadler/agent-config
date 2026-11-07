@@ -94,7 +94,11 @@ export const summarize = (name: string, output: string, now: Date): Account => {
   const none = { hoursToReset: null, budgetLeft: null, ratePerHour: null };
   if (!weekly) return { name, status: "unavailable", windows, ...none };
   const at = parseReset(weekly.resets, now);
-  const hours = at ? Math.max((at.getTime() - now.getTime()) / 3600e3, 0.25) : null;
+  // A reset that is not in the future means stale or misread output: the real window is
+  // unknown, so give it no rate instead of clamping it to a huge one that ranks first.
+  // A genuine reset under 15 minutes away is still clamped so its rate stays finite.
+  const ms = at ? at.getTime() - now.getTime() : 0;
+  const hours = ms > 0 ? Math.max(ms / 3600e3, 0.25) : null;
   const left = Math.max(100 - weekly.percentUsed, 0);
   return {
     name,
@@ -125,7 +129,7 @@ export const format = (ranked: Account[]): string => {
   );
   for (const a of ranked)
     if (a.status === "ok" && a.hoursToReset === null)
-      lines.push(`note: reset time for ${a.name} was not recognized, so the ranking is inconclusive`);
+      lines.push(`note: reset time for ${a.name} was not recognized or is in the past, so the ranking is inconclusive`);
   return lines.join("\n");
 };
 
@@ -152,12 +156,27 @@ export const run = (args: string[], d: Deps): number => {
   return ranked.some((a) => a.status === "ok") ? 0 : 1;
 };
 
+// Anything that can pick a login or provider other than the config dir's own. Claude Code
+// ranks these above the subscription login (see README), so passing them through makes every
+// label report the same account. Also drops generic key/token/secret variables the probe
+// has no use for, so no credential is handed to the child that it does not need.
+const CREDENTIAL_ENV = /^(ANTHROPIC_|CLAUDE_CODE_(OAUTH_|USE_))|(API_KEY|_TOKEN|SECRET)$/i;
+
+/** Child environment for one account's probe: no credentials, only that account's config dir. */
+export const probeEnv = (
+  base: Record<string, string | undefined>,
+  dir: string | null,
+): Record<string, string | undefined> => {
+  const env = Object.fromEntries(Object.entries(base).filter(([k]) => !CREDENTIAL_ENV.test(k)));
+  delete env["CLAUDE_CONFIG_DIR"];
+  if (dir !== null) env["CLAUDE_CONFIG_DIR"] = dir.replace(/^~(?=\/)/, homedir());
+  return env;
+};
+
 const realDeps = (): Deps => ({
   now: new Date(),
   probe: (dir) => {
-    const env = { ...process.env };
-    if (dir === null) delete env["CLAUDE_CONFIG_DIR"];
-    else env["CLAUDE_CONFIG_DIR"] = dir.replace(/^~(?=\/)/, homedir());
+    const env = probeEnv(process.env, dir);
     const r = spawnSync("claude", ["-p", "/usage"], { encoding: "utf8", env, timeout: 60_000 });
     // A missing `claude` or a timeout sets r.error; stdout is then null or partial.
     return r.error ? "" : r.stdout;
