@@ -31,7 +31,9 @@ metadata:
 1. **Find the sub-sessions.** Call `mcp__ccd_session_mgmt__list_sessions` with
    `{"linked": true}` and keep rows whose `startedBy` is this session. The listing is
    the source of truth; do not rely on memory of which sessions exist. Skip archived
-   sessions. If none remain, say so and stop.
+   sessions. If `$ARGUMENTS` names a session, keep only those that match it, so a
+   request to sweep one session never starts work in the others. If none remain
+   (or the name matches nothing), say so and stop.
 2. **Send one message to each**, by its `local_…` id with `SendMessage`
    (`notify_when_idle: true`, so you hear when it finishes without polling). Use
    this text, adding only a closing line if `$ARGUMENTS` asked for one:
@@ -46,9 +48,13 @@ metadata:
 
    Each session works under its own permissions. Do not ask a session to do
    something your own session was denied; route that to the user instead.
-3. **Collect.** Each reply or `[Cross-session idle notice]` is that session's report,
-   not proof. Spot-check one claim per session with `gh pr checks <n>` or
-   `gh pr view <n> --json mergeable` before repeating it as done.
+3. **Collect.** An idle notice only says the session stopped; it need not carry the
+   PR link, results or follow-ups. Mark a session "pending" until it sends a reply in
+   the requested format, and "incomplete" if it goes idle without one. A reply is that
+   session's report, not proof: spot-check one claim per session with
+   `gh pr checks <PR URL>` or `gh pr view <PR URL> --json mergeable` (use the
+   reported URL, or add `-R owner/repo`; a bare number targets this session's repo,
+   and a sub-session may be working in another) before repeating it as done.
 4. **Report** one table (session, PR, checks, conflicts, comments, status), then the
    proposed follow-ups, deduped across sessions. Ask before filing any issue; on a
    yes, file with `pr-followups` and the `issue-tracker` skill.
