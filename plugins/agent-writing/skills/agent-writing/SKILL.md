@@ -4,7 +4,7 @@ description: |
   ALWAYS invoke this skill first when writing, editing, shortening or auditing a SKILL.md,
   an agent definition, a CLAUDE.md or AGENTS.md file, or a convention file, even for a
   one-line rule or a short snippet written in a reply. It defines numbered rules
-  AW01-AW22, each with a runnable check and a fix. Not for READMEs, docs prose, commit
+  AW01-AW23, each with a runnable check and a fix. Not for READMEs, docs prose, commit
   messages or PR text.
 metadata:
   version: "1.1.0"
@@ -151,3 +151,14 @@ its number is never reused.
   `grep -nEi "leverage|utilize|facilitate|robust|seamless|serves as" <file>`, then read the file for
   passives and fragments. Fix: rewrite the sentence so it states an action, fact or
   number.
+
+## Affirmative guidance
+
+- **AW23 state-the-target.** Say what to do. Keep a prohibition only as a hard guardrail
+  that has no positive phrasing (a destructive action, a security boundary), and pair it
+  with the behaviour wanted in the same sentence. An instruction that already names its
+  target is not a finding. Check:
+  `grep -nEi "\b(don't|do not|never|avoid|must not|shouldn't)\b" <file>`, then read each
+  hit and the rest of the file for bans the pattern misses ("refrain from"). Fix: rewrite a style or preference ban as the behaviour wanted ("write one-line
+  comments"); on a guardrail, add what to do instead ("never force-push to main; open a
+  pull request").
