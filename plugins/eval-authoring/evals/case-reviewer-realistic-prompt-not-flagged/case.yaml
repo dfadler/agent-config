@@ -1,0 +1,90 @@
+# Run: node plugins/eval-authoring/scripts/ts/run-evals/run-evals.ts --tier standard --no-baseline plugins/eval-authoring --case case-reviewer-realistic-prompt-not-flagged
+# (plugin arm only: the no-plugin arm cannot dispatch a plugin agent.) Grant: Write, in grants.yaml.
+# Guard for case-reviewer-flags-unrealistic-prompt (#773 prompt realism): a prompt a real user
+# would type ("Here is our changelog, can you turn it into something users can read?") must not
+# be called unrealistic, so a reviewer that flags every prompt cannot pass both. Same case body as
+# the clean control's should-fire case; the regex is the narrow core of the planted case's, required absent.
+# Sabotage: no sentence is expected to make this fail; it fails only if a realism item over-flags.
+# Can fail: reviewer_dispatched fails if the model reviews the files itself; no_realism_flag
+# fails if the reviewer calls this natural prompt unrealistic, unnatural or test-harness shaped.
+# The reviewer has no Bash grant, so its lint pass reports "not run".
+# Unmeasured: false-positive rate; arm scores only, no delta claim, and no delta is expected
+# (the plain reviewer already says nothing about realism here).
+# good-reply: Mechanical pass not run. The prompt is how a user would ask; add a near-miss case and a second grader.
+# bad-reply: The prompt is unrealistic and reads like a test harness input; no real user would send it.
+schema_version: "1.1"
+name: case-reviewer-realistic-prompt-not-flagged
+description: >
+  The case-reviewer agent, given a case whose prompt is in a real user's words, does not call it
+  unrealistic. Regression guard, no delta expected. expected_outcome: PASS when the agent is
+  dispatched and the reply does not call the prompt unrealistic, unnatural or test-harness
+  shaped; FAIL when it is not dispatched or it does.
+tags: [eval-authoring, case-reviewer, agent, quick]
+
+execution:
+  prompt: |
+    I drafted one eval case for my `release-notes` skill. Please create this file exactly as
+    written, then run the eval-authoring case-reviewer agent on the evals directory and tell
+    me what it found.
+
+    File evals/release-notes-natural/case.yaml:
+
+    ```
+    schema_version: "1.1"
+    # sabotage: deleting the "Use when" clause of the release-notes description fails this case's Skill grader.
+    name: release-notes-natural
+    description: >
+      A changelog pasted into chat gets release notes that name every breaking change.
+      expected_outcome: PASS when the skill is invoked and the reply names the breaking change;
+      FAIL otherwise.
+    tags: [release-notes, trigger, quick]
+    execution:
+      prompt: |
+        Here is our changelog, can you turn it into something users can read?
+        - fix: login redirect loop
+        - rename `export` command to `download`; old scripts that call `export` stop working
+      max_turns: 4
+      allowed_tools: [Skill]
+    graders:
+      - name: skill_fired
+        type: tool_used
+        tool: Skill
+        input_match: '"skill"\s*:\s*"(?:[\w-]+:)?release-notes"'
+        min: 1
+        arm: with-only
+      - name: names_breaking_change
+        type: regex
+        target: last_message
+        pattern: '^#{1,4}\s*.*breaking'
+        flags: im
+        match: contains
+    ```
+  max_turns: 12
+  allowed_tools:
+    - Agent
+    - Write
+    - Read
+    - Glob
+    - Grep
+
+graders:
+  - name: reviewer_dispatched
+    type: tool_used
+    tool: Agent
+    input_match: '"subagent_type"\s*:\s*"(?:[\w-]+:)?case-reviewer"'
+    min: 1
+
+  - name: files_created
+    type: file_exists
+    path: "evals/release-notes-natural/case.yaml"
+    exists: true
+
+  # Polarity: the realism wording item 15 produces, required absent. Praise such as "natural" or
+  # "realistic", a negated "not unrealistic", and unrelated mentions of a test fixture or
+  # synthetic data are not matched.
+  - name: no_realism_flag
+    type: regex
+    target: last_message
+    pattern: '(?<!not )(?<!n.t )\b(?:unrealistic|unnatural)|\bnot realistic|no (?:real )?(?:user|one|person|human) would|(?:reads?|looks?|sounds?) like (?:a |an )?(?:test|harness|machine|script|template|fixture)'
+    flags: i
+    match: not_contains
