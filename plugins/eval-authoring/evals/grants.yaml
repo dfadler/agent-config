@@ -23,5 +23,9 @@ grants:
     - "Write"
   case-reviewer-flags-leaky-prompt:
     - "Write"
+  case-reviewer-flags-unrealistic-prompt:
+    - "Write"
+  case-reviewer-realistic-prompt-not-flagged:
+    - "Write"
   case-reviewer-flags-vacuous-push-guard:
     - "Write"
