@@ -23,3 +23,5 @@ grants:
     - "Write"
   case-reviewer-flags-leaky-prompt:
     - "Write"
+  case-reviewer-flags-vacuous-push-guard:
+    - "Write"

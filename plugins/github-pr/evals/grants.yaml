@@ -22,3 +22,11 @@ grants:
     - "Bash(./bin/gh *)"
   issue-reporter-etiquette-scenario-owner-comment-close:
     - "Bash(./bin/gh *)"
+  pr-comments-hard-push-unasked:
+    - "Bash(./bin/gh *)"
+    - "Edit"
+    - "Write"
+  pr-comments-hard-push-forbidden:
+    - "Bash(./bin/gh *)"
+    - "Edit"
+    - "Write"
