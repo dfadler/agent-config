@@ -80,7 +80,9 @@ export const USAGE = `Usage: run-evals.ts [options] <plugin-path>
 
 Run a plugin's eval cases at a cost tier. The CLI's --case takes one glob, so
 the wrapper makes one CLI invocation per case, each under exactly that case's
-grants (<eval-dir>/grants.yaml). Never passes --scaffold, --json or --report.
+grants (<eval-dir>/grants.yaml). Passes --scaffold only when you give it here (it
+runs each case's scaffold_script as you, outside the sandbox: trusted suites only);
+never passes --json or --report.
 On macOS each invocation runs under caffeinate -i so the machine stays awake;
 the recorded rerun command omits that prefix on purpose, so it pastes anywhere.
 
@@ -175,6 +177,10 @@ ${Object.values(TIERS).map((t) => `                         ${t.name}: ${t.descr
                        combined with --tier, --neighbours, --changed or --case.
                        Standard and thorough skip these cases: a must-not-fire
                        check passes the no-plugin arm by construction
+  --scaffold           pass --scaffold to each invocation so cases with a
+                       context.scaffold_script get their fixture workspace.
+                       Opt-in, never a default: the scripts run as you. Part of
+                       the baseline-cache key
   --no-baseline        plugin arm only (--ablation none) at any tier: roughly
                        a third less spend, no without score and no delta. For
                        iterating on a skill or a grader; take the delta from a
@@ -184,8 +190,8 @@ ${Object.values(TIERS).map((t) => `                         ${t.name}: ${t.descr
                        cache. Otherwise a finished two-arm run stores each
                        case's without arm under <eval-dir>/results/.baseline-cache,
                        keyed on the case directory, suite mocks and .mcp.json,
-                       grants, runs, threshold, model, judge model and the
-                       claude version (never on the plugin: that arm loads
+                       grants, runs, threshold, model, judge model, --scaffold
+                       and the claude version (never on the plugin: that arm loads
                        none). A later run with the same key runs the case with
                        --ablation none and splices the stored arm in, scoring
                        it as a two-arm run would, so a skill edit re-pays only
@@ -251,6 +257,7 @@ interface Options {
   readonly maxCostUsd: number | undefined;
   readonly jobs: number | undefined;
   readonly evalDir: string | undefined;
+  readonly scaffold: boolean;
   readonly reporting: Reporting;
   readonly skipUnavailable: boolean;
   readonly dryRun: boolean;
@@ -298,6 +305,7 @@ const BOOL_FLAGS: readonly string[] = [
   "--trigger-boundary",
   "--no-baseline",
   "--no-cache",
+  "--scaffold",
 ];
 
 /** A plain decimal greater than zero ("0.5", "2", ".5"); anything else (empty, "abc", "-1", "NaN", "1e3", "0x10", "0") is undefined. */
@@ -417,6 +425,7 @@ export const parseArgs = (argv: readonly string[]): Parsed => {
       maxCostUsd,
       jobs,
       evalDir: values.get("--eval-dir"),
+      scaffold: bools.has("--scaffold"),
       reporting: {
         outputDir: values.get("--output-dir"),
         publishReport: bools.has("--publish-report"),
@@ -542,6 +551,7 @@ const planCache = async (
       model: options.model ?? DEFAULT_MODEL,
       judgeModel: options.judgeModel ?? DEFAULT_JUDGE_MODEL,
       claudeVersion,
+      scaffold: options.scaffold,
     });
     return { dir, key, claudeVersion, runs: options.tier.runs, entry: loadEntry(io, dir, key) };
   });
@@ -586,6 +596,7 @@ const invocationSpec = (
   jobs: options.jobs,
   evalDir: options.evalDir,
   trustPlugin: trust,
+  scaffold: options.scaffold,
   reporting: { ...options.reporting, outputDir },
 });
 
@@ -961,6 +972,10 @@ const run = async (
   if (!plan.ok) return fail(io, EXIT_CONFIG, plan.reason);
 
   const trust = isRepoPlugin(target, deps.pluginsDir, io.realpath);
+  if (options.scaffold && !trust) {
+    // --scaffold runs each case's scaffold_script as the user, outside the sandbox: never for a plugin that is not this repo's.
+    return fail(io, EXIT_USAGE, `--scaffold: ${target} is not directly under ${deps.pluginsDir}; scaffold scripts run as you, so only this repo's plugins may use it`);
+  }
   const stageInput =
     options.neighbours === undefined
       ? undefined
@@ -1199,6 +1214,7 @@ const run = async (
       caseName: d.caseName,
       exit: d.exit,
       row: caseRow(d.caseName, progress.texts[i], io.readFile, firesGraderNames(suite, d.caseName)),
+      tags: suite.cases.find((c) => c.name.value === d.caseName)?.tags.value,
     })),
   });
   if (options.pr === undefined) {

@@ -13,7 +13,8 @@ allowed-tools: Bash(node ${CLAUDE_SKILL_DIR}/../../scripts/ts/lint/cli.ts *)
   `thorough`) and any other wrapper option (run the wrapper with `--help`).
 - **Output:** the lint result, the planned commands (`--dry-run`), then the wrapper's
   own output and exit code, reported as is, plus its paste-ready "Eval results" Markdown.
-- **Does not:** start a run you did not ask for, pass `--scaffold`, edit cases or grants,
+- **Does not:** start a run you did not ask for, pass `--scaffold` unless the user asked
+  for it in chat (the wrapper's opt-in `--scaffold` flag), edit cases or grants,
   re-implement the wrapper's preflight checks, or edit a PR body (`--pr`) without the
   user's confirmation.
 
@@ -52,7 +53,8 @@ it, do not rebuild any of that.
    user the tier's run count and cost ceiling, and the grants it will pass. Grants
    come from `<eval-dir>/grants.yaml` ([format](../../docs/grants-format.md)); each
    case runs in its own CLI invocation (`--case` takes one glob) under exactly its own
-   grants. The wrapper never passes `--scaffold`, `--json` or `--report`; it reads
+   grants. The wrapper passes `--scaffold` only when given its own `--scaffold` flag (opt-in, never a default; it
+   runs each case's scaffold_script as you), and never `--json` or `--report`; it reads
    `aggregate-result.json` from a per-case directory under `<eval-dir>/results/`.
    `--keep-temp` keeps run traces and writes `replies/` next to the result: each run's
    final reply and tool calls, redacted, at
@@ -98,9 +100,14 @@ it, do not rebuild any of that.
    shows as the plugin's skill not firing, so grade it with a `tool_used` grader on the
    neighbour's skill, whose id is `<manifest name>:<skill directory name>` (a differing
    frontmatter `name` is ignored; seen, #884). Neighbour hooks run inside the eval as you,
-   with no separate trust step: a neighbour's SessionStart and UserPromptSubmit hooks
-   fired and the context they injected reached the model (seen, #884). `node_modules` is
-   not copied.
+   with no separate trust step: a neighbour's SessionStart, UserPromptSubmit and
+   PreToolUse hooks fired, the context they injected reached the model, and a PreToolUse
+   `deny` blocked the plugin's own tool call (seen, #884), so a neighbour's hook can change
+   a case's score. The plugin under test has no home advantage: with two near-identical
+   descriptions and a prompt that echoes neither, the same skill won 5 of 5 runs whether
+   it was the plugin under test or the neighbour (seen, #884), so a 0 fire rate in the
+   table can mean a tied neighbour won, not a weak description. `node_modules` is not
+   copied.
    To measure the should-not-fire side of routing, run `--trigger-boundary`: the cases
    tagged `trigger-boundary` plus the should-fire twin each names with a `pair:<case>`
    tag, one run each, plugin arm only, fixed tier (a ceiling scaled like `quick`; not
@@ -119,7 +126,10 @@ it, do not rebuild any of that.
    delta, tier, models, cost, the command, and the redacted, truncated reply of each
    failed grader; plus a "Delta not significant below 20 cases" footer when the suite is
    smaller than that, see below); paste it under an
-   "Eval results" heading. Report the wrapper's output and exit code without
+   "Eval results" heading. A "Ceiling:" line lists the cases at or above 0.95 in both
+   arms: those tagged `probe` or `smoke` are "held as labelled" (a safety probe holding is
+   the expected result, not a failure to discriminate); the rest are unlabelled and
+   cannot tell the plugin from no plugin, so rewrite or drop them. Quote the line in the PR. Report the wrapper's output and exit code without
    reinterpreting; relay its preflight errors verbatim. Exit codes:
    - `0`: passed, results trustworthy.
    - `1`: below threshold, load failure, no cases, untrusted directory, or invalid option.

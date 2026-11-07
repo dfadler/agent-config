@@ -1,0 +1,65 @@
+# Run: node plugins/eval-authoring/scripts/ts/run-evals/run-evals.ts --tier standard --case author-cases-baseline-run-is-two-arm plugins/eval-authoring
+# No grant; reply-only. Covers author-cases step 7: the CLI has no without-only mode, so the
+# baseline check of a new case is a two-arm run (run-evals.ts --case <name>) that charges both arms;
+# the wrapper stores the without arm. (CLI --ablation takes none | with-without only.)
+# Can fail: says_no_without_only fails if the reply offers a without-only switch or never says there
+# is none; says_both_arms_charged fails if it does not say both arms are paid; names_case_filter fails
+# if it does not give the --case form. A bare model invents a flag or says "disable the plugin".
+# skill_fired accepts author-cases or run-evals (a run request may route to either).
+# Measured (standard tier, 3 runs per arm, 2026-11-06): first run with 0.56, without 0.11 (with-arm replies hedged
+# "I can't confirm a baseline-only option"); rerun with --no-cache: with 0.89, without 0.00. Skill fired 3/3 both times.
+# Sabotage: step 7 changed to offer `--ablation without`, one quick run: score 0.75, names_case_filter failed;
+# says_no_without_only still passed (the run-evals skill and CLI help also imply it), so the case detects the
+# wrapper-form sentence, not the "no without-only mode" claim alone. Arm scores only, no delta claim.
+# good-reply: The CLI has no without-only mode, so run the case two-arm with run-evals.ts --case my-case; both arms are charged, and the wrapper stores the without arm for later.
+# bad-reply: Run it with --ablation without-only so only the baseline arm is charged.
+schema_version: "1.1"
+name: author-cases-baseline-run-is-two-arm
+description: >
+  A user who wants to run a new case once without the plugin to check its baseline, as cheaply as
+  possible, is told there is no without-only mode and that the check is a two-arm run charging both
+  arms. expected_outcome: PASS when the reply says so and gives run-evals.ts --case; FAIL when it
+  invents a without-only flag.
+tags: [eval-authoring, author-cases, quick]
+
+execution:
+  prompt: |
+    I just wrote a new eval case `deploy-asks-before-push` for my plugin. Before I trust it I want
+    to see how it scores with the plugin removed, and I don't want to pay for the with-plugin runs
+    yet. What is the cheapest way to get only that baseline? Don't create files or run any
+    commands.
+  max_turns: 8
+  allowed_tools:
+    - Skill
+    - Read
+    - Glob
+    - Grep
+
+graders:
+  - name: skill_fired
+    type: tool_used
+    tool: Skill
+    input_match: '"skill"\s*:\s*"(?:[\w-]+:)?(?:author-cases|run-evals)"'
+    min: 1
+    arm: with-only
+
+  - name: says_no_without_only
+    type: regex
+    target: last_message
+    pattern: '\b(?:no|not|isn.t|doesn.t|there.s no|no way|no option)\b[^.\n]{0,40}(?:without|baseline)[- ]only|(?:without|baseline)[- ]only[^.\n]{0,30}(?:mode|option|flag)[^.\n]{0,20}(?:doesn.t exist|does not exist|isn.t|no such)|\b(?:cannot|can.?t|no way to)\b[^.\n]{0,30}(?:only|just) (?:the )?(?:without|baseline|no-plugin)|no (?:option|way|mode|flag)[^.\n]{0,30}(?:only|just)[^.\n]{0,20}(?:without|baseline|no-plugin)'
+    flags: i
+    match: contains
+
+  - name: says_both_arms_charged
+    type: regex
+    target: last_message
+    pattern: 'both arms|two[- ]arm|with(?:-| and )without|(?:with|plugin) arm[^.\n]{0,40}(?:also|charged|paid|runs)'
+    flags: i
+    match: contains
+
+  - name: names_case_filter
+    type: regex
+    target: last_message
+    pattern: 'run-evals(?:\.ts)?[^.\n]{0,80}--case'
+    flags: i
+    match: contains

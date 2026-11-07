@@ -1,0 +1,69 @@
+# Run: node plugins/eval-authoring/scripts/ts/run-evals/run-evals.ts --tier standard --case author-cases-regex-flags-key plugins/eval-authoring
+# No grant; reply-only. Covers graders.md "Types and options": regex patterns are JavaScript regex,
+# case-insensitivity is `flags: i`, never an inline (?i) (EVAL012), and absence is `match: not_contains`.
+# Can fail: uses_flags_key fails if the drafted grader has no `flags: i`; no_inline_flag fails if it
+# carries (?i), which JavaScript rejects; uses_not_contains fails if absence is not expressed with
+# match: not_contains. A bare model often writes (?i) or a lookahead. skill_fired is a with-arm indicator.
+# Measured (standard tier, 3 runs per arm, 2026-11-06): with 1.00, without 0.00 (the bare model, with no schema in
+# its sandbox, guesses field names and writes an inline (?i)). Skill fired 3/3. Sabotage: graders.md line 48 changed
+# to recommend inline (?i), one quick run: score 0.40, uses_flags_key and no_inline_flag and pattern_and_target
+# failed. Arm scores only, no delta claim.
+# good-reply: - name: no_rollback_claim\n  type: regex\n  target: last_message\n  pattern: 'rollback'\n  flags: i\n  match: not_contains
+# bad-reply: - name: no_rollback_claim\n  type: regex\n  pattern: '(?i)^(?!.*rollback)'
+schema_version: "1.1"
+name: author-cases-regex-flags-key
+description: >
+  Asked for a regex grader that fails a reply mentioning "rollback" in any letter case, the reply
+  gives a grader with flags: i and match: not_contains and no inline (?i). expected_outcome: PASS
+  when the drafted grader uses the flags key and not_contains; FAIL when it inlines (?i) or a
+  negative lookahead.
+tags: [eval-authoring, author-cases, quick]
+
+execution:
+  prompt: |
+    For a `claude plugin eval` case on my `deploy-helper` skill I need one grader that fails when
+    the final reply mentions the word rollback, however it is capitalised (Rollback, ROLLBACK).
+    Show me just that grader as YAML, in the case.yaml format. Don't create files or run any
+    commands.
+  max_turns: 8
+  allowed_tools:
+    - Skill
+    - Read
+    - Glob
+    - Grep
+
+graders:
+  - name: skill_fired
+    type: tool_used
+    tool: Skill
+    input_match: '"skill"\s*:\s*"(?:[\w-]+:)?author-cases"'
+    min: 1
+    arm: with-only
+
+  - name: uses_flags_key
+    type: regex
+    target: last_message
+    pattern: 'flags:\s*["'']?i["'']?(?![\w])'
+    flags: i
+    match: contains
+
+  # (?i) is rejected by JavaScript and by EVAL012.
+  - name: no_inline_flag
+    type: regex
+    target: last_message
+    pattern: 'pattern:\s*["'']?[^\n]*\(\?i\)'
+    match: not_contains
+
+  # The drafted grader must target the word and the final reply, not any pattern.
+  - name: pattern_and_target
+    type: regex
+    target: last_message
+    pattern: 'pattern:\s*["'']?rollback[\s\S]*target:\s*last_message|target:\s*last_message[\s\S]*pattern:\s*["'']?rollback'
+    flags: i
+    match: contains
+
+  - name: uses_not_contains
+    type: regex
+    target: last_message
+    pattern: 'match:\s*["'']?not_contains'
+    match: contains

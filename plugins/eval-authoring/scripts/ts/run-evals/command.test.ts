@@ -139,7 +139,7 @@ describe("buildCliArgs", () => {
     );
   });
 
-  it("never passes --scaffold", () => {
+  it("passes --scaffold only when the caller asked for it", () => {
     const every = buildCliArgs(
       spec({
         trustPlugin: true,
@@ -152,6 +152,8 @@ describe("buildCliArgs", () => {
       }),
     );
     expect(every).not.toContain("--scaffold");
+    expect(buildCliArgs(spec({ scaffold: false }))).not.toContain("--scaffold");
+    expect(buildCliArgs(spec({ scaffold: true }))).toContain("--scaffold");
   });
 
   it("maps the reporting options to the CLI's own flags", () => {

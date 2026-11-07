@@ -323,6 +323,21 @@ describe("main", () => {
     expect(first).not.toContain("--scaffold");
   });
 
+  it("passes --scaffold to every invocation of a repo plugin when asked", async () => {
+    const s = setup({ grants: GRANTS, onCli: okCli() });
+    expect(await main([s.root, "--scaffold"], { io: s.io, pluginsDir: dirname(s.root) })).toBe(EXIT_OK);
+    const runs = cliCalls(s.calls);
+    expect(runs).toHaveLength(2);
+    for (const r of runs) expect(r.args).toContain("--scaffold");
+  });
+
+  it("refuses --scaffold for a plugin outside the repo's plugins directory, before any run", async () => {
+    const s = setup({ grants: GRANTS, onCli: okCli() });
+    expect(await main([s.root, "--scaffold"], { io: s.io, pluginsDir: "/p" })).toBe(EXIT_USAGE);
+    expect(cliCalls(s.calls)).toEqual([]);
+    expect(s.err.join("")).toContain("--scaffold");
+  });
+
   it("passes when the CLI exits 0 and the results are clean, and records the mode", async () => {
     const s = setup({
       cases: [{ name: "a", tags: ["quick"] }],

@@ -54,6 +54,24 @@ teardown() {
   [ -z "$output" ]
 }
 
+@test "setup wires core.hooksPath in a git checkout, doctor confirms it, teardown unsets it" {
+  git -C "$FAKE_REPO" init -q
+  [ -f "$FAKE_REPO/scripts/hooks/pre-commit" ]
+
+  run bash "$FAKE_REPO/setup.sh" --no-companions
+  assert_success
+  [ "$(git -C "$FAKE_REPO" config --get core.hooksPath)" = "scripts/hooks" ]
+
+  run bash "$FAKE_REPO/doctor.sh"
+  assert_success
+  assert_output_contains "core.hooksPath is scripts/hooks"
+
+  run bash "$FAKE_REPO/teardown.sh"
+  assert_success
+  run git -C "$FAKE_REPO" config --get core.hooksPath
+  [ "$status" -eq 1 ]
+}
+
 @test "plugin-hooks.sh loads the same rows when the table has no trailing newline" {
   local n_with n_without
   n_with=$(bash -c 'source "$1"; echo "${#PLUGIN_HOOK_EVENTS[@]}"' _ "$FAKE_REPO/scripts/plugin-hooks.sh")

@@ -1,0 +1,10 @@
+#!/usr/bin/env node
+// Opt-in git pre-commit hook: blocks a commit that stages personal data (a real home-directory
+// name, a non-reserved email, or any term in PII_DENY_TERMS) in the scanner's default scope.
+// ./setup.sh enables it in this checkout (and ./doctor.sh --fix repairs it); by hand:
+//   git config core.hooksPath scripts/hooks
+// Report is file, line and rule only. Bypass once, knowingly, with: git commit --no-verify
+// Fails closed: if Node cannot load the scanner (too old to strip types), the commit is blocked.
+import { main } from "../../plugins/pii-cleanup/scripts/ts/check-pii.ts";
+
+process.exitCode = main(["--staged"], process.env, console.log);

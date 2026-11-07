@@ -135,6 +135,61 @@ hook_lines() {
   lacks "default-setting"
 }
 
+# The opt-in pre-commit hook (scripts/hooks/pre-commit) is wired by pointing
+# core.hooksPath at it; the fixtures above have no .git, so they stay inert.
+git_hooks_fixture() {
+  git -C "$FAKE_REPO" init -q
+  mkdir -p "$FAKE_REPO/scripts/hooks"
+  : >"$FAKE_REPO/scripts/hooks/pre-commit"
+}
+
+@test "plan: git-hooks-path is planned for a git checkout with the pre-commit hook" {
+  git_hooks_fixture
+  plan
+  [ "$status" -eq 0 ]
+  has "git-hooks-path${T}$FAKE_REPO${T}scripts/hooks"
+  [ "$(grep -c '^git-hooks-path' <<<"$output")" -eq 1 ]
+}
+
+@test "plan: git-hooks-path is not planned once core.hooksPath is scripts/hooks, including after a real install" {
+  git_hooks_fixture
+  install
+  [ "$(git -C "$FAKE_REPO" config --get core.hooksPath)" = "scripts/hooks" ]
+  plan
+  [ "$status" -eq 0 ]
+  [ -z "$output" ]
+}
+
+@test "plan: git-hooks-path never overwrites a different core.hooksPath" {
+  git_hooks_fixture
+  git -C "$FAKE_REPO" config core.hooksPath .husky
+  plan
+  [ "$status" -eq 0 ]
+  lacks "git-hooks-path"
+}
+
+@test "plan: git-hooks-path is left out by --skip=pii-cleanup" {
+  git_hooks_fixture
+  mkdir -p "$FAKE_REPO/plugins/pii-cleanup/.claude-plugin"
+  echo '{"name":"pii-cleanup"}' >"$FAKE_REPO/plugins/pii-cleanup/.claude-plugin/plugin.json"
+  plan --skip=pii-cleanup
+  [ "$status" -eq 0 ]
+  lacks "git-hooks-path"
+  plan --include=demo
+  lacks "git-hooks-path"
+}
+
+@test "plan: no git-hooks-path without the hook file or outside a git checkout" {
+  git -C "$FAKE_REPO" init -q
+  plan
+  lacks "git-hooks-path"
+  rm -rf "$FAKE_REPO/.git"
+  mkdir -p "$FAKE_REPO/scripts/hooks"
+  : >"$FAKE_REPO/scripts/hooks/pre-commit"
+  plan
+  lacks "git-hooks-path"
+}
+
 @test "plan: --dry-run is an alias and writes nothing under HOME" {
   run bash "$FAKE_REPO/setup.sh" --dry-run
   [ "$status" -eq 0 ]
@@ -355,14 +410,16 @@ PY
 @test "plan: every plan line starts with a verb from the documented set" {
   mkdir -p "$CLAUDE/commands" "$CLAUDE/skills" "$SANDBOX/elsewhere"
   ln -s "$SANDBOX/elsewhere" "$CLAUDE/commands/other.md"
+  git_hooks_fixture
   plan --skip=demo
   [ "$status" -eq 0 ]
+  has "git-hooks-path"
   local line verb
   while IFS= read -r line; do
     verb="${line%%$'\t'*}"
     case "$verb" in
       mkdir | personal-migrate | personal-create | include | claude-md | link | relink | unlink | \
-        register-hook | deregister-hook | migrate-hook | default-setting | skip-plugin | skip-command | warn-foreign-symlink | warn-exists) ;;
+        register-hook | deregister-hook | migrate-hook | default-setting | git-hooks-path | skip-plugin | skip-command | warn-foreign-symlink | warn-exists) ;;
       *)
         echo "undocumented verb: $verb" >&2
         return 1
