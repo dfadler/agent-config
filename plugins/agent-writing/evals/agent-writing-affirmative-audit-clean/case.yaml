@@ -1,0 +1,40 @@
+# Run: node plugins/eval-authoring/scripts/ts/run-evals/run-evals.ts plugins/agent-writing --case "agent-writing-affirmative-audit-clean" (no grant needed; Skill only).
+# Maps to SKILL.md: AW23 affirmative-guidance must not report an instruction that already names its target.
+# good-reply: No findings. Every instruction names the behaviour wanted and has a check.
+# bad-reply: | AW23 | CLAUDE.md:2 | "Write one-line comments" is not a prohibition... | rewrite |
+# Guard: no delta expected. It passes before the section by construction (AW23 does not exist yet) and fails if the new rule flags affirmative lines.
+schema_version: "1.1"
+name: agent-writing-affirmative-audit-clean
+description: >
+  Audit mode guard: every pasted instruction already states its target behaviour. expected_outcome:
+  PASS when AW23 is not reported; FAIL when the affirmative-guidance rule flags an affirmative line.
+  A regression guard against the rule over-reaching, delta 0 by design.
+tags: [agent-writing, trigger, quick]
+
+execution:
+  prompt: |
+    Can you check this CLAUDE.md section for problems?
+
+    ## Style
+    - Write one-line comments.
+    - Keep functions under 40 lines.
+    - Run `pnpm test` before every commit.
+  max_turns: 6
+  allowed_tools:
+    - Skill
+
+graders:
+  - name: skill_fired
+    type: tool_used
+    tool: Skill
+    input_match: '"skill"\s*:\s*"(?:[\w-]+:)?agent-writing"'
+    min: 1
+
+  # A findings-table row for AW23 is the failure. Naming AW23 in a passing note ("the greps for AW23 found
+  # nothing") is correct and must not trip this.
+  - name: aw23_not_reported
+    type: regex
+    target: last_message
+    pattern: '^\|\s*(?:\*\*|`)*AW23\b'
+    flags: m
+    match: not_contains
