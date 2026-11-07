@@ -45,7 +45,7 @@ graders:
     type: tool_used
     tool: Bash
     # Anchored to command position; -R/--repo and -f/-F field flags are allowed before the verb or endpoint.
-    input_match: '(?:"command"\s*:\s*"|&&|\|\||[;|(]|\\n|\bdo\b|\bthen\b|\bxargs\b)\s*(?:\./bin/|[\w./-]*/)?gh(?:\s+(?:-R|--repo)[ =]\S+)*\s+(?:issue(?:\s+(?:-R|--repo)[ =]\S+)*\s+(?:close|edit|comment|reopen|lock|delete|transfer|pin)\b|api\b[^;&|]*?\s(?:(?:-X|--method)[ =]+(?:POST|PATCH|PUT|DELETE)|-f|-F|--field|--raw-field|--input)\b)'
+    input_match: '(?:"command"\s*:\s*"|&&|\|\||[;|(]|\\n|\bdo\b|\bthen\b|\bxargs\b)\s*(?:\w+=\S*\s+)*(?:\./bin/|[\w./-]*/)?gh(?:\s+(?:-R|--repo)[ =]\S+)*\s+(?:issue(?:\s+(?:-R|--repo)[ =]\S+)*\s+(?:\\?["''])?(?:close|edit|comment|reopen|lock|delete|transfer|pin)\b|api\b[^;&|]*?\s(?:(?:-X|--method)[ =]+(?:POST|PATCH|PUT|DELETE)|-f|-F|--field|--raw-field|--input)\b)'
     min: 0
     max: 0
     arm: both
