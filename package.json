@@ -20,9 +20,13 @@
     "check-links": "node scripts/ts/check-markdown-links.ts --path .",
     "check": "bash scripts/ci.sh check",
     "test": "vitest run",
-    "coverage": "vitest run --coverage"
+    "coverage": "vitest run --coverage",
+    "mutate": "stryker run"
   },
   "devDependencies": {
+    "@stryker-mutator/core": "10.1.1",
+    "@stryker-mutator/typescript-checker": "10.1.1",
+    "@stryker-mutator/vitest-runner": "10.1.1",
     "@types/node": "22.20.4",
     "@vitest/coverage-v8": "5.0.2",
     "eslint": "10.11.0",

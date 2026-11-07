@@ -1,0 +1,19 @@
+{
+  "packageManager": "pnpm",
+  "testRunner": "vitest",
+  "plugins": [
+    "@stryker-mutator/vitest-runner",
+    "@stryker-mutator/typescript-checker"
+  ],
+  "mutate": [
+    "scripts/ts/**/*.ts",
+    "plugins/*/scripts/ts/**/*.ts",
+    "!**/*.test.ts",
+    "!**/test-support.ts",
+    "!**/fixtures/**"
+  ],
+  "coverageAnalysis": "perTest",
+  "ignoreStatic": true,
+  "incremental": true,
+  "reporters": ["clear-text", "progress"]
+}

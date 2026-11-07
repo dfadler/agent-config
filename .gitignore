@@ -8,6 +8,8 @@ coverage/
 coverage-py/
 .coverage
 node_modules/
+.stryker-tmp/
+/reports/
 .DS_Store
 
 # `claude plugin eval` run output (report.html, aggregate-result.json, traces)
