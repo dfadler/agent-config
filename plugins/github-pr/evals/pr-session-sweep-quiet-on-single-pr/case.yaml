@@ -1,0 +1,27 @@
+# Run: node plugins/eval-authoring/scripts/ts/run-evals/run-evals.ts plugins/github-pr --trigger-boundary (plugin arm only; no grant needed).
+# Maps to SKILL.md description: "Not for one PR you are working on yourself".
+# good-reply: Start with the lint failure: gh pr checks, then merge main, then answer the two threads.
+# bad-reply: (invokes pr-session-sweep and messages other sessions)
+schema_version: "1.1"
+name: pr-session-sweep-quiet-on-single-pr
+description: >
+  Near-miss: same three chores (checks, conflict, comments) but on the one PR the user is
+  working on. Trigger-boundary negative, plugin arm only, scored as a fire count, no delta.
+tags: [pr-session-sweep, trigger-boundary, "pair:pr-session-sweep-fires-on-natural-phrasing"]
+
+execution:
+  prompt: |
+    My PR has a failing lint check, a merge conflict with main and two unanswered review
+    comments. Walk me through fixing the checks, the conflict and the comments on this PR.
+    Do not run anything.
+  max_turns: 4
+  allowed_tools:
+    - Skill
+
+graders:
+  - name: pr_session_sweep_not_invoked
+    type: tool_used
+    tool: Skill
+    input_match: '"skill"\s*:\s*"(?:[\w-]+:)?pr-session-sweep"'
+    min: 0
+    max: 0
