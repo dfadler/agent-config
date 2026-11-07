@@ -136,8 +136,8 @@ its number is never reused.
   stating. Check: `grep -nE "^## Contract|\*\*(Input|Output|Does not):\*\*" SKILL.md`.
   Fix: add the section, stating only what the skill already does.
 - **AW22 evals-exist.** Each skill has at least one eval case that names it. Check:
-  `grep -rl "<skill-name>" <plugin>/evals`. When the audit has only pasted text and no
-  listing of the plugin directory, report AW22 as not checked. Fix: report the gap; where
+  `grep -rl "<skill-name>" <plugin>/evals`. When no plugin directory listing is available,
+  report AW22 as not checked. Fix: report the gap; where
   the eval-authoring plugin is installed, name its `author-cases` skill, and do not write
   the cases in the session that wrote or rewrote the skill.
 

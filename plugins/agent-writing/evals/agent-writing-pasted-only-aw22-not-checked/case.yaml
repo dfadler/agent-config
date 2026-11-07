@@ -44,7 +44,7 @@ graders:
   - name: aw22_reported_not_checked
     type: regex
     target: last_message
-    pattern: 'AW22[^\n]{0,160}(?:not checked|unchecked|cannot (?:be )?check|could not (?:be )?check|no listing|not able to check)'
+    pattern: 'AW22[^\n]{0,160}(?:not checked|unchecked|cannot (?:be )?check|could(?:n.t| not) (?:be )?check|did(?:n.t| not) check|no (?:plugin )?(?:directory )?listing|not able to check)'
     flags: i
     match: contains
 

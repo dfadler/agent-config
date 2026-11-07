@@ -85,16 +85,19 @@ graders:
     flags: i
     match: contains
 
+  # A passing rule may be named ("AW22 passes because ..."); only a finding about the gap fails.
   - name: no_contract_finding
     type: regex
     target: last_message
-    pattern: '\bAW21\b'
+    pattern: 'AW21[^\n]*(?:missing|no contract|lacks|without|add )|(?:missing|no contract|lacks|without)[^\n]*AW21'
+    flags: i
     match: not_contains
 
   - name: no_evals_finding
     type: regex
     target: last_message
-    pattern: '\bAW22\b'
+    pattern: 'AW22[^\n]*(?:no evals?|missing|lacks|gap|nothing names|add )|(?:no evals?|missing|lacks|gap)[^\n]*AW22'
+    flags: i
     match: not_contains
 
   - name: no_not_for_finding
