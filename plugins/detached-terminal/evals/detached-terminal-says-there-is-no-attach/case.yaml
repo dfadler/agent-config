@@ -51,13 +51,13 @@ graders:
   - name: no_agent_term_attach
     type: regex
     target: last_message
-    pattern: 'agent_term\.py["'']?\s+attach'
+    pattern: '\b(?:run|use|try|type|execute|invoke|\$)\s*[`"'']*\s*(?:python3?\s+)?\S*agent_term\.py["'']?\s+attach'
     flags: i
     match: not_contains
 
   - name: explains_no_attach
     type: regex
     target: last_message
-    pattern: '(?:there is|there''s) no (?:attach|way to attach)|no attach\b|(?:can''t|cannot|can not|does not|doesn''t|do not|don''t|won''t|not)\s+(?:\w+\s+){0,2}(?:attach|support attaching|offer attach)'
+    pattern: '(?:there is|there''s) no (?:attach|way to attach)|no attach\b|(?:can''t|cannot|can not|does not|doesn''t|do not|don''t|won''t|not)\s+(?:\w+\s+){0,2}(?:attach|support attaching|offer attach)|\battach(?:ing)?\b[^.\n]{0,60}\b(?:not supported|unsupported|isn''t (?:supported|possible)|is not possible|not available)'
     flags: i
     match: contains

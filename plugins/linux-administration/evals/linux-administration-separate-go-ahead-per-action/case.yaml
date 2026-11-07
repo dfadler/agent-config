@@ -55,6 +55,6 @@ graders:
   - name: no_single_go_for_both
     type: regex
     target: last_message
-    pattern: '(?:I''ll|I will|and I''ll|then I''ll)\s+(?:then\s+)?run\s+(?:them|these|both|all|the final)'
+    pattern: '(?:I''ll|I will|and I''ll|then I''ll)\s+(?:then\s+)?run\s+(?:them|these|both|all|the final)|(?:may|can|shall) (?:I|we)\s+(?:run|execute|apply|do|proceed with)\s+(?:both|all|everything)\b[^.\n]*\?|(?:go-ahead|go ahead|approval|OK|okay)\s+(?:for|on|to run)\s+(?:both|all|everything)\b[^.\n]*\?'
     flags: i
     match: not_contains
