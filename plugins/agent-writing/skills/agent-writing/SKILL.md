@@ -4,10 +4,10 @@ description: |
   ALWAYS invoke this skill first when writing, editing, shortening or auditing a SKILL.md,
   an agent definition, a CLAUDE.md or AGENTS.md file, or a convention file, even for a
   one-line rule or a short snippet written in a reply. It defines numbered rules
-  AW01-AW20, each with a runnable check and a fix. Not for READMEs, docs prose, commit
+  AW01-AW23, each with a runnable check and a fix. Not for READMEs, docs prose, commit
   messages or PR text.
 metadata:
-  version: "1.0.0"
+  version: "1.1.0"
 ---
 
 # Writing for agents
@@ -107,10 +107,11 @@ its number is never reused.
   "above". Check: `grep -nE "Step [0-9]|see above|below" <file>`. Fix: name the target.
 - **AW15 description-earns-its-load.** A `description` is permanent context. It holds a
   trigger and a contract (when to use, what comes back), no procedure and no rationale,
-  and stays under about 500 characters. A skill that only runs by hand sets
-  `disable-model-invocation: true` and needs no trigger text. Check: count the
-  description's characters, and confirm it says when to use the skill. Fix: cut it to
-  trigger plus contract.
+  and stays under about 500 characters. It ends with a "Not for" clause naming what the
+  skill does not handle and, where one exists, the skill that does. A skill that only runs
+  by hand sets `disable-model-invocation: true` and needs no trigger text. Check: count the
+  description's characters, confirm it says when to use the skill, and look for "Not for".
+  Fix: cut it to trigger, contract and "Not for".
 
 ## Context
 
@@ -128,6 +129,18 @@ its number is never reused.
   ("every modified file is listed with its line"), not "until you understand". Check:
   grep for "until", "as needed", "if appropriate". Fix: state the finish line.
 
+## Skill completeness
+
+- **AW21 contract-section.** A `SKILL.md` has a `## Contract` section with an `**Input:**`
+  and an `**Output:**` line, and a `**Does not:**` line when the skill has a limit worth
+  stating. Check: `grep -nE "^## Contract|\*\*(Input|Output|Does not):\*\*" SKILL.md`.
+  Fix: add the section, stating only what the skill already does.
+- **AW22 evals-exist.** Each skill has at least one eval case that names it. Check:
+  `grep -rl "<skill-name>" <plugin>/evals`. When no plugin directory listing is available,
+  report AW22 as not checked. Fix: report the gap; where
+  the eval-authoring plugin is installed, name its `author-cases` skill, and do not write
+  the cases in the session that wrote or rewrote the skill.
+
 ## Plain speech
 
 - **AW20 plain-words.** Write whole sentences in the active voice, one idea each, naming
@@ -138,3 +151,14 @@ its number is never reused.
   `grep -nEi "leverage|utilize|facilitate|robust|seamless|serves as" <file>`, then read the file for
   passives and fragments. Fix: rewrite the sentence so it states an action, fact or
   number.
+
+## Affirmative guidance
+
+- **AW23 state-the-target.** Say what to do. Keep a prohibition only as a hard guardrail
+  that has no positive phrasing (a destructive action, a security boundary), and pair it
+  with the behaviour wanted in the same sentence. An instruction that already names its
+  target is not a finding. Check:
+  `grep -nEi "\b(don't|do not|never|avoid|must not|shouldn't)\b" <file>`, then read each
+  hit and the rest of the file for bans the pattern misses ("refrain from"). Fix: rewrite a style or preference ban as the behaviour wanted ("write one-line
+  comments"); on a guardrail, add what to do instead ("never force-push to main; open a
+  pull request").

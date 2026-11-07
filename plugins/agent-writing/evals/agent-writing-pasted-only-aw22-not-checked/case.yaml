@@ -1,0 +1,57 @@
+# Run: node plugins/eval-authoring/scripts/ts/run-evals/run-evals.ts plugins/agent-writing --case "agent-writing-pasted-only-aw22-not-checked" (no grant needed; Skill only).
+# Maps to SKILL.md: "When the audit has only pasted text and no listing of the plugin directory, report AW22 as not checked." (AW22).
+# good-reply: | Rule | Where | Evidence | Fix | table with an AW21 row for the missing Contract and a line "AW22: not checked, no listing of the plugin directory was given".
+# bad-reply: | AW22 | plugin | no evals directory | add cases | (asserts a gap in a directory it never saw)
+schema_version: "1.1"
+name: agent-writing-pasted-only-aw22-not-checked
+description: >
+  With a pasted SKILL.md and no directory listing, AW22 cannot be checked. expected_outcome:
+  PASS when the reply says AW22 was not checked and still finds the missing Contract (AW21);
+  FAIL otherwise. The rule ids exist only in the plugin, so the graders separate the arms by
+  construction.
+tags: [agent-writing, quick, audit]
+
+execution:
+  prompt: |
+    Review this skill file and tell me what is wrong with it.
+
+    ```
+    ---
+    name: standup-notes
+    description: |
+      Use when the user asks for standup notes, a daily update or a summary of what they
+      did yesterday. Returns three bullets: done, doing, blocked. Not for sprint reports.
+    ---
+
+    # Standup notes
+
+    1. Read the activity list the user pasted.
+    2. Group items into done, doing and blocked.
+    3. Write one bullet per group, at most 20 words each.
+    4. Return the three bullets and nothing else.
+    ```
+  max_turns: 6
+  allowed_tools:
+    - Skill
+
+graders:
+  - name: skill_fired
+    type: tool_used
+    tool: Skill
+    input_match: '"skill"\s*:\s*"(?:[\w-]+:)?agent-writing"'
+    min: 1
+
+  - name: aw22_reported_not_checked
+    type: regex
+    target: last_message
+    pattern: 'AW22[^\n]{0,160}(?:not checked|unchecked|cannot (?:be )?check|could(?:n.t| not) (?:be )?check|did(?:n.t| not) check|no (?:plugin )?(?:directory )?listing|not able to check)'
+    flags: i
+    match: contains
+
+  # Anchor: the file has no Contract section, so AW21 should still be found.
+  - name: still_finds_missing_contract
+    type: regex
+    target: last_message
+    pattern: 'AW21[^\n]*contract|contract[^\n]*AW21'
+    flags: i
+    match: contains
