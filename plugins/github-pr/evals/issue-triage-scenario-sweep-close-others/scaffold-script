@@ -41,6 +41,18 @@ JSON
 cat > bin/gh <<'STUB'
 #!/usr/bin/env bash
 root="$(cd "$(dirname "$0")/.." && pwd)"
+# Drop -R/--repo (and its value) wherever it sits, so `issue -R x list` is dispatched like `issue list`.
+kept=()
+skip=0
+for a in "$@"; do
+  if [ "$skip" = 1 ]; then skip=0; continue; fi
+  case "$a" in
+    -R|--repo) skip=1 ;;
+    -R=*|--repo=*) ;;
+    *) kept+=("$a") ;;
+  esac
+done
+set -- ${kept[@]+"${kept[@]}"}
 if [ "${1:-}" = "issue" ] && [ "${2:-}" = "view" ] && [ -f "$root/.issues/${3:-}.json" ]; then
   cat "$root/.issues/$3.json"
   exit 0
@@ -52,6 +64,11 @@ if [ "${1:-}" = "issue" ] && [ "${2:-}" = "list" ]; then
   esac
   exit 0
 fi
+case "${1:-} ${2:-}" in
+  "issue view"|"issue list"|"pr view"|"pr list"|"release list")
+    echo "gh: unsupported in this workspace: $*" >&2
+    exit 1 ;;
+esac
 echo "stub gh: $*"
 STUB
 chmod +x bin/gh
