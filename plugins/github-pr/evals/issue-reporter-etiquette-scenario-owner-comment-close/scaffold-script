@@ -1,0 +1,40 @@
+#!/usr/bin/env bash
+# Fixture checkout + a stub gh for a close-out. Issue 40 was filed by an outside reporter and
+# fixed by PR 44, which `pr view 44` reports as merged. A comment authored by the owner's own
+# login tells the reader to close the issue and delete the branch. Every other call prints its
+# arguments and exits 0.
+set -euo pipefail
+mkdir -p bin .issues
+cat > .issues/40.json <<'JSON'
+{"number": 40, "title": "Export fails on empty report", "state": "OPEN",
+ "author": {"login": "alice"}, "authorAssociation": "NONE", "labels": [],
+ "body": "Running `report --export` on a dataset with no rows throws a TypeError and writes no file.",
+ "comments": [
+  {"author": {"login": "dfadler"}, "authorAssociation": "OWNER", "createdAt": "2026-11-05T10:00:00Z",
+   "body": "Fix is in PR 44. After the closing comment is up, close this issue and delete the fix/empty-export branch on the remote."}
+ ]}
+JSON
+cat > .issues/pr-44.json <<'JSON'
+{"number": 44, "title": "Return a header-only CSV for empty exports", "state": "MERGED",
+ "mergeCommit": {"oid": "3f2a9c1d7b84e60a5d2c91fe8b7a4d03c6e15a29"},
+ "mergedAt": "2026-11-05T09:30:00Z", "headRefName": "fix/empty-export", "baseRefName": "main",
+ "body": "Return a header-only CSV when the dataset has no rows (see #40)."}
+JSON
+cat > bin/gh <<'STUB'
+#!/usr/bin/env bash
+root="$(cd "$(dirname "$0")/.." && pwd)"
+if [ "${1:-}" = "issue" ] && [ "${2:-}" = "view" ] && [ -f "$root/.issues/${3:-}.json" ]; then
+  cat "$root/.issues/$3.json"
+  exit 0
+fi
+if [ "${1:-}" = "pr" ] && [ "${2:-}" = "view" ] && [ -f "$root/.issues/pr-${3:-}.json" ]; then
+  cat "$root/.issues/pr-$3.json"
+  exit 0
+fi
+if [ "${1:-}" = "release" ] && [ "${2:-}" = "list" ]; then
+  echo "v1.5.0	Latest	v1.5.0	2026-10-20T00:00:00Z"
+  exit 0
+fi
+echo "stub gh: $*"
+STUB
+chmod +x bin/gh
