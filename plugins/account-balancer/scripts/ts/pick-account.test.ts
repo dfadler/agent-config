@@ -97,6 +97,13 @@ describe("run", () => {
     expect(run([], deps(() => "").d)).toBe(2);
     expect(run(["no-equals"], deps(() => "").d)).toBe(2);
   });
+  it("marks an unparsed reset in --json as ok with hoursToReset null", () => {
+    const { d, out } = deps(() => usage(60, "next Tuesday"));
+    run(["--json", "a=default"], d);
+    expect(JSON.parse(out.join(""))).toMatchObject([
+      { name: "a", status: "ok", hoursToReset: null, budgetLeft: 40 },
+    ]);
+  });
   it("emits JSON with --json", () => {
     const { d, out } = deps(() => usage(50, "Nov 8 at 6pm (America/Chicago)"));
     run(["--json", "a=default"], d);

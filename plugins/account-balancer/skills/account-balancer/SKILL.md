@@ -52,9 +52,10 @@ budget left is spend that is lost if unused, so it ranks high. Then:
 - **An exhausted account** (0% left) ranks last; its reset hour does not matter until then.
 - **Only the weekly all-models window decides.** Per-model windows are shown in the raw
   `/usage` text. If the job uses a model whose own window is nearly full, mention it.
-- **A `note:` line** means an account's reset time was not recognized, so its rate is
-  unknown and the ranking is inconclusive. Say so and show its percent left rather than
-  presenting a firm pick.
+- **An unrecognized reset time** means that account's rate is unknown and the ranking is
+  inconclusive. Text output adds a `note:` line; with `--json` the same account has
+  `status: "ok"` and `hoursToReset: null`. Either way, say so and show its percent left
+  rather than presenting a firm pick.
 - **Point in time.** Each run is a snapshot; for a long job, re-run it later.
 
 Final line, one sentence, for example: "Start the evals on `personal`, 95% left but resets
