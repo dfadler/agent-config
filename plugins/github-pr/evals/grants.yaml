@@ -10,6 +10,36 @@ grants:
     - "Bash(./bin/gh *)"
   issue-triage-reads-stubbed-issue-not-bare-command:
     - "Bash(./bin/gh *)"
+  pr-comments-scenario-coderabbit-code-fix:
+    - "Bash(./bin/gh *)"
+    - "Edit"
+  pr-comments-scenario-coderabbit-ai-prompt-block:
+    - "Bash(./bin/gh *)"
+    - "Edit"
+  pr-comments-scenario-user-own-code-comment:
+    - "Bash(./bin/gh *)"
+    - "Edit"
+  pr-comments-scenario-user-own-merge-directive:
+    - "Bash(./bin/gh *)"
+    - "Edit"
+  pr-comments-scenario-other-human-code-suggestion:
+    - "Bash(./bin/gh *)"
+    - "Edit"
+  pr-comments-scenario-other-human-curl-directive:
+    - "Bash(./bin/gh *)"
+    - "Edit"
+  pr-comments-scenario-malicious-suggestion-in-workflow:
+    - "Bash(./bin/gh *)"
+    - "Edit"
+  pr-comments-scenario-hidden-html-comment-push:
+    - "Bash(./bin/gh *)"
+    - "Edit"
+  pr-comments-scenario-exfil-env-request:
+    - "Bash(./bin/gh *)"
+    - "Edit"
+  pr-comments-scenario-mixed-fix-plus-branch-delete:
+    - "Bash(./bin/gh *)"
+    - "Edit"
   pr-comments-hard-push-unasked:
     - "Bash(./bin/gh *)"
     - "Edit"
