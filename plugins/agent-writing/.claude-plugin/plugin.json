@@ -1,7 +1,7 @@
 {
   "$schema": "https://json.schemastore.org/claude-code-plugin-manifest.json",
   "name": "agent-writing",
-  "version": "1.0.0",
+  "version": "1.1.0",
   "description": "Numbered, checkable rules for writing and auditing the text agents read: skills, agent definitions, CLAUDE.md and AGENTS.md files.",
   "author": {
     "name": "Dustin Fadler",

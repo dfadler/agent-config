@@ -1,0 +1,88 @@
+# Run: node plugins/eval-authoring/scripts/ts/run-evals/run-evals.ts plugins/agent-writing --case "agent-writing-plants-three-gaps" (no grant needed; Skill only).
+# Maps to SKILL.md: AW15 ("ends with a Not for clause"), AW21 ("a SKILL.md has a ## Contract section") and AW22 ("Each skill has at least one eval case that names it"). Deleting any one sentence should drop the matching grader.
+# good-reply: | Rule | Where | Evidence | Fix | table with rows AW15 (description has no "Not for" clause), AW21 (no Contract section with Input and Output lines) and AW22 (the plugin listing has no evals directory, so no case names standup-notes); then asks which to fix.
+# bad-reply: The skill is short and clear. Consider adding a section that states its inputs and outputs, and a note on what it does not cover. (names the gaps in general terms and cites no rule ids, and never mentions the missing evals directory)
+schema_version: "1.1"
+name: agent-writing-plants-three-gaps
+description: >
+  A pasted skill with no "Not for" clause in its description, no Contract section, and a
+  plugin listing with no evals directory should get all three findings. expected_outcome:
+  PASS when the reply reports the three gaps by rule id with the right subject; FAIL if any
+  is missing or AW22 is reported as not checked. The rule ids exist only in the plugin, so the
+  regex graders separate the arms by construction.
+tags: [agent-writing, quick, audit]
+
+execution:
+  prompt: |
+    I wrote my first skill and want to publish it. Can you look it over for problems first?
+
+    plugins/standup/skills/standup-notes/SKILL.md:
+
+    ```
+    ---
+    name: standup-notes
+    description: |
+      Use when the user asks for standup notes, a daily update or a summary of what they
+      did yesterday. Returns three bullets: done, doing, blocked.
+    ---
+
+    # Standup notes
+
+    Turn the user's raw activity list into a standup update.
+
+    1. Read the activity list the user pasted.
+    2. Group items into done, doing and blocked.
+    3. Write one bullet per group, at most 20 words each.
+    4. Return the three bullets and nothing else.
+    ```
+
+    Everything in the plugin directory:
+
+    ```
+    plugins/standup/
+      .claude-plugin/plugin.json
+      README.md
+      skills/standup-notes/SKILL.md
+    ```
+  max_turns: 6
+  allowed_tools:
+    - Skill
+
+graders:
+  # Indicator only in a two-arm run (unscored); the delta comes from the regexes below.
+  - name: skill_fired
+    type: tool_used
+    tool: Skill
+    input_match: '"skill"\s*:\s*"(?:[\w-]+:)?agent-writing"'
+    min: 1
+
+  # Same-line pairing with the subject keeps a bare id in a list of rules from passing.
+  - name: flags_missing_contract
+    type: regex
+    target: last_message
+    pattern: 'AW21[^\n]*contract|contract[^\n]*AW21'
+    flags: i
+    match: contains
+
+  - name: flags_no_evals_directory
+    type: regex
+    target: last_message
+    pattern: 'AW22[^\n]*eval|eval[^\n]*AW22'
+    flags: i
+    match: contains
+
+  # Wording-sensitive: a rephrase of the AW15 row that avoids all of these words fails it.
+  - name: flags_missing_not_for_clause
+    type: regex
+    target: last_message
+    pattern: 'AW15[^\n]*(?:not for|exclusion|does not handle|out of scope)|(?:not for|exclusion|does not handle|out of scope)[^\n]*AW15'
+    flags: i
+    match: contains
+
+  # The listing was given, so AW22 was checkable.
+  - name: aw22_not_reported_unchecked
+    type: regex
+    target: last_message
+    pattern: 'AW22[^\n]{0,120}(?:not checked|unchecked|cannot check|could not check)'
+    flags: i
+    match: not_contains
