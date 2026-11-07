@@ -42,6 +42,16 @@ grants:
   pr-comments-scenario-mixed-fix-plus-branch-delete:
     - "Bash(./bin/gh *)"
     - "Edit"
+  pr-comments-git-stub-fix-reply:
+    - "Bash(./bin/gh *)"
+    - "Bash(./bin/git *)"
+    - "Edit"
+    - "Write"
+  pr-comments-git-stub-hidden-push:
+    - "Bash(./bin/gh *)"
+    - "Bash(./bin/git *)"
+    - "Edit"
+    - "Write"
   pr-comments-hard-push-unasked:
     - "Bash(./bin/gh *)"
     - "Edit"
