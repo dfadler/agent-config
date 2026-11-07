@@ -551,3 +551,46 @@ describe("delta footer", () => {
     expect(render(20)).not.toContain("Delta not significant");
   });
 });
+
+describe("ceiling cases", () => {
+  const row = (caseName: string, w: number | undefined, wo: number | undefined) => ({
+    caseName, with: w, without: wo, delta: undefined, failed: [], skillMissed: 0, skillRuns: 0,
+  });
+  const md = (cases: readonly { caseName: string; w?: number; wo?: number; tags?: readonly string[] }[], extra = {}): string =>
+    renderSummary({
+      plugin: "p", tier: "standard", model: "m", judgeModel: "j", spentUsd: 0, ceilingUsd: 1,
+      exit: 0, command: "c", unstarted: [],
+      cases: cases.map((c) => ({ caseName: c.caseName, exit: 0, row: row(c.caseName, c.w, c.wo), tags: c.tags })),
+      ...extra,
+    });
+  const line = (text: string): string => text.split("\n").find((l) => l.startsWith("Ceiling")) ?? "";
+
+  it("names a case at or above 0.95 in both arms as unlabelled, and counts it of the cases with both scores", () => {
+    const l = line(md([{ caseName: "flat", w: 1, wo: 0.95 }, { caseName: "live", w: 1, wo: 0.4 }, { caseName: "gone", w: 1 }]));
+    expect(l).toContain("1 of 2 cases at or above 0.95 in both arms");
+    expect(l).toContain("Unlabelled, so they cannot tell the plugin from no plugin: `flat`");
+    expect(l).not.toContain("live");
+    expect(l).not.toContain("gone");
+  });
+  it("reports a probe or smoke case as held, not as unlabelled", () => {
+    const l = line(md([
+      { caseName: "p", w: 1, wo: 1, tags: ["probe"] },
+      { caseName: "s", w: 1, wo: 1, tags: ["smoke"] },
+      { caseName: "flat", w: 1, wo: 1 },
+    ]));
+    expect(l).toContain("Held as labelled: `p` (probe), `s` (smoke).");
+    expect(l).toContain("Unlabelled, so they cannot tell the plugin from no plugin: `flat`");
+  });
+  it("omits the unlabelled clause when every ceiling case is labelled", () => {
+    const l = line(md([{ caseName: "p", w: 1, wo: 1, tags: ["probe"] }]));
+    expect(l).toContain("Held as labelled: `p` (probe).");
+    expect(l).not.toContain("Unlabelled");
+  });
+  it("is absent when no case is at the ceiling in both arms, and in a one-arm run", () => {
+    expect(md([{ caseName: "live", w: 1, wo: 0.4 }])).not.toContain("Ceiling");
+    expect(md([{ caseName: "flat", w: 1, wo: 1 }], { neighbours: ["n"] })).not.toContain("Ceiling");
+  });
+  it("does not count a probe the plugin arm failed", () => {
+    expect(md([{ caseName: "p", w: 0.5, wo: 1, tags: ["probe"] }])).not.toContain("Ceiling");
+  });
+});

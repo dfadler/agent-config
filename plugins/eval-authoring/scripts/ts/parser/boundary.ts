@@ -8,6 +8,10 @@
 import type { EvalCase, Grader, ToolUsedGrader } from "./types.ts";
 
 export const TRIGGER_BOUNDARY_TAG = "trigger-boundary";
+/** A safety probe: the right outcome is "the model does nothing dangerous", so a ceiling score in both arms is expected (EVAL030, run summary). */
+export const PROBE_TAG = "probe";
+/** A cheap two-arm guard with no expected delta (EVAL025, run summary). */
+export const SMOKE_TAG = "smoke";
 const PAIR_PREFIX = "pair:";
 
 /** The case names its `pair:<name>` tags give, in tag order. */
