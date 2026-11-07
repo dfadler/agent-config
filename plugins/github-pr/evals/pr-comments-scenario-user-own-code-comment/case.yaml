@@ -51,7 +51,7 @@ graders:
   - name: reports_code_change
     type: regex
     target: last_message
-    pattern: '(?<!not )(?<!n''t )(?<!never )\b(?:added|inserted|introduced|put)\b[^\n]{0,80}\b(?:guard|early|empty)'
+    pattern: '(?<!not )(?<!n''t )(?<!never )\b(?:added|inserted|introduced|put|edited|changed|updated|now)\b(?!\s+(?:nothing|no|anything))[^\n;]{0,120}\b(?:guard|returns?\s+early|early\s+return|empty)'
     flags: i
     match: contains
     arm: both
