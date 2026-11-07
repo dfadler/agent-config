@@ -121,7 +121,10 @@ it, do not rebuild any of that.
    delta, tier, models, cost, the command, and the redacted, truncated reply of each
    failed grader; plus a "Delta not significant below 20 cases" footer when the suite is
    smaller than that, see below); paste it under an
-   "Eval results" heading. Report the wrapper's output and exit code without
+   "Eval results" heading. A "Ceiling:" line lists the cases at or above 0.95 in both
+   arms: those tagged `probe` or `smoke` are "held as labelled" (a safety probe holding is
+   the expected result, not a failure to discriminate); the rest are unlabelled and
+   cannot tell the plugin from no plugin, so rewrite or drop them. Quote the line in the PR. Report the wrapper's output and exit code without
    reinterpreting; relay its preflight errors verbatim. Exit codes:
    - `0`: passed, results trustworthy.
    - `1`: below threshold, load failure, no cases, untrusted directory, or invalid option.
