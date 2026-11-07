@@ -1214,6 +1214,7 @@ const run = async (
       caseName: d.caseName,
       exit: d.exit,
       row: caseRow(d.caseName, progress.texts[i], io.readFile, firesGraderNames(suite, d.caseName)),
+      tags: suite.cases.find((c) => c.name.value === d.caseName)?.tags.value,
     })),
   });
   if (options.pr === undefined) {

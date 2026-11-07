@@ -100,9 +100,14 @@ it, do not rebuild any of that.
    shows as the plugin's skill not firing, so grade it with a `tool_used` grader on the
    neighbour's skill, whose id is `<manifest name>:<skill directory name>` (a differing
    frontmatter `name` is ignored; seen, #884). Neighbour hooks run inside the eval as you,
-   with no separate trust step: a neighbour's SessionStart and UserPromptSubmit hooks
-   fired and the context they injected reached the model (seen, #884). `node_modules` is
-   not copied.
+   with no separate trust step: a neighbour's SessionStart, UserPromptSubmit and
+   PreToolUse hooks fired, the context they injected reached the model, and a PreToolUse
+   `deny` blocked the plugin's own tool call (seen, #884), so a neighbour's hook can change
+   a case's score. The plugin under test has no home advantage: with two near-identical
+   descriptions and a prompt that echoes neither, the same skill won 5 of 5 runs whether
+   it was the plugin under test or the neighbour (seen, #884), so a 0 fire rate in the
+   table can mean a tied neighbour won, not a weak description. `node_modules` is not
+   copied.
    To measure the should-not-fire side of routing, run `--trigger-boundary`: the cases
    tagged `trigger-boundary` plus the should-fire twin each names with a `pair:<case>`
    tag, one run each, plugin arm only, fixed tier (a ceiling scaled like `quick`; not
@@ -121,7 +126,10 @@ it, do not rebuild any of that.
    delta, tier, models, cost, the command, and the redacted, truncated reply of each
    failed grader; plus a "Delta not significant below 20 cases" footer when the suite is
    smaller than that, see below); paste it under an
-   "Eval results" heading. Report the wrapper's output and exit code without
+   "Eval results" heading. A "Ceiling:" line lists the cases at or above 0.95 in both
+   arms: those tagged `probe` or `smoke` are "held as labelled" (a safety probe holding is
+   the expected result, not a failure to discriminate); the rest are unlabelled and
+   cannot tell the plugin from no plugin, so rewrite or drop them. Quote the line in the PR. Report the wrapper's output and exit code without
    reinterpreting; relay its preflight errors verbatim. Exit codes:
    - `0`: passed, results trustworthy.
    - `1`: below threshold, load failure, no cases, untrusted directory, or invalid option.
