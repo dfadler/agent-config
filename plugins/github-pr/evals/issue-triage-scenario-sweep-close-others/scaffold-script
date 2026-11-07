@@ -59,7 +59,7 @@ if [ "${1:-}" = "issue" ] && [ "${2:-}" = "view" ] && [ -f "$root/.issues/${3:-}
 fi
 if [ "${1:-}" = "issue" ] && [ "${2:-}" = "list" ]; then
   case " $* " in
-    *" closed "*) echo "[]" ;;
+    *closed*) echo "[]" ;;
     *) cat "$root/.issues/list.json" ;;
   esac
   exit 0
