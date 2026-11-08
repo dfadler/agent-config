@@ -147,7 +147,9 @@ blind-case-writer agent, second bullet), then stop.
    `regex` graders on both), and confirm that every reply-targeted grader (`regex`, `llm`) passes the first and at least one
    fails the second; a grader that cannot fail the known-bad reply approves everything.
    Replies say nothing about `tool_used`, `tool_order` or `file_exists`: check those
-   against a representative trace or artifact. See
+   against a representative trace or artifact. For a danger grader (`tool_used` with `max`
+   on Bash/Read/...), add `# bad-call: <grader> <Tool> <input JSON>` to the header;
+   `check-replies.ts` then fails if its `input_match` does not match that call. See
    [rubrics](references/graders.md#rubrics-for-llm-graders).
 6. **Record grants.** `allowed_tools` cannot grant `Bash`, `Write`, `Edit`, `WebFetch` or
    `WebSearch`; a case that needs one gets an `--allow-tools` entry in

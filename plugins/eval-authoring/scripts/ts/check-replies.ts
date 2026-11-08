@@ -13,6 +13,13 @@
  * reported "unchecked". A case with an `llm` grader and no header replies is
  * reported "missing" (so is a regex-only case); that is an error only with --require.
  *
+ * Positive control for `tool_used` danger graders (#1023): one header line per
+ * grader, `# bad-call: <grader> <Tool> <tool input as JSON>`, e.g.
+ * `# bad-call: no_mutation Bash {"command":"./bin/gh issue close 31"}`. The named
+ * grader's `input_match` must match that input, which puts it over its `max`.
+ * A case with any bad-call must control every `max` grader on a tool other than
+ * Skill/Agent. A typo in an `input_match` that makes it match nothing then fails here.
+ *
  * Probe (#859): `node check-replies.ts --probe CASE --reply - [PLUGIN_ROOT] <<'__REPLY__'`
  * runs the same regex graders on the reply read from stdin and prints pass/FAIL per
  * grader, so the grader-red-team agent can test a wrong reply without writing a file or
@@ -21,7 +28,7 @@
  */
 import { readFileSync } from "node:fs";
 import { parseArgs } from "node:util";
-import { readSuite, type EvalCase, type RegexGrader } from "./parser/index.ts";
+import { readSuite, type EvalCase, type RegexGrader, type ToolUsedGrader } from "./parser/index.ts";
 
 export interface Replies {
   readonly good: string | undefined;
@@ -70,6 +77,58 @@ export const probeCase = (c: EvalCase, reply: string): readonly string[] =>
       : `not-run ${name} (${g.type})`;
   });
 
+export interface BadCall {
+  readonly grader: string;
+  readonly tool: string;
+  readonly input: string;
+}
+
+/** Read `bad-call: <grader> <Tool> <input>` lines from the leading comment block. */
+export const headerCalls = (yaml: string): readonly BadCall[] =>
+  yaml
+    .split("\n")
+    .filter((l, i) => i > 0 || l.trim() !== "---")
+    .reduce<{ done: boolean; calls: BadCall[] }>(
+      (acc, line) => {
+        if (acc.done || !line.startsWith("#")) return { ...acc, done: true };
+        const m = /^# bad-call:\s+(\S+)\s+(\S+)\s+(.+)$/.exec(line);
+        if (m !== null) acc.calls.push({ grader: m[1] ?? "", tool: m[2] ?? "", input: m[3] ?? "" });
+        return acc;
+      },
+      { done: false, calls: [] },
+    ).calls;
+
+/** Danger graders: `max` set, on a tool other than Skill/Agent (those are routing checks). */
+const dangerGraders = (c: EvalCase): readonly ToolUsedGrader[] =>
+  c.graders.filter(
+    (g): g is ToolUsedGrader =>
+      g.type === "tool_used" &&
+      g.max.value !== undefined &&
+      g.tool.value !== "Skill" &&
+      g.tool.value !== "Agent",
+  );
+
+/** Failure detail if a bad-call does not trip its named grader, or a danger grader has no control; else undefined. */
+export const checkCalls = (c: EvalCase, calls: readonly BadCall[]): string | undefined => {
+  if (calls.length === 0) return undefined;
+  const bad: string[] = [];
+  for (const call of calls) {
+    const g = dangerGraders(c).find((x) => x.name.value === call.grader);
+    if (g === undefined) {
+      bad.push(`${call.grader}: no such max grader`);
+    } else if (g.tool.value !== call.tool) {
+      bad.push(`${call.grader}: grader watches ${g.tool.value}, not ${call.tool}`);
+    } else if (g.inputMatch.value !== undefined && !new RegExp(g.inputMatch.value).test(call.input)) {
+      bad.push(`${call.grader}: input_match does not match the bad call`);
+    }
+  }
+  const covered = new Set(calls.map((x) => x.grader));
+  for (const g of dangerGraders(c)) {
+    if (!covered.has(g.name.value ?? "")) bad.push(`${g.name.value ?? "(unnamed)"}: no bad-call control`);
+  }
+  return bad.length === 0 ? undefined : bad.join("; ");
+};
+
 export type Status = "ok" | "unchecked" | "missing" | "fail" | "skipped";
 export interface CaseReport {
   readonly name: string;
@@ -117,7 +176,12 @@ export const checkPlugin = (pluginRoot: string): readonly CaseReport[] => {
   }
   return suite.cases.map((c) => {
     const file = c.caseYamlFile ?? c.promptFile;
-    return checkCase(c, headerReplies(file === undefined ? "" : readFileSync(file, "utf8")));
+    const text = file === undefined ? "" : readFileSync(file, "utf8");
+    const report = checkCase(c, headerReplies(text));
+    const calls = checkCalls(c, headerCalls(text));
+    return calls === undefined || report.status === "fail"
+      ? report
+      : { name: report.name, status: "fail", detail: `bad-call: ${calls}` };
   });
 };
 
