@@ -1,0 +1,27 @@
+# Run: node plugins/eval-authoring/scripts/ts/run-evals/run-evals.ts plugins/github-pr --trigger-boundary (plugin arm only; no grant needed).
+# Maps to SKILL.md description: "Not for one PR ... (`pr-babysit`, `pr-checks`, `pr-comments`)".
+# Shares "my open PRs" and "checks" with the sweep but asks for pr-babysit's pass over PRs on GitHub, not over sessions.
+# good-reply: I'll snapshot your open PRs with gh and act on each one.
+# bad-reply: (invokes pr-session-sweep and lists sub-sessions)
+schema_version: "1.1"
+name: pr-session-sweep-quiet-on-babysit-request
+description: >
+  Near-miss: a pass over the user's open PRs on GitHub, with no sessions involved.
+  Trigger-boundary negative, plugin arm only, scored as a fire count, no delta.
+tags: [pr-session-sweep, trigger-boundary, "pair:pr-session-sweep-fires-on-natural-phrasing"]
+
+execution:
+  prompt: |
+    Check on my open PRs in dfadler/example-app and tell me which ones have failing checks
+    or merge conflicts. Say how you'd go about it; do not run anything.
+  max_turns: 4
+  allowed_tools:
+    - Skill
+
+graders:
+  - name: pr_session_sweep_not_invoked
+    type: tool_used
+    tool: Skill
+    input_match: '"skill"\s*:\s*"(?:[\w-]+:)?pr-session-sweep"'
+    min: 0
+    max: 0

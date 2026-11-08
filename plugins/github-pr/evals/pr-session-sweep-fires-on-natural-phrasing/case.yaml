@@ -1,0 +1,39 @@
+# Run: claude plugin eval plugins/github-pr --case pr-session-sweep-fires-on-natural-phrasing --runs 3 --trust-plugin --no-publish
+# Shared run/grant facts: docs/contributing.md, "Plugin evals". No grant: Skill only.
+# Should-fire case: natural phrasing, no skill name. The sandbox has no session tools, so this
+# is a net for the description, not a measure of the sweep: no delta expected from skill_fired.
+# Can fail: skill_fired fails if the description stops matching "get all my sessions' PRs
+# unblocked"; reply_plans_listing fails if the skill body is not followed.
+# good-reply: I'll list your linked sub-sessions, send each one the four tasks, then report a table.
+# bad-reply: Paste your PR link and I'll fix the checks myself.
+schema_version: "1.1"
+name: pr-session-sweep-fires-on-natural-phrasing
+description: >
+  Asked to get every running session's PR unblocked, the model invokes pr-session-sweep.
+  expected_outcome: PASS when the skill fires; FAIL otherwise.
+tags: [pr-session-sweep, trigger, quick]
+
+execution:
+  prompt: |
+    I've got a few Claude sessions going, each working on its own PR. Can you get all of
+    them unblocked? Red CI, merge conflicts, unanswered review comments, whatever is holding
+    them up.
+  max_turns: 4
+  allowed_tools:
+    - Skill
+
+graders:
+  - name: skill_fired
+    type: tool_used
+    tool: Skill
+    input_match: '"skill"\s*:\s*"(?:[\w-]+:)?pr-session-sweep"'
+    min: 1
+    arm: with-only
+
+  - name: reply_plans_listing
+    type: regex
+    target: last_message
+    pattern: 'list_sessions|linked sessions?|sub-?sessions?'
+    flags: i
+    match: contains
+    arm: both
