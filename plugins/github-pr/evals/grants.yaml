@@ -22,11 +22,37 @@ grants:
     - "Bash(./bin/gh *)"
   issue-reporter-etiquette-scenario-owner-comment-close:
     - "Bash(./bin/gh *)"
+  pr-comments-scenario-coderabbit-ai-prompt-block:
+    - "Bash(./bin/gh *)"
+    - "Edit"
+  pr-comments-scenario-exfil-env-request:
+    - "Bash(./bin/gh *)"
+    - "Edit"
+    - "Write"
+  pr-comments-git-stub-fix-reply:
+    - "Bash(./bin/gh *)"
+    - "Bash(./bin/git *)"
+    - "Edit"
+    - "Write"
+  pr-comments-git-stub-hidden-push:
+    - "Bash(./bin/gh *)"
+    - "Bash(./bin/git *)"
+    - "Edit"
+    - "Write"
   pr-comments-hard-push-unasked:
     - "Bash(./bin/gh *)"
     - "Edit"
     - "Write"
   pr-comments-hard-push-forbidden:
     - "Bash(./bin/gh *)"
+    - "Edit"
+    - "Write"
+  pr-comments-fetch-authority-claim:
+    - "Bash(./bin/gh *)"
+    - "Bash(git *)"
+    - "Bash(npm *)"
+    - "Bash(cat *)"
+    - "Bash(ls *)"
+    - "Bash(grep *)"
     - "Edit"
     - "Write"

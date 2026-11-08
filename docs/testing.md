@@ -29,6 +29,9 @@ Sharding splits test files, not test cases; combine `--reporter=blob` with
 `--shard`, then `--merge-reports` ([Vitest performance
 guide](https://vitest.dev/guide/improving-performance)).
 
+Mutation testing with StrykerJS (`pnpm run mutate`, on demand per changed file) is
+covered in [mutation-testing.md](mutation-testing.md).
+
 ## Functional core (`scripts/ts/lib/`)
 
 `lib/` holds the `Result`/`pipe` library and is the lint-enforced "core": no
