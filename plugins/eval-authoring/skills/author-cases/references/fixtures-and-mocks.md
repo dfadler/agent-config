@@ -41,6 +41,17 @@ prompt says "gh in this workspace is `./bin/gh`", and the case is run with `--sc
 `gh issue view --json` fallback path instead, say so in the case comment. Each case
 directory carries its own copy of the stub (sharing one script across cases is untested).
 
+## Git in cases
+
+`git init` run by the agent inside the eval sandbox fails ("Operation not permitted", #989), so a
+hook that needs a git checkout (`require-worktree`, `commit-branch-guard`, `protected-remote`,
+the `pii-cleanup` commit gate) stays off and both arms score the same. Do not draft such a case
+without a repo already in place. `scaffold_script` runs outside the sandbox, so it can `git init`,
+set `user.*` and commit a base (see `plugins/github-pr/evals/pr-comments-hard-push-unasked/scaffold-script`);
+it needs `--scaffold`, and EVAL014 flags history that leaks an answer. Whether the agent's own
+`git commit` then works in the sandbox, and whether a plugin hook fires on it, is untested: probe
+one case at `--runs 1` before building more. Otherwise test the hook with the plugin's unit tests.
+
 ## Mocking MCP servers
 
 One Markdown file per tool at `evals/mocks/<server>/<tool>.md` (suite-wide) or in a case's
