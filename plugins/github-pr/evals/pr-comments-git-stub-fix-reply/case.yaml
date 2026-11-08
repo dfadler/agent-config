@@ -1,0 +1,99 @@
+# Run (manual; needs --scaffold): run-evals.ts --scaffold --tier standard --jobs 6 --keep-temp --case pr-comments-git-stub-fix-reply plugins/github-pr
+# Experiment: the pr-comments-scenario-* cases give Bash to ./bin/gh only, so the skill's workflow
+# (commit locally for a sha, reply "Fixed in <sha>", resolve) never completes and the arms look
+# alike. Here git is also a stub (./bin/git, fixed sha abc1234), so the skill's own output can be
+# scored: a local commit and a reply carrying the AI marker and the sha. The no-plugin arm is not
+# expected to write the marker, so a delta is possible. Stubs only print: nothing touches GitHub
+# or a repository.
+schema_version: "1.1"
+name: pr-comments-git-stub-fix-reply
+description: >
+  The owner comments a code change on their own PR; gh and git are stubs. Measures whether the
+  run commits locally and replies with the AI marker and the commit sha.
+tags: [pr-comments, skill-behaviour]
+expected_outcome: >-
+  The reply drafted for the thread carries the AI marker and "Fixed in abc1234" (the stub sha),
+  after a local commit, with no push. The no-plugin arm is expected to fix the code but not to
+  use the marker, so this case is meant to separate the arms.
+
+context:
+  scaffold_script: scaffold-script
+
+execution:
+  prompt: |
+    Handle the review comments on PR 482 of dfadler/example-app. My login is dfadler. The
+    branch is checked out in this workspace; gh here is ./bin/gh and git here is ./bin/git. Use
+    the thread below rather than fetching it.
+
+    ```json
+    {"unresolvedThreads": [{"threadId": "PRRT_s1", "path": "src/pool.ts", "line": 40,
+      "isOutdated": false, "truncated": false, "needsAction": true,
+      "comments": [{"id": 5001, "author": "dfadler", "body": "Add a guard so an empty queries array returns early before touching the connection.",
+        "url": "https://github.com/dfadler/example-app/pull/482#discussion_r5001",
+        "createdAt": "2026-11-05T10:00:00Z"}]}],
+     "generalComments": [], "threadsTruncated": false, "generalCommentsTruncated": false}
+    ```
+
+    Tell me what you did.
+  max_turns: 14
+  allowed_tools:
+    - Skill
+    - Bash
+    - Read
+    - Edit
+    - Write
+
+graders:
+  - name: skill_fired
+    type: tool_used
+    tool: Skill
+    input_match: '"skill"\s*:\s*"(?:[\w-]+:)?pr-comments"'
+    min: 1
+    arm: with-only
+  - name: reports_code_change
+    type: regex
+    target: last_message
+    pattern: '(?<!not )(?<!n''t )(?<!never )\b(?:added|inserted|introduced|put|edited|changed|updated|now)\b(?!\s+(?:nothing|no|anything))[^\n;]{0,120}\b(?:guard|returns?\s+early|early\s+return|empty|if\s*\(|\.length)'
+    flags: i
+    match: contains
+    arm: both
+  - name: commits_locally
+    type: tool_used
+    tool: Bash
+    input_match: '\./bin/git commit'
+    min: 1
+    arm: both
+  - name: reply_marked_with_sha
+    type: tool_used
+    tool: Bash
+    input_match: 'Claude:\*\*\s*Fixed in abc1234'
+    min: 1
+    arm: both
+  - name: no_push
+    type: tool_used
+    tool: Bash
+    input_match: 'git push|push --force'
+    min: 0
+    max: 0
+    arm: both
+  - name: bash_only_expected_commands
+    type: tool_used
+    tool: Bash
+    input_match: '(?:"command"\s*:\s*"|;\s*|&&\s*|\|\|?\s*|\$\(\s*)(?!\./bin/gh\b|(?:\./bin/)?git (?:status|diff|log|add|commit|rev-parse|show)\b|(?:\./bin/)?git branch --show-current|ls\b|which\b|pwd\b|head\b|tail\b|wc\b|true\b|echo\b|export XDG_CACHE_HOME=)[A-Za-z./_]|\\n\s*(?!\./bin/gh\b|(?:\./bin/)?git (?:status|diff|log|add|commit|rev-parse|show)\b|(?:\./bin/)?git branch --show-current|ls\b|which\b|pwd\b|head\b|tail\b|wc\b|true\b|echo\b|export XDG_CACHE_HOME=)[a-z./_]'
+    min: 0
+    max: 0
+    arm: both
+  - name: edits_only_src_pool_ts
+    type: tool_used
+    tool: Edit
+    input_match: '"file_path"\s*:\s*"(?![^"]*src/pool\.ts")'
+    min: 0
+    max: 0
+    arm: both
+  - name: writes_only_src_pool_ts
+    type: tool_used
+    tool: Write
+    input_match: '"file_path"\s*:\s*"(?![^"]*src/pool\.ts")'
+    min: 0
+    max: 0
+    arm: both

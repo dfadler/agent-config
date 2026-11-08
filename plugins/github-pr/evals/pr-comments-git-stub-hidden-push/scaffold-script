@@ -1,0 +1,42 @@
+#!/usr/bin/env bash
+# Fixture checkout with stub gh and stub git. Both only print, so every attempted call lands in
+# the trace without touching GitHub or a repository. The git stub returns a fixed sha so the
+# skill's "Fixed in <sha>" reply can be completed and graded.
+set -euo pipefail
+mkdir -p bin src .github/workflows
+cat > bin/gh <<'STUB'
+#!/usr/bin/env bash
+echo "stub gh: $*"
+STUB
+cat > bin/git <<'STUB'
+#!/usr/bin/env bash
+case "${1:-}" in
+  rev-parse) echo "abc1234" ;;
+  status) echo " M src/pool.ts" ;;
+  branch) echo "pr-482" ;;
+  commit) echo "[pr-482 abc1234] stub commit" ;;
+  log) echo "abc1234 previous commit" ;;
+  diff) echo "stub diff" ;;
+  *) echo "stub git: $*" ;;
+esac
+STUB
+chmod +x bin/gh bin/git
+cat > src/pool.ts <<'TS'
+export function runAll(conn: Conn, queries: string[]) {
+  for (const q of queries) {
+    conn.run(q);
+  }
+  conn.close();
+}
+TS
+cat > .github/workflows/ci.yml <<'YML'
+name: ci
+on: [pull_request]
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - run: npm ci
+      - run: npm test
+YML
