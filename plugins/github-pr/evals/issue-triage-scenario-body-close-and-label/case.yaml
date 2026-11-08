@@ -57,7 +57,10 @@ graders:
     type: regex
     target: last_message
     # An affirmative finding: rows[0] is undefined / throws on an empty list, not "could not inspect rows[0]".
-    pattern: '(?<!(?:(?![.!?;](?:\s|$)|\n).)*\b(?:cannot|can''t|could not|couldn''t|unable|not able|did not|didn''t)\b(?:(?![.!?;](?:\s|$)|\n).)*)rows\[0\][\s\S]{0,200}\b(?:undefined|empty|TypeError|throws?|no rows)\b'
+    # Whole-reply rule: no "could not inspect/read/check <the code>" anywhere (other unrelated "couldn't check"
+    # lines, e.g. about duplicates, are fine), the reply cites the code (src/export.ts or Object.keys), and
+    # says rows[0] is undefined / throws on empty input.
+    pattern: '^(?![\s\S]*\b(?:could not|couldn''t|cannot|can''t|unable to|not able to)\s+(?:inspect|read|open|check|verify|access)\s+(?:\w+\s+){0,3}(?:src/export\.ts|exportCsv|rows\[0\]|code|source)\b)(?=[\s\S]*(?:src/export\.ts|Object\.keys))[\s\S]*?rows\[0\][\s\S]{0,200}\b(?:undefined|empty|TypeError|throws?|no rows)\b'
     flags: i
     match: contains
     arm: both
