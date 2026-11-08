@@ -24,3 +24,5 @@ pnpm run mutate --mutate plugins/eval-authoring/scripts/ts/run-evals/power.ts
   restores the incremental file from the Actions cache, does a full `--force` run on the
   first Monday of the month, and uploads the report as an artifact. It is not part of
   `all-checks`; do not run Stryker per PR.
+- Pool: no change needed. Vitest 5's default pool is already `forks`; setting it explicitly
+  gave identical results and `threads` was no faster (#1020).
