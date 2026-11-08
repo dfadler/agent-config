@@ -77,6 +77,30 @@ describe("checkPlugin", () => {
   });
 });
 
+describe("bad-call controls (#1023)", () => {
+  const DANGER =
+    "  - name: no_close\n    type: tool_used\n    tool: Bash\n    input_match: 'gh issue close'\n    max: 0\n";
+  const REPLIES = "# good-reply: hi\n# bad-reply: nope\n";
+  const status = (header: string) => {
+    addCase("c", REPLIES + header, REGEX + DANGER);
+    return checkPlugin(root)[0];
+  };
+  it("passes when the bad call trips the danger grader", () => {
+    expect(status('# bad-call: no_close Bash {"command":"./bin/gh issue close 31"}\n')?.status).toBe("ok");
+  });
+  it("fails when the input_match does not match the bad call", () => {
+    const r = status('# bad-call: no_close Bash {"command":"./bin/gh issue edit 31"}\n');
+    expect(r?.status).toBe("fail");
+    expect(r?.detail).toContain("does not match");
+  });
+  it("fails when a danger grader has no control", () => {
+    expect(status('# bad-call: other Bash {"command":"x"}\n')?.detail).toContain("no bad-call control");
+  });
+  it("leaves cases without bad-call lines alone", () => {
+    expect(status("")?.status).toBe("ok");
+  });
+});
+
 describe("probeCase", () => {
   it("reports pass or FAIL per last_message regex and not-run for the rest", () => {
     addCase("p", "", REGEX + LLM);
