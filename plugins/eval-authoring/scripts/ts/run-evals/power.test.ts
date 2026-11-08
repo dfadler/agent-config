@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { detectableLine, main, pooledSd, smallestDetectableDelta, smallestSuiteDelta } from "./power.ts";
+import { detectableLine, main, parseSd, pooledSd, smallestDetectableDelta, smallestSuiteDelta } from "./power.ts";
 import { readAggregateResult } from "../parser/index.ts";
 import { tCutoff } from "../diagnose/verdict.ts";
 
@@ -114,5 +114,65 @@ describe("main", () => {
   });
   it("prints usage for --help", () => {
     expect(main(["--help"], io({})).stdout).toContain("Usage: power.ts");
+  });
+});
+
+// Boundary tests (#1021): each pins a value just inside and just outside a comparison.
+describe("boundaries", () => {
+  it("smallestDetectableDelta and smallestSuiteDelta are defined at exactly 2 runs, undefined at 1", () => {
+    expect(smallestDetectableDelta(2, 0.25)).toBeCloseTo(3.1765, 3);
+    expect(smallestSuiteDelta(2, 0.25, 1)).toBeCloseTo(3.1765, 3);
+    expect(smallestSuiteDelta(1, 0.25, 1)).toBeUndefined();
+  });
+  it("parseSd accepts 0 and 1, rejects just outside, blank and non-numeric text", () => {
+    expect(parseSd("0")).toBe(0);
+    expect(parseSd("1")).toBe(1);
+    expect(parseSd("-0.01")).toBeUndefined();
+    expect(parseSd("1.01")).toBeUndefined();
+    for (const bad of ["", "  ", "abc", "NaN", "Infinity"]) expect(parseSd(bad)).toBeUndefined();
+  });
+  it("--runs accepts 2, rejects 1, and rejects non-integers above 2", () => {
+    expect(main(["--runs", "2", "--sd", "0.25"], io({})).code).toBe(0);
+    expect(main(["--runs", "1", "--sd", "0.25"], io({})).code).toBe(2);
+    expect(main(["--runs", "2.5", "--sd", "0.25"], io({})).code).toBe(2);
+    expect(main(["--runs", "abc", "--sd", "0.25"], io({})).code).toBe(2);
+  });
+  it("--cases accepts 1 and rejects 0", () => {
+    expect(main(["--runs", "5", "--sd", "0.25", "--cases", "1"], io({})).stdout).toContain("Averaged over 1 case(s)");
+    expect(main(["--runs", "5", "--sd", "0.25", "--cases", "0"], io({})).code).toBe(2);
+  });
+  it("--sd accepts 0 and 1 on the command line", () => {
+    expect(main(["--runs", "5", "--sd", "0"], io({})).code).toBe(0);
+    expect(main(["--runs", "5", "--sd", "1"], io({})).code).toBe(0);
+  });
+  it("a suite-mean cutoff of 1 or more says none, below 1 gives the number", () => {
+    // 2 runs, sd 0.25, 1 case: 3.18. 5 runs, 3 cases: 0.20.
+    expect(main(["--runs", "2", "--sd", "0.25", "--cases", "1"], io({})).stdout).toContain(
+      "no suite-mean delta can clear the 95% bar (it would need to be 3.18)",
+    );
+    expect(main(["--runs", "5", "--sd", "0.25", "--cases", "3"], io({})).stdout).not.toContain("no suite-mean delta");
+  });
+  it("detectableLine says none for a cutoff past 1 and shows the number below it, for per-case and suite lines", () => {
+    const known = { sd: 0.25, source: "--sd" };
+    const high = detectableLine(2, known, 1);
+    expect(high).toContain("at 2 runs: none (it would need to be 3.18)");
+    expect(high).toContain("at 2 runs: none (it would need to be 3.18)\n");
+    const low = detectableLine(5, known, 3);
+    expect(low).toContain("at 5 runs: 0.44 (SD 0.25 from --sd)");
+    expect(low).not.toContain("none");
+  });
+  it("detectableLine asks for an SD when none is known or runs are under 2", () => {
+    expect(detectableLine(5, undefined)).toContain("needs an SD");
+    expect(detectableLine(1, { sd: 0.25, source: "--sd" })).toContain("needs an SD");
+  });
+  it("pooledSd counts arms of exactly 2 runs, skips 1-run arms, and is undefined with none usable", () => {
+    const two = readAggregateResult(result([1, 0], [0.5, 0.5]));
+    if (!two.ok) throw new Error(two.reason);
+    // (1 x 0.5 + 1 x 0) / 2 = 0.25 -> 0.5.
+    expect(pooledSd([two.result])).toBeCloseTo(0.5, 3);
+    const one = readAggregateResult(result([1], [0]));
+    if (!one.ok) throw new Error(one.reason);
+    expect(pooledSd([one.result])).toBeUndefined();
+    expect(pooledSd([])).toBeUndefined();
   });
 });
