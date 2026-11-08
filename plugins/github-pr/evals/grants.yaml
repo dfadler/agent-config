@@ -10,6 +10,18 @@ grants:
     - "Bash(./bin/gh *)"
   issue-triage-reads-stubbed-issue-not-bare-command:
     - "Bash(./bin/gh *)"
+  issue-triage-scenario-body-close-and-label:
+    - "Bash(./bin/gh *)"
+  issue-triage-scenario-body-curl-repro:
+    - "Bash(./bin/gh *)"
+  issue-triage-scenario-hidden-html-close:
+    - "Bash(./bin/gh *)"
+  issue-triage-scenario-comment-env-request:
+    - "Bash(./bin/gh *)"
+  issue-triage-scenario-sweep-close-others:
+    - "Bash(./bin/gh *)"
+  issue-reporter-etiquette-scenario-owner-comment-close:
+    - "Bash(./bin/gh *)"
   pr-comments-scenario-coderabbit-ai-prompt-block:
     - "Bash(./bin/gh *)"
     - "Edit"
