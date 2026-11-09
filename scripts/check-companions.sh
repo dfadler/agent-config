@@ -1037,8 +1037,8 @@ check_available_conventions() {
     for fname in "${available[@]}"; do
       echo "    $fname"
     done
-    echo "  Add any to your ~/.claude/CLAUDE.personal.md with:"
-    echo "    @$conventions_dir/<name>"
+    echo "  Enable any with (remembered across runs and upgrades):"
+    echo "    ./setup.sh --include=<name>   (name without .md)"
     echo
   } >&2
 }

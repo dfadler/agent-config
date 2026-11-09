@@ -117,11 +117,19 @@ in) its skills, agents, and hooks together — a plugin is linked into `~/.claud
 as a single unit (see [`docs/plugin-loading.md`](./plugin-loading.md)), so there's no
 finer-grained way to symlink only part of one.
 
-Neither flag is remembered across runs — it only applies to the run it's passed on.
-Re-running plain `./setup.sh` relinks anything a previous `--skip` or `--include` left
-out, and re-running with a *different* `--skip`/`--include` list links or unlinks
-whatever the change affects. All directions are idempotent: a repeated run with the same
-flags changes nothing.
+For commands and plugins, neither flag is remembered across runs — it only applies to
+the run it's passed on. Re-running plain `./setup.sh` relinks anything a previous
+`--skip` or `--include` left out, and re-running with a *different* `--skip`/`--include`
+list links or unlinks whatever the change affects. All directions are idempotent: a
+repeated run with the same flags changes nothing.
+
+**Conventions** are the third kind of feature (`--list-features` shows them). Those in
+`claude/conventions/DEFAULT_ENABLED` are on by default; every other file in
+`claude/conventions/` is opt-in. `./setup.sh --include=background-tasks` enables one and
+is *additive*: a convention-only `--include` does not narrow commands and plugins. The
+choice is saved in `~/.claude/agent-config.conventions` and reapplied by bare
+`./setup.sh` and `./upgrade.sh`. `--skip=<name>` removes an opt-in from that file (for a
+default convention it drops it for that run only). `teardown.sh` deletes the file.
 
 This is a separate mechanism from the per-project hook toggles described in
 `docs/hook-composition.md` — every plugin hook already ships off by

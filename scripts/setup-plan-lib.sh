@@ -22,6 +22,8 @@
 #   mkdir             <dir>
 #   personal-migrate  <current> <personal>   mv a hand-written CLAUDE.md aside
 #   personal-create   <personal>             create the empty personal file
+#   save-conventions  <file> <comma-list>    rewrite the opt-in conventions file
+#                                            (empty list removes it)
 #   include           <ref>                  one @-include of the managed section
 #   claude-md         <mode> <path>          write the managed section; mode is
 #                                            create | replace-symlink | update |
@@ -73,15 +75,75 @@ plan_include_refs() {
   printf 'CLAUDE.personal.md\n'
   printf '%s/claude/CLAUDE.md\n' "$REPO_ROOT"
   local manifest="$REPO_ROOT/claude/conventions/DEFAULT_ENABLED"
-  [[ -f "$manifest" ]] || return 0
   local line
-  while IFS= read -r line || [[ -n "$line" ]]; do
-    line="${line%%#*}"
-    line="${line## }"
-    line="${line%% }"
-    [[ -n "$line" ]] || continue
-    printf '%s/claude/conventions/%s\n' "$REPO_ROOT" "$line"
-  done <"$manifest"
+  if [[ -f "$manifest" ]]; then
+    while IFS= read -r line || [[ -n "$line" ]]; do
+      line="${line%%#*}"
+      line="${line## }"
+      line="${line%% }"
+      [[ -n "$line" ]] || continue
+      local s skipped=0
+      for s in ${CONV_SKIP[@]+"${CONV_SKIP[@]}"}; do
+        [[ "$s" == "${line%.md}" ]] && skipped=1
+      done
+      [[ "$skipped" == 1 ]] && continue
+      printf '%s/claude/conventions/%s\n' "$REPO_ROOT" "$line"
+    done <"$manifest"
+  fi
+  local name
+  while IFS= read -r name; do
+    [[ -n "$name" ]] && printf '%s/claude/conventions/%s.md\n' "$REPO_ROOT" "$name"
+  done < <(plan_opt_in_conventions)
+}
+
+# Per-machine file listing the opt-in conventions this machine enabled, in the
+# DEFAULT_ENABLED format (filenames, # comments). Written by setup.sh.
+OPT_IN_FILE="$HOME/.claude/agent-config.conventions"
+
+# Names (no .md, sorted, unique) of the opt-in conventions that should be on:
+# the saved file plus this run's --include, minus this run's --skip. Names whose
+# file no longer exists are dropped so a removed convention never leaves a
+# dangling @include. CONV_INCLUDE / CONV_SKIP come from setup.sh.
+plan_opt_in_conventions() {
+  local line name
+  {
+    if [[ -f "$OPT_IN_FILE" ]]; then
+      while IFS= read -r line || [[ -n "$line" ]]; do
+        line="${line%%#*}"
+        line="${line## }"
+        line="${line%% }"
+        [[ -n "$line" ]] && printf '%s\n' "${line%.md}"
+      done <"$OPT_IN_FILE"
+    fi
+    printf '%s\n' ${CONV_INCLUDE[@]+"${CONV_INCLUDE[@]}"}
+  } | sort -u | while IFS= read -r name; do
+    [[ -n "$name" && -f "$REPO_ROOT/claude/conventions/$name.md" ]] || continue
+    local skipped=0 s
+    for s in ${CONV_SKIP[@]+"${CONV_SKIP[@]}"}; do
+      [[ "$s" == "$name" ]] && skipped=1
+    done
+    [[ "$skipped" == 1 ]] || printf '%s\n' "$name"
+  done
+}
+
+# save-conventions <file> <comma-list>: rewrite the saved file when the wanted
+# list differs from what it holds (empty list removes the file).
+plan_save_conventions() {
+  local wanted current
+  wanted="$(plan_opt_in_conventions | paste -sd, -)"
+  current=""
+  if [[ -f "$OPT_IN_FILE" ]]; then
+    current="$(
+      while IFS= read -r line || [[ -n "$line" ]]; do
+        line="${line%%#*}"
+        line="${line## }"
+        line="${line%% }"
+        [[ -n "$line" ]] && printf '%s\n' "${line%.md}"
+      done <"$OPT_IN_FILE" | sort -u | paste -sd, -
+    )"
+  fi
+  [[ "$wanted" == "$current" ]] && return 0
+  printf 'save-conventions\t%s\t%s\n' "$OPT_IN_FILE" "$wanted"
 }
 
 # The managed-section body: one "@<ref>" line per include ref.
@@ -346,6 +408,7 @@ plan_git_hooks_path() {
 plan_install() {
   plan_skipped_plugins
   plan_mkdir "$HOME/.claude"
+  plan_save_conventions
   plan_claude_md
   plan_dir_contents "$REPO_ROOT/claude/commands" "$HOME/.claude/commands"
   plan_prune_opted_out "$HOME/.claude/commands" "$REPO_ROOT/claude/commands"

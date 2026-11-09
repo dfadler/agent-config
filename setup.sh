@@ -169,11 +169,23 @@ for plugin_dir in "$REPO_ROOT"/plugins/*/; do
   PLUGIN_ALL_NAMES+=("$(basename "$plugin_dir")")
 done
 
+# Conventions are a third feature kind: every claude/conventions/*.md except
+# the README. Those listed in DEFAULT_ENABLED are on by default; the rest are
+# opt-in, enabled by --include=<name> and remembered in
+# ~/.claude/agent-config.conventions (see scripts/setup-plan-lib.sh).
+CONVENTION_NAMES=()
+for entry in "$REPO_ROOT"/claude/conventions/*.md; do
+  [[ -f "$entry" && "$(basename "$entry")" != README.md ]] || continue
+  CONVENTION_NAMES+=("$(basename "$entry" .md)")
+done
+
 if [[ "$LIST_FEATURES" == "1" ]]; then
   echo "Commands:"
   printf '  %s\n' ${COMMAND_NAMES[@]+"${COMMAND_NAMES[@]}"}
   echo "Plugins:"
   printf '  %s\n' ${PLUGIN_ALL_NAMES[@]+"${PLUGIN_ALL_NAMES[@]}"}
+  echo "Conventions (on by default if listed in claude/conventions/DEFAULT_ENABLED; --include=<name> enables the rest):"
+  printf '  %s\n' ${CONVENTION_NAMES[@]+"${CONVENTION_NAMES[@]}"}
   exit 0
 fi
 
@@ -192,7 +204,7 @@ fi
 unknown_selected=()
 for name in ${selected[@]+"${selected[@]}"}; do
   found=0
-  for known in ${COMMAND_NAMES[@]+"${COMMAND_NAMES[@]}"} ${PLUGIN_ALL_NAMES[@]+"${PLUGIN_ALL_NAMES[@]}"}; do
+  for known in ${COMMAND_NAMES[@]+"${COMMAND_NAMES[@]}"} ${PLUGIN_ALL_NAMES[@]+"${PLUGIN_ALL_NAMES[@]}"} ${CONVENTION_NAMES[@]+"${CONVENTION_NAMES[@]}"}; do
     [[ "$known" == "$name" ]] && found=1 && break
   done
   [[ "$found" == 1 ]] || unknown_selected+=("$name")
@@ -201,6 +213,34 @@ if [[ ${#unknown_selected[@]} -gt 0 ]]; then
   echo "Unknown $UNKNOWN_FLAG feature(s): ${unknown_selected[*]}" >&2
   echo "Run './setup.sh --list-features' to see available names." >&2
   exit 2
+fi
+
+# Split convention names out of the selection. They are not links, so they
+# never reach the SKIP_FEATURES machinery below: CONV_INCLUDE adds opt-in
+# conventions (and is remembered), CONV_SKIP drops one. A convention-only
+# --include is additive, not "only these", so it does not narrow commands and
+# plugins: INCLUDE_SET goes back to 0 when no command or plugin was named.
+is_convention() {
+  local n
+  for n in ${CONVENTION_NAMES[@]+"${CONVENTION_NAMES[@]}"}; do
+    [[ "$n" == "$1" ]] && return 0
+  done
+  return 1
+}
+CONV_INCLUDE=()
+CONV_SKIP=()
+rest=()
+for name in ${SKIP_FEATURES[@]+"${SKIP_FEATURES[@]}"}; do
+  if is_convention "$name"; then CONV_SKIP+=("$name"); else rest+=("$name"); fi
+done
+SKIP_FEATURES=(${rest[@]+"${rest[@]}"})
+rest=()
+for name in ${INCLUDE_FEATURES[@]+"${INCLUDE_FEATURES[@]}"}; do
+  if is_convention "$name"; then CONV_INCLUDE+=("$name"); else rest+=("$name"); fi
+done
+INCLUDE_FEATURES=(${rest[@]+"${rest[@]}"})
+if [[ "$INCLUDE_SET" == 1 && ${#INCLUDE_FEATURES[@]} -eq 0 ]]; then
+  INCLUDE_SET=0
 fi
 
 # --include is the positive form of the same selection --skip makes
@@ -337,6 +377,20 @@ apply_plan() {
         echo "Created empty $a (add machine-specific instructions there)"
         ;;
       include) INCLUDE_REFS+=("$a") ;;
+      save-conventions)
+        # $b is the comma-joined opt-in list; empty removes the file.
+        if [[ -z "${b:-}" ]]; then
+          rm -f "$a"
+          echo "Removed $a (no opt-in conventions left)"
+        else
+          {
+            echo "# Opt-in conventions written by setup.sh (--include=<name> adds, --skip=<name> removes)."
+            echo "# DEFAULT_ENABLED format: one filename per line."
+            printf '%s\n' "$b" | tr ',' '\n' | sed 's/$/.md/'
+          } >"$a"
+          echo "Saved opt-in conventions to $a: ${b//,/, }"
+        fi
+        ;;
       claude-md)
         apply_claude_md "$a" "$b"
         INCLUDE_REFS=()
@@ -415,6 +469,6 @@ fi
 # checks. Only the selection flag is repeated, not --install-deps/--fix.
 if [[ -n "$SKIP_LIST" ]]; then
   printf '\nTo re-run with this feature selection:\n  ./setup.sh --skip=%s\n' "$SKIP_LIST"
-elif [[ "$INCLUDE_SET" == 1 ]]; then
+elif [[ -n "$INCLUDE_LIST" ]]; then
   printf '\nTo re-run with this feature selection:\n  ./setup.sh --include=%s\n' "$INCLUDE_LIST"
 fi

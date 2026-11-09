@@ -761,3 +761,73 @@ assert 'PreToolUse' not in d.get('hooks', {}), d
 "
   [ "$status" -eq 0 ]
 }
+
+# --- opt-in conventions via --include / --skip -------------------------
+
+@test "--list-features lists conventions" {
+  run_setup_with --list-features
+  assert_success
+  assert_output_contains "Conventions"
+  assert_output_contains "three"
+}
+
+@test "--include=<opt-in convention> adds its @include and saves it" {
+  run_setup_with --no-companions --include=three
+  assert_success
+  grep -qF "@$FAKE_REPO/claude/conventions/three.md" "$HOME/.claude/CLAUDE.md"
+  grep -qxF "three.md" "$HOME/.claude/agent-config.conventions"
+  # Additive: the defaults, the command and the plugin are all still installed.
+  grep -qF "@$FAKE_REPO/claude/conventions/one.md" "$HOME/.claude/CLAUDE.md"
+  [ -L "$HOME/.claude/commands/demo.md" ]
+  [ -L "$HOME/.claude/skills/demo-plugin" ]
+}
+
+@test "a bare re-run keeps a saved opt-in convention" {
+  run_setup_with --no-companions --include=three
+  assert_success
+  run_setup
+  assert_success
+  grep -qF "@$FAKE_REPO/claude/conventions/three.md" "$HOME/.claude/CLAUDE.md"
+}
+
+@test "--skip=<opt-in convention> removes it and deletes the empty saved file" {
+  run_setup_with --no-companions --include=three
+  assert_success
+  run_setup_with --no-companions --skip=three
+  assert_success
+  ! grep -qF "three.md" "$HOME/.claude/CLAUDE.md"
+  [ ! -e "$HOME/.claude/agent-config.conventions" ]
+}
+
+@test "--skip=<default convention> drops it for that run only" {
+  run_setup_with --no-companions --skip=one
+  assert_success
+  ! grep -qF "one.md" "$HOME/.claude/CLAUDE.md"
+  [ ! -e "$HOME/.claude/agent-config.conventions" ]
+  run_setup
+  assert_success
+  grep -qF "@$FAKE_REPO/claude/conventions/one.md" "$HOME/.claude/CLAUDE.md"
+}
+
+@test "--plan --include=<convention> reports the save and writes nothing" {
+  run_setup_with --plan --include=three
+  assert_success
+  assert_output_contains "save-conventions"
+  [ ! -e "$HOME/.claude" ]
+}
+
+@test "an unknown --include name still exits 2 now that conventions are accepted" {
+  run_setup_with --include=not-a-real-feature
+  [ "$status" -eq 2 ]
+  assert_output_contains "Unknown --include feature(s): not-a-real-feature"
+}
+
+@test "a saved convention whose file was deleted is dropped, not left dangling" {
+  run_setup_with --no-companions --include=three
+  assert_success
+  rm "$FAKE_REPO/claude/conventions/three.md"
+  run_setup
+  assert_success
+  ! grep -qF "three.md" "$HOME/.claude/CLAUDE.md"
+  [ ! -e "$HOME/.claude/agent-config.conventions" ]
+}

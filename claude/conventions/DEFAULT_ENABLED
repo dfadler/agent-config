@@ -5,8 +5,9 @@
 # it's "safe/uncontroversial enough to force on an unfamiliar repo" vs.
 # "a personal workflow preference, opt in deliberately." Review and adjust this
 # list for your own use before relying on it. Everything NOT listed here still
-# ships in this directory; add it to a machine by putting an `@include` line
-# in that machine's own ~/.claude/CLAUDE.personal.md — see claude/CLAUDE.md.
+# ships in this directory; enable it on a machine with
+# `./setup.sh --include=<name>` (remembered in ~/.claude/agent-config.conventions)
+# — see claude/CLAUDE.md.
 
 secrets-handling.md
 cite-platform-claims.md

@@ -140,6 +140,14 @@ describe("CLAUDE.md", () => {
     expect(lines).toContain(`Removed empty ${claude("CLAUDE.md")}`);
   });
 
+  it("removes the saved opt-in conventions file", () => {
+    write(claude("CLAUDE.md"), managed());
+    write(claude("agent-config.conventions"), "background-tasks.md\n");
+    run();
+    expect(existsSync(claude("agent-config.conventions"))).toBe(false);
+    expect(lines).toContain(`Removed ${claude("agent-config.conventions")}`);
+  });
+
   it("preserves user additions below the managed section", () => {
     write(claude("CLAUDE.md"), managed("\nUser-added: custom\n"));
     run();
