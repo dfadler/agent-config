@@ -1,0 +1,27 @@
+# Run: claude plugin eval plugins/unslop --trigger-boundary --trust-plugin --no-publish
+# Drafted by the blind-case-writer agent from SKILL.md alone, then adapted to the repo case format.
+# Near-miss: shares "rewrite" and "paragraph" with the skill but never types /unslop. The skill is
+# manual-only (disable-model-invocation), so it must not fire here.
+# This is a tripwire with no expected delta. One negative cannot bound the over-trigger rate.
+schema_version: "1.1"
+name: unslop-boundary-edit-request
+description: >
+  A plain request to rewrite a paragraph, with no /unslop, should not load the unslop skill.
+  expected_outcome: PASS when the Skill tool is not called for unslop; FAIL when it is.
+tags: [trigger-boundary, "pair:unslop-rewrite-pasted"]
+
+execution:
+  prompt: |
+    Can you rewrite this paragraph so it flows better? "Our new dashboard is fast. It loads data from
+    three sources and caches the result for ten minutes."
+  max_turns: 4
+  allowed_tools:
+    - Skill
+
+graders:
+  - name: stays_quiet
+    type: tool_used
+    tool: Skill
+    input_match: '"skill"\s*:\s*"(?:[\w-]+:)?unslop"'
+    min: 0
+    max: 0

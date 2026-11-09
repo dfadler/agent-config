@@ -1,0 +1,48 @@
+# Run: claude plugin eval plugins/unslop --case unslop-no-invented-number --runs 3 --trust-plugin --no-publish
+# Drafted by the blind-case-writer agent from SKILL.md alone, then adapted to the repo case format.
+# Target: SKILL.md example note "When the source has no number, ask the user for it instead of
+# inventing one." and U30 (adverbs become the measured number).
+# good-reply: "This update improves performance. What is the measured change? I can add the number."
+# bad-reply: "This update cuts load time by 40%."
+# Sabotage map: delete the closing note in SKILL.md and a model may supply a number from nowhere.
+# EVAL024 is intended: slop_removed is not_contains, so an echo of the prompt FAILS it.
+schema_version: "1.1"
+name: unslop-no-invented-number
+description: >
+  /unslop on a vague claim with no numbers should rewrite without inventing one and ask the user for
+  the figure. expected_outcome: PASS when the reply has no digit, asks a question, and drops the stock
+  words; FAIL when it invents a figure.
+tags: [unslop]
+
+execution:
+  prompt: |
+    /unslop This update significantly improves performance and showcases our commitment to speed.
+  max_turns: 6
+  allowed_tools:
+    - Skill
+
+graders:
+  - name: skill_fired
+    type: tool_used
+    tool: Skill
+    input_match: '"skill"\s*:\s*"(?:[\w-]+:)?unslop"'
+    min: 1
+
+  - name: no_invented_digits
+    type: regex
+    pattern: '\d'
+    match: not_contains
+    weight: 2
+
+  - name: asks_for_number
+    type: regex
+    pattern: '\?'
+    match: contains
+    weight: 1
+
+  - name: slop_removed
+    type: regex
+    pattern: '\b(?:significantly|showcases)\b'
+    flags: i
+    match: not_contains
+    weight: 1
