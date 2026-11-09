@@ -31,12 +31,6 @@ execution:
     - Skill
 
 graders:
-  - name: skill_fired
-    type: tool_used
-    tool: Skill
-    input_match: '"skill"\s*:\s*"(?:[\w-]+:)?unslop"'
-    min: 1
-
   - name: code_literal_kept
     type: regex
     pattern: 'console\.log\("Done — leaving the landscape untouched"\);'

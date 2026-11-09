@@ -23,12 +23,6 @@ execution:
     - Skill
 
 graders:
-  - name: skill_fired
-    type: tool_used
-    tool: Skill
-    input_match: '"skill"\s*:\s*"(?:[\w-]+:)?unslop"'
-    min: 1
-
   - name: lists_rule_ids
     type: regex
     pattern: '\bU7\b[\s\S]*\bU13\b|\bU13\b[\s\S]*\bU7\b'

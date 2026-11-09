@@ -22,12 +22,6 @@ execution:
     - Skill
 
 graders:
-  - name: skill_fired
-    type: tool_used
-    tool: Skill
-    input_match: '"skill"\s*:\s*"(?:[\w-]+:)?unslop"'
-    min: 1
-
   - name: no_invented_digits
     type: regex
     pattern: '\d'

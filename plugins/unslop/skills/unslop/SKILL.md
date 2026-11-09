@@ -19,8 +19,10 @@ in cursor/plugins (MIT, copyright Lauren Tan; see `LICENSE` in the plugin root).
 
 - **Input:** prose from the user's message or a file they name. `check` as the first
   argument selects check-only mode.
-- **Output:** the rewritten text, with meaning and tone unchanged. In check-only mode, a
-  list of `rule id: quoted match` lines and no rewrite.
+- **Output:** for pasted text, the rewritten text only, with meaning and tone unchanged: no
+  list of rules, no list of removed words, no summary. For a named file, the edited file plus one
+  line of the rule ids fixed. In check-only mode, only lines of the form `U7: "pivotal"`
+  (rule id, colon, quoted match), with no introduction and no rewrite.
 - **Does not:** touch code blocks, inline code, logs, quoted material, or text the user
   did not hand over. It does not change facts, numbers, names or links.
 
@@ -31,7 +33,8 @@ in cursor/plugins (MIT, copyright Lauren Tan; see `LICENSE` in the plugin root).
 3. In check-only mode, print the matches and stop.
 4. Otherwise rewrite each match, then re-scan the result until no rule matches.
 5. When a file was named, edit that file in place and report the rule ids fixed.
-   When text was pasted, return the rewritten text.
+   When text was pasted, return the rewritten text and nothing else. The one exception is a
+   missing figure (see Example): add a single question after the rewrite asking for it.
 
 Rule ids are stable and other files cite them. A removed rule leaves a gap.
 
@@ -92,4 +95,5 @@ Before: "Additionally, this pivotal change serves as a testament to our commitme
 After: "This change makes the build faster. CI now finishes in 4 minutes instead of 9."
 
 The rewrite replaces the vague claim with a number the author must supply. When the source has no
-number, ask the user for it instead of inventing one.
+number, write the rewrite without a figure or a placeholder such as `[X%]`, then ask the user
+for the number in one question.
