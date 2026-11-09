@@ -16,7 +16,7 @@ tags: [unslop]
 
 execution:
   prompt: |
-    /unslop This update significantly improves performance and showcases our commitment to speed.
+    /unslop:unslop This update significantly improves performance and showcases our commitment to speed.
   max_turns: 6
   allowed_tools:
     - Skill

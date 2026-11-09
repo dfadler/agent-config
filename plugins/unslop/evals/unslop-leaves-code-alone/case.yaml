@@ -19,7 +19,7 @@ tags: [unslop]
 
 execution:
   prompt: |
-    /unslop Additionally, this function serves as a pivotal helper.
+    /unslop:unslop Additionally, this function serves as a pivotal helper.
 
     ```ts
     console.log("Done — leaving the landscape untouched");

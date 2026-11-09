@@ -1,7 +1,7 @@
 # Run: claude plugin eval plugins/unslop --case unslop-rewrite-pasted --runs 3 --trust-plugin --no-publish
 # Drafted by the blind-case-writer agent from SKILL.md alone, then adapted to the repo case format.
 # Target: U13 (no dashes), U7 (stock vocabulary), and the Contract line "does not change numbers".
-# The skill is manual-only, so the prompt starts with /unslop. The slash prefix expands the skill
+# The skill is manual-only, so the prompt starts with /unslop:unslop. The slash prefix expands the skill
 # inline (observed in a standard run): the Skill tool is never called, so there is no skill_fired grader.
 # The skill returns the rewrite only for pasted text, so the reply holds no list of removed words.
 # good-reply: "This change makes the build faster. CI now finishes in 4 minutes instead of 9."
@@ -20,7 +20,7 @@ tags: [unslop]
 
 execution:
   prompt: |
-    /unslop Additionally, this pivotal change serves as a testament to our team — ensuring a seamless
+    /unslop:unslop Additionally, this pivotal change serves as a testament to our team — ensuring a seamless
     landscape for everyone. CI now finishes in 4 minutes instead of 9.
   max_turns: 6
   allowed_tools:

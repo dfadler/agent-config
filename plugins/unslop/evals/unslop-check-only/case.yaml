@@ -17,7 +17,7 @@ tags: [unslop]
 
 execution:
   prompt: |
-    /unslop check This pivotal change is a testament to the team — ensuring a seamless result.
+    /unslop:unslop check This pivotal change is a testament to the team — ensuring a seamless result.
   max_turns: 6
   allowed_tools:
     - Skill

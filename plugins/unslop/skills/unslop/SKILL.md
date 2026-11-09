@@ -29,9 +29,10 @@ in cursor/plugins (MIT, copyright Lauren Tan; see `LICENSE` in the plugin root).
 ## Steps
 
 1. Read the text and note its tone (formal doc, PR body, chat message).
-2. Scan for each pattern below. Collect every match with its rule id.
+2. Scan for each pattern in the Patterns section. Collect every match with its rule id.
 3. In check-only mode, print the matches and stop.
-4. Otherwise rewrite each match, then re-scan the result until no rule matches.
+4. Otherwise rewrite each match, then re-scan the result once and fix any new match. Keep the
+   rewrite and report a rule that still matches after that second pass.
 5. When a file was named, edit that file in place and report the rule ids fixed.
    When text was pasted, return the rewritten text and nothing else. The one exception is a
    missing figure (see Example): add a single question after the rewrite asking for it.
@@ -47,7 +48,7 @@ Rule ids are stable and other files cite them. A removed rule leaves a gap.
 
 ### Language
 
-- **U7 stock vocabulary.** Additionally, crucial, delve, enduring, enhance, fostering, garner, interplay, intricate, landscape (abstract), pivotal, showcase, tapestry (abstract), testament, underscore, vibrant. Use the plain word.
+- **U7 stock vocabulary.** Additionally, crucial, delve, enduring, enhance, fostering, garner, interplay, intricate, landscape (abstract), pivotal, showcase, tapestry (abstract), testament, underscore, vibrant, for example. Any word that adds tone and no meaning counts. Use the plain word.
 - **U8 inflated "is".** "serves as", "stands as", "boasts", "features". Write "is" or "has".
 - **U9 "not just X, but Y".** State the point directly.
 - **U10 forced triples.** Use the natural number of items.
@@ -77,7 +78,7 @@ Rule ids are stable and other files cite them. A removed rule leaves a gap.
 
 ### Jargon
 
-- **U26 abstract metaphor nouns.** substrate, wedge, vector, locus, nexus, bedrock, paradigm, modality, north star, flywheel, "API surface", metaphorical scaffolding, harness, primitive or ratchet, "gold-plating", "evacuate" for moving code. Use the concrete word (base, add, way, move out, last phase).
+- **U26 abstract metaphor nouns.** substrate, wedge, vector, locus, nexus, bedrock, paradigm, modality, north star, flywheel, "API surface", metaphorical scaffolding, harness, primitive or ratchet, "gold-plating", "evacuate" for moving code. Use the concrete word (base, add, way, move out, last phase). The list is not complete: any noun used as a metaphor for a plainer thing counts.
 
 ### Plain speech
 
@@ -85,15 +86,15 @@ Rule ids are stable and other files cite them. A removed rule leaves a gap.
 - **U28 dense sentences.** Split a sentence the reader must reread. One idea each.
 - **U29 passive voice.** Name the actor: "queries are validated" becomes "the compiler validates queries". Keep the passive only when the actor is unknown or irrelevant.
 - **U30 adverbs.** Use a stronger verb or the measured number: "significantly improves" becomes the delta.
-- **U31 fancy words.** utilize and leverage become use, facilitate becomes help, numerous becomes many, "in the event that" becomes if.
+- **U31 fancy words.** utilize and leverage become use, facilitate becomes help, numerous becomes many, "in the event that" becomes if. These are examples: any inflated word with a plainer synonym counts.
 - **U32 mannered prose.** Aphorisms, effect-fragments, personified code, figurative verbs ("rides along", "stands on"). Say the literal thing.
 - **U33 over-compression.** Dropped articles, verbless fragments, arrows and unexplained abbreviations. "Parser rejects bad date, exit 2" becomes "The parser rejects a bad date and exits with code 2."
 
 ## Example
 
 Before: "Additionally, this pivotal change serves as a testament to our commitment, ensuring a robust, seamless landscape."
-After: "This change makes the build faster. CI now finishes in 4 minutes instead of 9."
+After: "This change makes the build faster."
+Question: "How much faster is it?"
 
-The rewrite replaces the vague claim with a number the author must supply. When the source has no
-number, write the rewrite without a figure or a placeholder such as `[X%]`, then ask the user
-for the number in one question.
+The source gives no figure, so the rewrite carries none, and one question after it asks the user
+for the number. Write no invented figure and no placeholder such as `[X%]`.
