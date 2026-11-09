@@ -853,10 +853,11 @@ write_engines_fixture() {
   printf "{\"engines\":{\"node\":\"%s\"}}\n" "$1" > "$FAKE_REPO/package.json"
 }
 
-@test "playwright-cli absent: informational note, still succeeds" {
+@test "playwright-cli absent: hard failure with the install hint" {
   PATH="$(path_without_playwright)" run_companions
-  assert_success
+  assert_failure
   assert_output_contains "playwright-cli (@playwright/cli) is not installed"
+  assert_output_contains "required for browser tasks"
   assert_output_contains "npm install -g @playwright/cli@latest"
 }
 
@@ -913,11 +914,12 @@ write_engines_fixture() {
   [ "$(cat "$SANDBOX/npm-calls")" = "install -g @playwright/cli@latest" ]
 }
 
-@test "a bare run never installs playwright-cli" {
+@test "a bare run never installs playwright-cli, even when it fails for want of it" {
   shim_node_npm 24.0.0
   write_engines_fixture ">=24.0"
   PATH="$PW_SHIM_BIN:$(path_without_playwright)" run_companions
-  assert_success
+  assert_failure
+  assert_output_contains "is not installed"
   [ ! -e "$SANDBOX/npm-calls" ]
 }
 
