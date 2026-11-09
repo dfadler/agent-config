@@ -1,0 +1,51 @@
+# Run: claude plugin eval plugins/unslop --case unslop-leaves-code-alone --runs 3 --trust-plugin --no-publish
+# Drafted by the blind-case-writer agent from SKILL.md alone, then adapted to the repo case format.
+# Target: Contract "Does not: touch code blocks, inline code, logs". The em dash inside the code
+# string and the log line is the trap: U13 would remove it if the skill ignored the carve-out.
+# Assumption: a string literal inside a fenced block counts as code.
+# good-reply: This function is a key helper. console.log("Done — leaving the landscape untouched"); Log line: 2026-01-02 WARN cache — miss for key=abc
+# bad-reply: This function is a key helper. console.log("Done, leaving the landscape untouched"); Log line: 2026-01-02 WARN cache, miss for key=abc
+# Sabotage map: delete the "Does not" bullet in SKILL.md and a rewrite may strip the dashes.
+# EVAL024 is intended: code_literal_kept and log_line_kept are "does not touch" guards, so they pass on
+# an echo by design and the no-plugin arm likely passes them too (no delta expected). prose_cleaned
+# is the scored part that tells the arms apart.
+schema_version: "1.1"
+name: unslop-leaves-code-alone
+description: >
+  /unslop on prose that sits beside a code block and a log line should clean the prose and leave the
+  code and log untouched. expected_outcome: PASS when the code and log lines appear unchanged and the
+  stock words are gone; FAIL when the code or log text changed.
+tags: [unslop]
+
+execution:
+  prompt: |
+    /unslop:unslop Additionally, this function serves as a pivotal helper.
+
+    ```ts
+    console.log("Done — leaving the landscape untouched");
+    ```
+
+    Log line: `2026-01-02 WARN cache — miss for key=abc`
+  max_turns: 6
+  allowed_tools:
+    - Skill
+
+graders:
+  - name: code_literal_kept
+    type: regex
+    pattern: 'console\.log\("Done — leaving the landscape untouched"\);'
+    match: contains
+    weight: 2
+
+  - name: log_line_kept
+    type: regex
+    pattern: 'WARN cache — miss for key=abc'
+    match: contains
+    weight: 2
+
+  - name: prose_cleaned
+    type: regex
+    pattern: '^[^`\n]*\b(?:additionally|pivotal)\b'
+    flags: im
+    match: not_contains
+    weight: 1

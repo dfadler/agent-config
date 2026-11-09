@@ -69,6 +69,9 @@ automatically, with no per-project copy to keep in sync.
     require it.
   - `typescript-gotchas/` — TypeScript/JS patterns that compile but cause runtime
     bugs or are better expressed with a safer API (e.g. `.at()` over indexed reads).
+  - `unslop/` — manual `/unslop:unslop` skill that rewrites prose to remove AI-writing
+    patterns (filler, stock vocabulary, dashes, chatbot phrases); `check` lists
+    matches without rewriting. Adapted from cursor/plugins `pstack` (MIT).
   - `vite/` — skills and agents for authoring, reviewing, testing, and maintaining
     Vite plugins: lifecycle, hook selection, deprecation guards, testing patterns,
     and peer-dependency maintenance.

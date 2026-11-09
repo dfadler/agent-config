@@ -1,0 +1,45 @@
+# Run: claude plugin eval plugins/unslop --case unslop-check-only --runs 3 --trust-plugin --no-publish
+# Drafted by the blind-case-writer agent from SKILL.md alone, then adapted to the repo case format.
+# Target: "`check` as the first argument selects check-only mode" and "a list of `rule id: quoted match`
+# lines and no rewrite".
+# good-reply: U7: "pivotal"; U7: "testament"; U13: "—"; U3: "ensuring a seamless result"
+# bad-reply: "Here is the cleaned version: This change helps the team and the build is seamless."
+# Sabotage map: delete the check-only step in SKILL.md and a model rewrites, so lists_rule_ids fails.
+# EVAL024 is intended: no_rewrite_lines is not_contains, so a reply that echoes the prompt sentence
+# (a line with no rule id) FAILS it.
+schema_version: "1.1"
+name: unslop-check-only
+description: >
+  /unslop check on prose with known patterns should list rule ids with quoted matches and not rewrite.
+  expected_outcome: PASS when the reply names U7 and U13 and has no line without a rule id; FAIL when
+  it returns a rewritten sentence.
+tags: [unslop]
+
+execution:
+  prompt: |
+    /unslop:unslop check This pivotal change is a testament to the team — ensuring a seamless result.
+  max_turns: 6
+  allowed_tools:
+    - Skill
+
+graders:
+  - name: lists_rule_ids
+    type: regex
+    pattern: '\bU7\b[\s\S]*\bU13\b|\bU13\b[\s\S]*\bU7\b'
+    match: contains
+    weight: 2
+
+  - name: quotes_matches
+    type: regex
+    pattern: 'U7\W+.{0,6}(?:pivotal|testament)'
+    flags: i
+    match: contains
+    weight: 1
+
+  # A non-empty line with no rule id is prose, which check-only mode does not produce.
+  - name: no_rewrite_lines
+    type: regex
+    pattern: '^(?![ \t]*$)(?!.*\bU\d+\b).+$'
+    flags: m
+    match: not_contains
+    weight: 1

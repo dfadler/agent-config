@@ -1,0 +1,47 @@
+# Run: claude plugin eval plugins/unslop --case unslop-rewrite-pasted --runs 3 --trust-plugin --no-publish
+# Drafted by the blind-case-writer agent from SKILL.md alone, then adapted to the repo case format.
+# Target: U13 (no dashes), U7 (stock vocabulary), and the Contract line "does not change numbers".
+# The skill is manual-only, so the prompt starts with /unslop:unslop. The slash prefix expands the skill
+# inline (observed in a standard run): the Skill tool is never called, so there is no skill_fired grader.
+# The skill returns the rewrite only for pasted text, so the reply holds no list of removed words.
+# good-reply: "This change makes the build faster. CI now finishes in 4 minutes instead of 9."
+# bad-reply: "Additionally, this pivotal change serves as a testament to our team - ensuring a seamless landscape. CI now finishes in 4 minutes instead of 9."
+# Sabotage map: delete U13 or U7 from SKILL.md and no_dashes or no_stock_words stop failing a model
+# that copies the input.
+# EVAL024 is intended: no_dashes and no_stock_words are not_contains, so an echo of the prompt FAILS them.
+# keeps_numbers is a guard the no-plugin arm also passes; expect no delta on it.
+schema_version: "1.1"
+name: unslop-rewrite-pasted
+description: >
+  /unslop on pasted prose with stock words and an em dash should return a rewrite with those removed
+  and the numbers kept. expected_outcome: PASS when the reply has no em or en dash, none of the stock
+  words, and still says 4 minutes and 9; FAIL when any remains or a number is dropped.
+tags: [unslop]
+
+execution:
+  prompt: |
+    /unslop:unslop Additionally, this pivotal change serves as a testament to our team — ensuring a seamless
+    landscape for everyone. CI now finishes in 4 minutes instead of 9.
+  max_turns: 6
+  allowed_tools:
+    - Skill
+
+graders:
+  - name: no_dashes
+    type: regex
+    pattern: '[—–]'
+    match: not_contains
+    weight: 1
+
+  - name: no_stock_words
+    type: regex
+    pattern: '\b(?:additionally|pivotal|testament|seamless|landscape)\b'
+    flags: i
+    match: not_contains
+    weight: 1
+
+  - name: keeps_numbers
+    type: regex
+    pattern: '\b4\b[\s\S]*\b9\b|\b9\b[\s\S]*\b4\b'
+    match: contains
+    weight: 1
