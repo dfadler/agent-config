@@ -3,3 +3,7 @@
 # the plugin's own range admits a patched release.
 overrides:
   deepmerge-ts: 8.0.0
+
+# pnpm 11 ignores `engine-strict` in .npmrc, so set it here: install/run
+# refuse to start under a Node below package.json engines.node.
+engineStrict: true
