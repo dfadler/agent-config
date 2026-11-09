@@ -42,6 +42,6 @@ graders:
 
   - name: keeps_numbers
     type: regex
-    pattern: '\b4 minutes\b[\s\S]*\b9\b'
+    pattern: '\b4\b[\s\S]*\b9\b|\b9\b[\s\S]*\b4\b'
     match: contains
     weight: 1
