@@ -286,6 +286,22 @@ source "$REPO_ROOT/scripts/setup-plan-lib.sh"
 # check about what is already present lives in scripts/setup-plan-lib.sh.
 # ---------------------------------------------------------------------------
 
+# One-time migration: drop the hand-written convention includes named in
+# NAMES (comma-separated) from the personal file, keeping every other line.
+# The original is kept once as <file>.pre-conventions-migration.
+apply_strip_personal() {
+  local file="$1" names="$2" line tmp="$1.tmp.$$"
+  [[ -e "$file.pre-conventions-migration" ]] || cp "$file" "$file.pre-conventions-migration"
+  while IFS= read -r line || [[ -n "$line" ]]; do
+    if [[ "$line" =~ $PERSONAL_CONV_RE ]] && [[ ",$names," == *",${BASH_REMATCH[1]},"* ]]; then
+      continue
+    fi
+    printf '%s\n' "$line"
+  done <"$file" >"$tmp"
+  mv "$tmp" "$file"
+  echo "Moved convention includes (${names//,/, }) out of $file; setup manages them now (original kept as $file.pre-conventions-migration)"
+}
+
 # Write the generated ~/.claude/CLAUDE.md. MODE comes from the plan;
 # INCLUDE_REFS holds the plan's include lines (without the "@").
 #   create          the file is absent: write the managed section
@@ -376,6 +392,7 @@ apply_plan() {
         touch "$a" "${a}.setup-managed"
         echo "Created empty $a (add machine-specific instructions there)"
         ;;
+      strip-personal-conventions) apply_strip_personal "$a" "$b" ;;
       include) INCLUDE_REFS+=("$a") ;;
       save-conventions)
         # $b is the comma-joined opt-in list; empty removes the file.
