@@ -3,7 +3,7 @@ name: unslop
 description: |
   Rewrite prose to remove AI-writing patterns (filler, stock vocabulary, em dashes,
   chatbot phrases, mannered or over-compressed sentences) while keeping the meaning and tone.
-  Runs only when the user invokes /unslop on text or a file. Pass `check` to list the
+  Runs only when the user invokes /unslop:unslop on text or a file. Pass `check` to list the
   matched rule ids without rewriting. Not for code, logs or quoted text.
 disable-model-invocation: true
 metadata:

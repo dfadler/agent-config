@@ -1,4 +1,6 @@
-# Run: claude plugin eval plugins/unslop --trigger-boundary --trust-plugin --no-publish
+# Run: claude plugin eval plugins/unslop --case unslop-boundary-edit-request --runs 3 --trust-plugin --no-publish
+# Smoke guard, not a trigger-boundary measurement: the /unslop prefix expands the skill inline, so no
+# should-fire twin can grade a Skill call, and run-evals --trigger-boundary would have no positive control.
 # Drafted by the blind-case-writer agent from SKILL.md alone, then adapted to the repo case format.
 # Near-miss: shares "rewrite" and "paragraph" with the skill but never types /unslop. The skill is
 # manual-only (disable-model-invocation), so it must not fire here.
@@ -8,7 +10,7 @@ name: unslop-boundary-edit-request
 description: >
   A plain request to rewrite a paragraph, with no /unslop, should not load the unslop skill.
   expected_outcome: PASS when the Skill tool is not called for unslop; FAIL when it is.
-tags: [trigger-boundary, "pair:unslop-rewrite-pasted"]
+tags: [smoke]
 
 execution:
   prompt: |
@@ -25,3 +27,4 @@ graders:
     input_match: '"skill"\s*:\s*"(?:[\w-]+:)?unslop"'
     min: 0
     max: 0
+    arm: both

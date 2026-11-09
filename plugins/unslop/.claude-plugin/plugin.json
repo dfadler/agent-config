@@ -2,7 +2,7 @@
   "$schema": "https://json.schemastore.org/claude-code-plugin-manifest.json",
   "name": "unslop",
   "version": "1.0.0",
-  "description": "Manual /unslop skill that rewrites prose to remove common AI-writing patterns. Adapted from cursor/plugins pstack (MIT).",
+  "description": "Manual /unslop:unslop skill that rewrites prose to remove common AI-writing patterns. Adapted from cursor/plugins pstack (MIT).",
   "author": {
     "name": "Dustin Fadler",
     "url": "https://github.com/dfadler"
