@@ -28,6 +28,7 @@ setup() {
   echo "# a command" >"$FAKE_REPO/claude/commands/demo.md"
   echo "# another command" >"$FAKE_REPO/claude/commands/other.md"
   echo "## Convention one" >"$FAKE_REPO/claude/conventions/one.md"
+  echo "## Convention two (opt-in only)" >"$FAKE_REPO/claude/conventions/two.md"
   printf '# comment\n\none.md\n' >"$FAKE_REPO/claude/conventions/DEFAULT_ENABLED"
   local p
   for p in collab-retro gh-publish-guide memory-hygiene scratch-guard worktree-core; do
@@ -455,4 +456,108 @@ PY
   before="$(shasum "$settings")"
   run bash -c 'source "$1"; hook_registration_state E /x "$2"' _ "$REPO_ROOT/scripts/settings-lib.sh" "$settings"
   [ "$(shasum "$settings")" = "$before" ]
+}
+
+# --- opt-in conventions -------------------------------------------------
+
+# Succeeds only if $output has a line exactly equal to $1.
+has_line() {
+  printf '%s\n' "$output" | grep -qxF -- "$1" || {
+    echo "expected plan to have the exact line: $1" >&2
+    echo "plan was:" >&2
+    echo "$output" >&2
+    return 1
+  }
+}
+
+@test "plan: an opt-in convention is not included unless asked for" {
+  plan
+  [ "$status" -eq 0 ]
+  lacks "conventions/two.md"
+  lacks "save-conventions"
+}
+
+@test "plan: --include=<opt-in convention> saves it and plans its @include" {
+  plan --include=two
+  [ "$status" -eq 0 ]
+  has_line "save-conventions${T}$CLAUDE/agent-config.conventions${T}two"
+  has_line "include${T}$FAKE_REPO/claude/conventions/two.md"
+  # The save is decided before the managed block is written.
+  [[ "${output%%save-conventions*}" != *"claude-md"* ]]
+  # Additive: a convention-only --include does not skip any plugin.
+  lacks "skip-plugin"
+}
+
+@test "plan: a convention name beside a plugin name still narrows the plugins" {
+  plan --include=two,worktree-core
+  [ "$status" -eq 0 ]
+  has_line "include${T}$FAKE_REPO/claude/conventions/two.md"
+  has "skip-plugin${T}collab-retro${T}not in --include"
+  lacks "skip-plugin${T}worktree-core"
+}
+
+@test "plan: after an install with --include, a bare plan is empty (saved file is reapplied)" {
+  install --include=two
+  plan
+  [ "$status" -eq 0 ]
+  [ -z "$output" ]
+}
+
+@test "plan: --skip=<opt-in convention> after install plans an empty save and drops the include" {
+  install --include=two
+  plan --skip=two
+  [ "$status" -eq 0 ]
+  has_line "save-conventions${T}$CLAUDE/agent-config.conventions${T}"
+  lacks "conventions/two.md"
+}
+
+@test "plan: --skip=<default convention> drops its include and saves nothing" {
+  plan --skip=one
+  [ "$status" -eq 0 ]
+  lacks "conventions/one.md"
+  lacks "save-conventions"
+}
+
+@test "plan: a saved convention whose file is gone is dropped from the list" {
+  install --include=two
+  rm "$FAKE_REPO/claude/conventions/two.md"
+  plan
+  [ "$status" -eq 0 ]
+  has_line "save-conventions${T}$CLAUDE/agent-config.conventions${T}"
+  lacks "conventions/two.md"
+}
+
+@test "plan: hand-written convention includes in CLAUDE.personal.md are migrated, any checkout path" {
+  mkdir -p "$CLAUDE"
+  printf '%s\n' \
+    "@/other/machine/agent-config/claude/conventions/two.md" \
+    "@/other/machine/agent-config/claude/conventions/one.md" \
+    "@/other/machine/agent-config/claude/conventions/gone.md" \
+    "my own note" >"$CLAUDE/CLAUDE.personal.md"
+  plan
+  [ "$status" -eq 0 ]
+  # Both repo conventions leave the personal file; only the opt-in is saved.
+  has_line "strip-personal-conventions${T}$CLAUDE/CLAUDE.personal.md${T}one,two"
+  has_line "save-conventions${T}$CLAUDE/agent-config.conventions${T}two"
+  has_line "include${T}$FAKE_REPO/claude/conventions/two.md"
+  # A convention this repo does not have is not ours to move.
+  lacks "gone"
+}
+
+@test "plan: a personal file with no convention includes plans no migration" {
+  mkdir -p "$CLAUDE"
+  printf '%s\n' "my own note" "@/elsewhere/notes.md" >"$CLAUDE/CLAUDE.personal.md"
+  plan
+  [ "$status" -eq 0 ]
+  lacks "strip-personal-conventions"
+}
+
+@test "plan: the migration is one-time (a bare plan after install is empty)" {
+  mkdir -p "$CLAUDE"
+  printf '%s\n' "@/other/machine/agent-config/claude/conventions/two.md" \
+    >"$CLAUDE/CLAUDE.personal.md"
+  install
+  plan
+  [ "$status" -eq 0 ]
+  [ -z "$output" ]
 }
