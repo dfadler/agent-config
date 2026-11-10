@@ -169,6 +169,25 @@ git_hooks_fixture() {
   lacks "git-hooks-path"
 }
 
+@test "plan: an absolute core.hooksPath to this repo's scripts/hooks is rewritten to the relative form" {
+  git_hooks_fixture
+  git -C "$FAKE_REPO" config core.hooksPath "$FAKE_REPO/scripts/hooks"
+  plan
+  [ "$status" -eq 0 ]
+  has_line "git-hooks-path${T}$FAKE_REPO${T}scripts/hooks"
+  install
+  [ "$(git -C "$FAKE_REPO" config --get core.hooksPath)" = "scripts/hooks" ]
+}
+
+@test "plan: an absolute core.hooksPath to another repo's hooks is left alone" {
+  git_hooks_fixture
+  mkdir -p "$SANDBOX/other/scripts/hooks"
+  git -C "$FAKE_REPO" config core.hooksPath "$SANDBOX/other/scripts/hooks"
+  plan
+  [ "$status" -eq 0 ]
+  lacks "git-hooks-path"
+}
+
 @test "plan: git-hooks-path is left out by --skip=pii-cleanup" {
   git_hooks_fixture
   mkdir -p "$FAKE_REPO/plugins/pii-cleanup/.claude-plugin"

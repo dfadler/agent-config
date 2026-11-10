@@ -216,9 +216,11 @@ check_git_identity() {
 
 # The opt-in pre-commit hook (scripts/hooks/pre-commit) is live only while
 # core.hooksPath points at scripts/hooks. Silent outside a git checkout or when
-# the hook file is absent. --fix sets it only when unset; a different value is
-# the user's and is warned about, never overwritten. The plain `git config`
-# write lands in the shared .git/config, so it covers every worktree.
+# the hook file is absent. --fix sets it when unset, or rewrites another
+# spelling of this repo's own scripts/hooks to the relative form; a value that
+# resolves anywhere else is the user's and is warned about, never overwritten.
+# The plain `git config` write lands in the shared .git/config, so it covers
+# every worktree.
 fix_hooks_path() {
   git -C "$REPO_ROOT" config core.hooksPath scripts/hooks || return 1
   echo "✓ Set core.hooksPath to scripts/hooks (pii-cleanup pre-commit hook)"
@@ -232,6 +234,20 @@ check_hooks_path() {
   current="$(git -C "$REPO_ROOT" config --get core.hooksPath 2>/dev/null || true)"
   if [[ "$current" == "scripts/hooks" ]]; then
     echo "✓ core.hooksPath is scripts/hooks (pii-cleanup pre-commit hook is active)"
+  elif [[ -n "$current" ]] && hooks_path_is_ours "$current"; then
+    # The same directory under another spelling (usually an absolute path), so
+    # the hook runs. The relative form is the one the docs and teardown use,
+    # and it makes each worktree run its own checked-out copy of the hook.
+    if [[ "$FIX" == "1" ]]; then
+      fix_hooks_path
+    else
+      {
+        echo
+        echo "ℹ core.hooksPath is $current, which is this repo's scripts/hooks, so the"
+        echo "  pii-cleanup pre-commit hook is active. './doctor.sh --fix' rewrites it to scripts/hooks."
+        echo
+      } >&2
+    fi
   elif [[ -n "$current" ]]; then
     {
       echo
@@ -1472,7 +1488,7 @@ check_local_allow_rules() {
     [[ -e "$proj/${f%%:*}" ]] && locks+="${f##*:} "
   done
 
-  local -a warns=() moves=()
+  local -a warns=() moves=() oneoffs=()
   local rule inner base tool p flagged short
   while IFS= read -r rule; do
     [[ -n "$rule" ]] || continue
@@ -1505,7 +1521,7 @@ check_local_allow_rules() {
       continue
     fi
     if [[ "$inner" != *\** && ("$inner" == "git commit"* || "$inner" == *\'* || "$inner" == *\"* || "$inner" == *'<<'*) ]]; then
-      warns+=("one-off literal command: $short")
+      oneoffs+=("$rule")
       continue
     fi
     if [[ "$base" =~ ^(git\ (status|diff|log|show|branch)|ls|cat|head|tail|wc|grep|rg|gh\ (pr|issue)\ (view|list|checks|status)|gh\ run\ (view|list))($|\ ) &&
@@ -1514,8 +1530,16 @@ check_local_allow_rules() {
     fi
   done <<<"$rules"
 
+  if [[ ${#oneoffs[@]} -gt 0 ]]; then
+    if [[ "$FIX" == "1" ]]; then
+      prune_local_allow_rules "$file" "${oneoffs[@]}"
+    else
+      echo "ℹ $file: ${#oneoffs[@]} one-off literal rule(s) (single-use \"don't ask again\" leftovers)." >&2
+      echo "  './doctor.sh --fix' removes them, keeping a backup in ~/.claude/backups/." >&2
+    fi
+  fi
   if [[ ${#warns[@]} -eq 0 && ${#moves[@]} -eq 0 ]]; then
-    echo "✓ no overly broad or stale allow rules in $file"
+    [[ ${#oneoffs[@]} -gt 0 ]] || echo "✓ no overly broad or stale allow rules in $file"
     return 0
   fi
   local w
@@ -1526,7 +1550,36 @@ check_local_allow_rules() {
     echo "ℹ $file: read-only rules that could live in shared .claude/settings.json:" >&2
     for w in "${moves[@]}"; do echo "    $w" >&2; done
   fi
-  echo "  Report only: doctor never edits settings. Prune $file by hand." >&2
+  echo "  Broad, stale and read-only rules are report-only: whether to keep them is your call." >&2
+}
+
+# prune_local_allow_rules FILE RULE...: drop exactly these allow rules from FILE.
+# Removing an allow rule only narrows what is permitted (the command prompts
+# again); deny, ask and every other key are untouched. Backs up first, into
+# ~/.claude/backups rather than beside the file so it never shows up as an
+# untracked file in the project, and swaps the result in with mv so a failed
+# write leaves the original intact.
+prune_local_allow_rules() {
+  local file="$1" ts target tmp backup drop
+  shift
+  ts="$(date +%Y%m%d%H%M%S)"
+  target="$file"
+  [[ -L "$file" ]] && target="$(readlink -f "$file")"
+  tmp="$target.tmp-$ts"
+  backup="$HOME/.claude/backups/settings.local.json.$(basename "$(dirname "$(dirname "$target")")").bak-$ts"
+  if ! { mkdir -p "$HOME/.claude/backups" && cp -p "$target" "$backup"; }; then
+    echo "⚠ could not back up $file; not pruning" >&2
+    return 0
+  fi
+  drop="$(printf '%s\n' "$@" | jq -R . | jq -s .)"
+  if cp -p "$target" "$tmp" &&
+    jq --argjson drop "$drop" '.permissions.allow -= $drop' "$target" >"$tmp" &&
+    mv -f "$tmp" "$target"; then
+    echo "Removed $# one-off rule(s) from $file (backup: $backup)"
+  else
+    rm -f "$tmp"
+    echo "⚠ could not rewrite $file; left unchanged" >&2
+  fi
 }
 
 # Counts registered worktrees under <main checkout>/.claude/worktrees, their

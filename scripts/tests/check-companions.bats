@@ -128,6 +128,66 @@ hooks_fixture() {
   refute_output_contains "core.hooksPath is not set"
 }
 
+@test "an absolute core.hooksPath to this repo's scripts/hooks is reported as active, not warned about" {
+  hooks_fixture
+  git -C "$FAKE_REPO" config core.hooksPath "$FAKE_REPO/scripts/hooks"
+  run_companions
+  assert_success
+  assert_output_contains "pii-cleanup pre-commit hook is active"
+  assert_output_contains "./doctor.sh --fix"
+  refute_output_contains "not active"
+  refute_output_contains "left alone"
+  # A bare run only reports.
+  [ "$(git -C "$FAKE_REPO" config --get core.hooksPath)" = "$FAKE_REPO/scripts/hooks" ]
+}
+
+@test "--fix rewrites an absolute path to this repo's scripts/hooks to the relative form" {
+  hooks_fixture
+  git -C "$FAKE_REPO" config core.hooksPath "$FAKE_REPO/scripts/hooks"
+  run_companions --fix
+  assert_success
+  assert_output_contains "Set core.hooksPath to scripts/hooks"
+  [ "$(git -C "$FAKE_REPO" config --get core.hooksPath)" = "scripts/hooks" ]
+}
+
+@test "--fix rewrites a ./scripts/hooks spelling too" {
+  hooks_fixture
+  git -C "$FAKE_REPO" config core.hooksPath ./scripts/hooks
+  run_companions --fix
+  assert_success
+  [ "$(git -C "$FAKE_REPO" config --get core.hooksPath)" = "scripts/hooks" ]
+}
+
+@test "an absolute core.hooksPath to ANOTHER repo's hooks is warned about and never overwritten" {
+  hooks_fixture
+  mkdir -p "$SANDBOX/other/scripts/hooks"
+  touch "$SANDBOX/other/scripts/hooks/pre-commit"
+  git -C "$FAKE_REPO" config core.hooksPath "$SANDBOX/other/scripts/hooks"
+  run_companions --fix
+  assert_success
+  assert_output_contains "left alone"
+  [ "$(git -C "$FAKE_REPO" config --get core.hooksPath)" = "$SANDBOX/other/scripts/hooks" ]
+}
+
+@test "a sibling directory whose name merely starts with scripts/hooks is not treated as ours" {
+  hooks_fixture
+  mkdir -p "$FAKE_REPO/scripts/hooks-extra"
+  git -C "$FAKE_REPO" config core.hooksPath "$FAKE_REPO/scripts/hooks-extra"
+  run_companions --fix
+  assert_success
+  assert_output_contains "left alone"
+  [ "$(git -C "$FAKE_REPO" config --get core.hooksPath)" = "$FAKE_REPO/scripts/hooks-extra" ]
+}
+
+@test "a core.hooksPath that does not exist is warned about and never overwritten" {
+  hooks_fixture
+  git -C "$FAKE_REPO" config core.hooksPath "$SANDBOX/gone/hooks"
+  run_companions --fix
+  assert_success
+  assert_output_contains "left alone"
+  [ "$(git -C "$FAKE_REPO" config --get core.hooksPath)" = "$SANDBOX/gone/hooks" ]
+}
+
 @test "a different core.hooksPath is warned about and never overwritten, even with --fix" {
   hooks_fixture
   git -C "$FAKE_REPO" config core.hooksPath .husky
