@@ -1,0 +1,40 @@
+# Run: claude plugin eval plugins/slack-canvas-sync --case pull-read-file-mktemp-fallback --runs 3 --trust-plugin --no-publish
+# Shared run/grant facts: docs/contributing.md, "Plugin evals". No grant needed (no tools).
+# Same slash-command mechanics as pull-read-file-in-scratchpad. Here no scratchpad is named, so
+# Step 2's fallback applies: a fresh `mktemp -d` directory, not a fixed shared path. A bare model
+# that is told to save a read file usually picks /tmp/<name>.json.
+# Can fail: makes_fresh_dir fails without mktemp -d; no_fixed_tmp_path fails on a literal /tmp file.
+# Delta is only known after a two-arm run (not yet run: this case is unmeasured).
+# Sabotage map: deleting the "or a fresh `mktemp -d` directory if none is named" clause fails
+# makes_fresh_dir.
+# good-reply: 1. scan --root /notes/team 2. D=$(mktemp -d); slack_read_canvas, save verbatim via <<'JSON' to "$D/read.json" 3. pull ... < "$D/read.json"; remove $D afterwards
+# bad-reply: 1. scan --root /notes/team 2. slack_read_canvas, save verbatim via <<'JSON' to /tmp/read.json 3. pull ... < /tmp/read.json
+schema_version: "1.1"
+name: pull-read-file-mktemp-fallback
+description: >
+  Invoked as a slash command with no scratchpad named, canvas-pull plans to save the
+  slack_read_canvas result inside a fresh mktemp -d directory. expected_outcome: PASS when the
+  plan creates a mktemp -d directory and writes the read file inside it; FAIL when it uses a
+  fixed /tmp file.
+tags: [slack-canvas-sync, pull, quick]
+
+execution:
+  prompt: |
+    /slack-canvas-sync:canvas-pull /notes/team
+
+    Don't call any tools. Reply with a numbered plan of at most 10 one-line steps, naming
+    the exact commands and tools you would use and the full path of any temporary file.
+  max_turns: 6
+
+graders:
+  - name: makes_fresh_dir
+    type: regex
+    target: last_message
+    pattern: 'mktemp\s+-d'
+    match: contains
+
+  - name: no_fixed_tmp_path
+    type: regex
+    target: last_message
+    pattern: '>\s*/tmp/|<\s*/tmp/|/tmp/[\w.-]+\.json'
+    match: not_contains

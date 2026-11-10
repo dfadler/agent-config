@@ -1,0 +1,45 @@
+# Run: claude plugin eval plugins/slack-canvas-sync --case pull-read-file-in-scratchpad --runs 3 --trust-plugin --no-publish
+# Shared run/grant facts: docs/contributing.md, "Plugin evals". No grant needed (no tools).
+# canvas-pull is slash-command only; the slash command expands the skill body inline, so there is
+# no Skill call to grade. The signal is the Step 2 detail only the skill supplies: the verbatim
+# slack_read_canvas result goes to a temporary file in the named session scratchpad. The no-plugin
+# arm has no such slash command and has no reason to mention a read file at all.
+# Can fail: saves_read_in_scratchpad fails if the plan puts the read file in /tmp or $TMPDIR, or
+# does not say where it goes; no_system_tmp fails on a /tmp or $TMPDIR path. Delta is only known
+# after a two-arm run (not yet run: this case is unmeasured).
+# Sabotage map: reverting Step 2 to "in the session scratchpad or `$TMPDIR`" lets a plan name
+# $TMPDIR and fails no_system_tmp.
+# good-reply: 1. scan --root /notes/team 2. slack_read_canvas, save verbatim via <<'JSON' to /scratch/s-4471/read.json 3. pull --root /notes/team --path a.md < /scratch/s-4471/read.json (dry run)
+# bad-reply: 1. scan --root /notes/team 2. slack_read_canvas, save verbatim via <<'JSON' to /tmp/read.json 3. pull ... < /tmp/read.json
+schema_version: "1.1"
+name: pull-read-file-in-scratchpad
+description: >
+  Invoked as a slash command with a named session scratchpad, canvas-pull plans to save the
+  slack_read_canvas result in that scratchpad, not in /tmp or $TMPDIR. expected_outcome: PASS
+  when the plan puts the verbatim read file under the named scratchpad and names no system temp
+  path; FAIL otherwise.
+tags: [slack-canvas-sync, pull, quick]
+
+execution:
+  prompt: |
+    /slack-canvas-sync:canvas-pull /notes/team
+
+    This session's scratchpad directory is /scratch/s-4471.
+
+    Don't call any tools. Reply with a numbered plan of at most 10 one-line steps, naming
+    the exact commands and tools you would use and the full path of any temporary file.
+  max_turns: 6
+
+graders:
+  - name: saves_read_in_scratchpad
+    type: regex
+    target: last_message
+    pattern: "(?:<<\\s*'JSON'|verbatim)[^\\n]*/scratch/s-4471/|/scratch/s-4471/[^\\n]*(?:<<\\s*'JSON'|verbatim)"
+    flags: i
+    match: contains
+
+  - name: no_system_tmp
+    type: regex
+    target: last_message
+    pattern: '/tmp/|\$TMPDIR'
+    match: not_contains
