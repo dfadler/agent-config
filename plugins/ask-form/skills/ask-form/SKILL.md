@@ -26,7 +26,8 @@ metadata:
    questions and exits non-zero with a readable error if one is malformed:
    `node <skill base dir>/../../scripts/ts/fill-form.ts ask-form/questions.json ask-form/form.html`
 3. Open it in the integrated browser: `mcp__Claude_Browser__navigate` to
-   `file://<project>/ask-form/form.html`. Do not use an external browser. If that browser tool
+   `file://<project>/ask-form/form.html` (in T3 Code use its preview tools, e.g.
+   `preview_open`; see `docs/host-differences.md`). Do not use an external browser. If that browser tool
    is not available, do not skip steps 1-2 or fall back yet: the form is still built, so give
    the user the full `file://` path to open themselves.
    The page also shows the answers in a text box, so if **Copy answers** does

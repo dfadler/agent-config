@@ -8,7 +8,8 @@ where it runs:
   context is already at 40% or more of the window. Ask for a compact result, not raw
   output.
 - **Measure, don't guess.** In Claude Code Desktop, `mcp__ccd_session_mgmt__get_usage`
-  reports context percent used. Elsewhere (CLI, Bedrock, Vertex), treat roughly 15
+  reports context percent used. Elsewhere (T3 Code, CLI, Bedrock, Vertex; see
+  `docs/host-differences.md`), treat roughly 15
   substantial turns as the 40% mark.
 - **Override the threshold** with a plain line in `CLAUDE.personal.md`, e.g.
   `delegation threshold: 50%`.
