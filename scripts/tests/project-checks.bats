@@ -65,7 +65,7 @@ write_rules() {
   assert_output_contains "overly broad: Bash(git checkout *)"
   assert_output_contains "overly broad: Bash(gh pr merge *)"
   refute_output_contains "overly broad: Bash(git push origin main)"
-  assert_output_contains "doctor never edits settings"
+  assert_output_contains "report-only"
 }
 
 @test "bun rules flagged in a pnpm repo, not in a bun repo" {
@@ -87,13 +87,84 @@ write_rules() {
   refute_output_contains "no longer uses"
 }
 
-@test "stale path and one-off literal are flagged; live path is not" {
+@test "stale path is flagged and a one-off literal is counted; live path is not" {
   write_rules 'Bash(ls /Users/nobody/old-checkout/dist)' "Bash(git commit -m 'fix a thing')" "Bash(ls $PROJ/src)" 'Bash(git commit *)'
   run_doctor
   assert_output_contains "hard-coded path that no longer exists (/Users/nobody/old-checkout/dist)"
-  assert_output_contains "one-off literal command: Bash(git commit -m 'fix a thing')"
+  assert_output_contains "1 one-off literal rule(s)"
+  assert_output_contains "./doctor.sh --fix"
   refute_output_contains "no longer exists ($PROJ/src)"
-  refute_output_contains "one-off literal command: Bash(git commit *)"
+}
+
+# The settings file as jq's compact allow list, for exact comparisons.
+allow_list() {
+  jq -c '.permissions.allow' "$PROJ/.claude/settings.local.json"
+}
+
+@test "a bare run never edits settings.local.json, even with one-off rules" {
+  write_rules "Bash(git commit -m 'fix a thing')" 'Bash(pnpm test:*)'
+  before="$(cat "$PROJ/.claude/settings.local.json")"
+  run_doctor
+  assert_success
+  [ "$(cat "$PROJ/.claude/settings.local.json")" = "$before" ]
+  [ ! -d "$HOME/.claude/backups" ]
+}
+
+@test "--fix removes only the one-off rules and keeps every other rule, in order" {
+  write_rules 'Bash(pnpm test:*)' "Bash(git commit -m 'fix a thing')" 'Bash(git checkout *)' 'Bash(git status)' 'Edit' "Bash(echo \\\"hi\\\")"
+  run_doctor --fix
+  assert_success
+  assert_output_contains "Removed 2 one-off rule(s)"
+  [ "$(allow_list)" = '["Bash(pnpm test:*)","Bash(git checkout *)","Bash(git status)","Edit"]' ]
+}
+
+@test "--fix leaves broad, read-only and stale-path rules for the user" {
+  write_rules 'Bash(git push *)' 'Bash(git status)' 'Bash(ls /Users/nobody/old-checkout/dist)' "Bash(git commit -m 'x')"
+  run_doctor --fix
+  assert_success
+  assert_output_contains "overly broad: Bash(git push *)"
+  assert_output_contains "hard-coded path that no longer exists"
+  [ "$(allow_list)" = '["Bash(git push *)","Bash(git status)","Bash(ls /Users/nobody/old-checkout/dist)"]' ]
+}
+
+@test "--fix keeps a backup outside the project, with the original content" {
+  write_rules "Bash(git commit -m 'fix a thing')" 'Bash(pnpm test:*)'
+  before="$(cat "$PROJ/.claude/settings.local.json")"
+  run_doctor --fix
+  assert_success
+  # Not beside the file: that would show up as an untracked file in the project.
+  run bash -c 'ls "$1"/.claude/settings.local.json* | wc -l | tr -d " "' _ "$PROJ"
+  [ "$output" = "1" ]
+  backup="$(ls "$HOME"/.claude/backups/settings.local.json.*.bak-* | head -1)"
+  [ "$(cat "$backup")" = "$before" ]
+}
+
+@test "--fix preserves every other key in the settings file" {
+  printf '{"permissions":{"allow":["Bash(git commit -m \\"x\\")","Edit"],"deny":["Bash(rm *)"]},"env":{"A":"1"}}\n' \
+    >"$PROJ/.claude/settings.local.json"
+  run_doctor --fix
+  assert_success
+  [ "$(jq -c . "$PROJ/.claude/settings.local.json")" = '{"permissions":{"allow":["Edit"],"deny":["Bash(rm *)"]},"env":{"A":"1"}}' ]
+}
+
+@test "--fix is idempotent: a second run has nothing to prune" {
+  write_rules "Bash(git commit -m 'fix a thing')" 'Bash(pnpm test:*)'
+  run_doctor --fix
+  run_doctor --fix
+  assert_success
+  refute_output_contains "Removed"
+  refute_output_contains "one-off literal"
+  assert_output_contains "no overly broad or stale allow rules"
+}
+
+@test "--fix with a failed backup leaves the file unchanged" {
+  write_rules "Bash(git commit -m 'fix a thing')"
+  before="$(cat "$PROJ/.claude/settings.local.json")"
+  # A file where the backup directory must go makes mkdir -p fail.
+  : >"$HOME/.claude/backups"
+  run_doctor --fix
+  assert_output_contains "could not back up"
+  [ "$(cat "$PROJ/.claude/settings.local.json")" = "$before" ]
 }
 
 @test "read-only rules get a move-to-shared suggestion, and files are untouched" {

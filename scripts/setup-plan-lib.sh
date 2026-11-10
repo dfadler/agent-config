@@ -443,13 +443,20 @@ plan_settings() {
 
 # Point this checkout's core.hooksPath at scripts/hooks (the opt-in pii-cleanup
 # pre-commit hook). Planned only in a git checkout that ships the hook, and
-# only while core.hooksPath is unset: a different value is the user's, and
-# doctor warns about it. Gated on pii-cleanup so --skip=pii-cleanup leaves it off.
+# only while core.hooksPath is unset or is another spelling (usually an absolute
+# path) of this repo's own scripts/hooks, which is rewritten to the relative
+# form. Any other value is the user's, and doctor warns about it. Gated on
+# pii-cleanup so --skip=pii-cleanup leaves it off.
 plan_git_hooks_path() {
   is_skipped pii-cleanup && return 0
   git -C "$REPO_ROOT" rev-parse --git-dir >/dev/null 2>&1 || return 0
   [[ -f "$REPO_ROOT/scripts/hooks/pre-commit" ]] || return 0
-  [[ -z "$(git -C "$REPO_ROOT" config --get core.hooksPath 2>/dev/null)" ]] || return 0
+  local current
+  current="$(git -C "$REPO_ROOT" config --get core.hooksPath 2>/dev/null || true)"
+  [[ "$current" == "scripts/hooks" ]] && return 0
+  if [[ -n "$current" ]]; then
+    hooks_path_is_ours "$current" || return 0
+  fi
   printf 'git-hooks-path\t%s\tscripts/hooks\n' "$REPO_ROOT"
 }
 

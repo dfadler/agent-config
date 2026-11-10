@@ -2,7 +2,9 @@
 # sourced-only
 # Loads the plugin hook table (scripts/plugin-hooks.tsv, the single source of
 # truth shared with TypeScript) into parallel arrays for setup.sh and the
-# setup plan. Sourced by setup.sh and setup-plan-lib.sh — do not run directly.
+# setup plan. Sourced by setup.sh, setup-plan-lib.sh and check-companions.sh —
+# do not run directly. Also holds hooks_path_is_ours, the one git-hooks helper
+# those scripts share (see the end of this file).
 #
 # Plain indexed arrays (bash 3.2 on macOS has no associative arrays); row i is
 # EVENT[i]/MATCHER[i]/FEATURE[i]/CMD[i]/ARGS_JSON[i]/SHELL_CMD[i]/LEGACY_CMD[i].
@@ -51,3 +53,15 @@ _load_plugin_hooks() {
   done <"$table"
 }
 _load_plugin_hooks
+
+# hooks_path_is_ours VALUE: succeeds when a core.hooksPath VALUE resolves (a
+# relative one against the checkout, as git does) to this checkout's own
+# scripts/hooks. Compared on resolved physical paths, never as a substring, so
+# another repo's hooks, .husky and the like never match. Needs REPO_ROOT.
+hooks_path_is_ours() {
+  local value="$1" want got
+  [[ "$value" == /* ]] || value="$REPO_ROOT/$value"
+  want="$(cd -P "$REPO_ROOT/scripts/hooks" 2>/dev/null && pwd -P)" || return 1
+  got="$(cd -P "$value" 2>/dev/null && pwd -P)" || return 1
+  [[ "$want" == "$got" ]]
+}
