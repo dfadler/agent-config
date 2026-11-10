@@ -12,6 +12,8 @@ published docs. T3 tools are deferred: load a schema with `ToolSearch` before ca
 | List sibling sessions | `mcp__ccd_session_mgmt__list_sessions` | `t3_thread_list`, `t3_thread_read` |
 | Context percent used | `mcp__ccd_session_mgmt__get_usage` | none known; use the ~15-turn estimate |
 | Start a separate session | `mcp__ccd_session__start_session` | `delegate_task` (`isolation: "worktree"` for its own checkout) |
+| Message a session | `SendMessage` to a `local_…` id (only sessions this session started; see `pr-session-sweep`) | `t3_thread_send` |
+| Stop a delegated run | none known | `task_cancel` |
 | Open a local page | `mcp__Claude_Browser__navigate` | `html_preview` / `html_render`, or `preview_open` |
 | Link or watch a PR | none | `link_pull_request`, `watch_pull_request` |
 
