@@ -61,6 +61,15 @@ run_setup_with() {
   run bash "$FAKE_REPO/setup.sh" "$@"
 }
 
+# refute_file_has TEXT FILE: fail the test if FILE contains TEXT. A bare
+# `! grep ...` mid-test never fails a bats test, so it asserts nothing.
+refute_file_has() {
+  if grep -qF -- "$1" "$2"; then
+    echo "unexpected '$1' in $2" >&2
+    return 1
+  fi
+}
+
 @test "creates the expected links from a clean HOME" {
   run_setup
   assert_success
@@ -760,4 +769,111 @@ d = json.load(open('$HOME/.claude/settings.json'))
 assert 'PreToolUse' not in d.get('hooks', {}), d
 "
   [ "$status" -eq 0 ]
+}
+
+# --- opt-in conventions via --include / --skip -------------------------
+
+@test "--list-features lists conventions" {
+  run_setup_with --list-features
+  assert_success
+  assert_output_contains "Conventions"
+  assert_output_contains "three"
+}
+
+@test "--include=<opt-in convention> adds its @include and saves it" {
+  run_setup_with --no-companions --include=three
+  assert_success
+  grep -qF "@$FAKE_REPO/claude/conventions/three.md" "$HOME/.claude/CLAUDE.md"
+  grep -qxF "three.md" "$HOME/.claude/agent-config.conventions"
+  # Additive: the defaults, the command and the plugin are all still installed.
+  grep -qF "@$FAKE_REPO/claude/conventions/one.md" "$HOME/.claude/CLAUDE.md"
+  [ -L "$HOME/.claude/commands/demo.md" ]
+  [ -L "$HOME/.claude/skills/demo-plugin" ]
+}
+
+@test "a bare re-run keeps a saved opt-in convention" {
+  run_setup_with --no-companions --include=three
+  assert_success
+  run_setup
+  assert_success
+  grep -qF "@$FAKE_REPO/claude/conventions/three.md" "$HOME/.claude/CLAUDE.md"
+}
+
+@test "--skip=<opt-in convention> removes it and deletes the empty saved file" {
+  run_setup_with --no-companions --include=three
+  assert_success
+  run_setup_with --no-companions --skip=three
+  assert_success
+  refute_file_has "three.md" "$HOME/.claude/CLAUDE.md"
+  [ ! -e "$HOME/.claude/agent-config.conventions" ]
+}
+
+@test "--skip=<default convention> drops it for that run only" {
+  run_setup_with --no-companions --skip=one
+  assert_success
+  refute_file_has "one.md" "$HOME/.claude/CLAUDE.md"
+  [ ! -e "$HOME/.claude/agent-config.conventions" ]
+  run_setup
+  assert_success
+  grep -qF "@$FAKE_REPO/claude/conventions/one.md" "$HOME/.claude/CLAUDE.md"
+}
+
+@test "--plan --include=<convention> reports the save and writes nothing" {
+  run_setup_with --plan --include=three
+  assert_success
+  assert_output_contains "save-conventions"
+  [ ! -e "$HOME/.claude" ]
+}
+
+@test "an unknown --include name still exits 2 now that conventions are accepted" {
+  run_setup_with --include=not-a-real-feature
+  [ "$status" -eq 2 ]
+  assert_output_contains "Unknown --include feature(s): not-a-real-feature"
+}
+
+@test "hand-written convention includes in CLAUDE.personal.md migrate into the saved list" {
+  mkdir -p "$HOME/.claude"
+  # A different machine's checkout path, a default convention, a missing one,
+  # and a line that is the user's own.
+  printf '%s\n' \
+    "@/other/machine/agent-config/claude/conventions/three.md" \
+    "@/other/machine/agent-config/claude/conventions/one.md" \
+    "@/other/machine/agent-config/claude/conventions/gone.md" \
+    "my own note" >"$HOME/.claude/CLAUDE.personal.md"
+  run_setup
+  assert_success
+  assert_output_contains "Moved convention includes"
+  # Opt-in saved and now generated; the default is not saved twice.
+  grep -qxF "three.md" "$HOME/.claude/agent-config.conventions"
+  refute_file_has "one.md" "$HOME/.claude/agent-config.conventions"
+  grep -qF "@$FAKE_REPO/claude/conventions/three.md" "$HOME/.claude/CLAUDE.md"
+  # Repo conventions leave the personal file; unrelated lines stay.
+  refute_file_has "three.md" "$HOME/.claude/CLAUDE.personal.md"
+  refute_file_has "conventions/one.md" "$HOME/.claude/CLAUDE.personal.md"
+  grep -qF "conventions/gone.md" "$HOME/.claude/CLAUDE.personal.md"
+  grep -qxF "my own note" "$HOME/.claude/CLAUDE.personal.md"
+  [ -f "$HOME/.claude/CLAUDE.personal.md.pre-conventions-migration" ]
+}
+
+@test "the personal-file migration runs once and a second run changes nothing" {
+  mkdir -p "$HOME/.claude"
+  printf '%s\n' "@/other/machine/agent-config/claude/conventions/three.md" \
+    >"$HOME/.claude/CLAUDE.personal.md"
+  run_setup
+  assert_success
+  run_setup
+  assert_success
+  refute_output_contains "Moved convention includes"
+  refute_output_contains "Saved opt-in conventions"
+  grep -qxF "three.md" "$HOME/.claude/agent-config.conventions"
+}
+
+@test "a saved convention whose file was deleted is dropped, not left dangling" {
+  run_setup_with --no-companions --include=three
+  assert_success
+  rm "$FAKE_REPO/claude/conventions/three.md"
+  run_setup
+  assert_success
+  refute_file_has "three.md" "$HOME/.claude/CLAUDE.md"
+  [ ! -e "$HOME/.claude/agent-config.conventions" ]
 }

@@ -16,7 +16,7 @@ automatically, with no per-project copy to keep in sync.
     convention files — not a symlink.
   - `conventions/` — one file per convention (worktree usage, secrets handling, etc.),
     each independently `@include`-able. `DEFAULT_ENABLED` controls which ones a fresh
-    machine gets; everything else is opt-in via `~/.claude/CLAUDE.personal.md`.
+    machine gets; everything else is opt-in via `./setup.sh --include=<name>`.
   - `commands/` — slash commands, symlinked individually into `~/.claude/commands/`.
 - `plugins/` — one directory per plugin. Each plugin's directory name matches its
   manifest `name`, which is what makes skills resolve as `<plugin-name>:<skill>`.

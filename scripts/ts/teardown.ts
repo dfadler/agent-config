@@ -118,6 +118,14 @@ export const restoreClaudeMd = (home: string, repoRoot: string, log: Log): void 
   const personal = join(home, ".claude", "CLAUDE.personal.md");
   const marker = `${personal}.setup-managed`;
 
+  // The opt-in conventions list setup.sh saved feeds the managed section
+  // stripped below, so it goes with it.
+  const optIn = join(home, ".claude", "agent-config.conventions");
+  if (existsSync(optIn)) {
+    rmSync(optIn);
+    log(`Removed ${optIn}`);
+  }
+
   if (isSymlink(link)) {
     unlinkIfOwned(link, join(repoRoot, "claude", "CLAUDE.md"), log);
   } else if (existsSync(link) && statSync(link).isFile()) {

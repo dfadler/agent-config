@@ -1090,3 +1090,43 @@ make_plugin_skill() {
   assert_success
   assert_output_contains "references \${CLAUDE_PLUGIN_ROOT}/../../scripts/ts/outside.ts"
 }
+
+# --- available opt-in conventions -------------------------------------------
+
+# A default convention (one.md), an opt-in (two.md), and the README, which is
+# never a convention.
+make_opt_in_fixture() {
+  mkdir -p "$FAKE_REPO/claude/conventions" "$HOME/.claude"
+  echo "## one" > "$FAKE_REPO/claude/conventions/one.md"
+  echo "## two" > "$FAKE_REPO/claude/conventions/two.md"
+  echo "# readme" > "$FAKE_REPO/claude/conventions/README.md"
+  printf 'one.md\n' > "$FAKE_REPO/claude/conventions/DEFAULT_ENABLED"
+  : > "$HOME/.claude/CLAUDE.md"
+  touch "$HOME/.claude/CLAUDE.personal.md"
+}
+
+@test "an opt-in convention that is not included is listed, with the setup.sh command to enable it" {
+  make_opt_in_fixture
+  run_companions
+  assert_success
+  assert_output_contains "1 opt-in convention(s) available but not enabled"
+  assert_output_contains "    two.md"
+  assert_output_contains "./setup.sh --include=<name>"
+  refute_output_contains "    one.md"
+  refute_output_contains "README.md"
+}
+
+@test "the opt-in hint no longer tells the user to hand-edit CLAUDE.personal.md" {
+  make_opt_in_fixture
+  run_companions
+  assert_success
+  refute_output_contains "Add any to your ~/.claude/CLAUDE.personal.md"
+}
+
+@test "an opt-in convention included in the managed block is no longer listed" {
+  make_opt_in_fixture
+  echo "@$FAKE_REPO/claude/conventions/two.md" >> "$HOME/.claude/CLAUDE.md"
+  run_companions
+  assert_success
+  refute_output_contains "opt-in convention(s) available"
+}
