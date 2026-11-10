@@ -93,7 +93,7 @@ give it an empty one with `< /dev/null`; otherwise it can wait on an open pipe.)
 
 For a **tracked** file, call `slack_read_canvas` with its `canvas_id`, save the
 tool's result **verbatim** to a temporary file (a quoted heredoc, `<<'JSON'`, in
-the session scratchpad or `$TMPDIR`; never retype, trim, or summarize it), then:
+the session scratchpad; never retype, trim, or summarize it), then:
 
 ```bash
 CANVAS plan-push --root "$ROOT" --path "$REL" < "$READ_FILE"

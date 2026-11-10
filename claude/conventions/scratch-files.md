@@ -6,6 +6,8 @@ or extracted data. Not `/tmp`, `$TMPDIR`, the working directory, or the project 
 The scratchpad is session-specific and outside the checkout, so nothing leaks into a
 commit or collides with another session.
 
+- A skill or tool that says "temp dir", "temporary directory" or `/tmp` does not override
+  this: when the environment names a scratchpad, that wording means the scratchpad.
 - Pass the scratchpad path to every subagent or workflow prompt you write. They do not
   see it otherwise and fall back to `/tmp`.
 - For a Bash command that creates temp files on its own (`mktemp`, `curl -o`), set

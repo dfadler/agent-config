@@ -134,8 +134,7 @@ canvas to the pending list; it does not touch Slack.
 ## Step 5: Deeper check (only if asked)
 
 For each tracked file, call `slack_read_canvas`, save the result verbatim to a
-temporary file (a quoted heredoc, `<<'JSON'`, in the session scratchpad or
-`$TMPDIR`), and run `CANVAS plan-push --root "$ROOT" --path "$REL" < "$READ_FILE"`.
+temporary file (a quoted heredoc, `<<'JSON'`, in the session scratchpad), and run `CANVAS plan-push --root "$ROOT" --path "$REL" < "$READ_FILE"`.
 That is a dry run and writes nothing. Report each file's `status`
 (`in-sync`, `push`, `pull`, `mixed`, `conflict`). Delete the temporary files after;
 they hold canvas content.
