@@ -214,6 +214,25 @@ check_git_identity() {
   fi
 }
 
+# Skills that read issues or open PRs (pr-session-sweep, github-pr, gh-publish)
+# fail mid-task when gh has no credentials, and a delegated session can't log
+# in on its own. `gh auth status` also honours GH_TOKEN/GITHUB_TOKEN. Silent
+# when gh isn't installed. Advisory only.
+check_gh_auth() {
+  command -v gh >/dev/null 2>&1 || return 0
+  if gh auth status >/dev/null 2>&1; then
+    echo "✓ gh is authenticated"
+  else
+    {
+      echo
+      echo "⚠ gh is not logged in. Skills that read issues or open PRs will fail"
+      echo "  with \"run gh auth login\" (sessions they start hit the same wall)."
+      echo "  Run \`gh auth login\` in your own terminal, or export GH_TOKEN."
+      echo
+    } >&2
+  fi
+}
+
 # The opt-in pre-commit hook (scripts/hooks/pre-commit) is live only while
 # core.hooksPath points at scripts/hooks. Silent outside a git checkout or when
 # the hook file is absent. --fix sets it when unset, or rewrites another
@@ -1740,6 +1759,7 @@ check_shell_form_hooks
 check_dangling_includes
 check_project
 check_git_identity
+check_gh_auth
 check_hooks_path
 check_python_deps
 
