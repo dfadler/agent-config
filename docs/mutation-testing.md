@@ -26,3 +26,7 @@ pnpm run mutate --mutate plugins/eval-authoring/scripts/ts/run-evals/power.ts
   `all-checks`; do not run Stryker per PR.
 - Pool: no change needed. Vitest 5's default pool is already `forks`; setting it explicitly
   gave identical results and `threads` was no faster (#1020).
+- Whole tree (`pnpm run mutate`, no override; #1018): 25,757 mutants in 161 files, about 48 min on a
+  12-core Mac with 11 runners, score 72.10% (17,057 killed, 371 timeout, 5,131 survived, 1,612 no
+  coverage). Plain `pnpm run mutate` does not get through the dry run yet; see the #1018 comment
+  for the four test and config changes it needed. Practical as a scheduled job, not per change.
