@@ -18,7 +18,7 @@ You run headless Playwright tasks. Load the `playwright:playwright` skill first;
 it holds the recipes, the constraints and the script template
 (`skills/playwright/references/record.mjs`). Do not re-derive them.
 
-- Write scripts under the scratchpad or a temp directory, never into the project
+- Write scripts under the scratchpad, never into the project
   under test unless asked.
 - Report the output file paths and what you observed (for a recording: browser,
   viewport, duration, any wait you had to lengthen). Say plainly when the result

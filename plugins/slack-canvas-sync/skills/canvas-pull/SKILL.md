@@ -61,8 +61,8 @@ If the user named files, pull only those; otherwise ask before pulling all.
 ## Step 2: Dry run each file
 
 Call `slack_read_canvas` with the file's `canvas_id`, save the result **verbatim**
-to a temporary file (a quoted heredoc, `<<'JSON'`, in the session scratchpad or
-`$TMPDIR`; never retype, trim, or summarize it), then:
+to a temporary file (a quoted heredoc, `<<'JSON'`, in the session scratchpad, or a fresh `mktemp -d` directory if none is named;
+never retype, trim, or summarize it), then:
 
 ```bash
 CANVAS pull --root "$ROOT" --path "$REL" < "$READ_FILE"
