@@ -28,7 +28,9 @@ metadata:
 
 ## Steps
 
-1. **Find the sub-sessions.** Call `mcp__ccd_session_mgmt__list_sessions` with
+1. **Find the sub-sessions.** (Claude Code Desktop only. In T3 Code the equivalents are
+   `t3_thread_list` / `t3_thread_send`; see `docs/host-differences.md`. If neither host's
+   tool is available, say so and stop.) Call `mcp__ccd_session_mgmt__list_sessions` with
    `{"linked": true}` and keep rows whose `startedBy` is this session. The listing is
    the source of truth; do not rely on memory of which sessions exist. Skip archived
    sessions. If `$ARGUMENTS` names a session, keep only those that match it, so a
