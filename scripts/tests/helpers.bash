@@ -40,7 +40,15 @@ exit 97
 EOF
     chmod +x "$SHIM_BIN/$tool"
   done
-  export PATH="$SHIM_BIN:$PATH"
+  # playwright-cli is a hard dependency (check-companions.sh fails without it),
+  # and CI runners do not have it installed. Stub it in its own directory so
+  # every suite's setup/doctor run sees it present, while a test that strips
+  # PATH to test the missing case can still drop it.
+  local pw_bin="$SANDBOX/pw-default-shim"
+  mkdir -p "$pw_bin"
+  printf '#!/usr/bin/env bash\necho "1.2.3"\n' > "$pw_bin/playwright-cli"
+  chmod +x "$pw_bin/playwright-cli"
+  export PATH="$SHIM_BIN:$pw_bin:$PATH"
 }
 
 # Extends make_sandbox for a script that runs REAL git against a remote (so

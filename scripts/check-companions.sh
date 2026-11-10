@@ -1115,12 +1115,12 @@ check_convention_deps() {
   done <"$deps_file"
 }
 
-# Playwright CLI (@playwright/cli): an optional companion to the playwright
-# plugin, which scripts the `playwright` npm package per project and does not
-# call the CLI itself. The CLI matters only for its official skill (see
-# docs/companion-plugins.md), so a missing CLI is informational, like rtk.
-# `playwright` the npm package is deliberately not checked: it is a
-# per-project dependency and this script runs in the repo, not the project.
+# Playwright CLI (@playwright/cli): a hard dependency. Browser tasks go through
+# the playwright-cli skill (see claude/conventions/prefer-real-chrome.md), so a
+# missing CLI fails this check. The fix is named in the failure message; the
+# install itself stays opt-in via --install-deps. The `playwright` npm package
+# is deliberately not checked: it is a per-project dependency and this script
+# runs in the repo, not the project.
 # --install-deps installs the CLI (npm install -g) the same opt-in way it
 # installs pyte; it never installs the skill, which the user chooses to place
 # globally or per project.
@@ -1158,13 +1158,13 @@ check_playwright_cli() {
     else
       {
         echo
-        echo "ℹ playwright-cli (@playwright/cli) is not installed — an optional companion"
-        echo "  to the playwright plugin, not required by anything here. Install it with:"
+        echo "✗ playwright-cli (@playwright/cli) is not installed — it is required for browser tasks."
+        echo "  Install it with:"
         echo "    npm install -g @playwright/cli@latest"
         echo "  or re-run this script as: ./setup.sh --install-deps"
         echo
       } >&2
-      return 0
+      return 1
     fi
   fi
   echo "✓ playwright-cli is installed ($(playwright-cli --version 2>/dev/null || echo "version unknown"))"

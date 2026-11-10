@@ -346,8 +346,9 @@ Playwright command line. `playwright-cli install --skills` installs its official
 recording guide ([docs](https://playwright.dev/agent-cli/skills)). The `playwright`
 plugin here is a thin layer on top of that: it adds recipes the official skill lacks
 (recording gotchas, Storybook play functions, frame extraction), and does not call the
-CLI itself, so nothing depends on this companion being installed. Research and the
-overlap comparison: PR #598.
+CLI itself. The CLI is a hard dependency of the browser-task convention
+(`claude/conventions/prefer-real-chrome.md`), so `check_playwright_cli` fails when it
+is missing. Research and the overlap comparison: PR #598.
 
 ```bash
 npm install -g @playwright/cli@latest
