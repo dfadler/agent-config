@@ -80,7 +80,9 @@ informational and fail open (exit 0).
 
 For `require-worktree-hook.ts`, `warn` is a middle ground: it prints an
 advisory instead of blocking (see the hook script's own header for the full
-mode table). For the other two, `off` isn't a distinct third state from the
+mode table). It only guards `tool_input.file_path` values inside the checkout
+(symlinks and `..` resolved); a path outside it, such as memory files or the
+scratchpad, passes, and a missing or relative path is still guarded. For the other two, `off` isn't a distinct third state from the
 default — an explicit `off`/`false` still means "don't run", same as leaving
 it unconfigured; `prune-merged-worktrees-hook.ts`'s lighter "nudge, don't
 act" mode (its `--hook` flag) is reached via the env var's or settings'

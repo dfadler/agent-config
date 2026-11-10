@@ -5,6 +5,7 @@ import {
   mkdirSync,
   mkdtempSync,
   rmSync,
+  symlinkSync,
   writeFileSync,
 } from "node:fs";
 import { tmpdir } from "node:os";
@@ -398,6 +399,21 @@ describe("entrypoints (spawned)", () => {
     } finally {
       rmSync(elsewhere, { recursive: true, force: true });
     }
+  });
+
+  // Issue #1050: only paths inside the checkout are guarded.
+  it("guards by tool_input.file_path: outside allowed, inside/symlink/..//missing blocked", () => {
+    const env = { WORKTREE_ENFORCE: "block" };
+    const run = (tool_input: unknown) =>
+      hook(main, env, "require-worktree-hook", JSON.stringify({ cwd: main, tool_input })).status;
+    const outside = join(tmp, "memory", "m.md");
+    symlinkSync(tmp, join(main, "link"));
+    expect(run({ file_path: outside })).toBe(0);
+    expect(run({ file_path: join(main, "a.txt") })).toBe(2);
+    expect(run({ file_path: join(main, "link", "main", "a.txt") })).toBe(2);
+    expect(run({ file_path: join(main, "..", "main", "a.txt") })).toBe(2);
+    expect(run({})).toBe(2);
+    expect(run({ file_path: "rel.txt" })).toBe(2);
   });
 
   it("honours settings.json in the repo", () => {
