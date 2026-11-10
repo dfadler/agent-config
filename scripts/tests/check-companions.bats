@@ -47,6 +47,30 @@ run_companions() {
   run bash "$FAKE_REPO/scripts/check-companions.sh" "$@"
 }
 
+# --- gh auth check ----------------------------------------------------------
+
+stub_gh() {
+  mkdir -p "$SANDBOX/ghbin"
+  printf '#!/bin/sh\nexit %s\n' "$1" >"$SANDBOX/ghbin/gh"
+  chmod +x "$SANDBOX/ghbin/gh"
+  export PATH="$SANDBOX/ghbin:$PATH"
+}
+
+@test "warns when gh is installed but not logged in" {
+  stub_gh 1
+  run_companions
+  assert_success
+  assert_output_contains "gh is not logged in"
+}
+
+@test "confirms gh auth when logged in" {
+  stub_gh 0
+  run_companions
+  assert_success
+  assert_output_contains "gh is authenticated"
+  refute_output_contains "gh is not logged in"
+}
+
 # --- git identity check -----------------------------------------------------
 #
 # scripts/git-identity.sh is the actual check (see its own bats suite); these
