@@ -151,6 +151,13 @@ it, do not rebuild any of that.
    (an untrusted directory, an invalid option, no cases), nothing is written: read the wrapper
    output and run the eval-authoring lint instead.
 
+   **A plugin outside this repo's `plugins/`.** The wrapper never passes `--trust-plugin` for
+   it (trust runs the plugin's code as you), so the run exits `1` with no results. Do not
+   work around it by running `claude plugin eval --trust-plugin` yourself: that skips the
+   wrapper's lint, dry-run, tier and cost ceiling. Tell the user, and run the direct command
+   only after they confirm that plugin's code is trusted, with the same `--max-cost-usd` the
+   dry-run showed.
+
 **A PR line from pasted scores.** When the user quotes scores and wants a delta in the PR,
 and the scores are `quick` or 3-run (`standard`) or the suite has fewer than about 20 cases,
 give the arm scores and write "delta not measured": no delta number, even marked
