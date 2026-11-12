@@ -78,7 +78,9 @@ staging, not a failed child.
    (`summary`, `findings`, `files_changed`, `next_actions`). Each parent folds its
    children's results into one handback of the same shape before returning it up.
 7. **Failures.** A child that fails or times out is reported by name in the merge;
-   retry it once at most, then continue the run without it.
+   retry it once at most, and only if unspent budget remains (a retry is a new
+   agent). Use the retry's result if it succeeds; if it fails or times out, or no budget
+   remains, continue the run without that child.
 
 ## Stop conditions
 
