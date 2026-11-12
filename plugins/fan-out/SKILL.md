@@ -3,17 +3,13 @@ name: fan-out
 description: |
   ALWAYS invoke this skill first when the user says "fan out", "split this across
   agents", "solve this with parallel sub-agents", or lets sub-agents spawn their own
-  helpers, even when only a plan is asked for: it defines the depth, width and total-agent
-  limits to state and obey. Splits the
-  prompt into independent subtasks, runs them as parallel sub-agents that may spawn
-  their own sub-agents under a fixed depth, width and total-agent budget, and merges
-  compact results. Not for small tasks or a single question: use
+  helpers, even when only a plan is asked for. Splits the prompt into independent
+  subtasks, runs them as parallel sub-agents under a fixed depth, width and total-agent
+  budget, and merges compact results. Not for small tasks or a single question: use
   `subagent-orchestration` to route those.
 argument-hint: "[--budget N] [--depth N] [--width N] <prompt>"
 allowed-tools: Bash(node ${CLAUDE_SKILL_DIR}/scripts/ts/limits.ts *)
 license: MIT
-metadata:
-  version: "1.2.0"
 ---
 
 # Fan out
@@ -21,7 +17,7 @@ metadata:
 ## Contract
 
 - **Input:** `$ARGUMENTS`: the prompt to solve, optionally preceded by `--budget N`,
-  `--depth N`, `--width N` to override the limits below.
+  `--depth N`, `--width N` to override the defaults in the Limits table.
 - **Output:** one merged answer, a one-line account of how the work was split, and
   which subtasks failed or were skipped.
 - **Does not:** decide whether a task deserves heavy parallelism (that is
@@ -47,8 +43,8 @@ bad input is rejected, not clamped.
 
 | Limit | Default | Meaning |
 |---|---|---|
-| `depth` | 2 | Layers of sub-agents below you. The harness hard-stops at 3. |
-| `width` | 4 | Children one agent may spawn at once. Never above `budget` minus 1. |
+| `depth` | 2 | Layers of sub-agents below you, 0 to 3. |
+| `width` | 4 | Children one agent may spawn at once. At most `budget` minus 1. |
 | `budget` | current max sub-agent count (env value, else 20) | Total agents in the whole run, all layers. |
 
 The harness also caps concurrent sub-agents (`CLAUDE_CODE_MAX_CONCURRENT_SUBAGENTS`,
@@ -69,19 +65,20 @@ staging, not a failed child.
 2. **Split.** Name the subtasks and what each reads or writes. Subtasks that edit
    files need disjoint file surfaces or their own worktrees; shared generated files
    count as a surface.
-3. **Divide the budget before spawning.** You hold `budget`. Reserve 1 for yourself,
-   give each child its entry in `shares` (children run in parallel, so shares sum to at
-   most what you hold; below the first layer, split what you were given the same way). Spawn the first wave of children (up to `width`, or the
-   concurrency cap if lower) in one message.
+3. **Divide the budget before spawning.** You hold `budget`. Reserve 1 for yourself
+   and give each child its entry in `shares`. Shares sum to at most what you hold.
+   Below the first layer, split what you were given the same way. Spawn the first
+   wave of children (up to `width`, or the concurrency cap if lower) in one message.
 4. **Brief each child** with: its subtask, its `depth`/`width`/`budget` remaining
-   (`depth` minus 1, its own budget share), and the leaf rule below.
+   (`depth` minus 1, its own budget share), the handback cap (summary under 10
+   lines), and step 5, Leaf rule.
 5. **Leaf rule.** An agent with `depth` 0, `budget` 1, or a subtask that is one
    bounded piece of work does it itself and does not spawn.
 6. **Merge.** Children return the compact handback from `subagent-orchestration`
    (`summary`, `findings`, `files_changed`, `next_actions`). Each parent folds its
    children's results into one handback of the same shape before returning it up.
 7. **Failures.** A child that fails or times out is reported by name in the merge;
-   do not retry it more than once, and do not let it sink the run.
+   retry it once at most, then continue the run without it.
 
 ## Stop conditions
 
