@@ -151,16 +151,14 @@ it, do not rebuild any of that.
    (an untrusted directory, an invalid option, no cases), nothing is written: read the wrapper
    output and run the eval-authoring lint instead.
 
-   **A plugin outside this repo's `plugins/`.** The wrapper never passes `--trust-plugin` for
-   it (trust runs the plugin's code as you), so the run exits `1` with no results; `--scaffold`
-   and `--neighbours` are refused earlier, with exit `2` and no dry-run output. Do not work
-   around it by running `claude plugin eval --trust-plugin` yourself: that skips the wrapper's
-   lint, dry-run, tier and cost ceiling. Tell the user, and run a direct command only after
-   they confirm that plugin's code is trusted. The dry-run prints one command per case with
-   that case's grants, and one direct command covers one case and gives no suite summary: run
-   the printed commands one at a time, or hand them to the user. Each prints the full ceiling,
-   so pass `--max-cost-usd` as the approved ceiling minus the `costUsd` of results already
-   returned, and stop when none is left and list the cases that did not run.
+   **A plugin outside the wrapper's `plugins/`** (a consumer repo's own plugin, say). The wrapper
+   passes `--trust-plugin` on its own only for a plugin directly under its own `plugins/`,
+   because trust runs the plugin's code as you; for any other plugin the run exits `1` with no
+   results. Ask the user to confirm in chat that the plugin's code is trusted, then add the
+   wrapper's own `--trust-plugin` flag to the dry-run and the run: the lint, tier, cost ceiling
+   and suite summary all still apply. Never add the flag unprompted, and never bypass the
+   wrapper with a raw `claude plugin eval --trust-plugin` command. `--scaffold` and
+   `--neighbours` stay repo-only: they exit `2` for such a plugin, even with `--trust-plugin`.
 
 **A PR line from pasted scores.** When the user quotes scores and wants a delta in the PR,
 and the scores are `quick` or 3-run (`standard`) or the suite has fewer than about 20 cases,

@@ -181,6 +181,12 @@ ${Object.values(TIERS).map((t) => `                         ${t.name}: ${t.descr
                        context.scaffold_script get their fixture workspace.
                        Opt-in, never a default: the scripts run as you. Part of
                        the baseline-cache key
+  --trust-plugin       pass --trust-plugin to each invocation for a plugin that is
+                       not directly under this wrapper's plugins/ (a consumer
+                       repo's own plugin). Opt-in, never a default: trusting a
+                       plugin runs its code as you, so pass it only for a plugin
+                       you trust. Not needed for plugins under plugins/.
+                       --scaffold and --neighbours still refuse such a plugin
   --no-baseline        plugin arm only (--ablation none) at any tier: roughly
                        a third less spend, no without score and no delta. For
                        iterating on a skill or a grader; take the delta from a
@@ -275,6 +281,8 @@ interface Options {
   readonly triggerBoundary: boolean;
   /** `--no-cache`: neither read nor write the baseline cache. */
   readonly noCache: boolean;
+  /** `--trust-plugin`: the user trusts a plugin that is not under this wrapper's `plugins/`. */
+  readonly trustPlugin: boolean;
 }
 
 type Parsed =
@@ -306,6 +314,7 @@ const BOOL_FLAGS: readonly string[] = [
   "--no-baseline",
   "--no-cache",
   "--scaffold",
+  "--trust-plugin",
 ];
 
 /** A plain decimal greater than zero ("0.5", "2", ".5"); anything else (empty, "abc", "-1", "NaN", "1e3", "0x10", "0") is undefined. */
@@ -442,6 +451,7 @@ export const parseArgs = (argv: readonly string[]): Parsed => {
       neighbours,
       triggerBoundary: bools.has("--trigger-boundary"),
       noCache: bools.has("--no-cache"),
+      trustPlugin: bools.has("--trust-plugin"),
     },
   };
 };
@@ -971,8 +981,10 @@ const run = async (
   );
   if (!plan.ok) return fail(io, EXIT_CONFIG, plan.reason);
 
-  const trust = isRepoPlugin(target, deps.pluginsDir, io.realpath);
-  if (options.scaffold && !trust) {
+  const repoPlugin = isRepoPlugin(target, deps.pluginsDir, io.realpath);
+  // --trust-plugin is the user's own opt-in for a plugin outside plugins/; scaffold and staging stay repo-only.
+  const trust = repoPlugin || options.trustPlugin;
+  if (options.scaffold && !repoPlugin) {
     // --scaffold runs each case's scaffold_script as the user, outside the sandbox: never for a plugin that is not this repo's.
     return fail(io, EXIT_USAGE, `--scaffold: ${target} is not directly under ${deps.pluginsDir}; scaffold scripts run as you, so only this repo's plugins may use it`);
   }
@@ -987,7 +999,7 @@ const run = async (
           cases: suite.cases.filter((c) => plan.groups.some((g) => g.cases.includes(c.name.value))),
         };
   if (stageInput !== undefined) {
-    if (!trust) {
+    if (!repoPlugin) {
       // The staged copy lives in a temp dir, so the CLI would ask for trust. Skipping that is safe only
       // when the copy is built entirely from plugins/ content, so a plugin outside plugins/ is refused.
       return fail(io, EXIT_USAGE, `--neighbours: ${target} is not directly under ${deps.pluginsDir}; only this repo's plugins can be staged and trusted`);
