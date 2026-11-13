@@ -201,7 +201,7 @@ blind-case-writer agent, second bullet), then stop.
    case covers. It never says a change "improves" or "fixes" a behavior without a case
    whose delta shows it; with a delta of zero, say the benefit is unverified. Before paying
    for a delta claim, read the "smallest detectable delta" line of `run-evals.ts --dry-run`
-   (or `scripts/ts/run-evals/power.ts`): a delta below it cannot be told from noise.
+   (or `${CLAUDE_SKILL_DIR}/../../scripts/ts/run-evals/power.ts`): a delta below it cannot be told from noise.
 
 ## Gotchas
 

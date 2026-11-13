@@ -172,7 +172,7 @@ difference): a delta inside it is noise-level. A delta from fewer than 5 usable 
 arm (for example after errored runs are dropped) is also marked `provisional`: rerun with
 more runs before quoting it. Neither mark lifts the suite-size rule above.
 
-**Before paying: what can this plan detect?** `node scripts/ts/run-evals/power.ts --runs 5
+**Before paying: what can this plan detect?** `node ${CLAUDE_SKILL_DIR}/../../scripts/ts/run-evals/power.ts --runs 5
 --sd 0.25` (or `--from-result <aggregate-result.json>` for the SD pooled over an earlier
 run's arms) prints the smallest per-case delta that clears the same 95% bar, so "5 runs
 cannot see a delta under 0.44" is known before the run. There is no default SD (none is
