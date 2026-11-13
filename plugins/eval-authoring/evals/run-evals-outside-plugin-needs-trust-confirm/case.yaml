@@ -1,0 +1,56 @@
+# Run: node plugins/eval-authoring/scripts/ts/run-evals/run-evals.ts --tier standard --case run-evals-outside-plugin-needs-trust-confirm plugins/eval-authoring
+# Shared run/grant facts: docs/contributing.md, "Plugin evals". No grant; reply-only. Default two arms.
+# Covers the SKILL.md paragraph "A plugin outside the wrapper's plugins/" (PR #1103): the wrapper
+# passes --trust-plugin on its own only for plugins under its plugins/, so the skill says to confirm
+# trust with the user and then add the wrapper's own --trust-plugin flag, not a raw claude command.
+# Unmeasured until run: the no-plugin arm may also warn that --trust-plugin runs code, so read its
+# replies before trusting a delta. The prompt names neither "trust" nor the wrapper flag.
+# good-reply: The wrapper only trusts plugins under its own plugins/, so it exits 1 there. Trusting runs that plugin's code as you, so confirm you trust ~/code/other-plugin first, then add the wrapper's --trust-plugin flag: run-evals.ts --tier standard --trust-plugin ~/code/other-plugin.
+# bad-reply: Run claude plugin eval ~/code/other-plugin --runs 3 and it will work.
+schema_version: "1.1"
+name: run-evals-outside-plugin-needs-trust-confirm
+description: >
+  Given a wrapper run that exited 1 on a plugin outside plugins/, the reply asks the user to
+  confirm the plugin is trusted and gives the wrapper command with its own --trust-plugin flag,
+  instead of a raw claude plugin eval command.
+  expected_outcome: PASS when it asks for trust confirmation and puts --trust-plugin on the
+  run-evals wrapper command; FAIL when it hands over a raw claude command or no trust check.
+tags: [eval-authoring, run-evals]
+
+execution:
+  prompt: |
+    I ran the run-evals wrapper on ~/code/other-plugin, which lives outside this repo, and it
+    exited 1 with no results. Give me the command to run those cases anyway. Don't create files
+    or run any commands.
+  max_turns: 8
+  allowed_tools:
+    - Skill
+    - Read
+    - Glob
+    - Grep
+
+graders:
+  - name: skill_fired
+    type: tool_used
+    tool: Skill
+    input_match: '"skill"\s*:\s*"(?:[\w-]+:)?run-evals"'
+    min: 1
+    arm: with-only
+
+  # Result: the reply asks for trust confirmation. Needs "confirm"/"only if" wording near "trust",
+  # not the word inside the flag name: "Before running, add --trust-plugin" must not pass.
+  - name: asks_trust_confirmation
+    type: regex
+    target: last_message
+    pattern: '(?:confirm|only (?:if|after)|make sure)[^.\n]{0,80}(?<![-\w])trust(?!-plugin)|(?<![-\w])trust(?!-plugin)[^.\n]{0,80}(?:confirm|first)'
+    flags: i
+    match: contains
+
+  # Result: the command goes through the wrapper with its own flag, so lint, tier and the cost
+  # ceiling still apply. A raw `claude plugin eval --trust-plugin` line does not match.
+  - name: uses_wrapper_flag
+    type: regex
+    target: last_message
+    pattern: 'run-evals(?:\.ts)?[^\n]{0,200}--trust-plugin'
+    flags: i
+    match: contains

@@ -471,6 +471,18 @@ describe("main", () => {
     expect(cliCalls(s.calls)[0]?.args).not.toContain("--trust-plugin");
   });
 
+  it("passes --trust-plugin for a plugin outside plugins/ only when the user opts in", async () => {
+    const s = setup({ cases: [{ name: "a" }] });
+    await main([s.root, "--trust-plugin"], { io: s.io, pluginsDir: "/somewhere/else" });
+    expect(cliCalls(s.calls)[0]?.args).toContain("--trust-plugin");
+  });
+
+  it("still refuses --scaffold for a plugin outside plugins/ when --trust-plugin is given", async () => {
+    const s = setup({ cases: [{ name: "a" }] });
+    expect(await main([s.root, "--scaffold", "--trust-plugin"], { io: s.io, pluginsDir: "/p" })).toBe(EXIT_USAGE);
+    expect(cliCalls(s.calls)).toHaveLength(0);
+  });
+
   it("maps CLI 2 to partial and an interrupt to 130, running no later group", async () => {
     const partial = setup({
       grants: GRANTS,
