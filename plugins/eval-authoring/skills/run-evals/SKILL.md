@@ -152,11 +152,15 @@ it, do not rebuild any of that.
    output and run the eval-authoring lint instead.
 
    **A plugin outside this repo's `plugins/`.** The wrapper never passes `--trust-plugin` for
-   it (trust runs the plugin's code as you), so the run exits `1` with no results. Do not
-   work around it by running `claude plugin eval --trust-plugin` yourself: that skips the
-   wrapper's lint, dry-run, tier and cost ceiling. Tell the user, and run the direct command
-   only after they confirm that plugin's code is trusted, with the same `--max-cost-usd` the
-   dry-run showed.
+   it (trust runs the plugin's code as you), so the run exits `1` with no results; `--scaffold`
+   and `--neighbours` are refused earlier, with exit `2` and no dry-run output. Do not work
+   around it by running `claude plugin eval --trust-plugin` yourself: that skips the wrapper's
+   lint, dry-run, tier and cost ceiling. Tell the user, and run a direct command only after
+   they confirm that plugin's code is trusted. The dry-run prints one command per case with
+   that case's grants, and one direct command covers one case and gives no suite summary: run
+   the printed commands one at a time, or hand them to the user. Each prints the full ceiling,
+   so pass `--max-cost-usd` as the approved ceiling minus the `costUsd` of results already
+   returned, and stop when none is left and list the cases that did not run.
 
 **A PR line from pasted scores.** When the user quotes scores and wants a delta in the PR,
 and the scores are `quick` or 3-run (`standard`) or the suite has fewer than about 20 cases,
