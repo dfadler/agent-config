@@ -186,7 +186,7 @@ ${Object.values(TIERS).map((t) => `                         ${t.name}: ${t.descr
                        repo's own plugin). Opt-in, never a default: trusting a
                        plugin runs its code as you, so pass it only for a plugin
                        you trust. Not needed for plugins under plugins/.
-                       --scaffold and --neighbours still refuse such a plugin
+                       --neighbours still refuses such a plugin; --scaffold works
   --no-baseline        plugin arm only (--ablation none) at any tier: roughly
                        a third less spend, no without score and no delta. For
                        iterating on a skill or a grader; take the delta from a
