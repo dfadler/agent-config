@@ -157,8 +157,9 @@ it, do not rebuild any of that.
    results. Ask the user to confirm in chat that the plugin's code is trusted, then add the
    wrapper's own `--trust-plugin` flag to the dry-run and the run: the lint, tier, cost ceiling
    and suite summary all still apply. Never add the flag unprompted, and never bypass the
-   wrapper with a raw `claude plugin eval --trust-plugin` command. `--scaffold` and
-   `--neighbours` stay repo-only: they exit `2` for such a plugin, even with `--trust-plugin`.
+   wrapper with a raw `claude plugin eval --trust-plugin` command. `--neighbours`
+   stays repo-only: it exits `2` for such a plugin, even with `--trust-plugin`. `--scaffold`
+   works for any plugin path, still only when the user asked for it in chat.
 
 **A PR line from pasted scores.** When the user quotes scores and wants a delta in the PR,
 and the scores are `quick` or 3-run (`standard`) or the suite has fewer than about 20 cases,
