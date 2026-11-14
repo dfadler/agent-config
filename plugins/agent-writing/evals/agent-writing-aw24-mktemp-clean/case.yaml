@@ -45,6 +45,6 @@ graders:
   - name: aw24_not_reported
     type: regex
     target: last_message
-    pattern: '^(?![^\n]*(?:\bnot\b|\bno\b|pass|n/a))[^\n]*\bAW24\b'
+    pattern: '^(?![^\n]*(?:\bpass(?:es)?\b|no finding|no issue|n/a|not (?:flagged|reported|applicable)))[^\n]*\bAW24\b'
     flags: im
     match: not_contains

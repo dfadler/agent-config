@@ -39,13 +39,13 @@ graders:
   - name: aw24_reported_with_line
     type: regex
     target: last_message
-    pattern: '^\|(?![^\n]*(?:no need|acceptable|no change|unnecessary|not required|does not apply|no issue|is fine))\s*(?:\*\*|`)*AW24\b[^\n]*(?:SKILL\.md:[15]\b|step 1\b|line [15]\b|tmp-base)'
+    pattern: '^\|\s*(?:\*\*|`)*AW24\b[^\n]*(?:SKILL\.md:[15]\b|step 1\b|line [15]\b|tmp-base)'
     flags: im
     match: contains
 
   - name: aw24_fix_names_safe_location
     type: regex
     target: last_message
-    pattern: '^\|(?![^\n]*(?:no need|acceptable|no change|unnecessary|not required|does not apply|no issue|is fine))\s*(?:\*\*|`)*AW24\b[^\n]*(?:use|extract|write|move|point)[^\n]*(?:mktemp|scratchpad)'
+    pattern: '^\|\s*(?:\*\*|`)*AW24\b[^\n]*\|\s*(?:[^|\n]*[;.]\s*)?(?:Use|Extract|Write|Move|Point|Replace|Switch|Create)\b[^|\n]*(?:mktemp|scratchpad)[^|\n]*\|?\s*$'
     flags: im
     match: contains
