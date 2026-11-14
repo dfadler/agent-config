@@ -7,7 +7,7 @@ import { mkdtempSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
 import { afterEach, describe, expect, it } from "vitest";
-import { EXIT_OK, EXIT_USAGE } from "./exit-codes.ts";
+import { EXIT_OK } from "./exit-codes.ts";
 import { nodeIo } from "./io.ts";
 import { main } from "./run-evals.ts";
 import { makePlugin } from "./test-support.ts";
@@ -56,11 +56,12 @@ describe("a plugin outside the wrapper's plugins/ directory, on the real filesys
     expect(r.out).not.toContain("--trust-plugin");
   });
 
-  it("still refuses --scaffold with --trust-plugin", async () => {
+  it("accepts --scaffold with --trust-plugin (#1105)", async () => {
     const root = plugin();
     const r = await run([root, "--dry-run", "--tier", "quick", "--scaffold", "--trust-plugin"], otherPluginsDir());
-    expect(r.code).toBe(EXIT_USAGE);
-    expect(r.err).toContain("--scaffold");
+    expect(r.code).toBe(EXIT_OK);
+    expect(r.out).toContain("--scaffold");
+    expect(r.out).toContain("--trust-plugin");
   });
 
   it("trusts a plugin directly under plugins/ with no flag, after real path resolution", async () => {

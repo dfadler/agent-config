@@ -81,7 +81,7 @@ export const USAGE = `Usage: run-evals.ts [options] <plugin-path>
 Run a plugin's eval cases at a cost tier. The CLI's --case takes one glob, so
 the wrapper makes one CLI invocation per case, each under exactly that case's
 grants (<eval-dir>/grants.yaml). Passes --scaffold only when you give it here (it
-runs each case's scaffold_script as you, outside the sandbox: trusted suites only);
+runs each case's scaffold_script as you, outside the sandbox: trusted suites only, any plugin path);
 never passes --json or --report.
 On macOS each invocation runs under caffeinate -i so the machine stays awake;
 the recorded rerun command omits that prefix on purpose, so it pastes anywhere.
@@ -186,7 +186,7 @@ ${Object.values(TIERS).map((t) => `                         ${t.name}: ${t.descr
                        repo's own plugin). Opt-in, never a default: trusting a
                        plugin runs its code as you, so pass it only for a plugin
                        you trust. Not needed for plugins under plugins/.
-                       --scaffold and --neighbours still refuse such a plugin
+                       --neighbours still refuses such a plugin; --scaffold works
   --no-baseline        plugin arm only (--ablation none) at any tier: roughly
                        a third less spend, no without score and no delta. For
                        iterating on a skill or a grader; take the delta from a
@@ -982,12 +982,9 @@ const run = async (
   if (!plan.ok) return fail(io, EXIT_CONFIG, plan.reason);
 
   const repoPlugin = isRepoPlugin(target, deps.pluginsDir, io.realpath);
-  // --trust-plugin is the user's own opt-in for a plugin outside plugins/; scaffold and staging stay repo-only.
+  // --trust-plugin is the user's own opt-in for a plugin outside plugins/; staging stays repo-only.
+  // --scaffold is the user's own opt-in too, so it works for any plugin path (#1105).
   const trust = repoPlugin || options.trustPlugin;
-  if (options.scaffold && !repoPlugin) {
-    // --scaffold runs each case's scaffold_script as the user, outside the sandbox: never for a plugin that is not this repo's.
-    return fail(io, EXIT_USAGE, `--scaffold: ${target} is not directly under ${deps.pluginsDir}; scaffold scripts run as you, so only this repo's plugins may use it`);
-  }
   const stageInput =
     options.neighbours === undefined
       ? undefined

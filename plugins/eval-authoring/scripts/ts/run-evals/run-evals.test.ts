@@ -331,11 +331,15 @@ describe("main", () => {
     for (const r of runs) expect(r.args).toContain("--scaffold");
   });
 
-  it("refuses --scaffold for a plugin outside the repo's plugins directory, before any run", async () => {
+  it("passes --scaffold for a plugin outside the repo's plugins directory, without --trust-plugin (#1105)", async () => {
     const s = setup({ grants: GRANTS, onCli: okCli() });
-    expect(await main([s.root, "--scaffold"], { io: s.io, pluginsDir: "/p" })).toBe(EXIT_USAGE);
-    expect(cliCalls(s.calls)).toEqual([]);
-    expect(s.err.join("")).toContain("--scaffold");
+    expect(await main([s.root, "--scaffold"], { io: s.io, pluginsDir: "/p" })).toBe(EXIT_OK);
+    const runs = cliCalls(s.calls);
+    expect(runs).toHaveLength(2);
+    for (const r of runs) {
+      expect(r.args).toContain("--scaffold");
+      expect(r.args).not.toContain("--trust-plugin");
+    }
   });
 
   it("passes when the CLI exits 0 and the results are clean, and records the mode", async () => {
@@ -477,10 +481,12 @@ describe("main", () => {
     expect(cliCalls(s.calls)[0]?.args).toContain("--trust-plugin");
   });
 
-  it("still refuses --scaffold for a plugin outside plugins/ when --trust-plugin is given", async () => {
-    const s = setup({ cases: [{ name: "a" }] });
-    expect(await main([s.root, "--scaffold", "--trust-plugin"], { io: s.io, pluginsDir: "/p" })).toBe(EXIT_USAGE);
-    expect(cliCalls(s.calls)).toHaveLength(0);
+  it("passes --scaffold and --trust-plugin together for a plugin outside plugins/ (#1105)", async () => {
+    const s = setup({ cases: [{ name: "a" }], onCli: okCli() });
+    expect(await main([s.root, "--scaffold", "--trust-plugin"], { io: s.io, pluginsDir: "/p" })).toBe(EXIT_OK);
+    const args = cliCalls(s.calls)[0]?.args;
+    expect(args).toContain("--scaffold");
+    expect(args).toContain("--trust-plugin");
   });
 
   it("maps CLI 2 to partial and an interrupt to 130, running no later group", async () => {
