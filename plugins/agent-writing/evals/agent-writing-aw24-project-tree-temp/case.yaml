@@ -1,0 +1,49 @@
+# Run: node plugins/eval-authoring/scripts/ts/run-evals/run-evals.ts plugins/agent-writing --case "agent-writing-aw24-project-tree-temp" (no grant needed; Skill only).
+# Maps to SKILL.md: AW24 scratch-in-scratchpad (a step that extracts files to a relative directory in the project tree).
+# good-reply: | AW24 | SKILL.md:5 | `mkdir -p tmp-base && ... | tar -x -C tmp-base` creates a directory in the project tree | extract into `$(mktemp -d)` or the scratchpad and say who deletes it |
+# bad-reply: Step 5 could be clearer about the output format.
+# Net plus measurement: AW24 does not exist before this change, so the no-plugin arm is expected to miss the row.
+schema_version: "1.1"
+name: agent-writing-aw24-project-tree-temp
+description: >
+  One pasted SKILL.md whose step 1 extracts the base branch into a relative directory
+  inside the project tree. expected_outcome: PASS when the reply reports AW24 with the
+  SKILL.md line of that step and a fix that names mktemp or the scratchpad; FAIL otherwise.
+tags: [agent-writing, trigger, quick]
+
+execution:
+  prompt: |
+    Can you check this SKILL.md for problems?
+
+    ---
+    name: base-compare
+    description: Compare build output against the base branch.
+    ---
+    1. Export the base branch sources: `mkdir -p tmp-base && git archive origin/main src packages | tar -x -C tmp-base`.
+    2. Build both trees and diff the output directories.
+    3. Report each changed file with its line count.
+    4. Delete tmp-base as the last step.
+  max_turns: 6
+  allowed_tools:
+    - Skill
+
+graders:
+  - name: skill_fired
+    type: tool_used
+    tool: Skill
+    input_match: '"skill"\s*:\s*"(?:[\w-]+:)?agent-writing"'
+    min: 1
+
+  - name: aw24_reported_with_line
+    type: regex
+    target: last_message
+    pattern: '^\|[^\n]*AW24[^\n]*SKILL\.md:5\b|^\|[^\n]*SKILL\.md:5\b[^\n]*AW24'
+    flags: im
+    match: contains
+
+  - name: aw24_fix_names_safe_location
+    type: regex
+    target: last_message
+    pattern: '^\|[^\n]*AW24[^\n]*(?:mktemp|scratchpad)'
+    flags: im
+    match: contains

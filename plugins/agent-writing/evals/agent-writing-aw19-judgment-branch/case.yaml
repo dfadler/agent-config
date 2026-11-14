@@ -1,0 +1,41 @@
+# Run: node plugins/eval-authoring/scripts/ts/run-evals/run-evals.ts plugins/agent-writing --case "agent-writing-aw19-judgment-branch" (no grant needed; Skill only).
+# Maps to SKILL.md: AW19 checkable-completion, decision-point sentence ("names the observable test that decides it").
+# good-reply: | AW19 | SKILL.md:6 | "required if the diff could change a rendered result" is a judgment, no command or path list decides it | name the command or path list |
+# bad-reply: Step 3 could say where the screenshots are saved.
+# Net plus measurement: the decision-point wording is new; the no-plugin arm is expected to miss the row.
+schema_version: "1.1"
+name: agent-writing-aw19-judgment-branch
+description: >
+  One pasted SKILL.md with a decision step that says verification is required if the diff
+  could change a rendered result, with no test. expected_outcome: PASS when the reply
+  reports AW19 against that step; FAIL otherwise.
+tags: [agent-writing, trigger, quick]
+
+execution:
+  prompt: |
+    Can you check this SKILL.md for problems?
+
+    ---
+    name: pr-visual-check
+    description: Verify the rendered result of a change before the pull request.
+    ---
+    1. Run `pnpm build`.
+    2. Verification is required if the diff could change a rendered result.
+    3. When verification is required, capture a screenshot of each changed page and list its file path.
+  max_turns: 6
+  allowed_tools:
+    - Skill
+
+graders:
+  - name: skill_fired
+    type: tool_used
+    tool: Skill
+    input_match: '"skill"\s*:\s*"(?:[\w-]+:)?agent-writing"'
+    min: 1
+
+  - name: aw19_decision_without_test
+    type: regex
+    target: last_message
+    pattern: '^\|[^\n]*AW19[^\n]*(?:SKILL\.md:6|step 2|could change|rendered)'
+    flags: im
+    match: contains

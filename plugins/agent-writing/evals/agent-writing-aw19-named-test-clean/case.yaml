@@ -1,0 +1,49 @@
+# Run: node plugins/eval-authoring/scripts/ts/run-evals/run-evals.ts plugins/agent-writing --case "agent-writing-aw19-named-test-clean" (no grant needed; Skill only).
+# Maps to SKILL.md: AW19 must not report a decision step that names a command and path list as its test.
+# good-reply: | AW08 | SKILL.md:5 | "Currently" ages | delete | and no AW19 row.
+# bad-reply: | AW19 | SKILL.md:6 | the decision is a judgment | name a test |
+# Guard: no delta expected. The AW08 row proves the audit ran; an AW19 row is the over-reach failure.
+schema_version: "1.1"
+name: agent-writing-aw19-named-test-clean
+description: >
+  Audit guard: a pasted SKILL.md whose decision step names a git diff command and a path
+  list, with one planted AW08 word. expected_outcome: PASS when AW08 is reported and AW19
+  is not; FAIL when AW19 flags the decision step. Delta 0 by design.
+tags: [agent-writing, trigger, quick]
+
+execution:
+  prompt: |
+    Can you check this SKILL.md for problems?
+
+    ---
+    name: pr-visual-check
+    description: Verify the rendered result of a change before the pull request.
+    ---
+    1. Run `pnpm build`; currently it takes two minutes.
+    2. Run `git diff --name-only origin/main | grep -E '^(src/ui/|packages/render/)'`. Verification is required when it prints at least one path; otherwise go to the final step.
+    3. When verification is required, capture a screenshot of each changed page and list its file path.
+    4. Report the paths, or the line "verification not required".
+  max_turns: 6
+  allowed_tools:
+    - Skill
+
+graders:
+  - name: skill_fired
+    type: tool_used
+    tool: Skill
+    input_match: '"skill"\s*:\s*"(?:[\w-]+:)?agent-writing"'
+    min: 1
+
+  - name: aw08_anchor_reported
+    type: regex
+    target: last_message
+    pattern: '^\|[^\n]*AW08'
+    flags: im
+    match: contains
+
+  - name: aw19_not_reported
+    type: regex
+    target: last_message
+    pattern: '^\|\s*(?:\*\*|`)*AW19\b'
+    flags: im
+    match: not_contains

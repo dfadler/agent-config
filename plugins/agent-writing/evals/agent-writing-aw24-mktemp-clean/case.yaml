@@ -1,0 +1,49 @@
+# Run: node plugins/eval-authoring/scripts/ts/run-evals/run-evals.ts plugins/agent-writing --case "agent-writing-aw24-mktemp-clean" (no grant needed; Skill only).
+# Maps to SKILL.md: AW24 scratch-in-scratchpad must not report a step that writes to `mktemp -d` or the named scratchpad.
+# good-reply: | AW08 | SKILL.md:6 | "Currently" ages | delete | and no AW24 row.
+# bad-reply: | AW24 | SKILL.md:5 | `tar -x -C "$d"` writes a directory | use mktemp |
+# Guard: no delta expected. AW24 does not exist before this change; the AW08 row proves the audit ran, and an AW24 row is the over-reach failure.
+schema_version: "1.1"
+name: agent-writing-aw24-mktemp-clean
+description: >
+  Audit guard: a pasted SKILL.md extracts the base branch into a fresh mktemp directory
+  and deletes it, with one planted AW08 word. expected_outcome: PASS when AW08 is reported
+  and AW24 is not; FAIL when AW24 flags the mktemp step. Delta 0 by design.
+tags: [agent-writing, trigger, quick]
+
+execution:
+  prompt: |
+    Can you check this SKILL.md for problems?
+
+    ---
+    name: base-compare
+    description: Compare build output against the base branch.
+    ---
+    1. Create the work directory: `d=$(mktemp -d)`, or use the session scratchpad when the environment names one.
+    2. Export the base branch sources: `git archive origin/main src packages | tar -x -C "$d"`.
+    3. Currently the build takes two minutes; build both trees and diff the output directories.
+    4. Report each changed file with its line count, then run `rm -rf "$d"`.
+  max_turns: 6
+  allowed_tools:
+    - Skill
+
+graders:
+  - name: skill_fired
+    type: tool_used
+    tool: Skill
+    input_match: '"skill"\s*:\s*"(?:[\w-]+:)?agent-writing"'
+    min: 1
+
+  - name: aw08_anchor_reported
+    type: regex
+    target: last_message
+    pattern: '^\|[^\n]*AW08'
+    flags: im
+    match: contains
+
+  - name: aw24_not_reported
+    type: regex
+    target: last_message
+    pattern: '^\|\s*(?:\*\*|`)*AW24\b'
+    flags: im
+    match: not_contains
