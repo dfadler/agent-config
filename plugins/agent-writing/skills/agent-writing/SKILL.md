@@ -171,9 +171,11 @@ its number is never reused.
 
 - **AW24 scratch-in-scratchpad.** An instruction that creates temporary files writes
   them to the session scratchpad when the environment names one, or to a fresh
-  `mktemp -d` directory, never to a path inside the project tree, and says who deletes
+  `mktemp -d /tmp/scratch.XXXXXX` directory (not bare `$TMPDIR`, which can point inside
+  the checkout), never to a path inside the project tree, and says who deletes
   the directory at the end. The policy lives in `claude/conventions/scratch-files.md`.
   Check: `grep -nE "mkdir( -p)? +\.?/?(tmp|temp)|> *\.?/?tmp|tar -x[a-z]* -C +[^/$\" ]|-o +tmp-|\.tmp\b" <file>`
-  is a lead, not a full list; read each step that creates a file or directory at a
-  relative path outside a scratchpad or `mktemp` path. Fix: point the step at the
-  scratchpad or `mktemp -d`, and name who deletes it.
+  is a lead, not a full list; read every step that creates a file or directory and check
+  its destination, including absolute paths (`/tmp/x`) and variable targets, against the
+  scratchpad or the `mktemp -d /tmp/scratch.XXXXXX` fallback. Fix: point the step at the
+  scratchpad or that fallback, and name who deletes it.
