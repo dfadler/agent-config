@@ -1,7 +1,8 @@
 # Run: node plugins/eval-authoring/scripts/ts/run-evals/run-evals.ts plugins/agent-writing --case "agent-writing-aw19-named-test-clean" (no grant needed; Skill only).
 # Maps to SKILL.md: AW19 must not report a decision step that names a command and path list as its test.
-# good-reply: | AW08 | SKILL.md:5 | "Currently" ages | delete | and no AW19 row.
+# good-reply: | AW08 | SKILL.md:5 | "Currently" ages | delete | and no row for the finish-condition rule.
 # bad-reply: | AW19 | SKILL.md:6 | the decision is a judgment | name a test |
+# Sabotage check: delete the "names the observable test" sentence's exemption wording so AW19 over-flags; aw19_not_reported should fail.
 # Guard: no delta expected. The AW08 row proves the audit ran; an AW19 row is the over-reach failure.
 schema_version: "1.1"
 name: agent-writing-aw19-named-test-clean
@@ -44,6 +45,6 @@ graders:
   - name: aw19_not_reported
     type: regex
     target: last_message
-    pattern: '^\|\s*(?:\*\*|`)*AW19\b'
+    pattern: '^(?:\||\s*[-*]\s)[^\n]*\bAW19\b'
     flags: im
     match: not_contains

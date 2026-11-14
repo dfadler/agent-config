@@ -1,7 +1,8 @@
 # Run: node plugins/eval-authoring/scripts/ts/run-evals/run-evals.ts plugins/agent-writing --case "agent-writing-aw24-mktemp-clean" (no grant needed; Skill only).
 # Maps to SKILL.md: AW24 scratch-in-scratchpad must not report a step that writes to `mktemp -d` or the named scratchpad.
-# good-reply: | AW08 | SKILL.md:6 | "Currently" ages | delete | and no AW24 row.
-# bad-reply: | AW24 | SKILL.md:5 | `tar -x -C "$d"` writes a directory | use mktemp |
+# good-reply: | AW08 | SKILL.md:7 | "Currently" ages | delete | and no row for the temp-file rule.
+# bad-reply: | AW24 | SKILL.md:6 | `tar -x -C "$d"` writes a directory | use mktemp |
+# Sabotage check: delete the "never to a path inside the project tree" clause so AW24 over-flags; aw24_not_reported should fail.
 # Guard: no delta expected. AW24 does not exist before this change; the AW08 row proves the audit ran, and an AW24 row is the over-reach failure.
 schema_version: "1.1"
 name: agent-writing-aw24-mktemp-clean
@@ -44,6 +45,6 @@ graders:
   - name: aw24_not_reported
     type: regex
     target: last_message
-    pattern: '^\|\s*(?:\*\*|`)*AW24\b'
+    pattern: '^(?:\||\s*[-*]\s)[^\n]*\bAW24\b'
     flags: im
     match: not_contains

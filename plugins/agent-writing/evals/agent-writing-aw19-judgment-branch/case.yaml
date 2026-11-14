@@ -2,7 +2,8 @@
 # Maps to SKILL.md: AW19 checkable-completion, decision-point sentence ("names the observable test that decides it").
 # good-reply: | AW19 | SKILL.md:6 | "required if the diff could change a rendered result" is a judgment, no command or path list decides it | name the command or path list |
 # bad-reply: Step 3 could say where the screenshots are saved.
-# Net plus measurement: the decision-point wording is new; the no-plugin arm is expected to miss the row.
+# Red/green: needs a run against the skill text before commit 7b223b9c (old AW19) and after; the no-plugin arm alone does not show the sentence did anything.
+# Sabotage check: delete the AW19 sentence "A branch or decision point ... names the observable test" and re-run; aw19_decision_without_test should fail.
 schema_version: "1.1"
 name: agent-writing-aw19-judgment-branch
 description: >
@@ -36,6 +37,6 @@ graders:
   - name: aw19_decision_without_test
     type: regex
     target: last_message
-    pattern: '^\|[^\n]*AW19[^\n]*(?:SKILL\.md:6|step 2|could change|rendered)'
+    pattern: '^\|\s*(?:\*\*|`)*AW19\b[^\n]*(?:SKILL\.md:6\b|step 2\b|line 6\b)'
     flags: im
     match: contains

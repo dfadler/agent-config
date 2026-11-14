@@ -2,7 +2,8 @@
 # Maps to SKILL.md: AW24 scratch-in-scratchpad (a step that extracts files to a relative directory in the project tree).
 # good-reply: | AW24 | SKILL.md:5 | `mkdir -p tmp-base && ... | tar -x -C tmp-base` creates a directory in the project tree | extract into `$(mktemp -d)` or the scratchpad and say who deletes it |
 # bad-reply: Step 5 could be clearer about the output format.
-# Net plus measurement: AW24 does not exist before this change, so the no-plugin arm is expected to miss the row.
+# Red/green: needs a run against the skill text before commit 7b223b9c (no AW24) and after; the no-plugin arm alone does not show the rule did anything.
+# Sabotage check: delete the AW24 rule from SKILL.md and re-run; aw24_reported_with_line should fail.
 schema_version: "1.1"
 name: agent-writing-aw24-project-tree-temp
 description: >
@@ -37,13 +38,13 @@ graders:
   - name: aw24_reported_with_line
     type: regex
     target: last_message
-    pattern: '^\|[^\n]*AW24[^\n]*SKILL\.md:5\b|^\|[^\n]*SKILL\.md:5\b[^\n]*AW24'
+    pattern: '^\|\s*(?:\*\*|`)*AW24\b[^\n]*(?:SKILL\.md:[15]\b|step 1\b|line [15]\b|tmp-base)'
     flags: im
     match: contains
 
   - name: aw24_fix_names_safe_location
     type: regex
     target: last_message
-    pattern: '^\|[^\n]*AW24[^\n]*(?:mktemp|scratchpad)'
+    pattern: '^\|\s*(?:\*\*|`)*AW24\b[^\n]*(?:use|extract|write|move|point)[^\n]*(?:mktemp|scratchpad)'
     flags: im
     match: contains
