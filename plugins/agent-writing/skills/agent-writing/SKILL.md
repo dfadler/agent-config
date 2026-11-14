@@ -4,10 +4,10 @@ description: |
   ALWAYS invoke this skill first when writing, editing, shortening or auditing a SKILL.md,
   an agent definition, a CLAUDE.md or AGENTS.md file, or a convention file, even for a
   one-line rule or a short snippet written in a reply. It defines numbered rules
-  AW01-AW23, each with a runnable check and a fix. Not for READMEs, docs prose, commit
+  AW01-AW24, each with a runnable check and a fix. Not for READMEs, docs prose, commit
   messages or PR text.
 metadata:
-  version: "1.1.0"
+  version: "1.2.0"
 ---
 
 # Writing for agents
@@ -126,8 +126,12 @@ its number is never reused.
   files changed) and a size cap. Check: each dispatch has a return line with a cap.
   Fix: add one.
 - **AW19 checkable-completion.** Each step ends on a condition an observer can check
-  ("every modified file is listed with its line"), not "until you understand". Check:
-  grep for "until", "as needed", "if appropriate". Fix: state the finish line.
+  ("every modified file is listed with its line"), not "until you understand". A branch
+  or decision point ("if verification is required") names the observable test that
+  decides it (a command, a path list, a file the reader can open), not a judgment the
+  reader makes alone. Check: grep for "until", "as needed", "if appropriate", then read
+  each "if", "required" and "could" branch for a named test. Fix: state the finish line,
+  or name the command or path list that decides the branch.
 
 ## Skill completeness
 
@@ -162,3 +166,14 @@ its number is never reused.
   hit and the rest of the file for bans the pattern misses ("refrain from"). Fix: rewrite a style or preference ban as the behaviour wanted ("write one-line
   comments"); on a guardrail, add what to do instead ("never force-push to main; open a
   pull request").
+
+## Temporary files
+
+- **AW24 scratch-in-scratchpad.** An instruction that creates temporary files writes
+  them to the session scratchpad when the environment names one, or to a fresh
+  `mktemp -d` directory, never to a path inside the project tree, and says who deletes
+  the directory at the end. The policy lives in `claude/conventions/scratch-files.md`.
+  Check: `grep -nE "mkdir( -p)? +\.?/?(tmp|temp)|> *\.?/?tmp|tar -x[a-z]* -C +[^/$\" ]|-o +tmp-|\.tmp\b" <file>`
+  is a lead, not a full list; read each step that creates a file or directory at a
+  relative path outside a scratchpad or `mktemp` path. Fix: point the step at the
+  scratchpad or `mktemp -d`, and name who deletes it.
