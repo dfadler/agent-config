@@ -130,7 +130,8 @@ its number is never reused.
   or decision point ("if verification is required") names the observable test that
   decides it (a command, a path list, a file the reader can open), not a judgment the
   reader makes alone. Check: grep for "until", "as needed", "if appropriate", then read
-  each "if", "required" and "could" branch for a named test. Fix: state the finish line,
+  every branch or decision point for a named test ("if", "required" and "could" are
+  leads, not a full list). Fix: state the finish line,
   or name the command or path list that decides the branch.
 
 ## Skill completeness

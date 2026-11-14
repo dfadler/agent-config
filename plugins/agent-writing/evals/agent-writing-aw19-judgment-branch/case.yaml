@@ -38,6 +38,6 @@ graders:
   - name: aw19_decision_without_test
     type: regex
     target: last_message
-    pattern: '^\|\s*(?:\*\*|`)*AW19\b[^\n]*(?:SKILL\.md:6\b|step 2\b|line 6\b)[^\n]*\|\s*(?:Name|State|Replace|Add|Use|Make|Change|Write|Say)\b[^|\n]*\|?\s*$'
+    pattern: '^\|\s*(?:\*\*|`)*AW19\b[^\n]*(?:SKILL\.md:6\b|step 2\b|line 6\b)[^\n]*\|\s*(?!\s)(?!(?:no\b(?![^|\n]*[;.]\s*use\b)|none|nothing|n/a|not|you|never|keep|leave)\b)[^|\n]*(?:command|path|file|list|git |diff|test|`)[^|\n]*\|?\s*$'
     flags: im
     match: contains

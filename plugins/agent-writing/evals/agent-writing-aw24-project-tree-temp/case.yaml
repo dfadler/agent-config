@@ -47,6 +47,6 @@ graders:
   - name: aw24_fix_names_safe_location
     type: regex
     target: last_message
-    pattern: '^\|\s*(?:\*\*|`)*AW24\b[^\n]*\|\s*(?:[^|\n]*[;.]\s*)?(?:Use|Extract|Write|Move|Point|Replace|Switch|Create)\b(?![^|\n]*\b(?:not|never|instead of|rather than)\s+(?:to\s+)?(?:use\s+)?(?:the\s+)?(?:mktemp|scratchpad))[^|\n]*(?:mktemp|scratchpad)[^|\n]*\|?\s*$'
+    pattern: '^\|\s*(?:\*\*|`)*AW24\b[^\n]*\|\s*(?!\s)(?!(?:no\b(?![^|\n]*[;.]\s*use\b)|none|nothing|n/a|not|you|never|keep|leave)\b)(?![^|\n]*\b(?:not|never|instead of|rather than)\s+(?:to\s+)?(?:use\s+)?(?:the\s+)?(?:mktemp|scratchpad))[^|\n]*(?:mktemp|scratchpad)[^|\n]*\|?\s*$'
     flags: im
     match: contains
