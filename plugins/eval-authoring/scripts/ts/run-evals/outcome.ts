@@ -198,6 +198,9 @@ export const judgeRun = (input: JudgeInput): Judgement => {
     meaning !== "pass" &&
     findings === undefined &&
     (signals.earlyAccess || signals.unavailable);
+  // Same caution as `unavailable`: with a readable result the line may come from a graded reply.
+  const dangling =
+    meaning !== "pass" && findings === undefined && signals.danglingLinks.length > 0;
   const notes: readonly Judgement[] = [
     ...(meaning === "interrupted"
       ? [note(EXIT_INTERRUPTED, ["the CLI was interrupted"], true)]
@@ -213,6 +216,15 @@ export const judgeRun = (input: JudgeInput): Judgement => {
             ], false),
         ]
       : []),
+    ...(dangling
+      ? [
+          note(EXIT_CONFIG, [
+              "the CLI could not load a path under the target because of a symlink with no target; stale agent worktrees leave these behind.",
+              "Remove the stale worktrees (`git worktree list`, then `git worktree remove <path>`), then rerun:",
+              ...signals.danglingLinks.slice(0, 5).map((l) => `  ${l}`),
+            ], true),
+        ]
+      : []),
     ...(unavailable
       ? [
           note(input.skipUnavailable ? EXIT_OK : EXIT_DEPENDENCY, [
@@ -223,7 +235,7 @@ export const judgeRun = (input: JudgeInput): Judgement => {
     ...(meaning === "partial"
       ? [note(EXIT_PARTIAL, ["partial run: cost ceiling hit or credential rejected"], false)]
       : []),
-    ...(meaning === "failed" && !unavailable
+    ...(meaning === "failed" && !unavailable && !dangling
       ? [note(EXIT_FAILURE, ["below threshold, or the CLI rejected the run (no cases, untrusted directory, invalid option)"], false)]
       : []),
     // No status at all (SIGKILL, OOM): the run died, which says nothing about the score.

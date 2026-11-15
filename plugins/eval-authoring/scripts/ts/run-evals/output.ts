@@ -7,6 +7,8 @@ export interface OutputSignals {
   readonly unavailable: boolean;
   /** Lines of the CLI's own preflight warning ("cannot pass with the granted tools"). */
   readonly cannotPass: readonly string[];
+  /** Lines naming a dangling symlink the CLI refused to load, as stale agent worktrees leave behind. */
+  readonly danglingLinks: readonly string[];
 }
 
 /**
@@ -21,5 +23,9 @@ export const scanOutput = (text: string): OutputSignals => ({
   cannotPass: text
     .split(/\r?\n/)
     .filter((l) => /cannot pass with the granted tools/i.test(l))
+    .map((l) => l.trim()),
+  danglingLinks: text
+    .split(/\r?\n/)
+    .filter((l) => /is a symbolic link whose target does not exist/i.test(l))
     .map((l) => l.trim()),
 });
