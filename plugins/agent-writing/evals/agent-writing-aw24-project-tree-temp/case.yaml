@@ -1,0 +1,52 @@
+# Run: node plugins/eval-authoring/scripts/ts/run-evals/run-evals.ts plugins/agent-writing --case "agent-writing-aw24-project-tree-temp" (no grant needed; Skill only).
+# Maps to SKILL.md: AW24 scratch-in-scratchpad (a step that extracts files to a relative directory in the project tree).
+# good-reply: | AW24 | SKILL.md:5 | `mkdir -p tmp-base && ... | tar -x -C tmp-base` creates a directory in the project tree | extract into `$(mktemp -d)` or the scratchpad and say who deletes it |
+# bad-reply: Step 5 could be clearer about the output format.
+# also-bad: | AW24 | SKILL.md:5 | tmp-base is acceptable; no change required. | No need to use mktemp or the scratchpad. | (a dismissal row)
+# also-bad: | AW24 | SKILL.md:5 | tmp-base is acceptable; no change required. | Use tmp-base, not mktemp or the scratchpad. | (rejects the safe location)
+# Red/green: needs a run against the skill text before commit 7b223b9c (no AW24) and after; the no-plugin arm alone does not show the rule did anything.
+# Sabotage check: delete the AW24 rule from SKILL.md and re-run; aw24_reported_with_line should fail.
+schema_version: "1.1"
+name: agent-writing-aw24-project-tree-temp
+description: >
+  One pasted SKILL.md whose step 1 extracts the base branch into a relative directory
+  inside the project tree. expected_outcome: PASS when the reply reports AW24 with the
+  SKILL.md line of that step and a fix that names mktemp or the scratchpad; FAIL otherwise.
+tags: [agent-writing, trigger, quick]
+
+execution:
+  prompt: |
+    Can you check this SKILL.md for problems?
+
+    ---
+    name: base-compare
+    description: Compare build output against the base branch.
+    ---
+    1. Export the base branch sources: `mkdir -p tmp-base && git archive origin/main src packages | tar -x -C tmp-base`.
+    2. Build both trees and diff the output directories.
+    3. Report each changed file with its line count.
+    4. Delete tmp-base as the last step.
+  max_turns: 6
+  allowed_tools:
+    - Skill
+
+graders:
+  - name: skill_fired
+    type: tool_used
+    tool: Skill
+    input_match: '"skill"\s*:\s*"(?:[\w-]+:)?agent-writing"'
+    min: 1
+
+  - name: aw24_reported_with_line
+    type: regex
+    target: last_message
+    pattern: '^\|\s*(?:\*\*|`)*AW24\b[^\n]*(?:SKILL\.md:[15]\b|step 1\b|line [15]\b|tmp-base)'
+    flags: im
+    match: contains
+
+  - name: aw24_fix_names_safe_location
+    type: regex
+    target: last_message
+    pattern: '^\|\s*(?:\*\*|`)*AW24\b[^\n]*\|\s*(?!\s)(?!(?:no\b(?![^|\n]*[;.]\s*use\b)|none|nothing|n/a|not|you|never|keep|leave)\b)(?![^|\n]*\b(?:not|never|instead of|rather than)\s+(?:to\s+)?(?:use\s+)?(?:the\s+)?(?:mktemp|scratchpad))[^|\n]*(?:mktemp|scratchpad)[^|\n]*\|?\s*$'
+    flags: im
+    match: contains

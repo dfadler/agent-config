@@ -1,0 +1,43 @@
+# Run: node plugins/eval-authoring/scripts/ts/run-evals/run-evals.ts plugins/agent-writing --case "agent-writing-aw19-judgment-branch" (no grant needed; Skill only).
+# Maps to SKILL.md: AW19 checkable-completion, decision-point sentence ("names the observable test that decides it").
+# good-reply: | AW19 | SKILL.md:6 | "required if the diff could change a rendered result" is a judgment, no command or path list decides it | name the command or path list |
+# bad-reply: Step 3 could say where the screenshots are saved.
+# also-bad: | AW19 | SKILL.md:6 | No issue; this branch is acceptable | None | (a dismissal row)
+# Red/green: needs a run against the skill text before commit 7b223b9c (old AW19) and after; the no-plugin arm alone does not show the sentence did anything.
+# Sabotage check: delete the AW19 sentence "A branch or decision point ... names the observable test" and re-run; aw19_decision_without_test should fail.
+schema_version: "1.1"
+name: agent-writing-aw19-judgment-branch
+description: >
+  One pasted SKILL.md with a decision step that says verification is required if the diff
+  could change a rendered result, with no test. expected_outcome: PASS when the reply
+  reports AW19 against that step; FAIL otherwise.
+tags: [agent-writing, trigger, quick]
+
+execution:
+  prompt: |
+    Can you check this SKILL.md for problems?
+
+    ---
+    name: pr-visual-check
+    description: Verify the rendered result of a change before the pull request.
+    ---
+    1. Run `pnpm build`.
+    2. Verification is required if the diff could change a rendered result.
+    3. When verification is required, capture a screenshot of each changed page and list its file path.
+  max_turns: 6
+  allowed_tools:
+    - Skill
+
+graders:
+  - name: skill_fired
+    type: tool_used
+    tool: Skill
+    input_match: '"skill"\s*:\s*"(?:[\w-]+:)?agent-writing"'
+    min: 1
+
+  - name: aw19_decision_without_test
+    type: regex
+    target: last_message
+    pattern: '^\|\s*(?:\*\*|`)*AW19\b[^\n]*(?:SKILL\.md:6\b|step 2\b|line 6\b)[^\n]*\|\s*(?!\s)(?!(?:no\b(?![^|\n]*[;.]\s*use\b)|none|nothing|n/a|not|you|never|keep|leave)\b)[^|\n]*(?:command|path|file|list|git |diff|test|`)[^|\n]*\|?\s*$'
+    flags: im
+    match: contains
