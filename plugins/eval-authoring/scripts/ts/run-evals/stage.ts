@@ -131,6 +131,31 @@ const skipCommon = (rel: string): boolean =>
   rel.split(sep).some((p) => p === ".git" || p === "node_modules");
 
 /**
+ * `claude plugin eval <dir>` walks everything under `<dir>` and fails every
+ * case at $0 on a dangling symlink there (CLI 2.1.321), as stale agent
+ * worktrees leave behind (dfadler/zombie-mermaid#3170). The CLI has no
+ * exclude flag, so a target holding a `worktrees/` dir is run from a copy
+ * without it. Returns undefined when the target has none: nothing to stage.
+ */
+export const stageWithoutWorktrees = (io: Io, target: string, evalDir: string): Staged | undefined => {
+  if (!io.listDir(target).includes("worktrees")) return undefined;
+  const evalRel = relative(target, evalDir);
+  const tempDir = io.mkTemp("run-evals-clean-");
+  const root = join(tempDir, basename(target));
+  try {
+    io.copyDir(
+      target,
+      root,
+      (rel) => skipCommon(rel) || rel === "worktrees" || rel === join(evalRel, "results"),
+    );
+  } catch (e: unknown) {
+    io.remove(tempDir);
+    throw e;
+  }
+  return { ok: true, tempDir, root };
+};
+
+/**
  * Build the staged copy and rewrite its cases. Writes only under a fresh temp
  * directory, which is removed again if anything throws midway.
  */

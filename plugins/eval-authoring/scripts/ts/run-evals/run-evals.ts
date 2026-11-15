@@ -73,7 +73,7 @@ import {
 import { replyFiles, runCount, safeName } from "./traces.ts";
 import { MIN_CLAUDE_VERSION, MIN_GIT_VERSION, formatVersion } from "./versions.ts";
 import { manifestOf } from "./plan.ts";
-import { checkNeighbours, checkStageable, parseNeighbours, stageNeighbours } from "./stage.ts";
+import { checkNeighbours, checkStageable, parseNeighbours, stageNeighbours, stageWithoutWorktrees } from "./stage.ts";
 import { firesGraderNames, routablesOf, triggerRows } from "./trigger.ts";
 
 export const USAGE = `Usage: run-evals.ts [options] <plugin-path>
@@ -1081,7 +1081,10 @@ const run = async (
     return blocking.reduce<ExitCode>((c, f) => worstExit(c, f.code), EXIT_OK);
   }
 
-  const staged = stageInput === undefined ? undefined : stageNeighbours(io, stageInput);
+  const staged =
+    stageInput === undefined
+      ? stageWithoutWorktrees(io, target, suite.evalDir)
+      : stageNeighbours(io, stageInput);
   if (staged?.ok === false) return fail(io, EXIT_CONFIG, staged.reason);
   if (staged !== undefined) {
     // From here the staged copy is removed on every way out: return, throw, or SIGINT/SIGTERM.
@@ -1094,7 +1097,11 @@ const run = async (
         else io.remove(staged.tempDir);
       },
     );
-    io.err(`run-evals: --neighbours ${(options.neighbours ?? []).join(",")}: running against the staged copy ${staged.root}\n`);
+    io.err(
+      options.neighbours === undefined
+        ? `run-evals: ${target} has a worktrees/ dir, which the CLI would load: running against a copy without it, ${staged.root}\n`
+        : `run-evals: --neighbours ${options.neighbours.join(",")}: running against the staged copy ${staged.root}\n`,
+    );
   }
   const runTarget = staged?.root ?? target;
   // SIGINT (the CI deadline's `timeout --signal=INT`): stop launching, cut the case in flight, and

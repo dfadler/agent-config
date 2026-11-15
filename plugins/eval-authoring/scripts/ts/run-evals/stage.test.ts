@@ -1,10 +1,10 @@
-import { existsSync, mkdirSync, mkdtempSync, readFileSync, writeFileSync } from "node:fs";
+import { existsSync, mkdirSync, mkdtempSync, readFileSync, symlinkSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { describe, expect, it } from "vitest";
 import { readPluginManifest, readSuite, resolveCasePath } from "../parser/index.ts";
 import { nodeIo } from "./io.ts";
-import { addPluginsLine, checkNeighbours, parseNeighbours, stageNeighbours } from "./stage.ts";
+import { addPluginsLine, checkNeighbours, parseNeighbours, stageNeighbours, stageWithoutWorktrees } from "./stage.ts";
 
 const write = (path: string, text: string): void => {
   mkdirSync(join(path, ".."), { recursive: true });
@@ -157,6 +157,27 @@ describe("stageNeighbours", () => {
         ["c1", true],
         ["c2", false],
       ]);
+    } finally {
+      w.io.remove(staged.tempDir);
+    }
+  });
+});
+
+describe("stageWithoutWorktrees", () => {
+  it("copies a target that holds a dangling-symlink worktree without worktrees/, and stages nothing otherwise", () => {
+    const w = world();
+    const suite = readSuite(w.target, {});
+    expect(stageWithoutWorktrees(w.io, w.target, suite.evalDir)).toBeUndefined();
+    mkdirSync(join(w.target, "worktrees", "w", "evals"), { recursive: true });
+    symlinkSync("/nonexistent/target", join(w.target, "worktrees", "w", "evals", "dangling"));
+    const staged = stageWithoutWorktrees(w.io, w.target, suite.evalDir);
+    if (staged?.ok !== true) throw new Error("expected a staged copy");
+    try {
+      expect(existsSync(join(staged.root, "worktrees"))).toBe(false);
+      expect(existsSync(join(staged.root, "evals", "results"))).toBe(false);
+      expect(readSuite(staged.root, {}).cases.map((c) => c.name.value)).toEqual(
+        suite.cases.map((c) => c.name.value),
+      );
     } finally {
       w.io.remove(staged.tempDir);
     }
