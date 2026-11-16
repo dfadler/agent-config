@@ -1,0 +1,10 @@
+# good-reply: Done, see main.ts.
+# bad-reply: Done, but I did not look at anything.
+schema_version: "1.1"
+name: weak
+execution:
+  prompt: Find the file.
+graders:
+  - type: "regex"
+    name: says-done
+    pattern: "Done"

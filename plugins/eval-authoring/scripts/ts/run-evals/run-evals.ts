@@ -5,6 +5,8 @@
  *
  * Usage: see USAGE below, or run with --help.
  */
+import { loadBadReply } from "../check-replies.ts";
+import { assess } from "../discrimination.ts";
 import { homedir } from "node:os";
 import { basename, dirname, join, resolve } from "node:path";
 import { readGrantsFile, readSuite } from "../parser/index.ts";
@@ -1048,6 +1050,11 @@ const run = async (
     io.out(
       `note: each invocation shows the full ceiling; a real run gives later invocations only the budget left after earlier results\n`,
     );
+    // Free: can each planned case fail? (discrimination.ts; only the paid no-plugin baseline settles it)
+    for (const c of suite.cases.filter((x) => plan.groups.some((g) => g.cases.includes(x.name.value)))) {
+      const a = assess(c, loadBadReply(c));
+      io.out(`discrimination: ${c.name.value}: ${a.state}${a.exempt === undefined ? "" : ` (${a.exempt})`}: ${a.reason}\n`);
+    }
     // Only a two-arm tier measures a delta; quick, --neighbours and --trigger-boundary run the plugin arm alone.
     if (options.tier.ablation === "cli-default") {
       const known =

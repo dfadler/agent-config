@@ -798,6 +798,15 @@ describe("one invocation per case", () => {
     expect(s.out.join("")).toContain("only the budget left");
     expect(cliCalls(s.calls)).toEqual([]);
   });
+
+  it("--dry-run prints one free discrimination line per planned case", async () => {
+    const s = setup({ cases: three() });
+    expect(await run(s, ["--dry-run"])).toBe(EXIT_OK);
+    const lines = s.out.join("").split("\n").filter((l) => l.startsWith("discrimination:"));
+    expect(lines).toHaveLength(3);
+    // The fake cases carry no # bad-reply header, so nothing free can show they fail.
+    expect(lines[0]).toMatch(/^discrimination: c1: unproven: no # bad-reply header/);
+  });
 });
 
 describe("quick tier ceiling scales with the cases selected", () => {

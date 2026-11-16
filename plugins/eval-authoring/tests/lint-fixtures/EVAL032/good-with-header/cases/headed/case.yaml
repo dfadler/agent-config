@@ -1,0 +1,10 @@
+# good-reply: It is in main.ts.
+# bad-reply: I could not find it.
+schema_version: "1.1"
+name: headed
+execution:
+  prompt: Find the file.
+graders:
+  - type: "regex"
+    name: names-file
+    pattern: "main\\.ts"

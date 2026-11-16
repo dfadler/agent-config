@@ -4,6 +4,7 @@
  */
 import { isAbsolute } from "node:path";
 import { PROBE_TAG, readAggregateResult, SMOKE_TAG } from "../parser/index.ts";
+import { CEILING } from "../discrimination.ts";
 import { deltaBar, diagnose } from "../diagnose/verdict.ts";
 import type { BoundaryReport } from "./boundary.ts";
 
@@ -250,9 +251,6 @@ export interface SummaryInput {
     readonly tags?: readonly string[] | undefined;
   }[];
 }
-
-/** A case at or above this in both arms cannot tell the plugin from no plugin. */
-export const CEILING = 0.95;
 
 /** The ceiling line: cases at or above `CEILING` in both arms, split into those tagged `probe` or `smoke` (held as labelled) and those that are not (no headroom). Empty when none, or in a one-arm run. */
 const ceilingLines = (s: SummaryInput, oneArm: boolean): readonly string[] => {
