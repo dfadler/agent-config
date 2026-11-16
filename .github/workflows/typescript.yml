@@ -15,6 +15,10 @@ name: TypeScript
 # check for it. Concurrency is inherited from the caller.
 on:
   workflow_call:
+    secrets:
+      # Deny terms (employer, people), one per line. Absent on fork PRs, where only the patterns run.
+      PII_DENY_TERMS:
+        required: false
 
 permissions:
   contents: read
@@ -48,6 +52,11 @@ jobs:
 
       - name: Plugin structure (manifests + frontmatter)
         run: pnpm run check-plugin-structure
+
+      - name: Personal data in committed evals
+        env:
+          PII_DENY_TERMS: ${{ secrets.PII_DENY_TERMS }}
+        run: pnpm run check-pii
 
       - name: Markdown links
         run: pnpm run check-links

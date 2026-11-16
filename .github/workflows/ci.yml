@@ -12,7 +12,7 @@ name: CI
 #
 #   shell       shell.yml        shellcheck, shfmt, test-sh, coverage (sh-*.yml)
 #   typescript  typescript.yml   pnpm run lint / typecheck / set-flags / CLAUDE.md size /
-#                                plugin structure / links / test / coverage
+#                                plugin structure / personal data (check-pii) / links / test / coverage
 #   python      python.yml       scripts/ci.sh lint-py / typecheck / test-py / coverage-py
 #
 # actionlint.yml (paths-filtered) and issue-bot.yml stay standalone: a
@@ -42,6 +42,8 @@ jobs:
 
   typescript:
     uses: ./.github/workflows/typescript.yml
+    secrets:
+      PII_DENY_TERMS: ${{ secrets.PII_DENY_TERMS }}
     permissions:
       contents: read
 
