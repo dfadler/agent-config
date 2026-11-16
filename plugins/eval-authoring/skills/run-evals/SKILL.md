@@ -171,7 +171,10 @@ wrapper's summary says the same under its table. The `± band (n runs/arm)` it p
 `thorough` case delta is that one case's 95% noise bar (t quantile x standard error of the
 difference): a delta inside it is noise-level. A delta from fewer than 5 usable runs in an
 arm (for example after errored runs are dropped) is also marked `provisional`: rerun with
-more runs before quoting it. Neither mark lifts the suite-size rule above.
+more runs before quoting it. Neither mark lifts the suite-size rule above. Carry the
+wrapper's `Ceiling:` line into the PR line unchanged (for pasted scores, count the cases at
+or above 0.95 in both arms yourself and write "N of M cases at or above 0.95 in both arms,
+no delta"), so a reader sees how many cases cannot tell the plugin from no plugin.
 
 **Before paying: what can this plan detect?** `node ${CLAUDE_SKILL_DIR}/../../scripts/ts/run-evals/power.ts --runs 5
 --sd 0.25` (or `--from-result <aggregate-result.json>` for the SD pooled over an earlier
