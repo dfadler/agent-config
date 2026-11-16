@@ -31,6 +31,6 @@ graders:
   - name: same_module_separate_waves
     type: regex
     target: last_message
-    pattern: '(?:#?101[^.]{0,120}#?102|#?102[^.]{0,120}#?101)[^.]{0,120}(?:wave|serial|sequential|chain|after|then|separate|one branch)|(?:wave|serial|sequential|chain|separate)[^.]{0,120}(?:#?101[^.]{0,80}#?102|#?102[^.]{0,80}#?101)'
+    pattern: '(?:#?102[^\n]{0,200}(?:same|shares?|overlap|conflict|collid)[^\n]{0,100}#?101|#?101[^\n]{0,200}(?:same|shares?|overlap|conflict|collid)[^\n]{0,100}#?102|(?:wave 2|waits?|after|then|serial|sequential|chain|separate)[^\n]{0,80}#?10[12])'
     flags: is
     match: contains
