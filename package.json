@@ -17,6 +17,7 @@
     "check-vitest-flags": "node scripts/ts/check-vitest-flags.ts",
     "check-vitest-v3-names": "node scripts/ts/check-vitest-v3-names.ts",
     "check-plugin-structure": "node scripts/ts/check-plugin-structure.ts .",
+    "check-pii": "node plugins/pii-cleanup/scripts/ts/check-pii.ts",
     "check-links": "node scripts/ts/check-markdown-links.ts --path .",
     "check": "bash scripts/ci.sh check",
     "test": "vitest run",
