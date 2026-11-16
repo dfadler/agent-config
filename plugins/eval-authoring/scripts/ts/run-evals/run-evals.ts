@@ -549,8 +549,16 @@ const optionsFor = (options: Options, cache: CacheUse | undefined): Options =>
  * is not in it, so a skill or agent edit keeps the entry.
  */
 /** The free pre-run assessment of a case, for the summary's ceiling line; undefined when the case is unknown. */
-const preRun = (c: EvalCase | undefined): Assessment | undefined =>
-  c === undefined ? undefined : assess(c, loadBadReply(c));
+const preRun = (c: EvalCase | undefined): Assessment | undefined => {
+  if (c === undefined) return undefined;
+  try {
+    return assess(c, loadBadReply(c));
+  } catch (e) {
+    // The case file moved during the paid run: report without the note. Any other read error still surfaces.
+    if (e instanceof Error && "code" in e && e.code === "ENOENT") return undefined;
+    throw e;
+  }
+};
 
 const planCache = async (
   io: Io,

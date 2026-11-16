@@ -59,6 +59,11 @@ describe("assess", () => {
   it("a not_contains regex that matches the prompt is not cued", () => {
     expect(assess(load(REGEX("find", "    match: not_contains\n"))).state).toBe("unproven");
   });
+  it("unproven, not run, when a pattern has a nested quantifier (ReDoS guard)", () => {
+    const a = assess(load(REGEX("^(a+)+$")), `${"a".repeat(40)}!`);
+    expect(a.state).toBe("unproven");
+    expect(a.reason).toContain("nested quantifier");
+  });
   it("unproven, not a crash, when a pattern does not compile", () => {
     expect(assess(load(REGEX("(unclosed")), "reply").state).toBe("unproven");
   });

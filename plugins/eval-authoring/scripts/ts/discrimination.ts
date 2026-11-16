@@ -100,6 +100,10 @@ export const assess = (c: EvalCase, badReply?: string): Assessment => {
   const runnable = c.graders.filter(isRunnable);
   if (runnable.length === 0) return out("unproven", "no last_message regex to run offline; only the paid no-plugin baseline can tell");
   if (badReply === undefined || badReply.trim() === "") return out("unproven", "no # bad-reply header to run the regex graders on");
+  // A nested quantifier can backtrack for a long time on a long bad reply; the guard is heuristic (not alternation).
+  if (runnable.some((g) => NESTED_QUANTIFIER.test(g.pattern.value))) {
+    return out("unproven", "a regex grader has a nested quantifier; not run offline");
+  }
   const results = runnable.map((g) => regexPasses(g, badReply));
   if (results.some((r) => r === false)) return out("can-fail", "a regex grader fails the bad reply");
   if (results.some((r) => r === undefined)) return out("unproven", "a regex grader does not compile");

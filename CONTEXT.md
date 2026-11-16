@@ -70,8 +70,10 @@ What is known about whether an eval case can tell a run with the plugin from a
 run without it. One of three: can-fail demonstrated (a free grader fails a
 stored bad reply), cannot-fail demonstrated (every free grader passes the bad
 reply, or the graders can pass on the prompt alone), or unproven (no bad reply,
-or only graders that cannot run offline). A clean lint does not mean
-"discriminates"; only the first state does.
+or only graders that cannot run offline). Can-fail shows only that the case
+rejects that one stored reply; whether the plugin arm beats the no-plugin arm
+still takes the paid baseline (ADR 0002). A clean lint does not mean
+"discriminates".
 
 ## Ceiling
 
