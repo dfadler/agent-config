@@ -1,5 +1,5 @@
 ---
-name: issue-batch
+name: github-issue-batch
 description: |
   ALWAYS invoke this skill first when the user hands over a list of two or more GitHub
   issue numbers to work in parallel ("do #12, #15 and #18", "sweep these issues"), even
@@ -12,7 +12,7 @@ metadata:
   version: "1.0.0"
 ---
 
-# Issue batch
+# GitHub issue batch
 
 ## Contract
 

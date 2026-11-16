@@ -1,6 +1,6 @@
 {
   "$schema": "https://json.schemastore.org/claude-code-plugin-manifest.json",
-  "name": "issue-batch",
+  "name": "github-issue-batch",
   "version": "1.0.0",
   "description": "Plan a parallel batch of GitHub issues into file-disjoint waves, cap agents in flight, and brief each worktree subagent.",
   "author": {
