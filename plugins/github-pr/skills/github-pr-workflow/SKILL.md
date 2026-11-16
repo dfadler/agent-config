@@ -47,6 +47,13 @@ reply terse.
   `git log --oneline origin/main..HEAD`, and confirm it lists only your own
   commits. If the branch's earlier PR already merged, don't open a PR from it:
   see the dead-branch bullet in `git-worktree-usage`.
+- Before `gh pr create`, ensure the PR body follows the repo's template:
+  `gh pr create --body` and `--body-file` replace the body, so GitHub never loads
+  the template for you. Read `.github/pull_request_template.md` (any casing, or the
+  single file under `.github/PULL_REQUEST_TEMPLATE/`) and build the body from it,
+  keeping every `## ` heading in order and its checklist. Put extra material (such
+  as "Not checked") under those headings. Delete a section only when its own comment
+  says to. Check: `gh pr view <n> --json body` shows every template heading.
 - Size a PR by whether it would be mergeable and valuable standing alone, not by
   line count. Split when a piece is independently useful on its own; keep pieces
   together when they only make sense as one concern.

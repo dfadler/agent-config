@@ -1,0 +1,53 @@
+# Run: claude plugin eval plugins/github-pr --case github-pr-workflow-reads-pr-template-before-create --runs 3 --trust-plugin --no-publish
+# Shared run/grant facts: docs/contributing.md, "Plugin evals". No grant: Skill only; the
+# commands are drafted in the reply and never run.
+# Should-fire case for github-pr-workflow's "Opening and sizing a PR" template rule (issue
+# #1098): `gh pr create --body` skips the repo's PR template, so the session reads the
+# template file first. The prompt says a template file exists but not that it must be read.
+# Can fail: skill_fired fails if github-pr-workflow does not load; reads_template fails if
+# no command reads the template before `gh pr create`; a no-skill reply goes straight to
+# `gh pr create --body`.
+# Skill phrases checked: "Read `.github/pull_request_template.md`".
+# good-reply: ```bash\ncat .github/pull_request_template.md\ngh pr create --draft --title "Fix parser crash" --body-file body.md\n```
+# bad-reply: ```bash\ngh pr create --draft --title "Fix parser crash" --body "Fixes the crash"\n```
+schema_version: "1.1"
+name: github-pr-workflow-reads-pr-template-before-create
+description: >
+  Asked for the commands that open a PR in a repo that has a pull request template, the
+  model invokes github-pr-workflow and reads the template before gh pr create.
+  expected_outcome: PASS when the skill fires and a command reading the template comes
+  before gh pr create; FAIL otherwise.
+tags: [github-pr-workflow, trigger, quick]
+
+execution:
+  prompt: |
+    My branch fix-parser in dfadler/example-app is pushed and ready. The repo has a pull
+    request template at .github/pull_request_template.md. Give me the shell commands, in
+    order, in one bash code block and no other text, that open the PR for it with the
+    title "Fix parser crash". Do not run them.
+  max_turns: 4
+  allowed_tools:
+    - Skill
+
+graders:
+  - name: skill_fired
+    type: tool_used
+    tool: Skill
+    input_match: '"skill"\s*:\s*"(?:[\w-]+:)?github-pr-workflow"'
+    min: 1
+    arm: with-only
+
+  - name: reads_template
+    type: regex
+    target: last_message
+    pattern: '(?:cat|less|head|sed|bat)\s[^\n]*pull_request_template\.md[\s\S]*gh pr create'
+    flags: i
+    match: contains
+
+  # Completion check: the PR is opened as a draft, per the same section.
+  - name: draft_flag
+    type: regex
+    target: last_message
+    pattern: 'gh pr create[\s\S]*--draft'
+    match: contains
+    weight: 0.5
