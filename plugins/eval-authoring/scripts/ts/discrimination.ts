@@ -112,8 +112,9 @@ export const assess = (c: EvalCase, badReply?: string): Assessment => {
 export const atCeiling = (
   s: { with: number; without: number; tags: readonly string[] },
   pre?: Assessment,
+  ceiling: number = CEILING, // diagnose's --near-ceiling overrides it
 ): { flat: boolean; held?: "smoke" | "probe"; flaggedBefore: boolean } => {
-  const flat = s.with >= CEILING && s.without >= CEILING;
+  const flat = s.with >= ceiling && s.without >= ceiling;
   const held = ([PROBE_TAG, SMOKE_TAG] as const).find((t) => s.tags.includes(t));
   return {
     flat,

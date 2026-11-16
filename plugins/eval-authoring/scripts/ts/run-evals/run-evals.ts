@@ -6,10 +6,10 @@
  * Usage: see USAGE below, or run with --help.
  */
 import { loadBadReply } from "../check-replies.ts";
-import { assess } from "../discrimination.ts";
+import { assess, type Assessment } from "../discrimination.ts";
 import { homedir } from "node:os";
 import { basename, dirname, join, resolve } from "node:path";
-import { readGrantsFile, readSuite } from "../parser/index.ts";
+import { readGrantsFile, readSuite, type EvalCase } from "../parser/index.ts";
 import {
   CACHE_DIR,
   cacheKey,
@@ -532,6 +532,10 @@ const optionsFor = (options: Options, cache: CacheUse | undefined): Options =>
  * all end here. The key covers what a no-plugin run depends on (see baseline-cache.ts); the plugin
  * is not in it, so a skill or agent edit keeps the entry.
  */
+/** The free pre-run assessment of a case, for the summary's ceiling line; undefined when the case is unknown. */
+const preRun = (c: EvalCase | undefined): Assessment | undefined =>
+  c === undefined ? undefined : assess(c, loadBadReply(c));
+
 const planCache = async (
   io: Io,
   options: Options,
@@ -1231,6 +1235,7 @@ const run = async (
       exit: d.exit,
       row: caseRow(d.caseName, progress.texts[i], io.readFile, firesGraderNames(suite, d.caseName)),
       tags: suite.cases.find((c) => c.name.value === d.caseName)?.tags.value,
+      pre: preRun(suite.cases.find((c) => c.name.value === d.caseName)),
     })),
   });
   if (options.pr === undefined) {

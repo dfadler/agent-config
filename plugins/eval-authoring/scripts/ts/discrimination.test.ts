@@ -112,6 +112,10 @@ describe("atCeiling", () => {
     expect(atCeiling(s(1, 0.94)).flat).toBe(false);
     expect(atCeiling(s(0.94, 1)).flat).toBe(false);
   });
+  it("takes an overriding ceiling (diagnose --near-ceiling)", () => {
+    expect(atCeiling(s(0.9, 0.9), undefined, 0.9).flat).toBe(true);
+    expect(atCeiling(s(0.9, 0.9)).flat).toBe(false);
+  });
   it("names the label that holds it: probe first, then smoke", () => {
     expect(atCeiling(s(1, 1, ["smoke"])).held).toBe("smoke");
     expect(atCeiling(s(1, 1, ["smoke", "probe"])).held).toBe("probe");
