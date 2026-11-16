@@ -23,6 +23,8 @@ const SKIP_DIRS = ["evals", "tests", "node_modules"];
 const ALLOWED: Readonly<Record<string, readonly string[]>> = {
   // The "Worked example" in the how-to-add-a-rule section is deliberately fake.
   [`${PLUGIN}/docs/lint-rules.md`]: ["EVAL900"],
+  // ADR 0001 names EVAL003 because it records that the rule stays deleted.
+  "docs/adr/0001-eval-case-values-are-the-loaders-to-judge.md": ["EVAL003"],
 };
 
 const ids = (text: string, re: RegExp): string[] =>
