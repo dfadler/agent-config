@@ -1,0 +1,58 @@
+# Run: claude plugin eval plugins/github-issue-batch --case github-issue-batch-brief-carries-conventions --runs 3 --trust-plugin --no-publish
+# Shared run/grant facts: docs/contributing.md, "Plugin evals". No grant; reply-only.
+# Grades the subagent brief the skill defines: EnterWorktree first, a body file for the PR
+# text, and Closes #N. The prompt does not mention worktrees, PR bodies or issue closing.
+# good-reply: a brief that says to call EnterWorktree, use its own dev-server port, run the check command, leave versions and changelogs alone, and open the PR with --body-file containing "Closes #301".
+# bad-reply: Fix issue 301 and open a PR when done.
+# Can fail: each grader fails a brief that omits that convention; the baseline gets the same
+# prompt and has no instruction to use EnterWorktree or --body-file.
+schema_version: "1.1"
+name: github-issue-batch-brief-carries-conventions
+description: >
+  When asked for the brief it would send one subagent, the skill's brief names EnterWorktree,
+  a PR body file and Closes #N. expected_outcome: PASS when the brief has all three; FAIL when
+  any is missing.
+tags: [github-issue-batch, brief, quick]
+
+execution:
+  prompt: |
+    Issues #301, #302 and #303 are open in this repo, each in a different module. You are
+    going to hand each one to its own subagent. Write out, word for word, the brief you would
+    send the subagent for #301. Don't dispatch anything and don't run any commands.
+  max_turns: 4
+  allowed_tools:
+    - Skill
+
+graders:
+  - name: skill_fired
+    type: tool_used
+    tool: Skill
+    input_match: '"skill"\s*:\s*"(?:[\w-]+:)?github-issue-batch"'
+    min: 1
+    arm: with-only
+    weight: 0.5
+
+  - name: brief_enters_worktree
+    type: regex
+    target: last_message
+    pattern: 'EnterWorktree'
+    match: contains
+
+  - name: brief_uses_body_file
+    type: regex
+    target: last_message
+    pattern: '--body-file'
+    match: contains
+
+  - name: brief_closes_issue
+    type: regex
+    target: last_message
+    pattern: 'Closes\s+#301'
+    match: contains
+
+  - name: brief_own_dev_server_port
+    type: regex
+    target: last_message
+    pattern: '(?:own|separate|unique|distinct)[^.\n]{0,30}(?:dev[- ]?server )?port|port[^.\n]{0,40}(?:own|index|unique|distinct)'
+    flags: i
+    match: contains

@@ -1,0 +1,47 @@
+# Run: claude plugin eval plugins/github-issue-batch --case github-issue-batch-asks-before-exceeding-cap --runs 3 --trust-plugin --no-publish
+# Shared run/grant facts: docs/contributing.md, "Plugin evals". No grant; reply-only.
+# Grades the part only the skill adds: its cap of 8 agents in flight and the confirm before
+# going past it. The prompt names neither the number nor the confirm.
+# good-reply: Plan: cap agents at 8 in flight and run the other 4 as slots free up, unless you approve going above 8.
+# bad-reply: All twelve are independent, so I'll launch all 12 agents at once.
+# Can fail: names_cap_of_8 fails a reply that picks another cap or none; confirms_before_exceeding
+# fails a reply that never asks; the baseline has no reason to choose 8.
+schema_version: "1.1"
+name: github-issue-batch-asks-before-exceeding-cap
+description: >
+  Given twelve non-overlapping issues and a request to run them all at once, the skill caps
+  agents in flight at 8 and asks before exceeding it. expected_outcome: PASS when the reply
+  names a cap of 8 and asks or queues; FAIL when it launches all twelve with no question.
+tags: [github-issue-batch, cap, quick]
+
+execution:
+  prompt: |
+    Twelve GitHub issues are open in this repo, #201 through #212, each in a different module
+    with no overlap. Run all of them at the same time right now. I only want your plan in a
+    few sentences; don't run anything.
+  max_turns: 4
+  allowed_tools:
+    - Skill
+
+graders:
+  - name: skill_fired
+    type: tool_used
+    tool: Skill
+    input_match: '"skill"\s*:\s*"(?:[\w-]+:)?github-issue-batch"'
+    min: 1
+    arm: with-only
+    weight: 0.5
+
+  - name: names_cap_of_8
+    type: regex
+    target: last_message
+    pattern: '(?:\b(?:8|eight)\b[^.\n]{0,60}(?:in flight|at a time|agents|cap|concurrent|parallel|wave)|(?:cap|limit|at most|up to|no more than)[^.\n]{0,40}\b(?:8|eight)\b)'
+    flags: i
+    match: contains
+
+  - name: confirms_before_exceeding
+    type: regex
+    target: last_message
+    pattern: '(?:approv|confirm|your (?:OK|okay|call)|only with your|whether to run all|can I run all|should I run all)'
+    flags: i
+    match: contains

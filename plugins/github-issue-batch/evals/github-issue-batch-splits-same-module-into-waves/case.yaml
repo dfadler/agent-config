@@ -1,0 +1,40 @@
+# Run: claude plugin eval plugins/github-issue-batch --case github-issue-batch-splits-same-module-into-waves --runs 3 --trust-plugin --no-publish
+# Shared run/grant facts: docs/contributing.md, "Plugin evals". No grant; reply-only.
+# Acceptance criterion from #1065. A bare model also splits same-file issues, so no delta is expected: this
+# case checks the skill fires and still gets the split right, not that it beats no plugin.
+# good-reply: Wave 1 runs #101, #103 and #104 in parallel; #102 waits in wave 2 because it shares src/router/match.ts with #101.
+# bad-reply: All four issues are independent, so run them in one wave.
+# Can fail: skill_fired fails if the skill is not invoked; same_module_separate_waves fails
+# if the reply never separates the two issues that touch the same module.
+schema_version: "1.1"
+name: github-issue-batch-splits-same-module-into-waves
+description: >
+  Given four issue numbers where two edit the same module, the skill plans waves by file
+  surface. expected_outcome: PASS when the skill fires and the two same-module issues land in
+  separate waves or are chained; FAIL when all four run in one wave.
+tags: [github-issue-batch, trigger, quick]
+
+execution:
+  prompt: |
+    Work these GitHub issues in parallel: #101 (fix off-by-one in src/router/match.ts),
+    #102 (add a cache to src/router/match.ts), #103 (typo in docs/install.md) and #104
+    (rename a flag in src/cli/args.ts). I only want the plan: which run together and
+    which wait, in a few sentences. Don't run anything.
+  max_turns: 4
+  allowed_tools:
+    - Skill
+
+graders:
+  - name: skill_fired
+    type: tool_used
+    tool: Skill
+    input_match: '"skill"\s*:\s*"(?:[\w-]+:)?github-issue-batch"'
+    min: 1
+    arm: with-only
+
+  - name: same_module_separate_waves
+    type: regex
+    target: last_message
+    pattern: '(?:#?102[^\n]{0,200}(?:same|shares?|overlap|conflict|collid)[^\n]{0,100}#?101|#?101[^\n]{0,200}(?:same|shares?|overlap|conflict|collid)[^\n]{0,100}#?102|(?:wave 2|waits?|after|then|serial|sequential|chain|separate)[^\n]{0,80}#?10[12])'
+    flags: is
+    match: contains
