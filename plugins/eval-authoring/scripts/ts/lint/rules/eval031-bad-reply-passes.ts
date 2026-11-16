@@ -11,7 +11,7 @@ export const rule: Rule = {
   id: "EVAL031",
   severity: "warn",
   title: "The # bad-reply header passes every grader in the case (tag smoke or probe to accept)",
-  source: "from docs/adr/0001: check-replies.ts probeCase moved into discrimination.ts; a case that cannot fail its own bad reply cannot tell the plugin from no plugin",
+  source: "from docs/adr/0002: check-replies.ts probeCase moved into discrimination.ts; a case that cannot fail its own bad reply cannot tell the plugin from no plugin",
   checkCase: (c) => {
     const bad = loadBadReply(c);
     if (bad === undefined || assess(c).state === "cannot-fail") return [];

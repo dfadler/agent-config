@@ -31,7 +31,7 @@ import { parseArgs } from "node:util";
 import { probeCase, regexPasses } from "./discrimination.ts";
 import { readSuite, type EvalCase, type RegexGrader, type ToolUsedGrader } from "./parser/index.ts";
 
-// Moved to discrimination.ts (docs/adr/0001); re-exported so existing importers keep working.
+// Moved to discrimination.ts (docs/adr/0002); re-exported so existing importers keep working.
 export { probeCase, regexPasses };
 
 export interface Replies {

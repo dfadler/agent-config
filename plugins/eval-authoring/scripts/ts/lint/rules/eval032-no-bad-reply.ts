@@ -13,7 +13,7 @@ export const rule: Rule = {
   // 217 hits over the 30 plugins with evals on 2026-11-16, and the acceptance tests demand a warning-free lint: opt in with `--enable EVAL032` until the cases carry headers.
   optIn: true,
   title: "Case with a last_message regex has no # bad-reply header (tag smoke or probe to accept)",
-  source: "from docs/adr/0001 and CONTEXT.md 'Discrimination State': unproven is never reported as ok",
+  source: "from docs/adr/0002 and CONTEXT.md 'Discrimination State': unproven is never reported as ok",
   checkCase: (c) => {
     const a = assess(c);
     if (a.state === "cannot-fail" || a.exempt !== undefined) return [];

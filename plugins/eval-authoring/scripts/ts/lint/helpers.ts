@@ -5,5 +5,5 @@ import type { Grader } from "../parser/index.ts";
 export const graderLabel = (g: Grader): string =>
   `grader '${g.name.value ?? `#${String(g.origin.index + 1)}`}'`;
 
-// The vacuity predicates moved to discrimination.ts (docs/adr/0001); re-exported for the rules that import them here.
+// The vacuity predicates moved to discrimination.ts (docs/adr/0002); re-exported for the rules that import them here.
 export { echoesPrompt, isQuietSkillCheck } from "../discrimination.ts";

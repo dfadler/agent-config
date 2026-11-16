@@ -1,5 +1,5 @@
 /**
- * Can this case fail? (docs/adr/0001, CONTEXT.md "Discrimination State", "Ceiling")
+ * Can this case fail? (docs/adr/0002, CONTEXT.md "Discrimination State", "Ceiling")
  *
  * One home for the vacuity checks that used to live in EVAL024, EVAL025,
  * check-replies.ts and the run summary. Pre-run (`assess`) is free and pure; post-run
