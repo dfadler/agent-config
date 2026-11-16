@@ -63,3 +63,18 @@ A scoping concept for this plugin system. The general `vite` plugin (this repo,
 `agent-config`) holds patterns valid for any Vite project. An organization-specific
 layer (a separate, private repo) can extend it with conventions specific to that
 organization's own monorepo.
+
+## Discrimination State
+
+What is known about whether an eval case can tell a run with the plugin from a
+run without it. One of three: can-fail demonstrated (a free grader fails a
+stored bad reply), cannot-fail demonstrated (every free grader passes the bad
+reply, or the graders can pass on the prompt alone), or unproven (no bad reply,
+or only graders that cannot run offline). A clean lint does not mean
+"discriminates"; only the first state does.
+
+## Ceiling
+
+A case scoring at or above one shared threshold in both arms, so the plugin
+shows no delta. A ceiling case is either labelled (`smoke`, `probe`) and held
+as such, or unlabelled and a defect in the case.
