@@ -1,4 +1,5 @@
 # Run: claude plugin eval plugins/fan-out --case fan-out-budget-flag-caps-spawns --runs 3 --trust-plugin --no-publish
+# Eval sandbox allows only Skill/Agent/Bash, so start_session is absent and these cases pin the sub-agent fallback path; the sub-session path is not testable here.
 # Shared run/grant facts: docs/contributing.md, "Plugin evals". Grants: see grants.yaml.
 # #807: the --budget flag is parsed by limits.ts and the root holds budget 3 = itself plus 2.
 # Sabotage map: delete the "Divide the budget before spawning" step and the `--budget N` flag
