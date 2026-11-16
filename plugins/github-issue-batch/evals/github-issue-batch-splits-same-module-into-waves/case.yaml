@@ -26,7 +26,7 @@ graders:
     tool: Skill
     input_match: '"skill"\s*:\s*"(?:[\w-]+:)?github-issue-batch"'
     min: 1
-    arm: with
+    arm: with-only
 
   - name: same_module_separate_waves
     type: regex
