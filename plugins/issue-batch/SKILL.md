@@ -45,8 +45,8 @@ metadata:
    chain reasons. Then dispatch each wave in one message; start the next wave after
    the previous wave's PRs exist.
 7. Brief each subagent with the template below. For routing, model tier and the
-   handback format, follow `subagent-orchestration`; for worktree mechanics, follow
-   `worktree-core:git-worktree-usage`.
+   handback format, follow `subagent-orchestration`. Each agent creates its worktree with
+   `EnterWorktree`.
 8. Collect the handbacks into the status table. Name any issue that failed or was
    skipped, with the reason.
 
