@@ -1,0 +1,38 @@
+# Run: claude plugin eval plugins/issue-batch --case issue-batch-stays-quiet-on-single-issue --runs 3 --trust-plugin --no-publish
+# Shared run/grant facts: docs/contributing.md, "Plugin evals". No grant; reply-only.
+# Should-not-fire half of the boundary: one issue is not a batch.
+# Regression guard: a baseline also answers directly, so the delta is 0 by design.
+# Can fail: no_issue_batch_fired fails if the skill fires on one issue; answers_directly
+# fails a reply that never gives the gh command.
+schema_version: "1.1"
+name: issue-batch-stays-quiet-on-single-issue
+description: >
+  A single issue number is not a batch, so issue-batch must not fire. expected_outcome: PASS
+  when the skill is not invoked and the reply gives the command; FAIL when it is invoked.
+  Regression guard: Delta 0 by design.
+tags: [issue-batch, trigger, quick]
+
+execution:
+  prompt: |
+    What gh command prints the title and labels of issue #42 as JSON? Answer with the
+    command in one bash code block and no other text. Don't run anything.
+  max_turns: 4
+  allowed_tools:
+    - Skill
+
+graders:
+  - name: no_issue_batch_fired
+    type: tool_used
+    tool: Skill
+    input_match: '"skill"\s*:\s*"(?:[\w-]+:)?issue-batch"'
+    min: 0
+    max: 0
+    arm: both
+
+  - name: answers_directly
+    type: regex
+    target: last_message
+    pattern: 'gh\s+issue\s+view\s+42\s+.*--json\s+[^\n]*title'
+    match: contains
+    arm: both
+    weight: 0.5

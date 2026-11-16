@@ -1,0 +1,36 @@
+# Run: claude plugin eval plugins/issue-batch --case issue-batch-splits-same-module-into-waves --runs 3 --trust-plugin --no-publish
+# Shared run/grant facts: docs/contributing.md, "Plugin evals". No grant; reply-only.
+# Can fail: skill_fired fails if the skill is not invoked; same_module_separate_waves fails
+# if the reply never separates the two issues that touch the same module.
+schema_version: "1.1"
+name: issue-batch-splits-same-module-into-waves
+description: >
+  Given four issue numbers where two edit the same module, the skill plans waves by file
+  surface. expected_outcome: PASS when the skill fires and the two same-module issues land in
+  separate waves or are chained; FAIL when all four run in one wave.
+tags: [issue-batch, trigger, quick]
+
+execution:
+  prompt: |
+    Work these GitHub issues in parallel: #101 (fix off-by-one in src/router/match.ts),
+    #102 (add a cache to src/router/match.ts), #103 (typo in docs/install.md) and #104
+    (rename a flag in src/cli/args.ts). I only want the plan: which run together and
+    which wait, in a few sentences. Don't run anything.
+  max_turns: 4
+  allowed_tools:
+    - Skill
+
+graders:
+  - name: skill_fired
+    type: tool_used
+    tool: Skill
+    input_match: '"skill"\s*:\s*"(?:[\w-]+:)?issue-batch"'
+    min: 1
+    arm: with
+
+  - name: same_module_separate_waves
+    type: regex
+    target: last_message
+    pattern: '(?:#?101[^.]{0,120}#?102|#?102[^.]{0,120}#?101)[^.]{0,120}(?:wave|serial|sequential|chain|after|then|separate|one branch)|(?:wave|serial|sequential|chain|separate)[^.]{0,120}(?:#?101[^.]{0,80}#?102|#?102[^.]{0,80}#?101)'
+    flags: is
+    match: contains
