@@ -1,12 +1,12 @@
 ---
 name: github-issue-batch
 description: |
-  ALWAYS invoke this skill first when the user hands over a list of two or more GitHub
-  issue numbers to work in parallel ("do #12, #15 and #18", "sweep these issues"), even
-  when only a plan is asked for. Reads each issue, infers the files it touches,
-  partitions the issues into waves with no shared file surface, caps agents in flight,
-  prints the plan, then briefs one worktree subagent per issue. Not for a single issue,
-  or for a task list that is not issues (use `subagent-orchestration`).
+  ALWAYS invoke this skill first when the user names two or more GitHub issue numbers
+  to work in parallel or hand to subagents ("do #12, #15 and #18", "sweep these
+  issues"), even when only a plan or one agent's brief is asked for. Partitions the
+  issues into waves with no shared file surface, caps agents in flight, prints the
+  plan, and defines the brief each worktree subagent gets. Not for a single issue, or
+  for a task list that is not issues (use `subagent-orchestration`).
 license: MIT
 metadata:
   version: "1.0.0"
