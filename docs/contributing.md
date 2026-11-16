@@ -159,7 +159,8 @@ need neither. Python tools always run through `.venv`, never whatever `python3` 
 `PATH`.
 
 The TypeScript targets need the Node in `.nvmrc`, and at least 24.2.0 (`engines.node`; the
-scripts' `import.meta.main` entrypoint needs it; the system Homebrew Node may not qualify), so run `nvm use` first.
+scripts' `import.meta.main` entrypoint needs it; the system Homebrew Node may not qualify).
+`.nvmrc` names only the major, so install a current 24 (`nvm install 24`), run `nvm use`, and check `node --version`.
 The package manager is pnpm, pinned by `packageManager` in `package.json`;
 dependencies are pinned by `pnpm-lock.yaml`. The Node-based checks (the TypeScript ones, `lint-set-flags`, `lint-claude-md`, `check-links`, `check-vitest-*`) are `package.json` scripts.
 
