@@ -1,5 +1,9 @@
 # Run: claude plugin eval plugins/github-issue-batch --case github-issue-batch-splits-same-module-into-waves --runs 3 --trust-plugin --no-publish
 # Shared run/grant facts: docs/contributing.md, "Plugin evals". No grant; reply-only.
+# Acceptance criterion from #1065. A bare model also splits same-file issues, so no delta is expected: this
+# case checks the skill fires and still gets the split right, not that it beats no plugin.
+# good-reply: Wave 1 runs #101, #103 and #104 in parallel; #102 waits in wave 2 because it shares src/router/match.ts with #101.
+# bad-reply: All four issues are independent, so run them in one wave.
 # Can fail: skill_fired fails if the skill is not invoked; same_module_separate_waves fails
 # if the reply never separates the two issues that touch the same module.
 schema_version: "1.1"

@@ -1,0 +1,29 @@
+# Run: claude plugin eval plugins/github-issue-batch --trigger-boundary --trust-plugin --no-publish
+# Shared run/grant facts: docs/contributing.md, "Plugin evals". No grant; reply-only.
+# Trigger-boundary negative: shares the skill's vocabulary (parallel agents, split the work)
+# but the items are chores, not GitHub issues. One negative is not a bound on the over-trigger
+# rate; add more distinct near-misses before reading the Wilson bound.
+# Can fail: no_issue_batch_fired fails if the skill fires on a chore list.
+schema_version: "1.1"
+name: github-issue-batch-stays-quiet-on-chore-list
+description: >
+  Three chores with no issue numbers are not an issue batch, so github-issue-batch must not
+  fire. expected_outcome: PASS when the skill is not invoked; FAIL when it is.
+tags: [github-issue-batch, trigger-boundary, "pair:github-issue-batch-splits-same-module-into-waves"]
+
+execution:
+  prompt: |
+    I have three chores for parallel agents: rename the config loader, bump the lint rules, and
+    add a retry to the uploader. How would you split them across agents? Two sentences, and
+    don't run anything.
+  max_turns: 4
+  allowed_tools:
+    - Skill
+
+graders:
+  - name: no_issue_batch_fired
+    type: tool_used
+    tool: Skill
+    input_match: '"skill"\s*:\s*"(?:[\w-]+:)?github-issue-batch"'
+    min: 0
+    max: 0

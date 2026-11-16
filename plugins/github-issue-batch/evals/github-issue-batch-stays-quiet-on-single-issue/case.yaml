@@ -2,6 +2,8 @@
 # Shared run/grant facts: docs/contributing.md, "Plugin evals". No grant; reply-only.
 # Should-not-fire half of the boundary: one issue is not a batch.
 # Regression guard: a baseline also answers directly, so the delta is 0 by design.
+# good-reply: gh issue view 42 --json title,labels
+# bad-reply: One issue is not a batch, so there is no command to run.
 # Can fail: no_issue_batch_fired fails if the skill fires on one issue; answers_directly
 # fails a reply that never gives the gh command.
 schema_version: "1.1"
