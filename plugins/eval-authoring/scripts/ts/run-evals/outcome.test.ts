@@ -148,6 +148,19 @@ describe("judgeRun output signals", () => {
       });
     }
   });
+  const dangling =
+    "/tmp/p/worktrees/w/evals/x is a symbolic link whose target does not exist";
+  it("names the stale-worktree fix when the CLI cannot load a dangling symlink, and stops", () => {
+    const j = judge({ status: 1, findings: undefined, signals: scanOutput(`error: ${dangling}\n`) });
+    expect(j).toMatchObject({ code: EXIT_CONFIG, stop: true });
+    expect(j.reasons.join("\n")).toContain("git worktree remove");
+    expect(j.reasons.join("\n")).toContain(dangling);
+    expect(j.reasons.join("\n")).not.toContain("below threshold");
+  });
+  it("ignores the dangling-symlink line when a result was read (a graded reply can say it)", () => {
+    const j = judge({ status: 1, signals: scanOutput(dangling) });
+    expect(j.reasons.join("\n")).not.toContain("git worktree remove");
+  });
   it("maps a CLI killed without a status to partial, not below-threshold", () => {
     const j = judge({ status: null, signal: "SIGKILL" });
     expect(j.code).toBe(EXIT_PARTIAL);
@@ -164,6 +177,7 @@ describe("scanOutput", () => {
       earlyAccess: false,
       unavailable: false,
       cannotPass: [],
+      danglingLinks: [],
     });
   });
 });
