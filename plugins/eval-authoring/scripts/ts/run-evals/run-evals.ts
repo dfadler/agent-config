@@ -214,6 +214,12 @@ ${Object.values(TIERS).map((t) => `                         ${t.name}: ${t.descr
                        each run's final reply and tool calls, redacted, at
                        <dir>/run-<time>/replies/<NN>-<case>/<case>/<arm>-<run>.md
   --skip-unavailable   exit 0 when plugin eval is in early access or down
+  --unproven           run only the cases the free check cannot show can fail
+                       (discrimination.ts: no # bad-reply header, or the bad
+                       reply passes every grader); cases tagged smoke, probe
+                       or trigger-boundary are left out. Combines with --changed;
+                       not with --case, --neighbours or --trigger-boundary.
+                       --dry-run lists each case's state and the command to run
   --dry-run            print the commands and exit; runs no case (a two-arm tier
                        also runs the free claude --version, to look each case
                        up in the baseline cache and show hit or miss). For a two-arm
@@ -269,6 +275,8 @@ interface Options {
   readonly reporting: Reporting;
   readonly skipUnavailable: boolean;
   readonly dryRun: boolean;
+  /** `--unproven`: run only cases whose free discrimination state is not can-fail (exempt cases left out). */
+  readonly unproven: boolean;
   /** `--sd`: the SD the dry run's detectable-delta line uses; undefined when not given. */
   readonly sd: number | undefined;
   readonly only: string | undefined;
@@ -310,6 +318,7 @@ const BOOL_FLAGS: readonly string[] = [
   "--keep-temp",
   "--skip-unavailable",
   "--dry-run",
+  "--unproven",
   "--yes",
   "--changed-allow-empty",
   "--trigger-boundary",
@@ -411,6 +420,12 @@ export const parseArgs = (argv: readonly string[]): Parsed => {
       return { kind: "error", message: `--trigger-boundary fixes its own tier and case set; it is not combined with ${clash}` };
     }
   }
+  if (bools.has("--unproven")) {
+    const clash = ["--case", "--neighbours"].find((f) => values.has(f)) ?? (bools.has("--trigger-boundary") ? "--trigger-boundary" : undefined);
+    if (clash !== undefined) {
+      return { kind: "error", message: `--unproven picks cases by their free state; it is not combined with ${clash}` };
+    }
+  }
   const [plugin, ...extra] = positionals;
   if (plugin === undefined) {
     return { kind: "error", message: "missing <plugin-path>" };
@@ -444,6 +459,7 @@ export const parseArgs = (argv: readonly string[]): Parsed => {
       },
       skipUnavailable: bools.has("--skip-unavailable"),
       dryRun: bools.has("--dry-run"),
+      unproven: bools.has("--unproven"),
       sd,
       only: values.get("--case"),
       changed: values.get("--changed"),
@@ -952,11 +968,22 @@ const run = async (
     .map((c) => c.name.value);
   const boundary = options.triggerBoundary ? boundaryPlan(suite) : undefined;
   if (boundary?.ok === false) return fail(io, EXIT_CONFIG, boundary.reason);
+  const unprovenNames = suite.cases
+    .filter((c) => {
+      const a = assess(c, loadBadReply(c));
+      return a.state !== "can-fail" && a.exempt === undefined;
+    })
+    .map((c) => c.name.value);
+  const unprovenPick = options.unproven ? unprovenNames.filter((n) => picked === undefined || picked.includes(n)) : undefined;
+  if (unprovenPick?.length === 0) {
+    io.out("run-evals: every case in scope is shown able to fail (or labelled smoke, probe or trigger-boundary) by the free check; no --unproven case to run\n");
+    return EXIT_OK;
+  }
   const pickedNames =
     boundary?.ok === true
       ? boundary.names
       : options.neighbours === undefined
-        ? picked
+        ? (unprovenPick ?? picked)
         : (picked ?? triggerNames).filter((n) => triggerNames.includes(n));
   if (options.neighbours !== undefined) {
     const bad = checkNeighbours(io, deps.pluginsDir, target, options.neighbours);
@@ -978,7 +1005,9 @@ const run = async (
     pickedNames,
     boundary !== undefined
       ? "--trigger-boundary"
-      : changed === undefined
+      : options.unproven && changed === undefined
+        ? "--unproven"
+        : changed === undefined
         ? "trigger"
         : options.neighbours === undefined
           ? "--changed"
@@ -1058,6 +1087,9 @@ const run = async (
     for (const c of suite.cases.filter((x) => plan.groups.some((g) => g.cases.includes(x.name.value)))) {
       const a = assess(c, loadBadReply(c));
       io.out(`discrimination: ${c.name.value}: ${a.state}${a.exempt === undefined ? "" : ` (${a.exempt})`}: ${a.reason}\n`);
+    }
+    if (!options.unproven && plan.groups.some((g) => g.cases.some((n) => unprovenNames.includes(n)))) {
+      io.out(`to pay only for the unproven cases: re-run with --unproven (${String(unprovenNames.length)} of ${String(suite.cases.length)} cases)\n`);
     }
     // Only a two-arm tier measures a delta; quick, --neighbours and --trigger-boundary run the plugin arm alone.
     if (options.tier.ablation === "cli-default") {
