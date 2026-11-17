@@ -140,6 +140,13 @@ export const ceilingFor = (
       };
 };
 
+/** A plain decimal greater than zero ("0.5", "2", ".5"); anything else (empty, "abc", "-1", "NaN", "1e3", "0x10", "0") is undefined. */
+export const parseCost = (text: string): number | undefined => {
+  if (!/^(?:\d+(?:\.\d*)?|\.\d+)$/.test(text)) return undefined;
+  const n = Number(text);
+  return Number.isFinite(n) && n > 0 ? n : undefined;
+};
+
 export const DEFAULT_TIER: TierName = "standard";
 
 export const isTierName = (s: string): s is TierName => s in TIERS;

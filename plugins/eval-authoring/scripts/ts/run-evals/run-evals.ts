@@ -62,6 +62,7 @@ import {
   DEFAULT_TIER,
   TIERS,
   ceilingFor,
+  parseCost,
   round4,
   QUICK_FLOOR_USD,
   QUICK_PER_CASE_USD,
@@ -73,6 +74,7 @@ import {
 import { replyFiles, runCount, safeName } from "./traces.ts";
 import { MIN_CLAUDE_VERSION, MIN_GIT_VERSION, formatVersion } from "./versions.ts";
 import { manifestOf } from "./plan.ts";
+import { CONFIG_FILE, resolveSettings } from "./config.ts";
 import { checkNeighbours, checkStageable, parseNeighbours, stageNeighbours } from "./stage.ts";
 import { firesGraderNames, routablesOf, triggerRows } from "./trigger.ts";
 
@@ -317,12 +319,7 @@ const BOOL_FLAGS: readonly string[] = [
   "--trust-plugin",
 ];
 
-/** A plain decimal greater than zero ("0.5", "2", ".5"); anything else (empty, "abc", "-1", "NaN", "1e3", "0x10", "0") is undefined. */
-export const parseCost = (text: string): number | undefined => {
-  if (!/^(?:\d+(?:\.\d*)?|\.\d+)$/.test(text)) return undefined;
-  const n = Number(text);
-  return Number.isFinite(n) && n > 0 ? n : undefined;
-};
+export { parseCost };
 
 /** Parse argv. `-h`/`--help` anywhere wins before anything else is validated. */
 export const parseArgs = (argv: readonly string[]): Parsed => {
@@ -885,12 +882,19 @@ const run = async (
   if (parsed.kind === "error") {
     return fail(io, EXIT_USAGE, `${parsed.message}\n${USAGE}`);
   }
-  const { options } = parsed;
-  const target = resolve(io.cwd, options.plugin);
+  const target = resolve(io.cwd, parsed.options.plugin);
   const suite = readSuite(
     target,
-    options.evalDir === undefined ? {} : { flag: options.evalDir },
+    parsed.options.evalDir === undefined ? {} : { flag: parsed.options.evalDir },
   );
+  const resolved = resolveSettings(
+    parsed.options,
+    io.env ?? {},
+    io.readFile(join(suite.evalDir, CONFIG_FILE)),
+  );
+  if (!resolved.ok) return fail(io, EXIT_CONFIG, resolved.message);
+  const { notes: configNotes, ...configured } = resolved.settings;
+  const options = { ...parsed.options, ...configured };
   const grants = readGrantsFile(join(suite.evalDir, "grants.yaml"));
   const changed =
     options.changed === undefined
@@ -1042,6 +1046,7 @@ const run = async (
         );
       }
     });
+    for (const note of configNotes) io.out(`config: ${note}\n`);
     io.out(
       `ceiling: $${String(ceilingUsd)} for the whole run (${ceiling.basis}); a result with no costUsd is charged $${String(shareUsd)} (ceiling / ${String(total)} cases)\n`,
     );
@@ -1070,7 +1075,7 @@ const run = async (
   }
 
   io.err(
-    `run-evals: cost ceiling $${String(ceilingUsd)} for ${String(total)} case(s) (${ceiling.basis})\n`,
+    `${configNotes.map((n) => `run-evals: config: ${n}\n`).join("")}run-evals: cost ceiling $${String(ceilingUsd)} for ${String(total)} case(s) (${ceiling.basis})\n`,
   );
   const findings = await runPreflight(io, needsBash(plan.groups));
   findings.forEach((f) => {

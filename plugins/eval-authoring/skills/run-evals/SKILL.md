@@ -207,7 +207,16 @@ so a single miss fails the case, **including a miss on a half-weight wording reg
 `--max-cost-usd` is a ceiling on the list-price cost estimate (the CLI has no default). The
 wrapper sets one total ceiling per run: `quick` the larger of $1 and $0.25 per selected case,
 `standard` $5, `thorough` $15; `--max-cost-usd` replaces it as a total. `--dry-run` prints
-the ceiling and how it was derived. Once spent, nothing further starts and the wrapper lists
+the ceiling and how it was derived.
+
+The defaults are configurable (#1116). Precedence, highest first: flag, environment variable,
+`<eval-dir>/run-config.json`, built-in value. `EVAL_MAX_COST_USD` is a whole-run ceiling like
+`--max-cost-usd`, and `EVAL_JOBS` is `--jobs`. The file sets a tier's ceiling (flat, so it
+drops `quick`'s per-case scaling) and run count, and the default `--jobs`:
+`{"jobs": 4, "tiers": {"standard": {"maxCostUsd": 8, "runs": 4}}}`. A bad value exits 3
+rather than falling back, and `--dry-run` prints a `config:` line naming the source of each
+value that is not built in. Tell the user those lines when you state the ceiling.
+The default tier is not configurable. Once spent, nothing further starts and the wrapper lists
 the cases it did not run (exit 7): trim the cases rather than reading partial scores as
 failures.
 

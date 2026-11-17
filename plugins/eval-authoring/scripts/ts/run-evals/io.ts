@@ -51,6 +51,8 @@ export type Spawner = (
 export interface Io {
   readonly platform: string;
   readonly cwd: string;
+  /** What the settings layer reads (`EVAL_MAX_COST_USD`, `EVAL_JOBS`); tests may omit it. */
+  readonly env?: Readonly<Record<string, string | undefined>>;
   /** The current time; injected so tests can fix the run directory name. */
   readonly now: () => Date;
   readonly out: (text: string) => void;
@@ -169,6 +171,7 @@ export const findExecutables = (
 export const nodeIo = (env: Readonly<Record<string, string | undefined>>): Io => ({
   platform: process.platform,
   cwd: process.cwd(),
+  env,
   now: () => new Date(),
   out: (text) => process.stdout.write(text),
   err: (text) => process.stderr.write(text),
