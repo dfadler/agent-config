@@ -291,6 +291,22 @@ describe("--max-cost-usd", () => {
     expect(text).toContain("config: standard ceiling $8 from run-config.json");
     expect(text).toContain("config: jobs 2 from --jobs");
   });
+  it("prints an approval line in --dry-run only when EVAL_AUTO_APPROVE_MAX_USD is set", async () => {
+    const plan = async (env: Record<string, string>) => {
+      const s = setup({ grants: GRANTS, env });
+      await main([s.root, "--dry-run"], { io: s.io, pluginsDir: "/p" });
+      return s.out.join("");
+    };
+    expect(await plan({ EVAL_AUTO_APPROVE_MAX_USD: "5" })).toContain("approval: pre-approved, ceiling $5 is within");
+    const over = await plan({ EVAL_AUTO_APPROVE_MAX_USD: "2" });
+    expect(over).toContain("approval: not pre-approved, ceiling $5 exceeds");
+    expect(over).toContain("ask the user");
+    expect(await plan({})).not.toContain("approval:");
+  });
+  it("exits 3 on a bad EVAL_AUTO_APPROVE_MAX_USD", async () => {
+    const s = setup({ grants: GRANTS, env: { EVAL_AUTO_APPROVE_MAX_USD: "lots" } });
+    expect(await main([s.root, "--dry-run"], { io: s.io, pluginsDir: "/p" })).toBe(EXIT_CONFIG);
+  });
   it("exits 3 when run-config.json exists but cannot be read, not the built-in ceiling", async () => {
     const root = makePlugin([{ name: "a" }], GRANTS);
     // No directory listing at all: the read error alone must be enough, as when listDir fails too.

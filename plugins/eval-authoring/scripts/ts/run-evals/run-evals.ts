@@ -899,7 +899,7 @@ const run = async (
     config.kind === "ok" ? config.text : undefined,
   );
   if (!resolved.ok) return fail(io, EXIT_CONFIG, resolved.message);
-  const { notes: configNotes, ...configured } = resolved.settings;
+  const { notes: configNotes, autoApproveUsd, ...configured } = resolved.settings;
   const options = { ...parsed.options, ...configured };
   const grants = readGrantsFile(join(suite.evalDir, "grants.yaml"));
   const changed =
@@ -1056,6 +1056,13 @@ const run = async (
     io.out(
       `ceiling: $${String(ceilingUsd)} for the whole run (${ceiling.basis}); a result with no costUsd is charged $${String(shareUsd)} (ceiling / ${String(total)} cases)\n`,
     );
+    if (autoApproveUsd !== undefined) {
+      io.out(
+        ceilingUsd <= autoApproveUsd
+          ? `approval: pre-approved, ceiling $${String(ceilingUsd)} is within EVAL_AUTO_APPROVE_MAX_USD=$${String(autoApproveUsd)}\n`
+          : `approval: not pre-approved, ceiling $${String(ceilingUsd)} exceeds EVAL_AUTO_APPROVE_MAX_USD=$${String(autoApproveUsd)}; ask the user for the go-ahead\n`,
+      );
+    }
     io.out(
       `note: each invocation shows the full ceiling; a real run gives later invocations only the budget left after earlier results\n`,
     );

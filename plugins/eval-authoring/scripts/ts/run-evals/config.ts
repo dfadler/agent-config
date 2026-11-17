@@ -15,6 +15,12 @@ export interface Settings {
   /** A whole-run ceiling that replaces the tier's (flag or env); undefined keeps the tier's own. */
   readonly maxCostUsd: number | undefined;
   readonly jobs: number | undefined;
+  /**
+   * `EVAL_AUTO_APPROVE_MAX_USD`: the user's standing go-ahead for runs whose ceiling is within it.
+   * Environment only, never a flag or the file: a flag the agent passes, or a file a PR commits,
+   * would let the agent approve its own spend.
+   */
+  readonly autoApproveUsd: number | undefined;
   /** One line per effective value that did not come from the built-in tiers. */
   readonly notes: readonly string[];
 }
@@ -89,6 +95,12 @@ export const resolveSettings = (
   }
   const envJobs = envJobsText === undefined || envJobsText === "" ? undefined : Number(envJobsText);
 
+  const approveText = env["EVAL_AUTO_APPROVE_MAX_USD"];
+  const autoApproveUsd = approveText === undefined || approveText === "" ? undefined : parseCost(approveText);
+  if (approveText !== undefined && approveText !== "" && autoApproveUsd === undefined) {
+    return { ok: false, message: `EVAL_AUTO_APPROVE_MAX_USD must be a positive number of US dollars, got '${approveText}'` };
+  }
+
   // Pick the winner per setting and note only what is effective and not built in.
   const notes: string[] = [];
   const name = flags.tier.name;
@@ -118,5 +130,5 @@ export const resolveSettings = (
     jobs = fileJobs;
     notes.push(`jobs ${String(fileJobs)} from ${CONFIG_FILE}`);
   }
-  return { ok: true, settings: { tier, maxCostUsd, jobs, notes } };
+  return { ok: true, settings: { tier, maxCostUsd, jobs, autoApproveUsd, notes } };
 };

@@ -62,6 +62,17 @@ describe("resolveSettings", () => {
     expect(s.notes).toEqual(["ceiling $2 (whole run) from --max-cost-usd", "jobs 4 from --jobs"]);
     expect(ok(resolveSettings(flags, {}, undefined)).notes).toEqual([]);
   });
+  it("reads the pre-approval cap from the environment only", () => {
+    expect(ok(resolveSettings(flags, { EVAL_AUTO_APPROVE_MAX_USD: "7.5" }, undefined)).autoApproveUsd).toBe(7.5);
+    expect(ok(resolveSettings(flags, {}, undefined)).autoApproveUsd).toBeUndefined();
+    // A committed file cannot grant it: the key is not a setting.
+    expect(resolveSettings(flags, {}, JSON.stringify({ autoApproveUsd: 99 })).ok).toBe(false);
+  });
+  it("rejects a bad pre-approval cap", () => {
+    for (const v of ["abc", "0", "-1", "1e3"]) {
+      expect(resolveSettings(flags, { EVAL_AUTO_APPROVE_MAX_USD: v }, undefined).ok).toBe(false);
+    }
+  });
   it("rejects bad values instead of falling back", () => {
     const bad = (env: Record<string, string>, text?: string) => resolveSettings(flags, env, text).ok;
     expect(bad({ EVAL_MAX_COST_USD: "abc" })).toBe(false);

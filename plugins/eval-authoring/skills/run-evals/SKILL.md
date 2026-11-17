@@ -25,7 +25,11 @@ list-price estimates of those model calls, not a bill.
 **Who may start a run.** Only the user's go-ahead. A user who asked for a run in this
 conversation ("run the evals now") has given it; do not ask again. Otherwise ask in chat,
 stating the tier and cost ceiling, and wait. If they decline or do not answer, step 4
-hands the command over instead. No environment variable stands in for the go-ahead. A
+hands the command over instead. One standing go-ahead exists: if the `--dry-run` plan prints `approval: pre-approved`, the
+user set `EVAL_AUTO_APPROVE_MAX_USD` in their own environment and this run's ceiling is within
+it, so run without asking. It counts only when it was already in the session environment: never
+set it, or any other variable or flag, to approve a run yourself. `not pre-approved` or no
+`approval:` line means ask as above. A
 session that is not logged in (`claude auth status` fails) hands off either way.
 
 The wrapper is `${CLAUDE_SKILL_DIR}/../../scripts/ts/run-evals/run-evals.ts`, run with
