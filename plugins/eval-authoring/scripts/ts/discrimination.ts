@@ -48,7 +48,8 @@ const countMatches = (pattern: string, flags: string | undefined, text: string):
   const f = [...new Set(`${flags ?? ""}g`)].join("");
   Object.assign(sandbox, { p: pattern, f, t: text });
   try {
-    return runInContext("[...t.matchAll(new RegExp(p, f))].length", sandbox, { timeout: REGEX_TIMEOUT_MS }) as number;
+    const n: unknown = runInContext("[...t.matchAll(new RegExp(p, f))].length", sandbox, { timeout: REGEX_TIMEOUT_MS });
+    return typeof n === "number" ? n : undefined;
   } catch {
     return undefined;
   }

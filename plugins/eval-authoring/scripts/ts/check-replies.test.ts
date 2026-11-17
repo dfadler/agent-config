@@ -50,6 +50,13 @@ describe("checkPlugin", () => {
     addCase("g", "# good-reply: nope\n# bad-reply: nope\n", REGEX);
     expect(checkPlugin(root)[0]?.detail).toContain("good-reply fails: says_hi");
   });
+  it("names a grader that does not compile instead of blaming the good reply", () => {
+    addCase("bad", "# good-reply: hi\n# bad-reply: nope\n", "  - name: broken\n    type: regex\n    pattern: '(unclosed'\n");
+    const r = checkPlugin(root)[0];
+    expect(r?.status).toBe("fail");
+    expect(r?.detail).toContain("grader broken does not compile");
+    expect(r?.detail).not.toContain("good-reply fails");
+  });
   it("reports llm-only cases as unchecked and header-less llm cases as missing", () => {
     addCase("a", "# good-reply: x\n# bad-reply: y\n", LLM);
     addCase("b", "", LLM);

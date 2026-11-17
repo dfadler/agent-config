@@ -147,7 +147,12 @@ export const checkCase = (c: EvalCase, replies: Replies): CaseReport => {
     return { name, status: "missing", detail: `header lacks ${good === undefined ? "good" : "bad"}-reply` };
   }
   const regexes = regexGraders(c);
-  const failsGood = regexes.filter((g) => regexPasses(g, good) !== true).map((g) => g.name.value ?? "(unnamed)");
+  const nameOf = (g: RegexGrader): string => g.name.value ?? "(unnamed)";
+  const broken = regexes.filter((g) => regexPasses(g, good) === undefined).map(nameOf);
+  if (broken.length > 0) {
+    return { name, status: "fail", detail: `grader ${broken.join(", ")} does not compile or ran out of time (unproven)` };
+  }
+  const failsGood = regexes.filter((g) => regexPasses(g, good) !== true).map(nameOf);
   if (failsGood.length > 0) {
     return { name, status: "fail", detail: `good-reply fails: ${failsGood.join(", ")}` };
   }

@@ -9,7 +9,7 @@ import { loadBadReply } from "../check-replies.ts";
 import { assess, type Assessment } from "../discrimination.ts";
 import { homedir } from "node:os";
 import { basename, dirname, join, resolve } from "node:path";
-import { readGrantsFile, readSuite, type EvalCase } from "../parser/index.ts";
+import { readGrantsFile, readSuite } from "../parser/index.ts";
 import {
   CACHE_DIR,
   cacheKey,
@@ -548,18 +548,6 @@ const optionsFor = (options: Options, cache: CacheUse | undefined): Options =>
  * all end here. The key covers what a no-plugin run depends on (see baseline-cache.ts); the plugin
  * is not in it, so a skill or agent edit keeps the entry.
  */
-/** The free pre-run assessment of a case, for the summary's ceiling line; undefined when the case is unknown. */
-const preRun = (c: EvalCase | undefined): Assessment | undefined => {
-  if (c === undefined) return undefined;
-  try {
-    return assess(c, loadBadReply(c));
-  } catch (e) {
-    // The case file moved during the paid run: report without the note. Any other read error still surfaces.
-    if (e instanceof Error && "code" in e && e.code === "ENOENT") return undefined;
-    throw e;
-  }
-};
-
 const planCache = async (
   io: Io,
   options: Options,
@@ -976,13 +964,17 @@ const run = async (
     .map((c) => c.name.value);
   const boundary = options.triggerBoundary ? boundaryPlan(suite) : undefined;
   if (boundary?.ok === false) return fail(io, EXIT_CONFIG, boundary.reason);
+  // Assessed once, before any paid work: the summary reuses these, so editing a case header mid-run cannot change them.
+  const assessments = new Map<string, Assessment>(suite.cases.map((c) => [c.name.value, assess(c, loadBadReply(c))]));
   const unprovenNames = suite.cases
-    .filter((c) => {
-      const a = assess(c, loadBadReply(c));
-      return a.state !== "can-fail" && a.exempt === undefined;
-    })
-    .map((c) => c.name.value);
-  const unprovenPick = options.unproven ? unprovenNames.filter((n) => picked === undefined || picked.includes(n)) : undefined;
+    .map((c) => c.name.value)
+    .filter((n) => {
+      const a = assessments.get(n);
+      return a !== undefined && a.state !== "can-fail" && a.exempt === undefined;
+    });
+  const unprovenPick = options.unproven
+    ? unprovenNames.filter((n) => inTier(n) && (picked === undefined || picked.includes(n)))
+    : undefined;
   if (unprovenPick?.length === 0) {
     io.out("run-evals: every case in scope is shown able to fail (or labelled smoke, probe or trigger-boundary) by the free check; no --unproven case to run\n");
     return EXIT_OK;
@@ -1096,8 +1088,10 @@ const run = async (
       const a = assess(c, loadBadReply(c));
       io.out(`discrimination: ${c.name.value}: ${a.state}${a.exempt === undefined ? "" : ` (${a.exempt})`}: ${a.reason}\n`);
     }
-    if (!options.unproven && plan.groups.some((g) => g.cases.some((n) => unprovenNames.includes(n)))) {
-      io.out(`to pay only for the unproven cases: re-run with --unproven (${String(unprovenNames.length)} of ${String(suite.cases.length)} cases)\n`);
+    const planned = new Set(plan.groups.flatMap((g) => g.cases));
+    const plannedUnproven = unprovenNames.filter((n) => planned.has(n));
+    if (!options.unproven && plannedUnproven.length > 0) {
+      io.out(`to pay only for the unproven cases: re-run with --unproven (${String(plannedUnproven.length)} of ${String(planned.size)} planned cases)\n`);
     }
     // Only a two-arm tier measures a delta; quick, --neighbours and --trigger-boundary run the plugin arm alone.
     if (options.tier.ablation === "cli-default") {
@@ -1226,10 +1220,11 @@ const run = async (
       : EXIT_OK,
   );
   // N is what finished, M what the same command would plan without --changed: the tier's cases.
+  const subsetOf = changed?.ok === true ? `--changed since ${changed.ref}` : options.unproven ? "--unproven" : undefined;
   const subset =
-    changed?.ok === true
-      ? `subset: ${String(progress.done.length)} of ${String(suite.cases.filter((c) => inTier(c.name.value)).length)} ${options.tier.name} cases, --changed since ${changed.ref}`
-      : null;
+    subsetOf === undefined
+      ? null
+      : `subset: ${String(progress.done.length)} of ${String(suite.cases.filter((c) => inTier(c.name.value)).length)} ${options.tier.name} cases, ${subsetOf}`;
   const summary: RunSummary = {
     tier: options.tier.name,
     ablation: options.tier.ablation,
@@ -1275,7 +1270,7 @@ const run = async (
       exit: d.exit,
       row: caseRow(d.caseName, progress.texts[i], io.readFile, firesGraderNames(suite, d.caseName)),
       tags: suite.cases.find((c) => c.name.value === d.caseName)?.tags.value,
-      pre: preRun(suite.cases.find((c) => c.name.value === d.caseName)),
+      pre: assessments.get(d.caseName),
     })),
   });
   if (options.pr === undefined) {
