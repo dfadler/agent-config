@@ -830,7 +830,7 @@ describe("--unproven", () => {
     const s = setup({ cases: three() });
     headed(s.root, "c2");
     await main([s.root, "--dry-run"], { io: s.io, pluginsDir: "/p" });
-    expect(s.out.join("")).toContain("re-run with --unproven (2 of 3 cases)");
+    expect(s.out.join("")).toContain("re-run with --unproven (2 of 3 planned cases)");
   });
   it("exits 0 and runs nothing when every case is shown able to fail", async () => {
     const s = setup({ cases: three() });
@@ -838,6 +838,48 @@ describe("--unproven", () => {
     expect(await main([s.root, "--unproven"], { io: s.io, pluginsDir: "/p" })).toBe(EXIT_OK);
     expect(s.out.join("")).toContain("no --unproven case to run");
     expect(cliCalls(s.calls)).toEqual([]);
+  });
+  it("honours the tier filter: nothing unproven inside the tier exits 0", async () => {
+    const s = setup({ cases: [{ name: "c1", tags: ["quick"] }, { name: "c2", tags: ["quick"] }, { name: "c3" }] });
+    headed(s.root, "c1");
+    headed(s.root, "c2");
+    expect(await main([s.root, "--tier", "quick", "--unproven"], { io: s.io, pluginsDir: "/p" })).toBe(EXIT_OK);
+    expect(s.out.join("")).toContain("no --unproven case to run");
+    expect(cliCalls(s.calls)).toEqual([]);
+  });
+  it("the hint counts planned cases only, under --tier", async () => {
+    const s = setup({ cases: [{ name: "c1", tags: ["quick"] }, { name: "c2", tags: ["quick"] }, { name: "c3" }] });
+    headed(s.root, "c1");
+    await main([s.root, "--tier", "quick", "--dry-run"], { io: s.io, pluginsDir: "/p" });
+    expect(s.out.join("")).toContain("re-run with --unproven (1 of 2 planned cases)");
+  });
+  it("marks an --unproven run as a subset in the summary", async () => {
+    const s = setup({ cases: three(), onCli: okCli() });
+    headed(s.root, "c2");
+    await main([s.root, "--unproven"], { io: s.io, pluginsDir: "/p" });
+    expect(JSON.parse([...s.written.values()][0] ?? "{}")).toMatchObject({
+      subset: "subset: 2 of 3 standard cases, --unproven",
+    });
+  });
+  it("reports the state from before the run, even if a case header is edited mid-run", async () => {
+    const holder: { s?: ReturnType<typeof setup> } = {};
+    const flat = { score: 1, error: null, graders: [{ name: "g", passed: true, weight: 1, scored: true }] };
+    const s = setup({
+      cases: [{ name: "c1" }],
+      onCli: (args) => {
+        if (holder.s !== undefined) headed(holder.s.root, "c1");
+        return {
+          result: resultJsonFor([caseOf(args)], {
+            cases: [{ name: caseOf(args), aggregates: { score: 1, scoreWithout: 1 }, arms: { with: [flat], without: [flat] } }],
+          }),
+        };
+      },
+    });
+    holder.s = s;
+    await main([s.root, "--tier", "standard"], { io: s.io, pluginsDir: "/p" });
+    const out = s.out.join("");
+    expect(out).toContain("Ceiling:");
+    expect(out).toContain("Flagged before the run, nothing free showed they can fail: `c1`");
   });
   it("is refused beside --case", async () => {
     const s = setup({ cases: three() });
