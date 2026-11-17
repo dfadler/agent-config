@@ -7,6 +7,7 @@
  * offline, only a `last_message` regex can be run, and only against a hand-written
  * bad reply. The module narrows what the baseline must find out.
  */
+import { createContext, runInContext } from "node:vm";
 import {
   isBoundaryCase,
   PROBE_TAG,
@@ -33,34 +34,40 @@ export interface Assessment {
 export const isQuietSkillCheck = (g: Grader): g is ToolUsedGrader =>
   g.type === "tool_used" && g.tool.value === "Skill" && g.max.value === 0 && g.arm.value === "both";
 
-/** A quantified group that itself holds a quantifier, e.g. `(a*)*`: the shape that backtracks catastrophically. */
-const NESTED_QUANTIFIER = /\([^)]*[*+}][^)]*\)[*+{]/;
 const MAX_PROMPT_CHARS = 20_000;
+/** Hard cap on one offline regex run. A sound pattern finishes in microseconds; one that backtracks catastrophically is cut off. */
+const REGEX_TIMEOUT_MS = 100;
+const sandbox = createContext({});
+
+/**
+ * How many times `pattern` matches `text`, run in a vm with a hard timeout so a
+ * catastrophic pattern cannot hang lint or run-evals. Undefined when it does not
+ * compile or does not finish in time (unproven, never a crash or a hang).
+ */
+const countMatches = (pattern: string, flags: string | undefined, text: string): number | undefined => {
+  const f = [...new Set(`${flags ?? ""}g`)].join("");
+  Object.assign(sandbox, { p: pattern, f, t: text });
+  try {
+    return runInContext("[...t.matchAll(new RegExp(p, f))].length", sandbox, { timeout: REGEX_TIMEOUT_MS }) as number;
+  } catch {
+    return undefined;
+  }
+};
 
 /** A `last_message` regex whose pattern already matches `prompt`, so an echo of the prompt satisfies (or trips) it. */
 export const echoesPrompt = (g: Grader, prompt: string): g is RegexGrader => {
   if (g.type !== "regex" || g.target.value.kind !== "last_message" || prompt.length > MAX_PROMPT_CHARS) return false;
-  // ponytail: heuristic ReDoS guard, not a proof; skipping loses only this check.
-  if (NESTED_QUANTIFIER.test(g.pattern.value)) return false;
-  try {
-    return new RegExp(g.pattern.value, g.flags.value).test(prompt);
-  } catch {
-    return false; // an invalid pattern is EVAL012's and the parser's to report
-  }
+  return (countMatches(g.pattern.value, g.flags.value, prompt) ?? 0) > 0; // invalid pattern: EVAL012's and the parser's to report
 };
 
-/** Does a regex grader pass on this reply? `contains`, `not_contains` or `count:N`. Undefined when the pattern does not compile (unproven). */
+/** Does a regex grader pass on this reply? `contains`, `not_contains` or `count:N`. Undefined when the pattern does not compile or times out (unproven). */
 export const regexPasses = (g: RegexGrader, reply: string): boolean | undefined => {
-  const flags = [...new Set(`${g.flags.value ?? ""}g`)].join("");
-  try {
-    const n = [...reply.matchAll(new RegExp(g.pattern.value, flags))].length;
-    const mode = g.match.value;
-    if (mode === "not_contains") return n === 0;
-    const count = /^count:(\d+)$/.exec(mode);
-    return count !== null ? n === Number(count[1]) : n > 0;
-  } catch {
-    return undefined; // candidate 1 rejects these in readSuite; until then, never crash
-  }
+  const n = countMatches(g.pattern.value, g.flags.value, reply);
+  if (n === undefined) return undefined;
+  const mode = g.match.value;
+  if (mode === "not_contains") return n === 0;
+  const count = /^count:(\d+)$/.exec(mode);
+  return count !== null ? n === Number(count[1]) : n > 0;
 };
 
 const isRunnable = (g: Grader): g is RegexGrader => g.type === "regex" && g.target.value.kind === "last_message";
@@ -100,13 +107,11 @@ export const assess = (c: EvalCase, badReply?: string): Assessment => {
   const runnable = c.graders.filter(isRunnable);
   if (runnable.length === 0) return out("unproven", "no last_message regex to run offline; only the paid no-plugin baseline can tell");
   if (badReply === undefined || badReply.trim() === "") return out("unproven", "no # bad-reply header to run the regex graders on");
-  // A nested quantifier can backtrack for a long time on a long bad reply; the guard is heuristic (not alternation).
-  if (runnable.some((g) => NESTED_QUANTIFIER.test(g.pattern.value))) {
-    return out("unproven", "a regex grader has a nested quantifier; not run offline");
-  }
-  const results = runnable.map((g) => regexPasses(g, badReply));
-  if (results.some((r) => r === false)) return out("can-fail", "a regex grader fails the bad reply");
-  if (results.some((r) => r === undefined)) return out("unproven", "a regex grader does not compile");
+  const results = runnable.map((g) => ({ g, ok: regexPasses(g, badReply) }));
+  // A `with-only` grader is never scored in the no-plugin arm, so failing the bad reply proves nothing about the baseline.
+  if (results.some((r) => r.ok === false && r.g.arm.value !== "with-only")) return out("can-fail", "a regex grader fails the bad reply");
+  if (results.some((r) => r.ok === false)) return out("unproven", "only an arm: with-only regex fails the bad reply; the no-plugin arm never scores it");
+  if (results.some((r) => r.ok === undefined)) return out("unproven", "a regex grader does not compile or ran out of time");
   return runnable.length === c.graders.length
     ? out("cannot-fail", "the bad reply passes every grader in the case")
     : out("unproven", "the bad reply passes every regex grader; the other graders need a paid run");

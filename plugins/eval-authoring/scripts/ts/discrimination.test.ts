@@ -59,10 +59,27 @@ describe("assess", () => {
   it("a not_contains regex that matches the prompt is not cued", () => {
     expect(assess(load(REGEX("find", "    match: not_contains\n"))).state).toBe("unproven");
   });
-  it("unproven, not run, when a pattern has a nested quantifier (ReDoS guard)", () => {
-    const a = assess(load(REGEX("^(a+)+$")), `${"a".repeat(40)}!`);
+  // 30 chars: tens of seconds without the timeout (it ends in a failure, not a forever-hang), cut off at 100 ms with it.
+  it("unproven when a pattern backtracks catastrophically (hard timeout)", () => {
+    for (const p of ["^((a+))+$", "(a|a)+$"]) {
+      const a = assess(load(REGEX(p)), `${"a".repeat(30)}!`);
+      expect(a.state, p).toBe("unproven");
+      expect(a.reason).toContain("ran out of time");
+    }
+  });
+  it("still runs a harmless nested-looking pattern", () => {
+    expect(assess(load(REGEX("\\(a+\\)+")), "no idea").state).toBe("can-fail");
+    expect(assess(load(REGEX("(ab+)+")), "no idea").state).toBe("can-fail");
+  });
+  it("one unrunnable grader does not hide another that fails the bad reply", () => {
+    const g = REGEX("main\\.ts") + REGEX("^((a+))+$");
+    expect(assess(load(g), `${"a".repeat(30)}!`).state).toBe("can-fail");
+  });
+  it("an arm: with-only regex that fails the bad reply is unproven, not can-fail", () => {
+    const a = assess(load(REGEX("main\\.ts", "    arm: with-only\n")), "no idea");
     expect(a.state).toBe("unproven");
-    expect(a.reason).toContain("nested quantifier");
+    expect(a.reason).toContain("with-only");
+    expect(assess(load(REGEX("main\\.ts", "    arm: with-only\n") + REGEX("zzz")), "no idea").state).toBe("can-fail");
   });
   it("unproven, not a crash, when a pattern does not compile", () => {
     expect(assess(load(REGEX("(unclosed")), "reply").state).toBe("unproven");
