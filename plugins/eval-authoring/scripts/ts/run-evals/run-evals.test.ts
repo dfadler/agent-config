@@ -293,9 +293,15 @@ describe("--max-cost-usd", () => {
   });
   it("exits 3 when run-config.json exists but cannot be read, not the built-in ceiling", async () => {
     const root = makePlugin([{ name: "a" }], GRANTS);
-    const f = fakeIo({ dirs: { [join(root, "evals")]: ["run-config.json"] } });
+    // No directory listing at all: the read error alone must be enough, as when listDir fails too.
+    const f = fakeIo({ unreadable: [join(root, "evals", "run-config.json")] });
     expect(await main([root, "--dry-run"], { io: f.io, pluginsDir: "/p" })).toBe(EXIT_CONFIG);
     expect(f.err.join("")).toContain("cannot be read");
+  });
+  it("falls back to the built-in values only when run-config.json is confirmed missing", async () => {
+    const s = setup({ grants: GRANTS });
+    expect(await main([s.root, "--dry-run"], { io: s.io, pluginsDir: "/p" })).toBe(EXIT_OK);
+    expect(s.out.join("")).toContain("--max-cost-usd 5");
   });
 });
 

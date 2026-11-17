@@ -888,12 +888,16 @@ const run = async (
     parsed.options.evalDir === undefined ? {} : { flag: parsed.options.evalDir },
   );
   const configPath = join(suite.evalDir, CONFIG_FILE);
-  const configText = io.readFile(configPath);
-  // readFile gives undefined for any error, so a file that is listed but unreadable must not read as absent.
-  if (configText === undefined && io.listDir(suite.evalDir).includes(CONFIG_FILE)) {
-    return fail(io, EXIT_CONFIG, `${CONFIG_FILE}: exists but cannot be read (${configPath})`);
+  // Only a confirmed missing file falls back to the built-in values; any other read failure must not.
+  const config = io.readOptional(configPath);
+  if (config.kind === "error") {
+    return fail(io, EXIT_CONFIG, `${CONFIG_FILE}: cannot be read (${configPath}): ${config.message}`);
   }
-  const resolved = resolveSettings(parsed.options, io.env ?? {}, configText);
+  const resolved = resolveSettings(
+    parsed.options,
+    io.env ?? {},
+    config.kind === "ok" ? config.text : undefined,
+  );
   if (!resolved.ok) return fail(io, EXIT_CONFIG, resolved.message);
   const { notes: configNotes, ...configured } = resolved.settings;
   const options = { ...parsed.options, ...configured };

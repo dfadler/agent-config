@@ -48,6 +48,11 @@ export type Spawner = (
   options?: SpawnOptions,
 ) => Promise<SpawnResult>;
 
+export type OptionalRead =
+  | { readonly kind: "ok"; readonly text: string }
+  | { readonly kind: "missing" }
+  | { readonly kind: "error"; readonly message: string };
+
 export interface Io {
   readonly platform: string;
   readonly cwd: string;
@@ -65,6 +70,8 @@ export interface Io {
   readonly listDir: (path: string) => readonly string[];
   /** File contents, or undefined when unreadable. */
   readonly readFile: (path: string) => string | undefined;
+  /** Like `readFile`, but only a confirmed missing file (ENOENT) is `missing`; any other failure is an `error`. */
+  readonly readOptional: (path: string) => OptionalRead;
   /** Writes a file, creating parent directories. */
   readonly writeFile: (path: string, text: string) => void;
   /** A fresh empty directory under the system temp dir; returns its path. */
@@ -191,6 +198,16 @@ export const nodeIo = (env: Readonly<Record<string, string | undefined>>): Io =>
       return readFileSync(path, "utf8");
     } catch {
       return undefined;
+    }
+  },
+  readOptional: (path) => {
+    try {
+      return { kind: "ok", text: readFileSync(path, "utf8") };
+    } catch (e) {
+      const code = typeof e === "object" && e !== null && "code" in e ? e.code : undefined;
+      return code === "ENOENT"
+        ? { kind: "missing" }
+        : { kind: "error", message: e instanceof Error ? e.message : String(e) };
     }
   },
   writeFile: (path, text) => {
