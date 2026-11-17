@@ -281,6 +281,22 @@ describe("--max-cost-usd", () => {
     await main([d.root, "--dry-run"], { io: d.io, pluginsDir: "/p" });
     expect(lines(d.out).every((l) => l.includes("--max-cost-usd 5"))).toBe(true);
   });
+  it("reads run-config.json and names each effective non-built-in source in --dry-run", async () => {
+    const root = makePlugin([{ name: "a" }, { name: "b" }], GRANTS);
+    const cfg = join(root, "evals", "run-config.json");
+    const f = fakeIo({ files: { [cfg]: JSON.stringify({ tiers: { standard: { maxCostUsd: 8 } } }) } });
+    await main([root, "--dry-run", "--jobs", "2"], { io: f.io, pluginsDir: "/p" });
+    const text = f.out.join("");
+    expect(text).toContain("--max-cost-usd 8");
+    expect(text).toContain("config: standard ceiling $8 from run-config.json");
+    expect(text).toContain("config: jobs 2 from --jobs");
+  });
+  it("exits 3 when run-config.json exists but cannot be read, not the built-in ceiling", async () => {
+    const root = makePlugin([{ name: "a" }], GRANTS);
+    const f = fakeIo({ dirs: { [join(root, "evals")]: ["run-config.json"] } });
+    expect(await main([root, "--dry-run"], { io: f.io, pluginsDir: "/p" })).toBe(EXIT_CONFIG);
+    expect(f.err.join("")).toContain("cannot be read");
+  });
 });
 
 describe("isRepoPlugin", () => {

@@ -34,6 +34,34 @@ describe("resolveSettings", () => {
     );
     expect([quick.tier.maxCostUsd, quick.tier.perCaseUsd, quick.tier.runs]).toEqual([2, undefined, 1]);
   });
+  it("rejects an unknown top-level key but keeps {} valid", () => {
+    expect(resolveSettings(flags, {}, JSON.stringify({ maxCostUsd: 1 })).ok).toBe(false);
+    expect(resolveSettings(flags, {}, "{}").ok).toBe(true);
+  });
+  it("validates a tier that is not selected", () => {
+    const text = JSON.stringify({ tiers: { quick: { runs: 0 } } });
+    expect(resolveSettings(flags, {}, text).ok).toBe(false);
+  });
+  it("validates a lower layer even when a higher one overrides it", () => {
+    const text = JSON.stringify({ jobs: 0 });
+    expect(resolveSettings({ ...flags, jobs: 3 }, {}, text).ok).toBe(false);
+    expect(resolveSettings({ ...flags, maxCostUsd: 2 }, { EVAL_MAX_COST_USD: "abc" }, undefined).ok).toBe(false);
+  });
+  it("notes only the effective source of each setting", () => {
+    const env = { EVAL_MAX_COST_USD: "3" };
+    const overridden = ok(resolveSettings(flags, env, file)).notes.join("\n");
+    expect(overridden).toContain("EVAL_MAX_COST_USD");
+    expect(overridden).not.toContain("ceiling $8");
+    expect(overridden).toContain("standard runs 4 from run-config.json");
+    const flagged = ok(resolveSettings({ ...flags, maxCostUsd: 2 }, env, file)).notes.join("\n");
+    expect(flagged).toContain("ceiling $2 (whole run) from --max-cost-usd");
+    expect(flagged).not.toContain("EVAL_MAX_COST_USD");
+  });
+  it("notes explicit flags, and nothing for built-in values", () => {
+    const s = ok(resolveSettings({ ...flags, maxCostUsd: 2, jobs: 4 }, {}, undefined));
+    expect(s.notes).toEqual(["ceiling $2 (whole run) from --max-cost-usd", "jobs 4 from --jobs"]);
+    expect(ok(resolveSettings(flags, {}, undefined)).notes).toEqual([]);
+  });
   it("rejects bad values instead of falling back", () => {
     const bad = (env: Record<string, string>, text?: string) => resolveSettings(flags, env, text).ok;
     expect(bad({ EVAL_MAX_COST_USD: "abc" })).toBe(false);

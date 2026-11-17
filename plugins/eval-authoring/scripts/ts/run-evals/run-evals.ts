@@ -887,11 +887,13 @@ const run = async (
     target,
     parsed.options.evalDir === undefined ? {} : { flag: parsed.options.evalDir },
   );
-  const resolved = resolveSettings(
-    parsed.options,
-    io.env ?? {},
-    io.readFile(join(suite.evalDir, CONFIG_FILE)),
-  );
+  const configPath = join(suite.evalDir, CONFIG_FILE);
+  const configText = io.readFile(configPath);
+  // readFile gives undefined for any error, so a file that is listed but unreadable must not read as absent.
+  if (configText === undefined && io.listDir(suite.evalDir).includes(CONFIG_FILE)) {
+    return fail(io, EXIT_CONFIG, `${CONFIG_FILE}: exists but cannot be read (${configPath})`);
+  }
+  const resolved = resolveSettings(parsed.options, io.env ?? {}, configText);
   if (!resolved.ok) return fail(io, EXIT_CONFIG, resolved.message);
   const { notes: configNotes, ...configured } = resolved.settings;
   const options = { ...parsed.options, ...configured };
