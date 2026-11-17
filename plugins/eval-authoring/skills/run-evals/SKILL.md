@@ -25,11 +25,15 @@ list-price estimates of those model calls, not a bill.
 **Who may start a run.** Only the user's go-ahead. A user who asked for a run in this
 conversation ("run the evals now") has given it; do not ask again. Otherwise ask in chat,
 stating the tier and cost ceiling, and wait. If they decline or do not answer, step 4
-hands the command over instead. One standing go-ahead exists: if the `--dry-run` plan prints `approval: pre-approved`, the
+hands the command over instead.
+
+One standing go-ahead exists. If the `--dry-run` plan prints `approval: pre-approved`, the
 user set `EVAL_AUTO_APPROVE_MAX_USD` in their own environment and this run's ceiling is within
-it, so run without asking. It counts only when it was already in the session environment: never
-set it, or any other variable or flag, to approve a run yourself. `not pre-approved` or no
-`approval:` line means ask as above. A
+it, so run without asking. Pin the reviewed ceiling: add `--max-cost-usd <the dry-run ceiling>`
+to the paid command, so a changed `run-config.json` or variable cannot raise it after the
+check. A larger ceiling needs a new approval decision. The cap counts only when it was already
+in the session environment: never set it, or any other variable or flag, to approve a run
+yourself. `not pre-approved` or no `approval:` line means ask as above. A
 session that is not logged in (`claude auth status` fails) hands off either way.
 
 The wrapper is `${CLAUDE_SKILL_DIR}/../../scripts/ts/run-evals/run-evals.ts`, run with
@@ -64,7 +68,8 @@ it, do not rebuild any of that.
    final reply and tool calls, redacted, at
    `<eval-dir>/results/run-<time>/replies/<NN>-<case>/<case>/<arm>-<run>.md`.
 4. **Run or hand off.** Run it from this session if the user asked for a run in this
-   conversation. If they did not (you reached this skill while doing something else), ask
+   conversation, or the plan is pre-approved (see "Who may start a run"). If neither holds
+   (you reached this skill while doing something else), ask
    in chat for a go-ahead, naming the tier and cost ceiling, and wait. If they decline or
    do not answer, give the exact non-dry-run command to run in their own shell and stop.
 

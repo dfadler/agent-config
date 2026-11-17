@@ -149,7 +149,8 @@ export const parseCost = (text: string): number | undefined => {
 
 export const DEFAULT_TIER: TierName = "standard";
 
-export const isTierName = (s: string): s is TierName => s in TIERS;
+/** Own keys only: `in` would accept inherited names such as `constructor` and `toString`. */
+export const isTierName = (s: string): s is TierName => Object.hasOwn(TIERS, s);
 
 /** Pinned so scores do not drift with a CLI default. Override with `--model` / `--judge-model`. */
 export const DEFAULT_MODEL = "claude-sonnet-5-5";

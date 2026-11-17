@@ -4,7 +4,17 @@ import {
   QUICK_PER_CASE_USD,
   TIERS,
   ceilingFor,
+  isTierName,
 } from "./tiers.ts";
+
+describe("isTierName", () => {
+  it("accepts the tiers and rejects inherited property names", () => {
+    expect(["quick", "standard", "thorough"].every(isTierName)).toBe(true);
+    for (const s of ["constructor", "toString", "__proto__", "hasOwnProperty", ""]) {
+      expect(isTierName(s)).toBe(false);
+    }
+  });
+});
 
 describe("ceilingFor", () => {
   it("scales the quick ceiling by the cases selected", () => {

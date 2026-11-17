@@ -38,6 +38,10 @@ describe("resolveSettings", () => {
     expect(resolveSettings(flags, {}, JSON.stringify({ maxCostUsd: 1 })).ok).toBe(false);
     expect(resolveSettings(flags, {}, "{}").ok).toBe(true);
   });
+  it("rejects an inherited property name as a tier", () => {
+    const text = JSON.stringify({ tiers: { constructor: { maxCostUsd: 1 } } });
+    expect(resolveSettings(flags, {}, text).ok).toBe(false);
+  });
   it("validates a tier that is not selected", () => {
     const text = JSON.stringify({ tiers: { quick: { runs: 0 } } });
     expect(resolveSettings(flags, {}, text).ok).toBe(false);
