@@ -5,6 +5,7 @@
  * parsed `aggregate-result.json`; no I/O, no model calls. The #436 delta gate
  * can import `diagnose` and read `verdict`.
  */
+import { atCeiling, CEILING } from "../discrimination.ts";
 import { isErrored, isSilentZero } from "../parser/result.ts";
 import type {
   AggregateResult,
@@ -119,7 +120,7 @@ export const SMALL_ARM_RUNS = 5;
 export const DEFAULT_THRESHOLDS: Thresholds = {
   neutralBand: 0,
   seFloor: 0.05,
-  nearCeiling: 0.95,
+  nearCeiling: CEILING,
   highVariance: 0.25,
   highVarianceSmallArm: 0.35,
 };
@@ -450,7 +451,7 @@ const judgeDelta = (
   const { se, mult, bar } = deltaBar(w, wo, t.seFloor);
   const noiseKnown = w.stdDev !== undefined && wo.stdDev !== undefined;
   const ceiling =
-    (w.mean ?? 0) >= t.nearCeiling && (wo.mean ?? 0) >= t.nearCeiling
+    atCeiling({ with: w.mean ?? 0, without: wo.mean ?? 0, tags: [] }, undefined, t.nearCeiling).flat
       ? ([
           {
             kind: "both-arms-pass-all",

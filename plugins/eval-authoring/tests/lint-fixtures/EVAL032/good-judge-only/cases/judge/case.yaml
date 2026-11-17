@@ -1,0 +1,7 @@
+schema_version: "1.1"
+name: judge
+execution:
+  prompt: Find the file.
+graders:
+  - type: "llm"
+    criteria: "PASS if the reply names the file. FAIL if it names none."

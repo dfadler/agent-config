@@ -1,10 +1,5 @@
-import { isBoundaryCase, PROBE_TAG, SMOKE_TAG, type Grader } from "../../parser/index.ts";
-import { echoesPrompt, isQuietSkillCheck } from "../helpers.ts";
+import { assess } from "../../discrimination.ts";
 import type { Rule } from "../types.ts";
-
-/** A `contains` regex on the reply that already matches the prompt (the EVAL024 test). */
-const isCued = (g: Grader, prompt: string): boolean =>
-  g.type === "regex" && g.match.value === "contains" && echoesPrompt(g, prompt);
 
 /**
  * EVAL025: every grader passes without the plugin by construction (a quiet
@@ -17,10 +12,10 @@ export const rule: Rule = {
   title: "Every grader passes without the plugin or is cued by the prompt (tag smoke to accept)",
   source: "from PR 789: a should-not-fire case scored 1.00 with and without; see author-cases, 'Can this case fail?'",
   checkCase: (c) => {
-    const prompt = c.prompt.value ?? "";
-    const dead = c.graders.length > 0 && c.graders.every((g) => isQuietSkillCheck(g) || isCued(g, prompt));
+    // No bad reply here: only the shape (quiet Skill checks and prompt-cued regexes) can say cannot-fail.
+    const a = assess(c);
     // `smoke` labels a two-arm guard and `probe` a safety probe (EVAL030 asks it to say why it might fail); a trigger-boundary case is read as a fire count, not a score (EVAL028).
-    if (!dead || c.tags.value.includes(SMOKE_TAG) || c.tags.value.includes(PROBE_TAG) || isBoundaryCase(c)) return [];
+    if (a.state !== "cannot-fail" || a.exempt !== undefined) return [];
     return [
       {
         message: `Case '${c.name.value}': every grader is a "must not fire" Skill check (the no-plugin arm passes it by construction) or a regex whose text is in the prompt, so only the with-arm skill fire rate can fail, and it is noise at a few runs.`,

@@ -28,7 +28,11 @@
  */
 import { readFileSync } from "node:fs";
 import { parseArgs } from "node:util";
+import { probeCase, regexPasses } from "./discrimination.ts";
 import { readSuite, type EvalCase, type RegexGrader, type ToolUsedGrader } from "./parser/index.ts";
+
+// Moved to discrimination.ts (docs/adr/0002); re-exported so existing importers keep working.
+export { probeCase, regexPasses };
 
 export interface Replies {
   readonly good: string | undefined;
@@ -58,24 +62,12 @@ export const headerReplies = (yaml: string): Replies => {
   return { good: text("good"), bad: text("bad") };
 };
 
-/** Does a regex grader pass on this reply? `contains`, `not_contains` or `count:N`. */
-export const regexPasses = (g: RegexGrader, reply: string): boolean => {
-  const flags = [...new Set(`${g.flags.value ?? ""}g`)].join("");
-  const n = [...reply.matchAll(new RegExp(g.pattern.value, flags))].length;
-  const mode = g.match.value;
-  if (mode === "not_contains") return n === 0;
-  const count = /^count:(\d+)$/.exec(mode);
-  return count !== null ? n === Number(count[1]) : n > 0;
+/** The `# bad-reply:` header of a case, read from its case.yaml or prompt.md; undefined when absent or blank. */
+export const loadBadReply = (c: EvalCase): string | undefined => {
+  const file = c.caseYamlFile ?? c.promptFile;
+  const bad = file === undefined ? undefined : headerReplies(readFileSync(file, "utf8")).bad;
+  return bad === undefined || bad.trim() === "" ? undefined : bad;
 };
-
-/** One line per grader: `pass|FAIL <name>` for a `last_message` regex, else `not-run <name> (<type>)`. */
-export const probeCase = (c: EvalCase, reply: string): readonly string[] =>
-  c.graders.map((g) => {
-    const name = g.name.value ?? "(unnamed)";
-    return g.type === "regex" && g.target.value.kind === "last_message"
-      ? `${regexPasses(g, reply) ? "pass" : "FAIL"} ${name}`
-      : `not-run ${name} (${g.type})`;
-  });
 
 export interface BadCall {
   readonly grader: string;
@@ -155,14 +147,14 @@ export const checkCase = (c: EvalCase, replies: Replies): CaseReport => {
     return { name, status: "missing", detail: `header lacks ${good === undefined ? "good" : "bad"}-reply` };
   }
   const regexes = regexGraders(c);
-  const failsGood = regexes.filter((g) => !regexPasses(g, good)).map((g) => g.name.value ?? "(unnamed)");
+  const failsGood = regexes.filter((g) => regexPasses(g, good) !== true).map((g) => g.name.value ?? "(unnamed)");
   if (failsGood.length > 0) {
     return { name, status: "fail", detail: `good-reply fails: ${failsGood.join(", ")}` };
   }
   if (regexes.length === 0) {
     return { name, status: "unchecked", detail: "no regex grader on last_message; judge graders need a paid run" };
   }
-  if (regexes.every((g) => regexPasses(g, bad))) {
+  if (regexes.every((g) => regexPasses(g, bad) === true)) {
     return { name, status: "fail", detail: "no regex grader fails the bad-reply" };
   }
   return { name, status: "ok", detail: "good passes, bad fails" };

@@ -3,7 +3,8 @@
  * it in a PR body. Pure: no I/O, so it is tested from recorded result text.
  */
 import { isAbsolute } from "node:path";
-import { PROBE_TAG, readAggregateResult, SMOKE_TAG } from "../parser/index.ts";
+import { readAggregateResult } from "../parser/index.ts";
+import { atCeiling, CEILING, type Assessment } from "../discrimination.ts";
 import { deltaBar, diagnose } from "../diagnose/verdict.ts";
 import type { BoundaryReport } from "./boundary.ts";
 
@@ -248,32 +249,33 @@ export interface SummaryInput {
     readonly row: CaseRow | undefined;
     /** The case's tags, for the ceiling line (`probe` and `smoke` label a ceiling result as expected). */
     readonly tags?: readonly string[] | undefined;
+    /** The free pre-run `assess` result, so the ceiling line can say the case was doubted before the run. */
+    readonly pre?: Assessment | undefined;
   }[];
 }
-
-/** A case at or above this in both arms cannot tell the plugin from no plugin. */
-export const CEILING = 0.95;
 
 /** The ceiling line: cases at or above `CEILING` in both arms, split into those tagged `probe` or `smoke` (held as labelled) and those that are not (no headroom). Empty when none, or in a one-arm run. */
 const ceilingLines = (s: SummaryInput, oneArm: boolean): readonly string[] => {
   if (oneArm) return [];
   const both = s.cases.filter((c) => c.row?.with !== undefined && c.row.without !== undefined);
-  const flat = both.filter((c) => (c.row?.with ?? 0) >= CEILING && (c.row?.without ?? 0) >= CEILING);
+  const checked = both.map((c) => ({
+    c,
+    r: atCeiling({ with: c.row?.with ?? 0, without: c.row?.without ?? 0, tags: c.tags ?? [] }, c.pre),
+  }));
+  const flat = checked.filter((x) => x.r.flat);
   if (flat.length === 0) return [];
-  const label = (c: (typeof flat)[number]): string | undefined =>
-    [PROBE_TAG, SMOKE_TAG].find((t) => c.tags?.includes(t));
-  const held = flat.flatMap((c) => {
-    const t = label(c);
-    return t === undefined ? [] : [`\`${cell(c.caseName)}\` (${t})`];
-  });
-  const unlabelled = flat.filter((c) => label(c) === undefined).map((c) => `\`${cell(c.caseName)}\``);
+  const held = flat.flatMap(({ c, r }) => (r.held === undefined ? [] : [`\`${cell(c.caseName)}\` (${r.held})`]));
+  const unlabelledRows = flat.filter((x) => x.r.held === undefined);
+  const unlabelled = unlabelledRows.map((x) => `\`${cell(x.c.caseName)}\``);
+  const doubted = unlabelledRows.filter((x) => x.r.flaggedBefore).map((x) => `\`${cell(x.c.caseName)}\``);
   return [
     "",
     `Ceiling: ${String(flat.length)} of ${String(both.length)} cases at or above ${String(CEILING)} in both arms, no delta.` +
       (held.length === 0 ? "" : ` Held as labelled: ${held.join(", ")}.`) +
       (unlabelled.length === 0
         ? ""
-        : ` Unlabelled, so they cannot tell the plugin from no plugin: ${unlabelled.join(", ")}. Rewrite them with a harder prompt, tag them \`probe\` if holding is the point, or drop them.`),
+        : ` Unlabelled, so they cannot tell the plugin from no plugin: ${unlabelled.join(", ")}. Rewrite them with a harder prompt, tag them \`probe\` if holding is the point, or drop them.`) +
+      (doubted.length === 0 ? "" : ` Flagged before the run, nothing free showed they can fail: ${doubted.join(", ")}.`),
   ];
 };
 

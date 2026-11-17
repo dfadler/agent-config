@@ -2,6 +2,7 @@ import { readFileSync } from "node:fs";
 import { join } from "node:path";
 import { describe, expect, it } from "vitest";
 import { EXIT_OK, EXIT_PARTIAL, EXIT_USAGE } from "./exit-codes.ts";
+import type { Assessment } from "../discrimination.ts";
 import { main, parseArgs } from "./run-evals.ts";
 import { caseMatcher } from "./plan.ts";
 import { fakeIo, makePlugin, spawned, type FakeIoOptions } from "./test-support.ts";
@@ -556,11 +557,11 @@ describe("ceiling cases", () => {
   const row = (caseName: string, w: number | undefined, wo: number | undefined) => ({
     caseName, with: w, without: wo, delta: undefined, failed: [], skillMissed: 0, skillRuns: 0,
   });
-  const md = (cases: readonly { caseName: string; w?: number; wo?: number; tags?: readonly string[] }[], extra = {}): string =>
+  const md = (cases: readonly { caseName: string; w?: number; wo?: number; tags?: readonly string[]; pre?: Assessment }[], extra = {}): string =>
     renderSummary({
       plugin: "p", tier: "standard", model: "m", judgeModel: "j", spentUsd: 0, ceilingUsd: 1,
       exit: 0, command: "c", unstarted: [],
-      cases: cases.map((c) => ({ caseName: c.caseName, exit: 0, row: row(c.caseName, c.w, c.wo), tags: c.tags })),
+      cases: cases.map((c) => ({ caseName: c.caseName, exit: 0, row: row(c.caseName, c.w, c.wo), tags: c.tags, pre: c.pre })),
       ...extra,
     });
   const line = (text: string): string => text.split("\n").find((l) => l.startsWith("Ceiling")) ?? "";
@@ -589,6 +590,15 @@ describe("ceiling cases", () => {
   it("is absent when no case is at the ceiling in both arms, and in a one-arm run", () => {
     expect(md([{ caseName: "live", w: 1, wo: 0.4 }])).not.toContain("Ceiling");
     expect(md([{ caseName: "flat", w: 1, wo: 1 }], { neighbours: ["n"] })).not.toContain("Ceiling");
+  });
+  it("says a flat unlabelled case was flagged before the run, unless the free check showed it can fail", () => {
+    const l = line(md([
+      { caseName: "doubted", w: 1, wo: 1, pre: { state: "unproven", reason: "r" } },
+      { caseName: "proven", w: 1, wo: 1, pre: { state: "can-fail", reason: "r" } },
+      { caseName: "unknown", w: 1, wo: 1 },
+    ]));
+    expect(l).toContain("Flagged before the run, nothing free showed they can fail: `doubted`.");
+    expect(l).not.toMatch(/Flagged before the run[^.]*(proven|unknown)/);
   });
   it("does not count a probe the plugin arm failed", () => {
     expect(md([{ caseName: "p", w: 0.5, wo: 1, tags: ["probe"] }])).not.toContain("Ceiling");

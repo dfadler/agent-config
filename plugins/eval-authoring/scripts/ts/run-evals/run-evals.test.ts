@@ -1,3 +1,4 @@
+import { readFileSync, writeFileSync } from "node:fs";
 import { homedir } from "node:os";
 import { dirname, join } from "node:path";
 import { describe, expect, it } from "vitest";
@@ -797,6 +798,50 @@ describe("one invocation per case", () => {
     expect(lines[2]).toMatch(/^invocation 3\/3: .* --case c3 /);
     expect(s.out.join("")).toContain("only the budget left");
     expect(cliCalls(s.calls)).toEqual([]);
+  });
+
+  it("--dry-run prints one free discrimination line per planned case", async () => {
+    const s = setup({ cases: three() });
+    expect(await run(s, ["--dry-run"])).toBe(EXIT_OK);
+    const lines = s.out.join("").split("\n").filter((l) => l.startsWith("discrimination:"));
+    expect(lines).toHaveLength(3);
+    // The fake cases carry no # bad-reply header, so nothing free can show they fail.
+    expect(lines[0]).toMatch(/^discrimination: c1: unproven: no # bad-reply header/);
+  });
+});
+
+describe("--unproven", () => {
+  const names = ["c1", "c2", "c3"];
+  const three = () => names.map((name) => ({ name }));
+  const headed = (root: string, name: string): void => {
+    const f = join(root, "evals", name, "case.yaml");
+    writeFileSync(f, `# good-reply: hi there\n# bad-reply: nope\n${readFileSync(f, "utf8")}`);
+  };
+  const invocations = (s: ReturnType<typeof setup>): string[] =>
+    s.out.filter((l) => l.startsWith("invocation")).map((l) => /--case (\S+)/.exec(l)?.[1] ?? "");
+
+  it("plans only the cases the free check cannot show can fail", async () => {
+    const s = setup({ cases: three() });
+    headed(s.root, "c2");
+    expect(await main([s.root, "--dry-run", "--unproven"], { io: s.io, pluginsDir: "/p" })).toBe(EXIT_OK);
+    expect(invocations(s)).toEqual(["c1", "c3"]);
+  });
+  it("--dry-run without it offers the flag and counts the unproven cases", async () => {
+    const s = setup({ cases: three() });
+    headed(s.root, "c2");
+    await main([s.root, "--dry-run"], { io: s.io, pluginsDir: "/p" });
+    expect(s.out.join("")).toContain("re-run with --unproven (2 of 3 cases)");
+  });
+  it("exits 0 and runs nothing when every case is shown able to fail", async () => {
+    const s = setup({ cases: three() });
+    for (const n of names) headed(s.root, n);
+    expect(await main([s.root, "--unproven"], { io: s.io, pluginsDir: "/p" })).toBe(EXIT_OK);
+    expect(s.out.join("")).toContain("no --unproven case to run");
+    expect(cliCalls(s.calls)).toEqual([]);
+  });
+  it("is refused beside --case", async () => {
+    const s = setup({ cases: three() });
+    expect(await main([s.root, "--unproven", "--case", "c1"], { io: s.io, pluginsDir: "/p" })).toBe(EXIT_USAGE);
   });
 });
 

@@ -25,6 +25,8 @@ const ALLOWED: Readonly<Record<string, readonly string[]>> = {
   [`${PLUGIN}/docs/lint-rules.md`]: ["EVAL900"],
   // ADR 0001 names EVAL003 because it records that the rule stays deleted.
   "docs/adr/0001-eval-case-values-are-the-loaders-to-judge.md": ["EVAL003"],
+  // ADR 0002 names two deleted rules (see the Audit in lint-rules.md) as outside the module.
+  "docs/adr/0002-paid-baseline-stays-free-check-narrows-it.md": ["EVAL003", "EVAL010"],
 };
 
 const ids = (text: string, re: RegExp): string[] =>
