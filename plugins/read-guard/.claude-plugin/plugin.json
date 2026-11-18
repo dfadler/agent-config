@@ -1,0 +1,12 @@
+{
+  "$schema": "https://json.schemastore.org/claude-code-plugin-manifest.json",
+  "name": "read-guard",
+  "version": "1.0.0",
+  "description": "PreToolUse hook that asks (or denies, READ_GUARD=deny) before Read, Grep, Glob or Bash touches a directory listed in ~/.claude/read-guard.json.",
+  "author": {
+    "name": "Dustin Fadler",
+    "url": "https://github.com/dfadler"
+  },
+  "homepage": "https://github.com/dfadler/agent-config",
+  "repository": "https://github.com/dfadler/agent-config"
+}
