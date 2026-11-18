@@ -52,6 +52,11 @@ it needs `--scaffold`, and EVAL014 flags history that leaks an answer. Whether t
 `git commit` then works in the sandbox, and whether a plugin hook fires on it, is untested: probe
 one case at `--runs 1` before building more. Otherwise test the hook with the plugin's unit tests.
 
+Two shortcuts that do not exist (#1015, checked on CLI 2.1.327): `claude plugin eval --help` has
+no fixture or pre-trial step besides `--scaffold`, and a prebuilt `.git` cannot be committed as a
+fixture, because git turns a nested repository into a gitlink and refuses `fixtures/.git/...`
+paths ("Pathspec is in submodule"). Build the repo in `scaffold_script`.
+
 ## Mocking MCP servers
 
 One Markdown file per tool at `evals/mocks/<server>/<tool>.md` (suite-wide) or in a case's
