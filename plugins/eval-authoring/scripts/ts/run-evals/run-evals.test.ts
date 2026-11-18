@@ -11,7 +11,7 @@ import {
   EXIT_PARTIAL,
   EXIT_USAGE,
 } from "./exit-codes.ts";
-import { isRepoPlugin, main, parseArgs } from "./run-evals.ts";
+import { evalChildEnv, isRepoPlugin, main, parseArgs } from "./run-evals.ts";
 import { TIERS } from "./tiers.ts";
 import { MIN_CLAUDE_VERSION, MIN_GIT_VERSION, formatVersion } from "./versions.ts";
 import {
@@ -58,7 +58,7 @@ const withCaffeinate = {
   caffeinate: ["/usr/bin/caffeinate"],
 };
 
-const cliCalls = (calls: readonly { command: string; args: readonly string[] }[]) =>
+const cliCalls = <T extends { command: string; args: readonly string[] }>(calls: readonly T[]) =>
   calls.filter((c) => c.command === "claude" && c.args[0] === "plugin");
 
 describe("parseArgs", () => {
@@ -1057,5 +1057,32 @@ describe("--dry-run smallest detectable delta (#863)", () => {
     expect(parseArgs(["p", "--dry-run", "--sd", "abc"])).toMatchObject({ kind: "error" });
     expect(parseArgs(["p", "--sd", "0.2"])).toMatchObject({ kind: "error" });
     expect(parseArgs(["p", "--dry-run", "--sd", "0.2"])).toMatchObject({ kind: "options" });
+  });
+});
+
+describe("host-managed auth (#1127)", () => {
+  const HOST = {
+    CLAUDE_CODE_PROVIDER_MANAGED_BY_HOST: "1",
+    CLAUDE_CODE_HOST_AUTH_ENV_VAR: "ANTHROPIC_AUTH_TOKEN",
+    CLAUDE_CODE_SDK_HAS_HOST_AUTH_REFRESH: "1",
+    CLAUDE_CODE_CHILD_SESSION: "1",
+    CLAUDECODE: "1",
+    PATH: "/bin",
+  };
+  it("strips the host-managed variables when a credential is present", () => {
+    const env = evalChildEnv({ ...HOST, ANTHROPIC_AUTH_TOKEN: "k" });
+    expect(env).toEqual({ PATH: "/bin", ANTHROPIC_AUTH_TOKEN: "k" });
+  });
+  it("leaves the environment alone with no credential or no host management", () => {
+    expect(evalChildEnv(HOST)).toBeUndefined();
+    expect(evalChildEnv({ ANTHROPIC_AUTH_TOKEN: "k" })).toBeUndefined();
+    expect(evalChildEnv(undefined)).toBeUndefined();
+  });
+  it("passes the stripped environment to the eval child", async () => {
+    const s = setup({ cases: [{ name: "a" }], onCli: okCli(), env: { ...HOST, ANTHROPIC_AUTH_TOKEN: "k" } });
+    await main([s.root], { io: s.io, pluginsDir: "/p" });
+    const env = cliCalls(s.calls)[0]?.env;
+    expect(env?.["CLAUDECODE"]).toBeUndefined();
+    expect(env?.["ANTHROPIC_AUTH_TOKEN"]).toBe("k");
   });
 });

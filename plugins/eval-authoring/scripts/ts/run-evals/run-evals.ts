@@ -82,6 +82,29 @@ import { CONFIG_FILE, resolveSettings } from "./config.ts";
 import { checkNeighbours, checkStageable, parseNeighbours, stageNeighbours } from "./stage.ts";
 import { firesGraderNames, routablesOf, triggerRows } from "./trigger.ts";
 
+/** Variables the desktop app sets when it, not the CLI, holds the login. Verified in #1127. */
+const HOST_MANAGED_VARS = [
+  "CLAUDE_CODE_PROVIDER_MANAGED_BY_HOST",
+  "CLAUDE_CODE_HOST_AUTH_ENV_VAR",
+  "CLAUDE_CODE_SDK_HAS_HOST_AUTH_REFRESH",
+  "CLAUDE_CODE_CHILD_SESSION",
+  "CLAUDECODE",
+];
+
+/**
+ * The eval child's environment. Under host-managed auth the child reports `Not logged in`
+ * even with a key supplied, until the host-managed variables are gone (#1127). Strip them
+ * only when a credential is present to take over; without one, leave the environment alone.
+ * Returns undefined (inherit) when nothing needs stripping.
+ */
+export const evalChildEnv = (
+  env: Readonly<Record<string, string | undefined>> | undefined,
+): Readonly<Record<string, string | undefined>> | undefined => {
+  if (env === undefined || env["CLAUDE_CODE_PROVIDER_MANAGED_BY_HOST"] !== "1") return undefined;
+  if ((env["ANTHROPIC_AUTH_TOKEN"] ?? env["ANTHROPIC_API_KEY"] ?? "") === "") return undefined;
+  return Object.fromEntries(Object.entries(env).filter(([k]) => !HOST_MANAGED_VARS.includes(k)));
+};
+
 export const USAGE = `Usage: run-evals.ts [options] <plugin-path>
 
 Run a plugin's eval cases at a cost tier. The CLI's --case takes one glob, so
@@ -727,6 +750,7 @@ const runInvocation = async (
       ? ["caffeinate", ["-i", "--", "claude", ...args]]
       : ["claude", args];
   const raw = await io.spawn(cmd, argv, {
+    env: evalChildEnv(io.env),
     onStdout: io.out,
     onStderr: io.err,
     signal: interrupt,
