@@ -182,4 +182,5 @@ The plugin also ships a `PreToolUse` Bash hook (`scripts/ts/protected-remote-hoo
 that asks before `gh pr create`, `gh issue create`, `gh issue comment` or
 `git push` targets an owner other than `origin`'s (for example a fork's parent).
 It asks and never denies. Add trusted owners with `GH_PROTECTED_REMOTE_ALLOW`
-(comma-separated) or skip the check with `GH_PROTECTED_REMOTE_OVERRIDE=1`.
+(comma-separated) or skip the check with `GH_PROTECTED_REMOTE_OVERRIDE=1`;
+set either under `env` in `~/.claude/settings.json` so it applies however `claude` is launched.

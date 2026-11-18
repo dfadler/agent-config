@@ -21,5 +21,5 @@ commit or collides with another session.
   inside the checkout), cleaned up when done.
 
 The `scratch-guard` plugin backs this up: a `PreToolUse` hook warns when `Edit`/`Write`
-targets a system temp directory outside the scratchpad (`SCRATCH_GUARD=block` to refuse
+targets a system temp directory outside the scratchpad (`"env": {"SCRATCH_GUARD": "block"}` in `~/.claude/settings.json` to refuse
 instead, `off` to silence). It does not see Bash writes.
