@@ -28,18 +28,19 @@ the source of each effective value that is not built in. The default tier is not
 it (the `run-evals` skill, "Who may start a run"). `--dry-run` prints `approval: pre-approved`
 or `approval: not pre-approved` when it is set, and no `approval:` line when it is not.
 
-The user sets it, in one of two places:
+The user sets it in `~/.claude/settings.json`. The `run-evals` skill runs without asking only
+when it reads the cap from that file and the value equals the one the plan prints. A cap set
+only in a shell profile is not honored: a profile can hold the assignment in a branch that
+never runs, so the skill cannot tell from its text that the user set the cap, and it asks
+instead.
 
-- **User settings (preferred).** Put it under `env` in `~/.claude/settings.json`:
+- **Settings file.** Put it under `env` in `~/.claude/settings.json`:
   `{"env": {"EVAL_AUTO_APPROVE_MAX_USD": "5"}}`. The value is a string. Claude Code reads the
   key from the file, so the variable takes effect "no matter how `claude` was launched", and a
   running session applies a saved change ([Claude Code docs: variables in settings
   files](https://code.claude.com/docs/en/env-vars.md#set-variables-in-settings-files)). This
   works for the desktop app, which reads the same settings files ([Claude Code docs: settings
   files](https://code.claude.com/docs/en/settings.md)).
-- **Shell profile.** `export EVAL_AUTO_APPROVE_MAX_USD=5`. It reaches a session only when the
-  app that started the session inherited the profile's environment.
-
 Keep it out of every project file. The `env` key is accepted in any settings file, so a
 committed `.claude/settings.json` would grant the cap to everyone who clones the repository,
 and a PR could add it; `.claude/settings.local.json` is a file the agent can edit. The wrapper

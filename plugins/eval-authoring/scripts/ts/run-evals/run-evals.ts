@@ -248,8 +248,8 @@ Settings (flag, then environment, then <eval-dir>/run-config.json, then the tier
   run-config.json            {"jobs": 4, "tiers": {"standard": {"maxCostUsd": 8, "runs": 4}}}
   EVAL_AUTO_APPROVE_MAX_USD  the user's standing go-ahead for runs whose ceiling is within it;
                              --dry-run prints 'approval: pre-approved' or 'not pre-approved'.
-                             Set it in the user's own environment or ~/.claude/settings.json
-                             "env", never in a project file or by the agent.
+                             Set it under "env" in ~/.claude/settings.json, never in a project
+                             file or by the agent; the run-evals skill honors only that file.
 
 Exit codes:
   0   every case passed, results trustworthy
