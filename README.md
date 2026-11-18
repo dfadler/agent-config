@@ -48,6 +48,8 @@ automatically, with no per-project copy to keep in sync.
   - `nvm/` — running commands under nvm from an agent shell: `nvm use` not
     persisting between calls, `nvm` undefined in non-interactive shells, `PATH`
     shadowing, safe fixes.
+  - `storybook/` — writing and running Storybook stories: CSF shape, play
+    functions, dev/build commands, verifying a story renders.
   - `pnpm/` — pnpm projects: `packageManager` pin, where settings go in pnpm 11,
     lockfile drift and conflicts, blocked build scripts, supply-chain settings.
   - `pii-cleanup/` — user-invoked skill that finds personal data (a real home-directory
