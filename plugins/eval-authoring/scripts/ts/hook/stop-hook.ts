@@ -1,8 +1,9 @@
 /**
  * Stop hook: when the work in this checkout changes a plugin's skills or
- * agents but not its evals, block the stop once and tell Claude to update the
- * cases and compare scores before and after. The omission is easy to make and
- * hard to notice, so this surfaces it at the moment the work would finish.
+ * agents but not its evals, or only changes cases the free check shows cannot
+ * fail (`assess` in ../discrimination.ts), block the stop once and tell Claude
+ * to update the cases and compare scores before and after. The omission is easy
+ * to make and hard to notice, so this surfaces it at the moment the work would finish.
  *
  * Contract (https://code.claude.com/docs/en/hooks, Stop): stdin JSON carries
  * `cwd` and `stop_hook_active`; stdout `{ decision: "block", reason }` makes
@@ -14,7 +15,9 @@ import { execFileSync } from "node:child_process";
 import { existsSync, readFileSync, readdirSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join, relative, resolve, sep } from "node:path";
-import { resolveEvalDir } from "../parser/index.ts";
+import { assess } from "../discrimination.ts";
+import { loadBadReply } from "../check-replies.ts";
+import { readSuite, resolveEvalDir } from "../parser/index.ts";
 import { EXIT_FAILURE, EXIT_OK } from "../run-evals/exit-codes.ts";
 import { findPluginRoot } from "./lint-hook.ts";
 
@@ -116,6 +119,8 @@ export interface Gap {
   readonly changed: readonly string[];
   /** Newest results directory under the eval directory: the "before" score. */
   readonly baseline: string | undefined;
+  /** Changed cases that cannot fail (`name: reason`); empty when no case changed at all. */
+  readonly weak: readonly string[];
 }
 
 /** Plugins that already have an eval directory whose skills or agents changed while nothing under it did. */
@@ -139,24 +144,42 @@ export const findGaps = (
     const changed = rel.filter(
       (p) => /^(skills|agents)\//.test(p) && !p.split(sep).includes("tests"),
     );
-    if (changed.length === 0 || rel.some(inEvals)) return [];
+    if (changed.length === 0) return [];
+    const touched = rel.filter(inEvals);
+    const weak = touched.length === 0 ? [] : weakCases(root, evalRel, touched);
+    if (touched.length > 0 && weak.length === 0) return [];
     return [
       {
         plugin: relative(top, root),
         changed,
         baseline: latestResults(join(root, evalRel)),
+        weak,
       },
     ];
   });
 };
 
+/** Changed cases the free check shows cannot fail (`cannot-fail`, not smoke/probe/trigger-boundary), as `name: reason`. Fails open: an unreadable suite flags nothing. */
+const weakCases = (root: string, evalRel: string, touched: readonly string[]): readonly string[] => {
+  try {
+    const names = new Set(touched.map((p) => p.slice(evalRel.length + 1).split(sep)[0]));
+    return readSuite(root).cases.flatMap((c) => {
+      if (!names.has(c.dirName)) return [];
+      const a = assess(c, loadBadReply(c));
+      return a.state === "cannot-fail" && a.exempt === undefined ? [`${c.dirName}: ${a.reason}`] : [];
+    });
+  } catch {
+    return [];
+  }
+};
+
 export const reasonFor = (gaps: readonly Gap[]): string =>
   [
-    "Eval check: you changed a plugin's skills or agents and no eval case changed with them.",
-    ...gaps.map(
-      (g) =>
-        `- ${g.plugin}: changed ${g.changed.join(", ")}. Baseline (before) results: ${g.baseline ?? "none recorded yet"}.`,
-    ),
+    "Eval check: you changed a plugin's skills or agents and the eval cases do not cover the change.",
+    ...gaps.flatMap((g) => [
+      `- ${g.plugin}: changed ${g.changed.join(", ")}. Baseline (before) results: ${g.baseline ?? "none recorded yet"}.`,
+      ...g.weak.map((w) => `  - case cannot fail, so it cannot show the plugin adds anything: ${w}`),
+    ]),
     "Before you finish:",
     "1. Add or update cases that cover the change (load the author-cases skill) and lint them.",
     "2. Get the after score and compare it with the baseline: check `claude auth status`, then run `run-evals` if you are logged in and the user asked for a run; otherwise hand the user the run command.",

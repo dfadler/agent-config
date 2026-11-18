@@ -28,7 +28,7 @@ describe("findGaps", () => {
     const top = repoWithPlugin();
     const gaps = findGaps(top, ["plugins/p/skills/s/SKILL.md"]);
     expect(gaps).toEqual([
-      { plugin: "plugins/p", changed: ["skills/s/SKILL.md"], baseline: "run-1" },
+      { plugin: "plugins/p", changed: ["skills/s/SKILL.md"], baseline: "run-1", weak: [] },
     ]);
   });
 
@@ -37,6 +37,63 @@ describe("findGaps", () => {
     expect(
       findGaps(top, ["plugins/p/skills/s/SKILL.md", "plugins/p/evals/c/prompt.md"]),
     ).toEqual([]);
+  });
+
+  describe("changed cases that cannot fail", () => {
+    const quietCheck = `    type: tool_used
+    tool: Skill
+    input_match: 's'
+    min: 0
+    max: 0
+    arm: both`;
+    const regexCheck = `    type: regex
+    target: last_message
+    pattern: 'gh issue view'
+    match: contains
+    arm: both`;
+    const caseYaml = (name: string, tags: string, header: string, grader: string): string =>
+      `${header}schema_version: "1.1"
+name: ${name}
+description: >
+  A fixture case. expected_outcome: PASS when the reply is right; FAIL when it is wrong.
+tags: [${tags}]
+execution:
+  prompt: |
+    Which command prints issue 42?
+  max_turns: 4
+graders:
+  - name: g
+${grader}
+`;
+    const withCase = (name: string, tags: string, header: string, grader: string): string => {
+      const top = repoWithPlugin();
+      mkdirSync(join(top, "plugins/p/evals", name), { recursive: true });
+      writeFileSync(join(top, "plugins/p/evals", name, "case.yaml"), caseYaml(name, tags, header, grader));
+      return top;
+    };
+    const files = (name: string): string[] => ["plugins/p/skills/s/SKILL.md", `plugins/p/evals/${name}/case.yaml`];
+
+    it("flags a changed case whose only grader passes without the plugin, with the reason", () => {
+      const top = withCase("weak", "t", "", quietCheck);
+      expect(findGaps(top, files("weak"))[0]?.weak).toEqual([
+        "weak: every grader passes without the plugin or is cued by the prompt text",
+      ]);
+    });
+
+    it("is quiet when a regex grader fails the case's own bad reply", () => {
+      const top = withCase("strong", "t", "# bad-reply: no command here\n", regexCheck);
+      expect(findGaps(top, files("strong"))).toEqual([]);
+    });
+
+    it("is quiet for a labelled smoke case", () => {
+      const top = withCase("held", "smoke", "", quietCheck);
+      expect(findGaps(top, files("held"))).toEqual([]);
+    });
+
+    it("does not judge a case that did not change", () => {
+      const top = withCase("weak", "t", "", quietCheck);
+      expect(findGaps(top, ["plugins/p/skills/s/SKILL.md", "plugins/p/evals/other/case.yaml"])).toEqual([]);
+    });
   });
 
   it("is quiet for a plugin with no eval directory", () => {
@@ -194,8 +251,9 @@ describe("runStopHook in a real repo", () => {
 
 describe("reasonFor", () => {
   it("mentions baseline, author-cases and the escape hatch", () => {
-    const text = reasonFor([{ plugin: "plugins/p", changed: ["skills/s/SKILL.md"], baseline: undefined }]);
+    const text = reasonFor([{ plugin: "plugins/p", changed: ["skills/s/SKILL.md"], baseline: undefined, weak: ["c: every grader passes"] }]);
     expect(text).toContain("none recorded yet");
+    expect(text).toContain("c: every grader passes");
     expect(text).toContain("author-cases");
     expect(text).toContain("do not apply");
   });
