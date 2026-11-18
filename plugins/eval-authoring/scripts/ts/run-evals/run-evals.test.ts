@@ -1073,6 +1073,14 @@ describe("host-managed auth (#1127)", () => {
     const env = evalChildEnv({ ...HOST, ANTHROPIC_AUTH_TOKEN: "k" });
     expect(env).toEqual({ PATH: "/bin", ANTHROPIC_AUTH_TOKEN: "k" });
   });
+  it("strips with an empty token when the API key is set, and not when both are empty", () => {
+    expect(evalChildEnv({ ...HOST, ANTHROPIC_AUTH_TOKEN: "", ANTHROPIC_API_KEY: "k" })).toEqual({
+      PATH: "/bin",
+      ANTHROPIC_AUTH_TOKEN: "",
+      ANTHROPIC_API_KEY: "k",
+    });
+    expect(evalChildEnv({ ...HOST, ANTHROPIC_AUTH_TOKEN: "", ANTHROPIC_API_KEY: "" })).toBeUndefined();
+  });
   it("leaves the environment alone with no credential or no host management", () => {
     expect(evalChildEnv(HOST)).toBeUndefined();
     expect(evalChildEnv({ ANTHROPIC_AUTH_TOKEN: "k" })).toBeUndefined();

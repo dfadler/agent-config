@@ -101,7 +101,7 @@ export const evalChildEnv = (
   env: Readonly<Record<string, string | undefined>> | undefined,
 ): Readonly<Record<string, string | undefined>> | undefined => {
   if (env === undefined || env["CLAUDE_CODE_PROVIDER_MANAGED_BY_HOST"] !== "1") return undefined;
-  if ((env["ANTHROPIC_AUTH_TOKEN"] ?? env["ANTHROPIC_API_KEY"] ?? "") === "") return undefined;
+  if ((env["ANTHROPIC_AUTH_TOKEN"] ?? "") === "" && (env["ANTHROPIC_API_KEY"] ?? "") === "") return undefined;
   return Object.fromEntries(Object.entries(env).filter(([k]) => !HOST_MANAGED_VARS.includes(k)));
 };
 
