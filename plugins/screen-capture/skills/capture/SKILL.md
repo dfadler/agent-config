@@ -1,5 +1,6 @@
 ---
 name: capture
+argument-hint: "<url>"
 description: >
   Generic primitive for capturing a screenshot (image) or short walkthrough
   (video) of a URL, on either Playwright (primary) or system Chrome via CDP

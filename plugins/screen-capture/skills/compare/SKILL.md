@@ -1,5 +1,6 @@
 ---
 name: compare
+argument-hint: "[--before <url> --after <url>]"
 description: >
   Orchestrate a before/after screenshot (or video) comparison across two
   branches — typically a PR's base branch and its compare branch, each

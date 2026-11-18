@@ -1,5 +1,6 @@
 ---
 name: config
+argument-hint: "<skill-name> [project-name]"
 description: |
   Internal primitive that reads YAML frontmatter from vault config files via
   mcp__obsidian__* tools, and returns it as merged key-value data. Not a

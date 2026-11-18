@@ -1,5 +1,6 @@
 ---
 name: lighthouse
+argument-hint: "<url>"
 description: >
   Run a Lighthouse CLI pass (mobile + desktop) against a URL and store the
   results in the second-brain vault under knowledge/lighthouse/<project>/.

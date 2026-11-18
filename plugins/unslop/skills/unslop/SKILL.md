@@ -1,5 +1,6 @@
 ---
 name: unslop
+argument-hint: "[check] [file]"
 description: |
   Rewrite prose to remove AI-writing patterns (filler, stock vocabulary, em dashes,
   chatbot phrases, mannered or over-compressed sentences) while keeping the meaning and tone.

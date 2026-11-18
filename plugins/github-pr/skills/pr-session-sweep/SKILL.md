@@ -1,5 +1,6 @@
 ---
 name: pr-session-sweep
+argument-hint: "[session-filter]"
 description: |
   Ask every sub-session this session started to bring its own PR to green:
   fix failed checks, resolve merge conflicts, answer PR review comments, and
