@@ -81,3 +81,7 @@ test; `CLAUDE.md` and personal settings are absent, and project config a
 `fixtures-and-mocks.md`). Pasting the rule into the case prompt would test the model
 reading a prompt, not the include, so the always-loaded includes have no evals
 (#647). A rule that needs one should become a skill with a trigger, per the sort above.
+
+The case field `append_system_prompt` can carry a rule's text into a run, which #654
+missed. Design and per-file classification: [docs/convention-evals.md](../../docs/convention-evals.md)
+(#1061).
