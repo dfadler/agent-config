@@ -85,6 +85,10 @@ export interface FakeIoOptions {
   readonly files?: Readonly<Record<string, string>>;
   /** Directory listings to return, by path. */
   readonly dirs?: Readonly<Record<string, readonly string[]>>;
+  /** The environment `io.env` exposes (`EVAL_*` settings). */
+  readonly env?: Readonly<Record<string, string | undefined>>;
+  /** Paths whose `readOptional` fails with a non-ENOENT error. */
+  readonly unreadable?: readonly string[];
   /** Called before each write is recorded; throw to make that write fail. */
   readonly onWrite?: (path: string) => void;
   /** The answer to a confirm() question; default is no. */
@@ -128,6 +132,7 @@ export const fakeIo = (o: FakeIoOptions = {}): FakeIo => {
   const io: Io = {
     platform: o.platform ?? "darwin",
     cwd: o.cwd ?? "/",
+    ...(o.env === undefined ? {} : { env: o.env }),
     now: () => new Date(o.now ?? "2026-01-02T03:04:05.000Z"),
     out: (t) => out.push(t),
     err: (t) => err.push(t),
@@ -178,6 +183,11 @@ export const fakeIo = (o: FakeIoOptions = {}): FakeIo => {
         .filter((e) => e !== "" && e !== "aggregate-result.json"),
     ],
     readFile: (p) => files.get(p),
+    readOptional: (p) => {
+      if (o.unreadable?.includes(p) === true) return { kind: "error", message: "EACCES: permission denied" };
+      const text = files.get(p);
+      return text === undefined ? { kind: "missing" } : { kind: "ok", text };
+    },
     writeFile: (p, t) => {
       o.onWrite?.(p);
       written.set(p, t);

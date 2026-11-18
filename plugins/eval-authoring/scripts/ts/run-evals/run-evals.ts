@@ -63,7 +63,10 @@ import {
   DEFAULT_MODEL,
   DEFAULT_TIER,
   TIERS,
+  COST_RANGE_TEXT,
   ceilingFor,
+  floor4,
+  parseCost,
   round4,
   QUICK_FLOOR_USD,
   QUICK_PER_CASE_USD,
@@ -75,6 +78,7 @@ import {
 import { replyFiles, runCount, safeName } from "./traces.ts";
 import { MIN_CLAUDE_VERSION, MIN_GIT_VERSION, formatVersion } from "./versions.ts";
 import { manifestOf } from "./plan.ts";
+import { CONFIG_FILE, resolveSettings } from "./config.ts";
 import { checkNeighbours, checkStageable, parseNeighbours, stageNeighbours } from "./stage.ts";
 import { firesGraderNames, routablesOf, triggerRows } from "./trigger.ts";
 
@@ -246,6 +250,15 @@ redacted, truncated failing reply of each failed grader).
 After each invocation the wrapper checks that the result holds exactly the
 planned case; a missing, extra or zero-case result exits 7 and names the case.
 
+Settings (flag, then environment, then <eval-dir>/run-config.json, then the tier's value):
+  EVAL_MAX_COST_USD          whole-run ceiling, like --max-cost-usd
+  EVAL_JOBS                  like --jobs
+  run-config.json            {"jobs": 4, "tiers": {"standard": {"maxCostUsd": 8, "runs": 4}}}
+  EVAL_AUTO_APPROVE_MAX_USD  the user's standing go-ahead for runs whose ceiling is within it;
+                             --dry-run prints 'approval: pre-approved' or 'not pre-approved'.
+                             Set it under "env" in ~/.claude/settings.json, never in a project
+                             file or by the agent; the run-evals skill honors only that file.
+
 Exit codes:
   0   every case passed, results trustworthy
   1   below threshold, load failure, no cases, untrusted directory, invalid option
@@ -328,12 +341,7 @@ const BOOL_FLAGS: readonly string[] = [
   "--trust-plugin",
 ];
 
-/** A plain decimal greater than zero ("0.5", "2", ".5"); anything else (empty, "abc", "-1", "NaN", "1e3", "0x10", "0") is undefined. */
-export const parseCost = (text: string): number | undefined => {
-  if (!/^(?:\d+(?:\.\d*)?|\.\d+)$/.test(text)) return undefined;
-  const n = Number(text);
-  return Number.isFinite(n) && n > 0 ? n : undefined;
-};
+export { parseCost };
 
 /** Parse argv. `-h`/`--help` anywhere wins before anything else is validated. */
 export const parseArgs = (argv: readonly string[]): Parsed => {
@@ -374,12 +382,12 @@ export const parseArgs = (argv: readonly string[]): Parsed => {
   if (costText !== undefined && maxCostUsd === undefined) {
     return {
       kind: "error",
-      message: `--max-cost-usd must be a positive finite number of US dollars, got '${costText}'`,
+      message: `--max-cost-usd must be a positive finite number of US dollars (a plain decimal from ${COST_RANGE_TEXT}), got '${costText}'`,
     };
   }
   const jobsText = values.get("--jobs");
   const jobs = jobsText === undefined ? undefined : Number(jobsText);
-  if (jobsText !== undefined && !/^[1-9]\d*$/.test(jobsText)) {
+  if (jobsText !== undefined && !(/^[1-9]\d*$/.test(jobsText) && Number.isSafeInteger(jobs))) {
     return { kind: "error", message: `--jobs must be a positive integer, got '${jobsText}'` };
   }
   const pr = values.get("--pr");
@@ -903,12 +911,25 @@ const run = async (
   if (parsed.kind === "error") {
     return fail(io, EXIT_USAGE, `${parsed.message}\n${USAGE}`);
   }
-  const { options } = parsed;
-  const target = resolve(io.cwd, options.plugin);
+  const target = resolve(io.cwd, parsed.options.plugin);
   const suite = readSuite(
     target,
-    options.evalDir === undefined ? {} : { flag: options.evalDir },
+    parsed.options.evalDir === undefined ? {} : { flag: parsed.options.evalDir },
   );
+  const configPath = join(suite.evalDir, CONFIG_FILE);
+  // Only a confirmed missing file falls back to the built-in values; any other read failure must not.
+  const config = io.readOptional(configPath);
+  if (config.kind === "error") {
+    return fail(io, EXIT_CONFIG, `${CONFIG_FILE}: cannot be read (${configPath}): ${config.message}`);
+  }
+  const resolved = resolveSettings(
+    parsed.options,
+    io.env ?? {},
+    config.kind === "ok" ? config.text : undefined,
+  );
+  if (!resolved.ok) return fail(io, EXIT_CONFIG, resolved.message);
+  const { notes: configNotes, autoApproveUsd, ...configured } = resolved.settings;
+  const options = { ...parsed.options, ...configured };
   const grants = readGrantsFile(join(suite.evalDir, "grants.yaml"));
   const changed =
     options.changed === undefined
@@ -1077,9 +1098,17 @@ const run = async (
         );
       }
     });
+    for (const note of configNotes) io.out(`config: ${note}\n`);
     io.out(
       `ceiling: $${String(ceilingUsd)} for the whole run (${ceiling.basis}); a result with no costUsd is charged $${String(shareUsd)} (ceiling / ${String(total)} cases)\n`,
     );
+    if (autoApproveUsd !== undefined) {
+      io.out(
+        ceilingUsd <= autoApproveUsd
+          ? `approval: pre-approved, ceiling $${String(ceilingUsd)} is within EVAL_AUTO_APPROVE_MAX_USD=$${String(autoApproveUsd)}\n`
+          : `approval: not pre-approved, ceiling $${String(ceilingUsd)} exceeds EVAL_AUTO_APPROVE_MAX_USD=$${String(autoApproveUsd)}; ask the user for the go-ahead\n`,
+      );
+    }
     io.out(
       `note: each invocation shows the full ceiling; a real run gives later invocations only the budget left after earlier results\n`,
     );
@@ -1115,7 +1144,7 @@ const run = async (
   }
 
   io.err(
-    `run-evals: cost ceiling $${String(ceilingUsd)} for ${String(total)} case(s) (${ceiling.basis})\n`,
+    `${configNotes.map((n) => `run-evals: config: ${n}\n`).join("")}run-evals: cost ceiling $${String(ceilingUsd)} for ${String(total)} case(s) (${ceiling.basis})\n`,
   );
   const findings = await runPreflight(io, needsBash(plan.groups));
   findings.forEach((f) => {
@@ -1154,7 +1183,7 @@ const run = async (
     async (accP, inv, i) => {
       const acc = await accP;
       if (acc.stopped || acc.outOfBudget || interrupt.signal.aborted) return acc;
-      const remaining = round4(ceilingUsd - acc.spentUsd);
+      const remaining = floor4(ceilingUsd - acc.spentUsd);
       if (remaining <= 0) return { ...acc, outOfBudget: true };
       const outDir = invocationDir(runDir, i + 1, total, inv);
       const r = await runInvocation(

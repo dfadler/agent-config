@@ -140,9 +140,32 @@ export const ceilingFor = (
       };
 };
 
+/**
+ * The dollar range a ceiling or cap may take. Outside it `String(n)` prints exponent form
+ * ("1e+21", "1e-7"), which `parseCost` rejects, so a printed ceiling would not be a valid
+ * `--max-cost-usd` argument.
+ */
+export const MIN_COST_USD = 0.0001;
+export const MAX_COST_USD = 1_000_000;
+export const COST_RANGE_TEXT = `${String(MIN_COST_USD)} to ${String(MAX_COST_USD)}`;
+
+export const inCostRange = (n: number): boolean =>
+  Number.isFinite(n) && n >= MIN_COST_USD && n <= MAX_COST_USD;
+
+/** A plain decimal within the cost range ("0.5", "2", ".5"); anything else (empty, "abc", "-1", "NaN", "1e3", "0x10", "0", "1e+21") is undefined. */
+export const parseCost = (text: string): number | undefined => {
+  if (!/^(?:\d+(?:\.\d*)?|\.\d+)$/.test(text)) return undefined;
+  const n = Number(text);
+  return inCostRange(n) ? n : undefined;
+};
+
+/** The largest four-decimal amount not above `n`, so a child budget never exceeds the ceiling that was approved. */
+export const floor4 = (n: number): number => Math.floor(Number((n * 10000).toFixed(6))) / 10000;
+
 export const DEFAULT_TIER: TierName = "standard";
 
-export const isTierName = (s: string): s is TierName => s in TIERS;
+/** Own keys only: `in` would accept inherited names such as `constructor` and `toString`. */
+export const isTierName = (s: string): s is TierName => Object.hasOwn(TIERS, s);
 
 /** Pinned so scores do not drift with a CLI default. Override with `--model` / `--judge-model`. */
 export const DEFAULT_MODEL = "claude-sonnet-5-5";

@@ -25,8 +25,30 @@ list-price estimates of those model calls, not a bill.
 **Who may start a run.** Only the user's go-ahead. A user who asked for a run in this
 conversation ("run the evals now") has given it; do not ask again. Otherwise ask in chat,
 stating the tier and cost ceiling, and wait. If they decline or do not answer, step 4
-hands the command over instead. No environment variable stands in for the go-ahead. A
-session that is not logged in (`claude auth status` fails) hands off either way.
+hands the command over instead.
+
+One standing go-ahead exists: `EVAL_AUTO_APPROVE_MAX_USD`, set by the user. Run without
+asking only when all three hold:
+
+1. The `--dry-run` plan prints `approval: pre-approved`.
+2. The user's settings file sets the cap the approval line prints, and no project file
+   mentions it. The line shows the value, not who set it, and a project settings file can set
+   it too. Run
+   `node -p 'JSON.parse(require("fs").readFileSync(require("os").homedir()+"/.claude/settings.json","utf8")).env?.EVAL_AUTO_APPROVE_MAX_USD'`:
+   settings files are strict JSON, so this reads the key the user wrote, with no comments or
+   conditional branches to fool it. Its output must equal the cap in the approval line. Then run
+   `grep -l EVAL_AUTO_APPROVE_MAX_USD .claude/settings.json .claude/settings.local.json` at the
+   working directory and the main checkout's root; any hit fails the check. A missing key, a
+   differing value, an unreadable file, or a cap set only in a shell profile fails it too: a
+   shell profile can hold the assignment in a branch that never runs, so a text match there
+   does not show the user set the cap. When the check fails, ask as above.
+3. The paid command pins the reviewed ceiling: add `--max-cost-usd <the dry-run ceiling>`, so
+   a changed `run-config.json` or variable cannot raise it after the check.
+
+If any one fails, ask as above; a larger ceiling needs a new approval decision. The cap
+counts only when it was already in the session environment: leave it as the user set it, and
+set no variable or flag yourself to approve a run. A session that is not logged in
+(`claude auth status` fails) hands off either way.
 
 The wrapper is `${CLAUDE_SKILL_DIR}/../../scripts/ts/run-evals/run-evals.ts`, run with
 a current `node` (see `.nvmrc`). It owns tiers, grants, preflight checks and exit codes; call
@@ -60,7 +82,8 @@ it, do not rebuild any of that.
    final reply and tool calls, redacted, at
    `<eval-dir>/results/run-<time>/replies/<NN>-<case>/<case>/<arm>-<run>.md`.
 4. **Run or hand off.** Run it from this session if the user asked for a run in this
-   conversation. If they did not (you reached this skill while doing something else), ask
+   conversation, or the plan is pre-approved (see "Who may start a run"). If neither holds
+   (you reached this skill while doing something else), ask
    in chat for a go-ahead, naming the tier and cost ceiling, and wait. If they decline or
    do not answer, give the exact non-dry-run command to run in their own shell and stop.
 
@@ -210,6 +233,11 @@ wrapper sets one total ceiling per run: `quick` the larger of $1 and $0.25 per s
 the ceiling and how it was derived. Once spent, nothing further starts and the wrapper lists
 the cases it did not run (exit 7): trim the cases rather than reading partial scores as
 failures.
+
+The ceiling, run count and jobs are configurable, and `--dry-run` prints a `config:` line for
+each effective value that is not built in; tell the user those lines when you state the
+ceiling. To read the precedence, the `run-config.json` format, or how the user sets
+`EVAL_AUTO_APPROVE_MAX_USD`, open [run-settings.md](../../docs/run-settings.md).
 
 ## Run in your repo (CI)
 

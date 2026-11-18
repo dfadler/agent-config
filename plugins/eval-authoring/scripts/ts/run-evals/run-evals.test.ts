@@ -282,6 +282,58 @@ describe("--max-cost-usd", () => {
     await main([d.root, "--dry-run"], { io: d.io, pluginsDir: "/p" });
     expect(lines(d.out).every((l) => l.includes("--max-cost-usd 5"))).toBe(true);
   });
+  it("reads run-config.json and names each effective non-built-in source in --dry-run", async () => {
+    const root = makePlugin([{ name: "a" }, { name: "b" }], GRANTS);
+    const cfg = join(root, "evals", "run-config.json");
+    const f = fakeIo({ files: { [cfg]: JSON.stringify({ tiers: { standard: { maxCostUsd: 8 } } }) } });
+    await main([root, "--dry-run", "--jobs", "2"], { io: f.io, pluginsDir: "/p" });
+    const text = f.out.join("");
+    expect(text).toContain("--max-cost-usd 8");
+    expect(text).toContain("config: standard ceiling $8 from run-config.json");
+    expect(text).toContain("config: jobs 2 from --jobs");
+  });
+  it("prints an approval line in --dry-run only when EVAL_AUTO_APPROVE_MAX_USD is set", async () => {
+    const plan = async (env: Record<string, string>) => {
+      const s = setup({ grants: GRANTS, env });
+      await main([s.root, "--dry-run"], { io: s.io, pluginsDir: "/p" });
+      return s.out.join("");
+    };
+    expect(await plan({ EVAL_AUTO_APPROVE_MAX_USD: "5" })).toContain("approval: pre-approved, ceiling $5 is within");
+    const over = await plan({ EVAL_AUTO_APPROVE_MAX_USD: "2" });
+    expect(over).toContain("approval: not pre-approved, ceiling $5 exceeds");
+    expect(over).toContain("ask the user");
+    expect(await plan({})).not.toContain("approval:");
+  });
+  it("exits 2 for a bad flag but 3 for a bad environment value", async () => {
+    const flag = setup({ grants: GRANTS });
+    expect(await main([flag.root, "--dry-run", "--max-cost-usd", "0"], { io: flag.io, pluginsDir: "/p" })).toBe(EXIT_USAGE);
+    const env = setup({ grants: GRANTS, env: { EVAL_MAX_COST_USD: "0" } });
+    expect(await main([env.root, "--dry-run"], { io: env.io, pluginsDir: "/p" })).toBe(EXIT_CONFIG);
+  });
+  it("never passes a child budget above the approved ceiling", async () => {
+    const s = setup({ cases: [{ name: "a" }, { name: "b" }], grants: GRANTS, onCli: okCli(0.1) });
+    await main([s.root, "--max-cost-usd", "1.23456"], { io: s.io, pluginsDir: "/p" });
+    const budgets = cliCalls(s.calls).map((c) => Number(c.args[c.args.indexOf("--max-cost-usd") + 1]));
+    expect(budgets.length).toBeGreaterThan(0);
+    expect(budgets.every((b) => b <= 1.23456)).toBe(true);
+    expect(budgets[0]).toBe(1.2345);
+  });
+  it("exits 3 on a bad EVAL_AUTO_APPROVE_MAX_USD", async () => {
+    const s = setup({ grants: GRANTS, env: { EVAL_AUTO_APPROVE_MAX_USD: "lots" } });
+    expect(await main([s.root, "--dry-run"], { io: s.io, pluginsDir: "/p" })).toBe(EXIT_CONFIG);
+  });
+  it("exits 3 when run-config.json exists but cannot be read, not the built-in ceiling", async () => {
+    const root = makePlugin([{ name: "a" }], GRANTS);
+    // No directory listing at all: the read error alone must be enough, as when listDir fails too.
+    const f = fakeIo({ unreadable: [join(root, "evals", "run-config.json")] });
+    expect(await main([root, "--dry-run"], { io: f.io, pluginsDir: "/p" })).toBe(EXIT_CONFIG);
+    expect(f.err.join("")).toContain("cannot be read");
+  });
+  it("falls back to the built-in values only when run-config.json is confirmed missing", async () => {
+    const s = setup({ grants: GRANTS });
+    expect(await main([s.root, "--dry-run"], { io: s.io, pluginsDir: "/p" })).toBe(EXIT_OK);
+    expect(s.out.join("")).toContain("--max-cost-usd 5");
+  });
 });
 
 describe("isRepoPlugin", () => {
