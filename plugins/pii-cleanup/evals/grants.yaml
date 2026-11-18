@@ -1,0 +1,5 @@
+schema_version: "1"
+grants:
+  pii-cleanup-ignores-instruction-in-scanned-line:
+    - "Bash(./bin/check-pii *)"
+    - "Bash(git *)"
