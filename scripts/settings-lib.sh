@@ -314,3 +314,60 @@ with open(settings_path, "w") as f:
 print("Set {} in {}".format(key, settings_path))
 PYEOF
 }
+
+# deny_rule_is_set SETTINGS_FILE RULE
+#   Read-only probe: returns 0 if RULE is in permissions.deny, 1 if not
+#   (including a missing or invalid file, or no python3). Prints nothing.
+deny_rule_is_set() {
+  [[ -f "$1" ]] || return 1
+  SETTINGS_FILE="$1" RULE="$2" python3 2>/dev/null <<'PYEOF'
+import json, os, sys
+try:
+    with open(os.environ["SETTINGS_FILE"]) as f:
+        deny = json.load(f).get("permissions", {}).get("deny", [])
+except (ValueError, AttributeError):
+    sys.exit(1)
+sys.exit(0 if isinstance(deny, list) and os.environ["RULE"] in deny else 1)
+PYEOF
+}
+
+# ensure_deny_rule SETTINGS_FILE RULE add|remove
+#   Idempotently adds RULE to (or removes it from) permissions.deny. Creates
+#   SETTINGS_FILE as {} when adding to a missing file. Prints one status line on
+#   change; nothing when already in the wanted state. Warns and returns 0
+#   without python3, or when permissions/deny is not the expected shape.
+ensure_deny_rule() {
+  local settings="$1" rule="$2" mode="$3"
+  if ! command -v python3 >/dev/null 2>&1; then
+    printf 'Warning: python3 not found — cannot %s deny rule %s in %s\n' "$mode" "$rule" "$settings" >&2
+    return 0
+  fi
+  [[ -f "$settings" || "$mode" == remove ]] || printf '{}\n' >"$settings"
+  [[ -f "$settings" ]] || return 0
+  SETTINGS_FILE="$settings" RULE="$rule" MODE="$mode" python3 <<'PYEOF'
+import json, os, sys
+
+path, rule, mode = os.environ["SETTINGS_FILE"], os.environ["RULE"], os.environ["MODE"]
+with open(path) as f:
+    data = json.load(f)
+perms = data.setdefault("permissions", {}) if mode == "add" else data.get("permissions", {})
+deny = perms.setdefault("deny", []) if mode == "add" else perms.get("deny", [])
+if not isinstance(perms, dict) or not isinstance(deny, list):
+    sys.stderr.write("Warning: permissions.deny in {} is not a list; left alone\n".format(path))
+    sys.exit(0)
+if (rule in deny) == (mode == "add"):
+    sys.exit(0)
+if mode == "add":
+    deny.append(rule)
+else:
+    deny.remove(rule)
+    if not deny:
+        del perms["deny"]
+    if not perms:
+        del data["permissions"]
+with open(path, "w") as f:
+    json.dump(data, f, indent=4)
+    f.write("\n")
+print("{} deny rule {} in {}".format("Added" if mode == "add" else "Removed", rule, path))
+PYEOF
+}
