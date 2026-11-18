@@ -4,7 +4,7 @@ description: |
   ALWAYS invoke this skill first when writing, editing, shortening or auditing a SKILL.md,
   an agent definition, a CLAUDE.md or AGENTS.md file, or a convention file, even for a
   one-line rule or a short snippet written in a reply. It defines numbered rules
-  AW01-AW24, each with a runnable check and a fix. Not for READMEs, docs prose, commit
+  AW01-AW26, each with a runnable check and a fix. Not for READMEs, docs prose, commit
   messages or PR text.
 metadata:
   version: "1.2.0"
@@ -53,7 +53,7 @@ its number is never reused.
   through `skills:` frontmatter. Check: does the agent body contain numbered steps?
   Fix: move them into the skill. If no skill exists for the procedure, propose one
   rather than keeping the steps in the agent.
-- **AW03 model-alias.** Declare a model by alias (`sonnet`, `opus`, `haiku`), never a
+- **AW03 model-alias.** Declare a model by alias (`sonnet`, `opus`, `haiku`, `fable`), never a
   versioned ID. Check: `grep -rnE "^model:.*[0-9]" <agents-dir>`. Fix: use the alias.
 - **AW04 register-and-delete.** A new skill is listed wherever skills are discovered
   (README table, router skill, agent roster); what it replaces is deleted, with the
@@ -117,7 +117,9 @@ its number is never reused.
 
 - **AW16 bound-always-loaded.** `SKILL.md` stays under about 250 lines. Material that
   only one branch needs moves to a sibling file, with the condition for opening it
-  written beside the pointer. Check: `wc -l SKILL.md`. Fix: split by branch.
+  written beside the pointer, one trigger per branch (synonyms that rename one branch
+  collapse to one). Check: `wc -l SKILL.md`; read each pointer for its condition.
+  Fix: split by branch.
 - **AW17 delegate-bulky.** A step that reads more than about three files, searches the
   repo broadly, or prints more than about 50 lines goes to a read-only sub-agent, given
   the absolute repo root, the file list and the scratchpad path. Check: look for such
@@ -180,3 +182,21 @@ its number is never reused.
   its destination, including absolute paths (`/tmp/x`) and variable targets, against the
   scratchpad or the `mktemp -d /tmp/scratch.XXXXXX` fallback. Fix: point the step at the
   scratchpad or that fallback, and name who deletes it.
+
+## Pruning
+
+- **AW25 prune-no-ops.** Delete a sentence that does not change what the agent does:
+  an instruction it already follows by default, or a copy of something it can look up
+  in one command (a `package.json` script, a config value, `--help` output). Keep a
+  copy only for what no lookup shows: an unwritten convention, the reason for a choice,
+  a gotcha. Where one phrase or list repeats at three or more sites, replace it with one
+  short token (a leading word) used each time. Check: for each sentence, ask whether
+  deleting it changes the agent's behaviour; for each command or config value, run the
+  lookup and compare; `grep -c` a repeated phrase. Fix: delete the whole sentence, or
+  collapse the repeats to one token.
+- **AW26 content-in-its-class.** A paragraph sits in the file for its kind and next to
+  what it relates to: a setup step does not live in a cleanup file, and one concept's
+  definition, rules and caveats sit under one heading, not scattered. Check: read each
+  heading and ask whether every paragraph under it belongs to that heading's job; grep
+  the concept's name and see whether its hits sit under a single heading. Fix: move the
+  paragraph to its class, or delete it.
