@@ -1,0 +1,48 @@
+# Run: node plugins/eval-authoring/scripts/ts/run-evals/run-evals.ts plugins/agent-writing --case "agent-writing-aw25-quiet-on-clean-file" (no grant needed; Skill only).
+# Maps to SKILL.md: AW25 prune-no-ops ("Keep a copy only for what no lookup shows").
+# Drafted by the blind-case-writer agent from the committed SKILL.md alone, then reviewed.
+# good-reply: I found no problems in this file. Every line gives a gotcha, a reason or a convention an agent could not look up, and none repeats a phrase three times.
+# bad-reply: | AW25 | CLAUDE.md:5 | "Run `pnpm build` before `pnpm publish`" | A script lookup shows this | Delete the line |
+# Smoke tripwire: the bare model never says "AW25", so it passes this by construction. No delta expected and no evidence about the over-report rate.
+# Risk: a good reply that writes "AW25 ... line 4 is a gotcha" in one sentence false-fails; tighten the pattern if that shows.
+# Sabotage check: none; a smoke guard has no rule text to remove.
+schema_version: "1.1"
+name: agent-writing-aw25-quiet-on-clean-file
+description: >
+  A pasted CLAUDE.md where every line is a gotcha, a reason or an unwritten convention,
+  including commands that look like lookups. The audit must not report AW25. expected_outcome:
+  PASS when no AW25 finding row or sentence cites a line; FAIL otherwise. Smoke guard, no
+  delta expected.
+tags: [agent-writing, aw25, audit, smoke, quick]
+
+execution:
+  prompt: |
+    Please audit this CLAUDE.md against your writing rules. The line numbers are mine.
+
+    1   # Release scripts
+    2
+    3   ## Commands
+    4   - Run `pnpm test:e2e` only after `docker compose up -d`; it hangs without an error otherwise.
+    5   - Run `pnpm build` before `pnpm publish`; publish does not build, and the registry accepts an empty dist.
+    6
+    7   ## Conventions
+    8   - Branch names start with the ticket key (`PAY-123-fix-rounding`) so the changelog bot can link them.
+    9   - Store payment amounts as integer cents; the ledger export rejects decimals.
+    10  - Keep `legacy/` untouched: a vendor syncs it nightly and overwrites local edits.
+  max_turns: 6
+  allowed_tools:
+    - Skill
+
+graders:
+  - name: skill_fired
+    type: tool_used
+    tool: Skill
+    input_match: '"skill"\s*:\s*"(?:[\w-]+:)?agent-writing"'
+    min: 1
+
+  - name: aw25_not_reported
+    type: regex
+    target: last_message
+    pattern: 'AW25[^\n]{0,160}?(?:\bline\s*\d+|:\s*\d+\b|\|\s*\d+\s*\||\bL\d+\b)'
+    flags: i
+    match: not_contains

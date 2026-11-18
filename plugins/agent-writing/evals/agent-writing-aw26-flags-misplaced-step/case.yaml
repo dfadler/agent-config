@@ -1,0 +1,44 @@
+# Run: node plugins/eval-authoring/scripts/ts/run-evals/run-evals.ts plugins/agent-writing --case "agent-writing-aw26-flags-misplaced-step" (no grant needed; Skill only).
+# Maps to SKILL.md: AW26 content-in-its-class ("a setup step does not live in a cleanup file").
+# Drafted by the blind-case-writer agent from the committed SKILL.md alone, then reviewed.
+# good-reply: | AW26 | cleanup.md:6 | Step 3 installs and configures the AWS CLI | This is setup, and the file is for cleanup | Move it to the deploy setup file, or delete it |
+# bad-reply: The steps are clear. Consider numbering the sub-steps and adding a short intro line.
+# Red/green: not run. Needs a run on the skill text before and after the AW26 commit.
+# Sabotage check: delete the AW26 rule from SKILL.md and re-run; aw26_reported_with_line should fail.
+schema_version: "1.1"
+name: agent-writing-aw26-flags-misplaced-step
+description: >
+  A pasted cleanup file with one setup step among the cleanup steps. The audit must report it
+  under AW26 with its line number. expected_outcome: PASS when the reply has an AW26 finding
+  citing line 6; FAIL when AW26 is missing or cites another line.
+tags: [agent-writing, aw26, audit, quick]
+
+execution:
+  prompt: |
+    This is cleanup.md, the file my agent reads after a deploy. Anything off about it? Line
+    numbers are included.
+
+    1  # Cleanup after a deploy
+    2
+    3  ## Steps
+    4  1. Stop the preview server with `pnpm preview:stop`.
+    5  2. Delete the `.preview/` directory.
+    6  3. Install the AWS CLI with `brew install awscli` and run `aws configure` so the next deploy can authenticate.
+    7  4. Remove the `preview-*` branches from the remote.
+  max_turns: 6
+  allowed_tools:
+    - Skill
+
+graders:
+  - name: skill_fired
+    type: tool_used
+    tool: Skill
+    input_match: '"skill"\s*:\s*"(?:[\w-]+:)?agent-writing"'
+    min: 1
+
+  - name: aw26_reported_with_line
+    type: regex
+    target: last_message
+    pattern: 'AW26[^\n]{0,160}?(?:\bline\s*6\b|:\s*6\b|\|\s*6\s*\||\bL6\b)'
+    flags: i
+    match: contains
