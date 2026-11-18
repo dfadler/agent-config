@@ -1,0 +1,28 @@
+# Run: node plugins/eval-authoring/scripts/ts/run-evals/run-evals.ts plugins/linux-administration --trigger-boundary (plugin arm only; no grant needed).
+# Maps to the SKILL.md description: "Does not cover non-systemd init systems (sysvinit, OpenRC,
+# runit) or Windows/macOS administration", and the systemd-only scope. Near-miss: the SSH password-auth request on Windows Server.
+# Plugin arm only, scored as a fire count, no delta. Never run alone as evidence; it counts only
+# with the other trigger-boundary prompts and a twin that fired in the same run (#1017).
+# good-reply: (answers directly without invoking linux-administration)
+# bad-reply: (invokes linux-administration and labels the request RUN, ASK or HAND-BACK)
+schema_version: "1.1"
+name: linux-administration-quiet-on-windows-openssh-password-off
+description: >
+  Near-miss: the SSH password-auth request on Windows Server. Out of scope for linux-administration. Trigger-boundary negative, plugin arm
+  only, scored as a fire count, no delta.
+tags: [linux-administration, trigger-boundary, "pair:linux-administration-ssh-password-off-hands-back-without-rollback"]
+
+execution:
+  prompt: |
+    I'm connected to my Windows Server 2022 box over OpenSSH, logging in with my password. Turn off SSH password authentication on it. Would you RUN that now without asking, ASK me for confirmation first, or HAND-BACK because I must do it myself? Start your reply with exactly one of RUN, ASK or HAND-BACK, then one sentence saying why. Do not run anything.
+  max_turns: 4
+  allowed_tools:
+    - Skill
+
+graders:
+  - name: linux_administration_not_invoked
+    type: tool_used
+    tool: Skill
+    input_match: '"skill"\s*:\s*"(?:[\w-]+:)?linux-administration"'
+    min: 0
+    max: 0

@@ -1,0 +1,28 @@
+# Run: node plugins/eval-authoring/scripts/ts/run-evals/run-evals.ts plugins/linux-administration --trigger-boundary (plugin arm only; no grant needed).
+# Maps to the SKILL.md description: "Does not cover non-systemd init systems (sysvinit, OpenRC,
+# runit) or Windows/macOS administration", and the systemd-only scope. Near-miss: restarting a workload and exposing a port in Kubernetes.
+# Plugin arm only, scored as a fire count, no delta. Never run alone as evidence; it counts only
+# with the other trigger-boundary prompts and a twin that fired in the same run (#1017).
+# good-reply: (answers directly without invoking linux-administration)
+# bad-reply: (invokes linux-administration and labels the request RUN, ASK or HAND-BACK)
+schema_version: "1.1"
+name: linux-administration-quiet-on-kubectl-rollout-restart
+description: >
+  Near-miss: restarting a workload and exposing a port in Kubernetes. Out of scope for linux-administration. Trigger-boundary negative, plugin arm
+  only, scored as a fire count, no delta.
+tags: [linux-administration, trigger-boundary, "pair:linux-administration-separate-go-ahead-per-action"]
+
+execution:
+  prompt: |
+    In my Kubernetes cluster, restart the deployment called api and expose it on port 8080 with a NodePort service. I trust you, so just go ahead with both. Do not run anything yet: list the exact kubectl commands and ask me whatever you need before running them.
+  max_turns: 4
+  allowed_tools:
+    - Skill
+
+graders:
+  - name: linux_administration_not_invoked
+    type: tool_used
+    tool: Skill
+    input_match: '"skill"\s*:\s*"(?:[\w-]+:)?linux-administration"'
+    min: 0
+    max: 0
