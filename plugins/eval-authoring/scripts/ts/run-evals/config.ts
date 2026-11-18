@@ -6,7 +6,7 @@
  * File shape (all keys optional):
  *   { "jobs": 4, "tiers": { "standard": { "maxCostUsd": 8, "runs": 4 } } }
  */
-import { TIERS, isTierName, parseCost, type Tier } from "./tiers.ts";
+import { COST_RANGE_TEXT, TIERS, inCostRange, isTierName, parseCost, type Tier } from "./tiers.ts";
 
 export const CONFIG_FILE = "run-config.json";
 
@@ -30,9 +30,9 @@ export type Resolved =
   | { readonly ok: false; readonly message: string };
 
 const posInt = (v: unknown): number | undefined =>
-  typeof v === "number" && Number.isInteger(v) && v > 0 ? v : undefined;
-const posNum = (v: unknown): number | undefined =>
-  typeof v === "number" && Number.isFinite(v) && v > 0 ? v : undefined;
+  typeof v === "number" && Number.isSafeInteger(v) && v > 0 ? v : undefined;
+const costNum = (v: unknown): number | undefined =>
+  typeof v === "number" && inCostRange(v) ? v : undefined;
 const isRecord = (v: unknown): v is Record<string, unknown> =>
   typeof v === "object" && v !== null && !Array.isArray(v);
 
@@ -72,9 +72,9 @@ export const resolveSettings = (
       for (const k of Object.keys(raw)) {
         if (k !== "maxCostUsd" && k !== "runs") return bad(`tiers.${name}.${k} is not a setting (maxCostUsd, runs)`);
       }
-      const maxCostUsd = posNum(raw["maxCostUsd"]);
+      const maxCostUsd = costNum(raw["maxCostUsd"]);
       const runs = posInt(raw["runs"]);
-      if (raw["maxCostUsd"] !== undefined && maxCostUsd === undefined) return bad(`tiers.${name}.maxCostUsd must be a positive number`);
+      if (raw["maxCostUsd"] !== undefined && maxCostUsd === undefined) return bad(`tiers.${name}.maxCostUsd must be a number of US dollars from ${COST_RANGE_TEXT}`);
       if (raw["runs"] !== undefined && runs === undefined) return bad(`tiers.${name}.runs must be a positive integer`);
       if (name === flags.tier.name) {
         fileTier = { ...(maxCostUsd === undefined ? {} : { maxCostUsd }), ...(runs === undefined ? {} : { runs }) };
@@ -87,18 +87,18 @@ export const resolveSettings = (
   const envCostText = env["EVAL_MAX_COST_USD"];
   const envCost = envCostText === undefined || envCostText === "" ? undefined : parseCost(envCostText);
   if (envCostText !== undefined && envCostText !== "" && envCost === undefined) {
-    return { ok: false, message: `EVAL_MAX_COST_USD must be a positive number of US dollars, got '${envCostText}'` };
+    return { ok: false, message: `EVAL_MAX_COST_USD must be a plain decimal number of US dollars from ${COST_RANGE_TEXT}, got '${envCostText}'` };
   }
   const envJobsText = env["EVAL_JOBS"];
-  if (envJobsText !== undefined && envJobsText !== "" && !/^[1-9]\d*$/.test(envJobsText)) {
+  const envJobs = envJobsText === undefined || envJobsText === "" ? undefined : Number(envJobsText);
+  if (envJobsText !== undefined && envJobsText !== "" && !(/^[1-9]\d*$/.test(envJobsText) && Number.isSafeInteger(envJobs))) {
     return { ok: false, message: `EVAL_JOBS must be a positive integer, got '${envJobsText}'` };
   }
-  const envJobs = envJobsText === undefined || envJobsText === "" ? undefined : Number(envJobsText);
 
   const approveText = env["EVAL_AUTO_APPROVE_MAX_USD"];
   const autoApproveUsd = approveText === undefined || approveText === "" ? undefined : parseCost(approveText);
   if (approveText !== undefined && approveText !== "" && autoApproveUsd === undefined) {
-    return { ok: false, message: `EVAL_AUTO_APPROVE_MAX_USD must be a positive number of US dollars, got '${approveText}'` };
+    return { ok: false, message: `EVAL_AUTO_APPROVE_MAX_USD must be a plain decimal number of US dollars from ${COST_RANGE_TEXT}, got '${approveText}'` };
   }
 
   // Pick the winner per setting and note only what is effective and not built in.

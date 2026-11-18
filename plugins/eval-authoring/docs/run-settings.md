@@ -14,9 +14,12 @@ built-in tier value.
   tier's run count, and the default `--jobs`:
   `{"jobs": 4, "tiers": {"standard": {"maxCostUsd": 8, "runs": 4}}}`.
 
-A bad value, an unknown key or a malformed file exits 3 rather than falling back, in every
-layer and every tier, even one a higher layer overrides. Only a confirmed missing
-`run-config.json` falls back to the built-in values. `--dry-run` prints a `config:` line naming
+A bad value in an environment variable or in `run-config.json`, an unknown key, or a malformed
+file exits 3 rather than falling back, in every layer and every tier, even one a higher layer
+overrides. A bad flag, such as `--max-cost-usd 0`, is rejected first and exits 2. Dollar values
+are plain decimals from 0.0001 to 1000000, so a printed ceiling is always a valid
+`--max-cost-usd` argument; `EVAL_JOBS` and `jobs` must be safe integers. Only a confirmed
+missing `run-config.json` falls back to the built-in values. `--dry-run` prints a `config:` line naming
 the source of each effective value that is not built in. The default tier is not configurable.
 
 ## Pre-approving paid runs
@@ -44,3 +47,10 @@ cannot tell which file a value came from. Review any diff that adds
 `EVAL_AUTO_APPROVE_MAX_USD` to a repository.
 
 To confirm the variable arrives, run `--dry-run` once and look for the `approval:` line.
+
+To revoke the approval, remove the key from `~/.claude/settings.json` (or the `export` line
+from the shell profile), then start a new `claude` session. Claude Code does not unset a
+removed variable in a running session, so the old value stays in effect there ([Claude Code
+docs: variables in settings
+files](https://code.claude.com/docs/en/env-vars.md#set-variables-in-settings-files)). In the
+new session, run `--dry-run` and confirm no `approval:` line appears.

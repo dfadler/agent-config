@@ -72,6 +72,20 @@ describe("resolveSettings", () => {
     // A committed file cannot grant it: the key is not a setting.
     expect(resolveSettings(flags, {}, JSON.stringify({ autoApproveUsd: 99 })).ok).toBe(false);
   });
+  it("rejects an EVAL_JOBS that overflows, even when a flag overrides it", () => {
+    const huge = "9".repeat(309);
+    expect(resolveSettings(flags, { EVAL_JOBS: huge }, undefined).ok).toBe(false);
+    expect(resolveSettings({ ...flags, jobs: 3 }, { EVAL_JOBS: huge }, undefined).ok).toBe(false);
+    expect(resolveSettings(flags, {}, JSON.stringify({ jobs: 1e300 })).ok).toBe(false);
+    expect(ok(resolveSettings(flags, { EVAL_JOBS: "4" }, undefined)).jobs).toBe(4);
+  });
+  it("rejects out-of-range dollar values from every source", () => {
+    const big = "1000000000000000000000";
+    expect(resolveSettings(flags, { EVAL_MAX_COST_USD: big }, undefined).ok).toBe(false);
+    expect(resolveSettings(flags, { EVAL_AUTO_APPROVE_MAX_USD: big }, undefined).ok).toBe(false);
+    expect(resolveSettings(flags, {}, JSON.stringify({ tiers: { standard: { maxCostUsd: 1e21 } } })).ok).toBe(false);
+    expect(resolveSettings(flags, {}, JSON.stringify({ tiers: { standard: { maxCostUsd: 1e-7 } } })).ok).toBe(false);
+  });
   it("rejects a bad pre-approval cap", () => {
     for (const v of ["abc", "0", "-1", "1e3"]) {
       expect(resolveSettings(flags, { EVAL_AUTO_APPROVE_MAX_USD: v }, undefined).ok).toBe(false);

@@ -27,14 +27,23 @@ conversation ("run the evals now") has given it; do not ask again. Otherwise ask
 stating the tier and cost ceiling, and wait. If they decline or do not answer, step 4
 hands the command over instead.
 
-One standing go-ahead exists. If the `--dry-run` plan prints `approval: pre-approved`, the
-user set `EVAL_AUTO_APPROVE_MAX_USD` in their own environment and this run's ceiling is within
-it, so run without asking. Pin the reviewed ceiling: add `--max-cost-usd <the dry-run ceiling>`
-to the paid command, so a changed `run-config.json` or variable cannot raise it after the
-check. A larger ceiling needs a new approval decision. The cap counts only when it was already
-in the session environment: never set it, or any other variable or flag, to approve a run
-yourself. `not pre-approved` or no `approval:` line means ask as above. A
-session that is not logged in (`claude auth status` fails) hands off either way.
+One standing go-ahead exists: `EVAL_AUTO_APPROVE_MAX_USD`, set by the user. Run without
+asking only when all three hold:
+
+1. The `--dry-run` plan prints `approval: pre-approved`.
+2. A user file holds the variable and no project file does. The approval line shows the value,
+   not who set it, and a project settings file can set it too. Run
+   `grep -l EVAL_AUTO_APPROVE_MAX_USD ~/.claude/settings.json ~/.zshrc ~/.zprofile ~/.bashrc ~/.bash_profile`
+   (a hit is a user file), then the same grep on the project's `.claude/settings.json` and
+   `.claude/settings.local.json`, at the working directory and the main checkout's root (a hit
+   there fails the check).
+3. The paid command pins the reviewed ceiling: add `--max-cost-usd <the dry-run ceiling>`, so
+   a changed `run-config.json` or variable cannot raise it after the check.
+
+If any one fails, ask as above; a larger ceiling needs a new approval decision. The cap
+counts only when it was already in the session environment: leave it as the user set it, and
+set no variable or flag yourself to approve a run. A session that is not logged in
+(`claude auth status` fails) hands off either way.
 
 The wrapper is `${CLAUDE_SKILL_DIR}/../../scripts/ts/run-evals/run-evals.ts`, run with
 a current `node` (see `.nvmrc`). It owns tiers, grants, preflight checks and exit codes; call

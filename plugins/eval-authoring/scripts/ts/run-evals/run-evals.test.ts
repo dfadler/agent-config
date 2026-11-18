@@ -303,6 +303,20 @@ describe("--max-cost-usd", () => {
     expect(over).toContain("ask the user");
     expect(await plan({})).not.toContain("approval:");
   });
+  it("exits 2 for a bad flag but 3 for a bad environment value", async () => {
+    const flag = setup({ grants: GRANTS });
+    expect(await main([flag.root, "--dry-run", "--max-cost-usd", "0"], { io: flag.io, pluginsDir: "/p" })).toBe(EXIT_USAGE);
+    const env = setup({ grants: GRANTS, env: { EVAL_MAX_COST_USD: "0" } });
+    expect(await main([env.root, "--dry-run"], { io: env.io, pluginsDir: "/p" })).toBe(EXIT_CONFIG);
+  });
+  it("never passes a child budget above the approved ceiling", async () => {
+    const s = setup({ cases: [{ name: "a" }, { name: "b" }], grants: GRANTS, onCli: okCli(0.1) });
+    await main([s.root, "--max-cost-usd", "1.23456"], { io: s.io, pluginsDir: "/p" });
+    const budgets = cliCalls(s.calls).map((c) => Number(c.args[c.args.indexOf("--max-cost-usd") + 1]));
+    expect(budgets.length).toBeGreaterThan(0);
+    expect(budgets.every((b) => b <= 1.23456)).toBe(true);
+    expect(budgets[0]).toBe(1.2345);
+  });
   it("exits 3 on a bad EVAL_AUTO_APPROVE_MAX_USD", async () => {
     const s = setup({ grants: GRANTS, env: { EVAL_AUTO_APPROVE_MAX_USD: "lots" } });
     expect(await main([s.root, "--dry-run"], { io: s.io, pluginsDir: "/p" })).toBe(EXIT_CONFIG);

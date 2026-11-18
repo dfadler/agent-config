@@ -61,7 +61,9 @@ import {
   DEFAULT_MODEL,
   DEFAULT_TIER,
   TIERS,
+  COST_RANGE_TEXT,
   ceilingFor,
+  floor4,
   parseCost,
   round4,
   QUICK_FLOOR_USD,
@@ -369,12 +371,12 @@ export const parseArgs = (argv: readonly string[]): Parsed => {
   if (costText !== undefined && maxCostUsd === undefined) {
     return {
       kind: "error",
-      message: `--max-cost-usd must be a positive finite number of US dollars, got '${costText}'`,
+      message: `--max-cost-usd must be a positive finite number of US dollars (a plain decimal from ${COST_RANGE_TEXT}), got '${costText}'`,
     };
   }
   const jobsText = values.get("--jobs");
   const jobs = jobsText === undefined ? undefined : Number(jobsText);
-  if (jobsText !== undefined && !/^[1-9]\d*$/.test(jobsText)) {
+  if (jobsText !== undefined && !(/^[1-9]\d*$/.test(jobsText) && Number.isSafeInteger(jobs))) {
     return { kind: "error", message: `--jobs must be a positive integer, got '${jobsText}'` };
   }
   const pr = values.get("--pr");
@@ -1136,7 +1138,7 @@ const run = async (
     async (accP, inv, i) => {
       const acc = await accP;
       if (acc.stopped || acc.outOfBudget || interrupt.signal.aborted) return acc;
-      const remaining = round4(ceilingUsd - acc.spentUsd);
+      const remaining = floor4(ceilingUsd - acc.spentUsd);
       if (remaining <= 0) return { ...acc, outOfBudget: true };
       const outDir = invocationDir(runDir, i + 1, total, inv);
       const r = await runInvocation(

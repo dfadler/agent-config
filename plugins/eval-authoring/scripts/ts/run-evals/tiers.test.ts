@@ -4,8 +4,35 @@ import {
   QUICK_PER_CASE_USD,
   TIERS,
   ceilingFor,
+  floor4,
   isTierName,
+  parseCost,
 } from "./tiers.ts";
+
+describe("parseCost range", () => {
+  it("rejects values whose printed form is not a valid argument", () => {
+    for (const v of ["1000000000000000000000", "0.0000001", "0.00001", "1000000.5"]) {
+      expect(parseCost(v)).toBeUndefined();
+    }
+    expect([parseCost("0.0001"), parseCost("5"), parseCost("1000000")]).toEqual([0.0001, 5, 1000000]);
+  });
+  it("round-trips every accepted value through String()", () => {
+    for (const n of [0.0001, 0.5, 1.2345, 5, 999999.9999, 1000000]) {
+      expect(parseCost(String(n))).toBe(n);
+    }
+  });
+});
+
+describe("floor4", () => {
+  it("never exceeds its input, and keeps exact four-decimal amounts", () => {
+    expect(floor4(1.23456)).toBe(1.2345);
+    expect(floor4(1.2345)).toBe(1.2345);
+    expect(floor4(0.1 + 0.2)).toBe(0.3);
+    expect(floor4(5)).toBe(5);
+    expect(floor4(0.00009)).toBe(0);
+    expect(floor4(-0.5)).toBeLessThanOrEqual(0);
+  });
+});
 
 describe("isTierName", () => {
   it("accepts the tiers and rejects inherited property names", () => {
