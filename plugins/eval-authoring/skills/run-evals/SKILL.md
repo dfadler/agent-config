@@ -31,12 +31,16 @@ One standing go-ahead exists: `EVAL_AUTO_APPROVE_MAX_USD`, set by the user. Run 
 asking only when all three hold:
 
 1. The `--dry-run` plan prints `approval: pre-approved`.
-2. A user file holds the variable and no project file does. The approval line shows the value,
-   not who set it, and a project settings file can set it too. Run
-   `grep -l EVAL_AUTO_APPROVE_MAX_USD ~/.claude/settings.json ~/.zshrc ~/.zprofile ~/.bashrc ~/.bash_profile`
-   (a hit is a user file), then the same grep on the project's `.claude/settings.json` and
-   `.claude/settings.local.json`, at the working directory and the main checkout's root (a hit
-   there fails the check).
+2. A user file sets the cap the approval line prints, and no project file sets it at all. The
+   line shows the value, not who set it, and a project settings file can set it too. Run
+   `grep -nE '"EVAL_AUTO_APPROVE_MAX_USD" *:' ~/.claude/settings.json` and
+   `grep -nE '^ *(export +)?EVAL_AUTO_APPROVE_MAX_USD=' ~/.zshrc ~/.zprofile ~/.bashrc ~/.bash_profile`,
+   which match active assignments only, not commented-out lines. Read each hit: its value must
+   equal the cap in the approval line. Then run the first grep on the project's
+   `.claude/settings.json` and `.claude/settings.local.json`, at the working directory and the
+   main checkout's root; any hit there fails the check. No matching user hit, or a value that
+   differs from the printed cap, fails it too, because the effective cap then came from
+   somewhere else.
 3. The paid command pins the reviewed ceiling: add `--max-cost-usd <the dry-run ceiling>`, so
    a changed `run-config.json` or variable cannot raise it after the check.
 
