@@ -48,9 +48,12 @@ cannot tell which file a value came from. Review any diff that adds
 
 To confirm the variable arrives, run `--dry-run` once and look for the `approval:` line.
 
-To revoke the approval, remove the key from `~/.claude/settings.json` (or the `export` line
-from the shell profile), then start a new `claude` session. Claude Code does not unset a
-removed variable in a running session, so the old value stays in effect there ([Claude Code
-docs: variables in settings
-files](https://code.claude.com/docs/en/env-vars.md#set-variables-in-settings-files)). In the
-new session, run `--dry-run` and confirm no `approval:` line appears.
+To revoke the approval, remove it from every place that sets it: the key in
+`~/.claude/settings.json` and the `export` line in the shell profile. Then start a new
+`claude` session. Claude Code does not unset a removed variable in a running session, so the
+old value stays in effect there ([Claude Code docs: variables in settings
+files](https://code.claude.com/docs/en/env-vars.md#set-variables-in-settings-files)). Deleting
+an `export` line does not change a shell that already ran it, and a new `claude` session
+started from that shell inherits the value. Run `unset EVAL_AUTO_APPROVE_MAX_USD` in that
+shell, or open a fresh terminal, before starting `claude`. In the new session, run `--dry-run`
+and confirm no `approval:` line appears.
