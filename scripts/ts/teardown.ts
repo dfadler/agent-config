@@ -107,6 +107,36 @@ export const stripManagedSection = (text: string): string => {
 };
 
 /**
+ * Undo `setup.sh --browser`: drop the saved choice and the permissions.deny
+ * rules it wrote. Only when the choice file exists, so a deny rule the user
+ * wrote themselves is never touched without setup having been asked for one.
+ */
+export const removeBrowserChoice = (home: string, log: Log): void => {
+  const file = join(home, ".claude", "agent-config.browser");
+  if (!existsSync(file)) return;
+  rmSync(file);
+  log(`Removed ${file}`);
+  const settings = join(home, ".claude", "settings.json");
+  if (!existsSync(settings)) return;
+  try {
+    const data: unknown = JSON.parse(readFileSync(settings, "utf8"));
+    if (!isRecord(data) || !isRecord(data["permissions"])) return;
+    const { deny, ...perms } = data["permissions"];
+    if (!Array.isArray(deny)) return;
+    const ours = ["mcp__Claude_Browser__*", "mcp__claude-in-chrome__*"];
+    const rest: unknown[] = deny.filter((r) => !ours.includes(String(r)));
+    if (rest.length === deny.length) return;
+    const nextPerms = rest.length > 0 ? { ...perms, deny: rest } : perms;
+    const others = Object.fromEntries(Object.entries(data).filter(([k]) => k !== "permissions"));
+    const next = Object.keys(nextPerms).length > 0 ? { ...others, permissions: nextPerms } : others;
+    writeFileSync(settings, `${JSON.stringify(next, null, 4)}\n`);
+    log(`Removed browser deny rules from ${settings}`);
+  } catch {
+    process.stderr.write(`Warning: ${settings} is not valid JSON; deny rules left in place\n`);
+  }
+};
+
+/**
  * Restore CLAUDE.md. Handles the legacy symlink format (remove the repo link)
  * and the current generated file (strip the managed section, keep user
  * additions). Then a non-empty CLAUDE.personal.md moves back to CLAUDE.md; an
@@ -125,6 +155,8 @@ export const restoreClaudeMd = (home: string, repoRoot: string, log: Log): void 
     rmSync(optIn);
     log(`Removed ${optIn}`);
   }
+
+  removeBrowserChoice(home, log);
 
   if (isSymlink(link)) {
     unlinkIfOwned(link, join(repoRoot, "claude", "CLAUDE.md"), log);

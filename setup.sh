@@ -16,6 +16,7 @@ NO_COMPANIONS=0
 DRY_RUN=0
 SKIP_LIST=""
 INCLUDE_LIST=""
+BROWSER_CHOICE=""
 INCLUDE_SET=0
 LIST_FEATURES=0
 
@@ -63,7 +64,11 @@ run is rejected rather than guessing which one wins.
                      with nothing after the "=" is rejected rather than
                      silently installing everything. Cannot be combined
                      with --skip.
-  --list-features    Print the feature names --skip and --include accept
+  --browser=<name>   Browser policy: playwright, builtin or chrome. Denies the
+                   other two browsers' MCP tools in settings.json; remembered
+                   in ~/.claude/agent-config.browser. Unset: Playwright advice
+                   only, no deny rules. playwright turns on prefer-real-chrome.
+--list-features    Print the feature names --skip and --include accept
                      and exit without linking anything.
   --plan, --dry-run  Print what this run would do, one tab-separated action
                      per line (format: scripts/setup-plan-lib.sh), and exit
@@ -87,6 +92,7 @@ while [[ $# -gt 0 ]]; do
       INCLUDE_LIST="${1#--include=}"
       INCLUDE_SET=1
       ;;
+    --browser=*) BROWSER_CHOICE="${1#--browser=}" ;;
     --list-features) LIST_FEATURES=1 ;;
     -h | --help)
       usage
@@ -243,6 +249,18 @@ if [[ "$INCLUDE_SET" == 1 && ${#INCLUDE_FEATURES[@]} -eq 0 ]]; then
   INCLUDE_SET=0
 fi
 
+# --browser: validate; the prefer-real-chrome convention says "use Playwright",
+# so it is on only for playwright and off for the other choices.
+case "$BROWSER_CHOICE" in
+  "") ;;
+  playwright) CONV_INCLUDE+=(prefer-real-chrome) ;;
+  builtin | chrome) CONV_SKIP+=(prefer-real-chrome) ;;
+  *)
+    echo "Unknown --browser value: $BROWSER_CHOICE (playwright, builtin or chrome)" >&2
+    exit 2
+    ;;
+esac
+
 # --include is the positive form of the same selection --skip makes
 # negatively. Rather than teach every downstream consumer (is_skipped,
 # link_dir_contents, prune_skipped_dir_links, the PLUGIN_SRCS loop) a second
@@ -394,6 +412,14 @@ apply_plan() {
         ;;
       strip-personal-conventions) apply_strip_personal "$a" "$b" ;;
       include) INCLUDE_REFS+=("$a") ;;
+      save-browser)
+        printf '%s\n' "$b" >"$a"
+        echo "Saved browser choice to $a: $b"
+        ;;
+      deny-rule) ensure_deny_rule "$a" "$b" "$c" ;;
+      warn-browser-preview)
+        echo "Note: denying mcp__Claude_Browser__* disables the desktop app's dev-server preview." >&2
+        ;;
       save-conventions)
         # $b is the comma-joined opt-in list; empty removes the file.
         if [[ -z "${b:-}" ]]; then

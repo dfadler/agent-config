@@ -40,6 +40,9 @@
 #   default-setting   <file> <key> <json>    set a dotted key only if absent
 #   git-hooks-path    <repo> <path>          git config core.hooksPath <path> in <repo>
 #                                            (only when unset; skipped with pii-cleanup)
+#   save-browser      <file> <choice>        remember the --browser choice
+#   deny-rule         <file> <rule> <add|remove>   edit permissions.deny
+#   warn-browser-preview                     informational: choice denies the Browser pane
 #   skip-plugin       <name> <reason>        informational: plugin left out
 #   skip-command      <dest> <reason> <name> informational: command left out
 #   warn-foreign-symlink <dest> <target>     informational: not ours, left alone
@@ -460,6 +463,34 @@ plan_git_hooks_path() {
   printf 'git-hooks-path\t%s\tscripts/hooks\n' "$REPO_ROOT"
 }
 
+# Browser choice (playwright | builtin | chrome): this run's --browser
+# (BROWSER_CHOICE) or the one saved by an earlier run. With none, nothing is
+# planned (Playwright advice only, no deny rules). With one, the browsers not
+# chosen get a permissions.deny rule and the chosen one's rule is removed.
+BROWSER_FILE="$HOME/.claude/agent-config.browser"
+BROWSER_BUILTIN_RULE='mcp__Claude_Browser__*'
+BROWSER_CHROME_RULE='mcp__claude-in-chrome__*'
+plan_browser() {
+  local choice="${BROWSER_CHOICE:-}" saved="" settings="$HOME/.claude/settings.json"
+  [[ -f "$BROWSER_FILE" ]] && saved="$(head -n1 "$BROWSER_FILE")"
+  [[ -n "$choice" ]] || choice="$saved"
+  case "$choice" in playwright | builtin | chrome) ;; *) return 0 ;; esac
+  [[ "$choice" == "$saved" ]] || printf 'save-browser\t%s\t%s\n' "$BROWSER_FILE" "$choice"
+  local rule mode
+  for rule in "$BROWSER_BUILTIN_RULE" "$BROWSER_CHROME_RULE"; do
+    mode=add
+    [[ "$choice" == builtin && "$rule" == "$BROWSER_BUILTIN_RULE" ]] && mode=remove
+    [[ "$choice" == chrome && "$rule" == "$BROWSER_CHROME_RULE" ]] && mode=remove
+    if [[ "$mode" == add ]]; then
+      deny_rule_is_set "$settings" "$rule" || printf 'deny-rule\t%s\t%s\tadd\n' "$settings" "$rule"
+    else
+      ! deny_rule_is_set "$settings" "$rule" || printf 'deny-rule\t%s\t%s\tremove\n' "$settings" "$rule"
+    fi
+  done
+  # Only when this run picks a choice that denies the Browser pane.
+  if [[ -n "${BROWSER_CHOICE:-}" && "$choice" != builtin ]]; then printf 'warn-browser-preview\n'; fi
+}
+
 # The whole install plan, in the order it must be applied.
 plan_install() {
   plan_skipped_plugins
@@ -476,4 +507,5 @@ plan_install() {
   plan_hooks
   plan_git_hooks_path
   plan_settings
+  plan_browser
 }

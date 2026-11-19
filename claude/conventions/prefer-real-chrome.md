@@ -21,7 +21,10 @@ logins or extensions, so for a logged-in site either ask the user to supply a
 Do not use the desktop app's built-in Browser pane (`mcp__Claude_Browser__*`)
 for these tasks either.
 
-This is advice, not a gate. To enforce it, add `"mcp__Claude_Browser__*"` and
+This is advice, not a gate. `./setup.sh --browser=playwright|builtin|chrome` picks
+the browser once, remembers it in `~/.claude/agent-config.browser`, and writes the
+deny rules for the other two (with `builtin` this convention is turned off). Without
+`--browser`, nothing is denied. To enforce it by hand instead, add `"mcp__Claude_Browser__*"` and
 `"mcp__claude-in-chrome__*"` to `permissions.deny` in `~/.claude/settings.json`
 (a bare-name or glob deny removes the tools from context;
 [permissions docs](https://code.claude.com/docs/en/permissions)). **Warning:**
