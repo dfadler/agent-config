@@ -43,6 +43,16 @@ new to adopt there.
 - Running any of them is a fetch-and-execute (`npx`), which needs your explicit
   per-run go-ahead (`claude/conventions/fetch-execute-installs.md`).
 
+## Trial results
+
+- **agentlinter 0.3.3** (`npx agentlinter --local`, run once, 2026-11-19): 12 rules
+  fired, 0 real gaps, 3 false positives, 9 noise. It flagged existing files as
+  missing and "no prompt injection defense" after scanning only 2 files. Network use
+  was not monitored. Not worth adopting.
+- **cclint 0.25.0** and **claudelint (`claude-code-lint`) 0.10.0**: not run. The
+  approved commands were denied three times each by the session's auto-mode
+  classifier, so there are no results.
+
 ## Recommendation (owner's call)
 
 Do not adopt a linter yet. If you want to close the gaps above, the smallest trial is
