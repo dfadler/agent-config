@@ -20,8 +20,10 @@ the skills named below in full or in their first 35-60 lines. I did not read eve
 - **One idea worth a follow-up:** `technical-writing`, a docs and PR-text standard that
   defers slop patterns to `unslop`. This repo has no writing standard for docs prose
   or PR text.
-- **Install vs port: port.** pstack targets Cursor (`~/.cursor/rules`, `Task` subagents,
-  cloud environments), and almost all of its skills set `disable-model-invocation: true`.
+- **Install vs port: port the few pieces we want.** pstack installs in Claude Code
+  (`/plugin marketplace add cursor/plugins`) and ships an adapter that maps Cursor names
+  to Claude Code ones, so installing is possible. Installing adds about 60 skills for
+  the handful that fill a gap here (see Install or port).
 
 ## unslop: upstream vs ours
 
@@ -80,10 +82,24 @@ matters, but that is a guess.
 
 ## Install or port?
 
-Port. The skills depend on Cursor features (`Task` with `subagent_type`,
-`environment: "cloud"`, `.cursor/rules`), so installing the plugin into Claude Code would
-load skills that cannot run as written. Porting a single skill keeps one owner per rule
-(`agent-writing` AW01) and lets us attach evals, as `plugins/unslop` did.
+Port the few pieces we want. An earlier version of this section said pstack could not
+run in Claude Code. That was wrong. pstack's
+[`poteto-help`](https://github.com/cursor/plugins/blob/main/pstack/skills/poteto-help/SKILL.md)
+says it installs with `/plugin marketplace add cursor/plugins` then
+`/plugin install pstack@cursor-plugins`, with a `pstack:` command prefix, and its
+[Claude Code adapter](https://github.com/cursor/plugins/blob/main/pstack/docs/harness/claude-code.md)
+maps `Task` to `Agent`, `environment: "cloud"` to `isolation: "worktree"`, and
+`.cursor/rules` to `~/.claude/rules`. I read both; I did not install or run pstack.
+
+Remaining reasons to port instead of install:
+
+- Most workflow skills spawn subagents with per-role models, and the adapter tells the
+  agent to read the mapping file each session. That is extra context and a moving
+  dependency on a third party's mapping.
+- `setup-pstack` writes `~/.claude/rules/pstack-models.md`, a global rule this repo does
+  not manage.
+- Porting keeps one owner per rule (`agent-writing` AW01) and lets us attach evals, as
+  `plugins/unslop` did.
 
 ## Follow-ups worth filing
 
