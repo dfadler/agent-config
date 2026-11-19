@@ -55,12 +55,19 @@ new to adopt there.
   the suspected gaps are untested; it may not recognise this repo's layout. `--strict`
   was not run. It wrote an untracked `.claudelint-cache/` into the repo. Adds nothing
   on this run.
-- **cclint 0.25.0**: not run yet. The auto-mode classifier errored on the approved
-  command three times; a retry in manual mode is waiting on an approval.
+- **cclint 0.25.0** (`lint . --format json`, exit 0, 9s): 69 files, 0 errors, 34
+  warnings, 18 infos across 8 rules. 0 real gaps, 0 duplicates of existing checks,
+  28 false positives (sibling worktrees' `CLAUDE.md` read as duplicates; demands for
+  sections the repo's lean `CLAUDE.md` deliberately omits; "personal information"
+  hints), 18 info-level noise. It reads `CLAUDE.md`, `.claude/` and one `plugin.json`
+  per plugin, not skill bodies, hooks, scripts or workflows. Adopting it would need
+  `monorepo-hierarchy`, `file-location` and `structure` turned off. Not worth it.
+
+None of the three found a gap the existing checks miss.
 
 ## Recommendation (owner's call)
 
-Do not adopt a linter yet. If you want to close the gaps above, the smallest trial is
-a one-off local run of claudelint (`claudelint check-all`) against this repo, to see
-whether it finds anything the existing checks miss. Adopt into CI only if it does, and
-pin the version. Otherwise extend `check-plugin-structure` for the specific gap.
+Do not adopt any of the three. The trials above found no gap the existing checks
+miss, and none of the tools reads this repo's skill bodies, hooks or scripts. If one
+of the suspected gaps (`settings.json` schema, `.mcp.json`, `@import` resolution)
+starts to matter, extend `check-plugin-structure` for that case instead.
