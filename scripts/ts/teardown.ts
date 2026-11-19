@@ -127,7 +127,7 @@ export const removeBrowserChoice = (home: string, log: Log): void => {
     const rest: unknown[] = deny.filter((r) => !ours.includes(String(r)));
     if (rest.length === deny.length) return;
     const nextPerms = rest.length > 0 ? { ...perms, deny: rest } : perms;
-    const { permissions: _drop, ...others } = data;
+    const others = Object.fromEntries(Object.entries(data).filter(([k]) => k !== "permissions"));
     const next = Object.keys(nextPerms).length > 0 ? { ...others, permissions: nextPerms } : others;
     writeFileSync(settings, `${JSON.stringify(next, null, 4)}\n`);
     log(`Removed browser deny rules from ${settings}`);
