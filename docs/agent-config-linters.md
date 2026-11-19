@@ -22,7 +22,7 @@ what this repo already runs. Facts come from each project's own README as read o
 | Tool | Scope | Run | Notes |
 |---|---|---|---|
 | [cclint](https://github.com/felixgeelhaar/cclint) (MIT, 12 stars) | `CLAUDE.md`, `AGENTS.md`, skills, agents, output styles, rules, settings, `.mcp.json`, plugin manifests; 24 rules | `npx @felixgeelhaar/cclint lint .` | Broadest file coverage. Overlaps `check-plugin-structure` and `lint-claude-md`. |
-| [agentlinter](https://github.com/seojoonkim/agentlinter) (MIT, 83 stars) | `CLAUDE.md`, `AGENTS.md`, `SOUL.md`, skills, rules, other agent frameworks; 38+ rules, scored | `npx agentlinter` | README is inconsistent about telemetry ("no telemetry by default" next to an opt-out flag); `--local` is said to make no network calls. Scores are opinionated. |
+| [agentlinter](https://github.com/seojoonkim/agentlinter) (MIT, 83 stars) | `CLAUDE.md`, `AGENTS.md`, `SOUL.md`, skills, rules, other agent frameworks; 38+ rules, scored | `npx agentlinter` (no documented path argument; run from the target directory) | README is inconsistent about telemetry ("no telemetry by default" next to an opt-out flag); `--local` is mentioned once, not listed as a command option, so verify it before relying on it. README says v2.3.0 but the npm `latest` is 0.3.3 (modified 2026-02-08), so the README may describe a different build than the one `npx` fetches. Scores are opinionated. |
 | [claudelint](https://github.com/pdugan20/claudelint) (MIT, 16 stars) | `CLAUDE.md`, skills, settings, hooks, MCP, plugins | `npm install -g claude-code-lint` | Closest match to this repo's plugin layout (manifest schema, hook scripts exist, skill references). Also ships a Claude plugin. |
 
 The dev.to article in the issue describes running a linter from a `Stop` or
