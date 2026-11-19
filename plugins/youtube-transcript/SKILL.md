@@ -1,5 +1,6 @@
 ---
 name: youtube-transcript
+argument-hint: "<youtube-url>"
 description: |
   ALWAYS invoke before fetching a transcript, captions or description for a
   YouTube video, even when only asked how you would get them. Given a YouTube

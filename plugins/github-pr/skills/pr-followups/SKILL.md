@@ -1,5 +1,6 @@
 ---
 name: pr-followups
+argument-hint: "<pr-number-or-url>"
 description: |
   Account for the follow-ups a PR deferred and file them as tracked issues.
   Use when asked to "check this PR for follow-ups", "file the follow-ups for

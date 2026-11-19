@@ -1,5 +1,6 @@
 ---
 name: pr-checks
+argument-hint: "<pr-number-or-url>"
 description: |
   Load this whenever the user asks about the CI checks of one specific PR — even
   when they paste the check output or logs themselves — before answering. It

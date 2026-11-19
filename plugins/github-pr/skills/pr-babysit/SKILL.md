@@ -1,5 +1,6 @@
 ---
 name: pr-babysit
+argument-hint: "[pr-number-or-url] [--auto-merge]"
 description: |
   ALWAYS invoke this skill first when the user hands over a babysit snapshot or
   asks for a pass over their open PRs, even with --auto-merge and even when the

@@ -1,5 +1,6 @@
 ---
 name: url-to-audio
+argument-hint: "<url>"
 description: |
   ALWAYS invoke before answering any request to narrate or convert a URL or
   article to audio, even when only asked what you would do or which backend you

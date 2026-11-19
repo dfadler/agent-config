@@ -1,5 +1,6 @@
 ---
 name: pr-comments
+argument-hint: "<pr-number-or-url>"
 description: |
   Load this before drafting or posting any reply to a PR review thread or
   comment — even when the thread text is pasted into the conversation. It

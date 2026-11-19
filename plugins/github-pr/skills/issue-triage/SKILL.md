@@ -1,5 +1,6 @@
 ---
 name: issue-triage
+argument-hint: "[issue-number-or-url] [repo]"
 description: |
   Triage GitHub issues, read-only: classify (bug / enhancement / question), check for
   duplicates, verify the claim against the code, suggest a priority, and list what to ask
