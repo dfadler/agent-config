@@ -362,3 +362,15 @@ PATH, its version, and whether the skill is installed globally. `setup.sh
 it is either global or per project. The generated skill files are refreshed by
 re-running the install after each `@playwright/cli` update. The `playwright` npm package
 the plugin's scripts import is a per-project dependency and is not checked here.
+
+## blader/humanizer (retired, replaced by unslop)
+
+This repo does not recommend `humanizer`. The `unslop` plugin carries its patterns (U34 to U39,
+the no-invention self-check and the leave-alone rule); `/unslop:unslop` is manual-only. Voice
+calibration, personality coaching and hyphenated-word-pair rules were not ported.
+
+`./doctor.sh` reports a leftover copy (`~/.claude/skills/humanizer`, a symlink into
+`~/.agents/skills/humanizer`, and a `humanizer` entry in `~/.agents/.skill-lock.json`) and never
+deletes it, because it is a global install other projects may use. To retire it on a machine,
+run the skills CLI's own command (`npx skills remove --help` first), or remove the pieces by
+hand with the commands doctor prints.

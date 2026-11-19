@@ -1,0 +1,51 @@
+# Run: claude plugin eval plugins/unslop --case unslop-fragmented-header --runs 3 --trust-plugin --no-publish
+# Drafted in the session that edited SKILL.md, not by blind-case-writer: it shares that session's reading of U34 to U39.
+# Target: U37.
+# good-reply: ## Retry policy
+#   
+#   The client retries a failed request three times and waits 2 seconds between tries.
+# bad-reply: ## Retry policy
+#   
+#   This section covers the retry policy.
+#   
+#   The client retries a failed request three times and waits 2 seconds between tries.
+# EVAL024 is intended where a grader is not_contains: an echo of the prompt FAILS it. "Keeps" graders pass on a no-plugin run by design.
+schema_version: "1.1"
+name: unslop-fragmented-header
+description: >
+  /unslop on a heading followed by a line that restates it should drop the restating line and keep the heading
+  and the content. expected_outcome: PASS when the restating line is gone; FAIL when it remains or the content is lost.
+tags: [unslop]
+
+execution:
+  prompt: |
+    /unslop:unslop ## Retry policy
+
+    This section covers the retry policy.
+
+    The client retries a failed request three times and waits 2 seconds between tries.
+  max_turns: 6
+  allowed_tools:
+    - Skill
+
+graders:
+  - name: restating_line_gone
+    type: regex
+    pattern: 'This section covers'
+    flags: i
+    match: not_contains
+    weight: 2
+
+  - name: heading_kept
+    type: regex
+    pattern: '^## Retry policy$'
+    flags: m
+    match: contains
+    weight: 1
+
+  - name: content_kept
+    type: regex
+    pattern: 'three times[\s\S]*\b2 seconds\b'
+    flags: i
+    match: contains
+    weight: 1

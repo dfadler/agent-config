@@ -1216,3 +1216,23 @@ make_opt_in_fixture() {
   assert_success
   refute_output_contains "opt-in convention(s) available"
 }
+
+@test "humanizer absent: reports a pass" {
+  run_companions
+  assert_success
+  assert_output_contains "the retired humanizer skill is not installed"
+}
+
+@test "humanizer installed: reports it with the removal commands and deletes nothing, even with --fix" {
+  mkdir -p "$HOME/.agents/skills/humanizer" "$HOME/.claude/skills"
+  ln -s ../../.agents/skills/humanizer "$HOME/.claude/skills/humanizer"
+  run_companions
+  assert_success
+  assert_output_contains "the retired humanizer skill is still installed"
+  assert_output_contains "npx skills remove --help"
+  assert_output_contains ".skill-lock.json"
+  # --fix may exit early on unrelated checks; only its effect on humanizer matters here.
+  run_companions --fix
+  [ -L "$HOME/.claude/skills/humanizer" ]
+  [ -d "$HOME/.agents/skills/humanizer" ]
+}

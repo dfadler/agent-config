@@ -1,0 +1,38 @@
+# Run: claude plugin eval plugins/unslop --case unslop-clean-prose-untouched --runs 3 --trust-plugin --no-publish
+# Drafted in the session that edited SKILL.md, not by blind-case-writer: it shares that session's reading of U34 to U39.
+# Target: Contract "Leave alone" (no match means unchanged). Over-editing guard.
+# good-reply: The scheduler runs each job in its own process and retries a job that exits non-zero once. After that it marks the job failed.
+# bad-reply: The scheduler runs every job in a separate process and retries a failing job one time. Afterwards the job is marked as failed. Anything else?
+# EVAL024 is intended where a grader is not_contains: an echo of the prompt FAILS it. "Keeps" graders pass on a no-plugin run by design.
+schema_version: "1.1"
+name: unslop-clean-prose-untouched
+description: >
+  /unslop on prose with no matching pattern should return it unchanged and add no commentary.
+  expected_outcome: PASS when both sentences survive and no question is added; FAIL when the text is reworded or a question appears.
+tags: [unslop]
+
+execution:
+  prompt: |
+    /unslop:unslop The scheduler runs each job in its own process and retries a job that exits non-zero once. After that it marks the job failed.
+  max_turns: 6
+  allowed_tools:
+    - Skill
+
+graders:
+  - name: first_sentence_kept
+    type: regex
+    pattern: 'The scheduler runs each job in its own process and retries a job that exits non-zero once\.'
+    match: contains
+    weight: 2
+
+  - name: second_sentence_kept
+    type: regex
+    pattern: 'After that it marks the job failed\.'
+    match: contains
+    weight: 2
+
+  - name: no_commentary
+    type: regex
+    pattern: '\?'
+    match: not_contains
+    weight: 1

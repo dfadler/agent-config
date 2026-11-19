@@ -66,6 +66,8 @@ count and disk use under .claude/worktrees plus whether worktree.autoPrune
 It also reports (never edits) whether the node on PATH meets package.json
 engines.node, and whether mcp__terminal__run_in_terminal is in
 permissions.allow in ~/.claude/settings.json (needed to launch eval runs).
+It reports (never deletes) a leftover humanizer skill from the skills CLI, with
+the commands to remove it.
 USAGE
 }
 
@@ -1731,6 +1733,28 @@ check_eval_run_permission() {
   } >&2
 }
 
+# The third-party `humanizer` skill (skills CLI, blader/humanizer) is retired
+# in favor of the unslop plugin. Report-only: this script never deletes it,
+# because it is a global install other projects on the machine may use and the
+# skills CLI keeps a lock-file entry for it.
+check_humanizer_retired() {
+  local link="$HOME/.claude/skills/humanizer" dir="$HOME/.agents/skills/humanizer"
+  if [[ ! -e "$link" && ! -L "$link" && ! -e "$dir" ]]; then
+    echo "✓ the retired humanizer skill is not installed"
+    return 0
+  fi
+  {
+    echo
+    echo "ℹ the retired humanizer skill is still installed ($link, $dir)."
+    echo "  The unslop plugin replaces it (manual /unslop:unslop). Doctor never deletes it."
+    echo "  Remove it when you are ready, with the skills CLI that installed it"
+    echo "  (run 'npx skills remove --help' first), or by hand:"
+    echo "    rm \"$link\" && rm -r \"$dir\""
+    echo "    jq 'del(.skills.humanizer)' ~/.agents/.skill-lock.json > ~/.agents/.skill-lock.json.new && mv ~/.agents/.skill-lock.json.new ~/.agents/.skill-lock.json"
+    echo
+  } >&2
+}
+
 # SKILL.md files reference runtime scripts as ${CLAUDE_PLUGIN_ROOT}/<path>; a
 # path that isn't in the plugin's tree fails only when the skill runs.
 check_plugin_script_paths() {
@@ -1799,6 +1823,7 @@ check_rtk
 check_playwright_cli
 check_node_floor
 check_eval_run_permission
+check_humanizer_retired
 check_require_worktree_hook
 check_plugin_script_paths
 

@@ -1,0 +1,40 @@
+# Run: claude plugin eval plugins/unslop --case unslop-required-marker --runs 3 --trust-plugin --no-publish
+# Drafted in the session that edited SKILL.md, not by blind-case-writer: it shares that session's reading of U34 to U39.
+# Target: Contract carve-out for required AI-authorship markers (U18 would strip the emoji). Assumption: the marker is a closing line.
+# good-reply: This change speeds up our build.
+#   
+#   🤖 Generated with [Claude Code](https://claude.com/claude-code)
+# bad-reply: This change speeds up our build.
+#   
+#   Generated with Claude Code
+# EVAL024 is intended where a grader is not_contains: an echo of the prompt FAILS it. "Keeps" graders pass on a no-plugin run by design.
+schema_version: "1.1"
+name: unslop-required-marker
+description: >
+  /unslop on a PR body that ends with the required attribution line should clean the prose and keep that line
+  byte for byte. expected_outcome: PASS when the line survives and the stock words are gone; FAIL when the line changes.
+tags: [unslop]
+
+execution:
+  prompt: |
+    /unslop:unslop Additionally, this change is pivotal for our build.
+
+    🤖 Generated with [Claude Code](https://claude.com/claude-code)
+  max_turns: 6
+  allowed_tools:
+    - Skill
+
+graders:
+  - name: marker_kept
+    type: regex
+    pattern: '^🤖 Generated with \[Claude Code\]\(https://claude\.com/claude-code\)$'
+    flags: m
+    match: contains
+    weight: 2
+
+  - name: prose_cleaned
+    type: regex
+    pattern: '\b(?:additionally|pivotal)\b'
+    flags: i
+    match: not_contains
+    weight: 1
