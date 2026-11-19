@@ -74,14 +74,11 @@ recorded as-is: Include (default).
 
 ## Eval coverage
 
-Plugin evals cannot test an `@include` convention. A run loads only the plugin under
-test; `CLAUDE.md` and personal settings are absent, and project config a
-`scaffold_script` writes (`CLAUDE.md`, `.claude/`) is not loaded
-(`plugins/eval-authoring/skills/author-cases/references/agents.md` and
-`fixtures-and-mocks.md`). Pasting the rule into the case prompt would test the model
-reading a prompt, not the include, so the always-loaded includes have no evals
-(#647). A rule that needs one should become a skill with a trigger, per the sort above.
-
-The case field `append_system_prompt` can carry a rule's text into a run, which #654
-missed. Design and per-file classification: [docs/convention-evals.md](../../docs/convention-evals.md)
-(#1061).
+Plugin evals cannot test the `@include` path itself: a run loads only the plugin under
+test, and no `CLAUDE.md` loads, even one a `scaffold_script` writes
+([plugin-evals docs](https://code.claude.com/docs/en/plugin-evals), "How runs are
+isolated"). They can test whether the model follows a rule's text: the case field
+`append_system_prompt` carries it into the run, and a twin case without it is the
+comparison. No such cases exist yet. The design, the per-file classification and the
+open questions are in the
+[#1061 findings](https://github.com/dfadler/agent-config/issues/1061).
