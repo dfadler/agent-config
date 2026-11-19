@@ -25,14 +25,21 @@ decisions so the work can be split into small PRs.
        "hook/pii-cleanup/commit-gate": false,
        "skill/eval-authoring/mine-cases": false,
        "convention/background-tasks": true,
-       "hook/scratch-guard": "block"
+       "hook/scratch-guard/scratch-guard-hook": "block"
    } }
    ```
 
    IDs: `plugin/<n>`, `command/<n>`, `convention/<n>`, `skill/<plugin>/<n>`,
-   `agent/<plugin>/<n>`, `hook/<plugin>/<n>`. A parent set to `false` wins over
-   its children. Allowlist mode stays the existing `--include`, which writes
-   `false` for every other feature rather than adding a second config syntax.
+   `agent/<plugin>/<n>`, `hook/<plugin>/<n>`. A hook's `<n>` is its entrypoint
+   script's basename without `.ts` (`plugins/scratch-guard/scripts/ts/scratch-guard-hook.ts`
+   gives `scratch-guard-hook`), so the ID is derivable from disk and a lint can
+   check it. A parent set to `false` wins over its children.
+
+   Allowlist mode stays the existing `--include`, with its current per-kind
+   meaning: a convention-only `--include` is additive and writes only
+   `convention/*` entries; a plugin or command `--include` writes `false` for
+   every other plugin and command, but never for the children of an included
+   plugin, so `--include=worktree-core` keeps that plugin's hooks.
 3. **Realization of a disabled child: gate at runtime, not at link time.**
    Filtering at link time would mean linking a plugin as a partial copy, which
    breaks "edits are live" and the unit-symlink design. Instead:
@@ -53,13 +60,23 @@ decisions so the work can be split into small PRs.
      issue's first acceptance line is narrowed to hooks, conventions, commands
      and plugins.
 4. **One reader.** A single script (`scripts/features.ts`) resolves
-   flags + legacy conventions file + JSON into one effective state. `setup.sh`,
-   `upgrade.sh`, `doctor.sh`, `teardown.sh`, `--list-features` and `--plan` call
-   it, which is what `scripts/tests/lifecycle-drift.bats` should then enforce.
-5. **Migration:** `agent-config.conventions` is read as `convention/*` entries
-   when the JSON has none, and rewritten into the JSON on the next `setup.sh`
-   run. `--skip`/`--include` keep their current meaning and write into the JSON.
-   Env-var knobs (`SCRATCH_GUARD`) stay as an override above the file.
+   flags + legacy conventions file + JSON into one effective state. `upgrade.sh`,
+   `teardown.sh` and the hooks call it; `teardown.sh` already needs Node 22.18.
+   `setup.sh` and `doctor.sh` are bootstrap bash that run before Node exists
+   (`docs/plugin-loading.md`), so they stay Node-free by default: with no
+   `agent-config.json` they behave exactly as today, with no Node call. Node
+   becomes a prerequisite only when the JSON file exists, and then `setup.sh`
+   (including `--plan` and `--list-features`) and `doctor.sh` call the reader and
+   fail with a clear "Node 22.18 or newer is required" message if it is missing.
+   `scripts/tests/lifecycle-drift.bats` should then enforce that all four
+   scripts agree.
+5. **Migration:** the legacy `agent-config.conventions` file is a per-ID source
+   beneath the JSON: for each convention, an explicit JSON entry wins, otherwise
+   the legacy file's entry applies, so a JSON entry for convention B never hides
+   the legacy entry for convention A. The next `setup.sh` run (with Node) writes
+   the merged result into the JSON and deletes the legacy file; until then both
+   are read. `--skip`/`--include` keep their current meaning and write into the
+   JSON. Env-var knobs (`SCRATCH_GUARD`) stay as an override above the file.
 
 ## Build order (each its own PR)
 
