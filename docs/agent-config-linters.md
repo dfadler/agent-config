@@ -49,9 +49,14 @@ new to adopt there.
   fired, 0 real gaps, 3 false positives, 9 noise. It flagged existing files as
   missing and "no prompt injection defense" after scanning only 2 files. Network use
   was not monitored. Not worth adopting.
-- **cclint 0.25.0** and **claudelint (`claude-code-lint`) 0.10.0**: not run. The
-  approved commands were denied three times each by the session's auto-mode
-  classifier, so there are no results.
+- **claudelint (`claude-code-lint`) 0.10.0** (`claudelint check-all`, plain mode):
+  "Checked 10 files across 3 categories (claude-md, settings, mcp). No problems
+  found." It did not look at anything under `plugins/` (manifests, hooks, skills), so
+  the suspected gaps are untested; it may not recognise this repo's layout. `--strict`
+  was not run. It wrote an untracked `.claudelint-cache/` into the repo. Adds nothing
+  on this run.
+- **cclint 0.25.0**: not run yet. The auto-mode classifier errored on the approved
+  command three times; a retry in manual mode is waiting on an approval.
 
 ## Recommendation (owner's call)
 
