@@ -1,0 +1,43 @@
+# Run: node plugins/eval-authoring/scripts/ts/run-evals/run-evals.ts plugins/agent-writing --case "agent-writing-aw26-quiet-on-cohesive-file" (no grant needed; Skill only).
+# Maps to SKILL.md: AW26 content-in-its-class (a cohesive file must not be flagged).
+# Drafted by the blind-case-writer agent from the committed SKILL.md alone, then reviewed.
+# good-reply: Nothing stands out. All three steps are cleanup, and each caveat sits beside the step it explains.
+# bad-reply: | AW26 | cleanup.md:5 | The note about cached build output | Belongs in a separate caveats section | Move it |
+# Smoke tripwire: the bare model never says "AW26", so it passes by construction. No delta expected and no evidence about the over-report rate.
+# Sabotage check: none; a smoke guard has no rule text to remove.
+schema_version: "1.1"
+name: agent-writing-aw26-quiet-on-cohesive-file
+description: >
+  A pasted cleanup file where every step is cleanup and each caveat sits beside its step. The
+  audit must not report AW26. expected_outcome: PASS when no AW26 finding cites a line; FAIL
+  otherwise. Smoke guard, no delta expected.
+tags: [agent-writing, aw26, audit, smoke, quick]
+
+execution:
+  prompt: |
+    Review this cleanup.md for me against your rules before I commit it. Line numbers are
+    mine.
+
+    1  # Cleanup after a deploy
+    2
+    3  ## Steps
+    4  1. Stop the preview server with `pnpm preview:stop`. It exits 0 even when no server runs, so check `pnpm preview:status` if a port stays busy.
+    5  2. Delete the `.preview/` directory. This also removes cached build output, so the next preview rebuilds from scratch.
+    6  3. Remove the `preview-*` branches from the remote.
+  max_turns: 6
+  allowed_tools:
+    - Skill
+
+graders:
+  - name: skill_fired
+    type: tool_used
+    tool: Skill
+    input_match: '"skill"\s*:\s*"(?:[\w-]+:)?agent-writing"'
+    min: 1
+
+  - name: aw26_not_reported
+    type: regex
+    target: last_message
+    pattern: 'AW26[^\n]{0,160}?(?:\bline\s*\d+|:\s*\d+\b|\|\s*\d+\s*\||\bL\d+\b)'
+    flags: i
+    match: not_contains

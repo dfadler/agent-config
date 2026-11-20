@@ -1,0 +1,46 @@
+# Run: node plugins/eval-authoring/scripts/ts/run-evals/run-evals.ts plugins/agent-writing --case "agent-writing-aw25-flags-default-instruction" (no grant needed; Skill only).
+# Maps to SKILL.md: AW25 prune-no-ops ("an instruction it already follows by default").
+# Drafted by the blind-case-writer agent from the committed SKILL.md alone, then reviewed.
+# good-reply: | AW25 | CLAUDE.md:7 | "Write clean, readable code and follow best practices." | The agent does this by default; deleting it changes nothing | Delete the sentence |
+# bad-reply: Looks good overall. Line 4 could be clearer and the file could use more headings.
+# Red/green: not run. Needs a run on the skill text before and after the AW25 commit; the no-plugin arm alone does not show the rule did anything.
+# Sabotage check: delete the AW25 rule from SKILL.md and re-run; aw25_reported_with_line should fail.
+schema_version: "1.1"
+name: agent-writing-aw25-flags-default-instruction
+description: >
+  A pasted CLAUDE.md with one generic instruction and two lines that carry real information.
+  The audit must report the generic line under AW25 with its line number. expected_outcome:
+  PASS when the reply has an AW25 finding that cites line 7; FAIL when AW25 is missing or
+  cites another line. The bare model never emits rule ids, so the delta comes from the skill.
+tags: [agent-writing, aw25, audit, quick]
+
+execution:
+  prompt: |
+    Can you go through this CLAUDE.md for my repo and tell me what's wrong with it? I've
+    numbered the lines.
+
+    1  # Project notes
+    2
+    3  ## Commands
+    4  - The e2e suite needs `docker compose up -d` running first, or it hangs without an error.
+    5
+    6  ## Style
+    7  - Write clean, readable code and follow best practices.
+    8  - Store payment amounts as integer cents; the ledger export rejects decimals.
+  max_turns: 6
+  allowed_tools:
+    - Skill
+
+graders:
+  - name: skill_fired
+    type: tool_used
+    tool: Skill
+    input_match: '"skill"\s*:\s*"(?:[\w-]+:)?agent-writing"'
+    min: 1
+
+  - name: aw25_reported_with_line
+    type: regex
+    target: last_message
+    pattern: 'AW25[^\n]{0,160}?(?:\bline\s*7\b|:\s*7\b|\|\s*7\s*\||\bL7\b)'
+    flags: i
+    match: contains
