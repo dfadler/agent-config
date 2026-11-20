@@ -65,7 +65,35 @@ new to adopt there.
 
 None of the three found a gap the existing checks miss.
 
+## Alternatives found (2026-11-20, desk research, none run)
+
+Read from each project's README or registry page, so star counts and activity are
+approximate. All are MIT and single-maintainer or small-org unless noted.
+
+| Tool | Covers | Why it might matter |
+|---|---|---|
+| [`claude plugin validate`](https://code.claude.com/docs/en/plugins-reference#validate-the-manifest) (built in, Claude Code 2.1.328 here) | `plugin.json`, marketplace manifest, skills, agents, commands, hooks and MCP entries, path existence and containment; `--strict`, `--json` | First party and local, no new dependency. **Ran it with `--strict` on all 41 plugins: all pass.** `docs/contributing.md` lists it as a manual step, but no script or workflow runs it. |
+| [SchemaStore `claude-code-settings.json`](https://github.com/anthropics/claude-code/issues/11795) | `settings.json` shape, editor-time | Closes the settings gap from the Findings above for editors. Does not warn on every unknown key. |
+| [agentskills `skills-ref`](https://agentskills.io/specification) | `SKILL.md` against the open Agent Skills spec | Reference implementation; its README calls it demonstration-only. |
+| [agentfile-lint](https://pypi.org/project/agentfile-lint/) (0.11.0, 2026-11-14) | `AGENTS.md`, `CLAUDE.md`, `.claude/rules/`, `SKILL.md`, hooks settings, `.mcp.json` | TOML config with per-rule levels and expiring allowlists; stdlib-only Python. Closest to a rule-by-rule tool this repo could tune. |
+| [ctxlint](https://github.com/YawLabs/ctxlint) | Checks `CLAUDE.md` paths and commands against the codebase, cross-file contradictions, dead hooks | The only one found that verifies instructions against the repo. Untested here. |
+| [skilldoctor](https://github.com/studiomeyer-io/skilldoctor) | `SKILL.md`, agents, `AGENTS.md`: 17 lint and 8 security rules | The security rules (prompt injection, hidden Unicode) are the part this repo lacks. 1 star. |
+| [skill-lint](https://github.com/himself65/skill-lint), [agent-skills-lint](https://github.com/swarmclawai/agent-skills-lint) | `SKILL.md` frontmatter and structure | Overlap `check-plugin-structure` and `claude plugin validate`. |
+| [claude-code-json-schema](https://github.com/hesreallyhim/claude-code-json-schema), [marketplace-validator](https://github.com/KeisukeYamashita/claude-code-marketplace-validator) | `plugin.json` and `marketplace.json` schemas | Superseded by the built-in command. |
+
+Not read in depth: agents-lint (two unrelated repos with that name), agent-rules-linter,
+and agentlint.app.
+
 ## Recommendation (owner's call)
+
+The one change worth making: run `claude plugin validate --strict` over `plugins/*`
+from `scripts/ci.sh` (or a workflow), since it is first-party, already passes, and is
+only a manual step today. CI would need a pinned Claude Code install, which is a
+fetch-and-execute and so your call. Of the third-party tools, only ctxlint (verifies
+`CLAUDE.md` against the repo) and skilldoctor (security rules) cover something nothing
+here does; a trial would need your go-ahead per command.
+
+Earlier recommendation, kept for the trial results above:
 
 Do not adopt any of the three. The trials above found no gap the existing checks
 miss, and none of the tools reads this repo's skill bodies, hooks or scripts. If one
