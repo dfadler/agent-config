@@ -1,0 +1,26 @@
+# Run: node plugins/eval-authoring/scripts/ts/run-evals/run-evals.ts plugins/storybook --trigger-boundary (plugin arm only; no grant needed).
+# Maps to the SKILL.md description: "Not for ... unit tests with no Storybook."
+# good-reply: Set test.isolate to false only if your tests share no state; otherwise use pool 'threads' or 'forks' options in vitest.config.ts.
+# bad-reply: (invokes the storybook-usage skill and talks about stories)
+schema_version: "1.1"
+name: storybook-usage-quiet-on-vitest-config
+description: >
+  Near-miss: a Vitest config question in a repo that happens to have Storybook. Trigger-boundary
+  negative, plugin arm only, scored as a fire count, no delta.
+tags: [storybook-usage, trigger-boundary, "pair:storybook-usage-fires-on-play-function"]
+
+execution:
+  prompt: |
+    Our repo has Storybook, but this is about the plain unit tests: how do I make Vitest run
+    test files in parallel across worker threads instead of forks?
+  max_turns: 4
+  allowed_tools:
+    - Skill
+
+graders:
+  - name: storybook_usage_not_invoked
+    type: tool_used
+    tool: Skill
+    input_match: '"skill"\s*:\s*"(?:[\w-]+:)?storybook-usage"'
+    min: 0
+    max: 0

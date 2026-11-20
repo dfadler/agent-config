@@ -1,0 +1,38 @@
+# Run: node plugins/eval-authoring/scripts/ts/run-evals/run-evals.ts plugins/storybook --case storybook-usage-fires-on-play-function (Skill only; no grant needed).
+# Deleting the "Query `canvas` by role first" bullet from SKILL.md should make the role-query grader fail.
+# good-reply: Add a play function: await userEvent.click(canvas.getByRole('button', { name: /save/i })); await expect(args.onSave).toHaveBeenCalled(); with onSave: fn() in args.
+# bad-reply: Use document.querySelector('.save-btn').click() in a useEffect inside the story.
+schema_version: "1.1"
+name: storybook-usage-fires-on-play-function
+description: >
+  A request to make a story click a button and check a callback. expected_outcome: PASS when the
+  skill fires and the reply uses a play function with a role query and fn() spy; FAIL when it
+  reaches for DOM selectors or skips the skill.
+tags: [storybook-usage, trigger, quick]
+
+execution:
+  prompt: |
+    I have a Storybook story for our SaveButton component. Make the story click the button
+    and check the onSave callback fires. Show the story code.
+  max_turns: 6
+  allowed_tools:
+    - Skill
+
+graders:
+  - name: skill_fired
+    type: tool_used
+    tool: Skill
+    input_match: '"skill"\s*:\s*"(?:[\w-]+:)?storybook-usage"'
+    min: 1
+
+  - name: uses_play_with_role_query
+    type: regex
+    target: last_message
+    pattern: 'play\s*:[\s\S]{0,400}getByRole'
+    match: contains
+
+  - name: uses_fn_spy
+    type: regex
+    target: last_message
+    pattern: '\bfn\(\)'
+    match: contains
