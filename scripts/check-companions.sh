@@ -1739,6 +1739,7 @@ check_eval_run_permission() {
 # skills CLI keeps a lock-file entry for it.
 check_humanizer_retired() {
   local link="$HOME/.claude/skills/humanizer" dir="$HOME/.agents/skills/humanizer"
+  local lock="$HOME/.agents/.skill-lock.json"
   if [[ ! -e "$link" && ! -L "$link" && ! -e "$dir" ]]; then
     echo "✓ the retired humanizer skill is not installed"
     return 0
@@ -1749,8 +1750,12 @@ check_humanizer_retired() {
     echo "  The unslop plugin replaces it (manual /unslop:unslop). Doctor never deletes it."
     echo "  Remove it when you are ready, with the skills CLI that installed it"
     echo "  (run 'npx skills remove --help' first), or by hand:"
-    echo "    rm \"$link\" && rm -r \"$dir\""
-    echo "    jq 'del(.skills.humanizer)' ~/.agents/.skill-lock.json > ~/.agents/.skill-lock.json.new && mv ~/.agents/.skill-lock.json.new ~/.agents/.skill-lock.json"
+    # Each path is removed on its own line, so one already gone does not block the other.
+    if [[ -e "$link" || -L "$link" ]]; then echo "    rm \"$link\""; fi
+    if [[ -e "$dir" ]]; then echo "    rm -r \"$dir\""; fi
+    if [[ -f "$lock" ]] && grep -q '"humanizer"' "$lock"; then
+      echo "    jq 'del(.skills.humanizer)' \"$lock\" > \"$lock.new\" && mv \"$lock.new\" \"$lock\""
+    fi
     echo
   } >&2
 }
@@ -1786,6 +1791,9 @@ check_git_identity
 check_gh_auth
 check_hooks_path
 check_python_deps
+# Before the checks below: a failing check under `set -e` ends the script, and
+# this report must still print.
+check_humanizer_retired
 
 # mattpocock-skills: the id can be "mattpocock-skills@mattpocock" (self-hosted
 # fallback) or "@claude-plugins-official" - either satisfies the check, so the
@@ -1823,7 +1831,6 @@ check_rtk
 check_playwright_cli
 check_node_floor
 check_eval_run_permission
-check_humanizer_retired
 check_require_worktree_hook
 check_plugin_script_paths
 

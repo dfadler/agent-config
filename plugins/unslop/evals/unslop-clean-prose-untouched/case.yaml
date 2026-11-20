@@ -19,17 +19,12 @@ execution:
     - Skill
 
 graders:
-  - name: first_sentence_kept
+  # No flags: ^ and $ anchor the whole reply, so any line before or after the paragraph fails.
+  - name: unchanged_exactly
     type: regex
-    pattern: 'The scheduler runs each job in its own process and retries a job that exits non-zero once\.'
+    pattern: '^\s*The scheduler runs each job in its own process and retries a job that exits non-zero once\. After that it marks the job failed\.\s*$'
     match: contains
-    weight: 2
-
-  - name: second_sentence_kept
-    type: regex
-    pattern: 'After that it marks the job failed\.'
-    match: contains
-    weight: 2
+    weight: 3
 
   - name: no_commentary
     type: regex

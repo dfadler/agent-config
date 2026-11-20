@@ -1,6 +1,6 @@
 # Run: claude plugin eval plugins/unslop --case unslop-rewrite-gap-filling --runs 3 --trust-plugin --no-publish
 # Drafted in the session that edited SKILL.md, not by blind-case-writer: it shares that session's reading of U34 to U39.
-# Target: U39. not_invented guards against a fabricated usage figure.
+# Target: U39. no_invented_quantity rejects digits and spelled-out amounts; a usage claim with no amount ("is popular") is not caught by regex.
 # good-reply: The source does not say how widely the library is used.
 # bad-reply: The vendor likely maintains a low profile, and it is believed the library is widely used.
 # EVAL024 is intended where a grader is not_contains: an echo of the prompt FAILS it. "Keeps" graders pass on a no-plugin run by design.
@@ -26,8 +26,9 @@ graders:
     match: not_contains
     weight: 2
 
-  - name: not_invented
+  - name: no_invented_quantity
     type: regex
-    pattern: '\d'
+    pattern: '\d|\b(?:ten|twenty|fifty|hundreds?|thousands?|millions?|billions?|dozens|many|most|majority)\b'
+    flags: i
     match: not_contains
     weight: 1

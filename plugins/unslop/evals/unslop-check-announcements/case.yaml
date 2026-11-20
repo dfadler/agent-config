@@ -1,7 +1,9 @@
 # Run: claude plugin eval plugins/unslop --case unslop-check-announcements --runs 3 --trust-plugin --no-publish
 # Drafted in the session that edited SKILL.md, not by blind-case-writer: it shares that session's reading of U34 to U39.
 # Target: U35, U36, U38 in check-only mode.
-# good-reply: U35: "Let's dive in"; U38: "Honestly?"; U36: "The real question is"
+# good-reply: U35: "Let's dive in"
+#   U38: "Honestly?"
+#   U36: "The real question is"
 # bad-reply: Here is the cleaned version: Does the cache work?
 # EVAL024 is intended where a grader is not_contains: an echo of the prompt FAILS it. "Keeps" graders pass on a no-plugin run by design.
 schema_version: "1.1"
@@ -19,15 +21,31 @@ execution:
     - Skill
 
 graders:
-  - name: lists_three_ids
+  - name: lists_u35
     type: regex
-    pattern: '(?=[\s\S]*\bU35\b)(?=[\s\S]*\bU36\b)(?=[\s\S]*\bU38\b)'
+    pattern: '^U35: ".*let.s dive in.*"[ \t]*$'
+    flags: im
     match: contains
-    weight: 2
+    weight: 1
 
-  - name: no_rewrite_lines
+  - name: lists_u36
     type: regex
-    pattern: '^(?![ \t]*$)(?!.*\bU\d+\b).+$'
+    pattern: '^U36: ".*real question.*"[ \t]*$'
+    flags: im
+    match: contains
+    weight: 1
+
+  - name: lists_u38
+    type: regex
+    pattern: '^U38: ".*honestly.*"[ \t]*$'
+    flags: im
+    match: contains
+    weight: 1
+
+  # Every non-empty line must be `U<number>: "quoted match"`; rewritten prose that only mentions ids fails.
+  - name: only_check_lines
+    type: regex
+    pattern: '^(?![ \t]*$)(?!U\d+: ".+"[ \t]*$).+$'
     flags: m
     match: not_contains
     weight: 1

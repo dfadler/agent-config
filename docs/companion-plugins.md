@@ -369,8 +369,9 @@ This repo does not recommend `humanizer`. The `unslop` plugin carries its patter
 the no-invention self-check and the leave-alone rule); `/unslop:unslop` is manual-only. Voice
 calibration, personality coaching and hyphenated-word-pair rules were not ported.
 
-`./doctor.sh` reports a leftover copy (`~/.claude/skills/humanizer`, a symlink into
-`~/.agents/skills/humanizer`, and a `humanizer` entry in `~/.agents/.skill-lock.json`) and never
-deletes it, because it is a global install other projects may use. To retire it on a machine,
-run the skills CLI's own command (`npx skills remove --help` first), or remove the pieces by
-hand with the commands doctor prints.
+`./doctor.sh` reports a leftover copy (the symlink `~/.claude/skills/humanizer` or the directory
+`~/.agents/skills/humanizer`) and never deletes it, because it is a global install other
+projects may use. Doctor does not look at the skills lock file on its own; when a copy is found
+and `~/.agents/.skill-lock.json` has a `humanizer` entry, it prints the command that removes
+that entry too. To retire it on a machine, run the skills CLI's own command
+(`npx skills remove --help` first), or remove the pieces by hand with the commands doctor prints.

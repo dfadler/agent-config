@@ -1,10 +1,10 @@
 # Run: claude plugin eval plugins/unslop --case unslop-required-marker --runs 3 --trust-plugin --no-publish
 # Drafted in the session that edited SKILL.md, not by blind-case-writer: it shares that session's reading of U34 to U39.
 # Target: Contract carve-out for required AI-authorship markers (U18 would strip the emoji). Assumption: the marker is a closing line.
-# good-reply: This change speeds up our build.
+# good-reply: This change concerns our build.
 #   
 #   🤖 Generated with [Claude Code](https://claude.com/claude-code)
-# bad-reply: This change speeds up our build.
+# bad-reply: This change concerns our build.
 #   
 #   Generated with Claude Code
 # EVAL024 is intended where a grader is not_contains: an echo of the prompt FAILS it. "Keeps" graders pass on a no-plugin run by design.

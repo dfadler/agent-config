@@ -115,8 +115,8 @@ number.
 
 ## Example
 
-Before: "Additionally, this pivotal change serves as a testament to our commitment, ensuring a robust, seamless landscape."
-After: "This change makes the build faster."
+Before: "Additionally, this pivotal change speeds up the build and serves as a testament to our commitment, ensuring a robust, seamless landscape."
+After: "This change speeds up the build."
 Question: "How much faster is it?"
 
 The source gives no figure, so the rewrite carries none, and one question after it asks the user
