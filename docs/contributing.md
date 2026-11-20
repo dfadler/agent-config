@@ -44,7 +44,8 @@
    linked entry-by-entry into `~/.claude/commands/`, outside any plugin, so those names
    really are flat.
 3. Run `claude plugin validate plugins/<plugin>` — it checks the manifest
-   and parses the frontmatter of every skill and agent inside.
+   and parses the frontmatter of every skill and agent inside. CI runs it with
+   `--strict` over every plugin (`scripts/ci.sh validate-plugins`).
 4. Run `bash scripts/ci.sh check` (see [Checks](#checks) below) before pushing.
 5. Commit and push. A new skill or agent inside an already-linked plugin needs no
    `setup.sh` re-run; anything under `claude/`, or a whole new plugin, does — see

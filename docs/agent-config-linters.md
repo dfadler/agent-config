@@ -84,18 +84,17 @@ approximate. All are MIT and single-maintainer or small-org unless noted.
 Not read in depth: agents-lint (two unrelated repos with that name), agent-rules-linter,
 and agentlint.app.
 
-## Recommendation (owner's call)
+## Decision
 
-The one change worth making: run `claude plugin validate --strict` over `plugins/*`
-from `scripts/ci.sh` (or a workflow), since it is first-party, already passes, and is
-only a manual step today. CI would need a pinned Claude Code install, which is a
-fetch-and-execute and so your call. Of the third-party tools, only ctxlint (verifies
-`CLAUDE.md` against the repo) and skilldoctor (security rules) cover something nothing
-here does; a trial would need your go-ahead per command.
-
-Earlier recommendation, kept for the trial results above:
-
-Do not adopt any of the three. The trials above found no gap the existing checks
-miss, and none of the tools reads this repo's skill bodies, hooks or scripts. If one
-of the suspected gaps (`settings.json` schema, `.mcp.json`, `@import` resolution)
-starts to matter, extend `check-plugin-structure` for that case instead.
+- **Adopted:** `claude plugin validate --strict` over `plugins/*`, as
+  `bash scripts/ci.sh validate-plugins` (part of `check`, and a step in
+  `typescript.yml` with Claude Code pinned to 2.1.300, as in `plugin-evals.yml`).
+  Off CI it skips when the `claude` CLI is missing; under CI it fails.
+- **Not adopted:** cclint, claudelint and agentlinter. The trials above found no gap the
+  existing checks miss, and none reads this repo's skill bodies, hooks or scripts.
+- **Open:** whether to trial ctxlint (checks `CLAUDE.md` against the repo) or skilldoctor
+  (security rules). Each trial needs a per-command go-ahead.
+- **Follow-up:** [#1155](https://github.com/dfadler/agent-config/issues/1155) researches
+  `claude plugin validate` and where it belongs in the plugin-writing workflow. If a
+  suspected gap (`settings.json` schema, `.mcp.json`, `@import` resolution) starts to
+  matter, extend `check-plugin-structure` for it.

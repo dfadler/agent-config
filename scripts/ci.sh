@@ -132,6 +132,7 @@ Shell (no Python or Node needed):
   lint-shellcheck   shellcheck over every shell script
   lint-shfmt        shfmt -i 2 -ci -d (check only)
   structure         validate plugin manifests and skill/agent frontmatter (Node: pnpm run check-plugin-structure)
+  validate-plugins  claude plugin validate --strict over plugins/* (needs the claude CLI; skips off CI without it)
   test-sh           bats suites under scripts/tests
   coverage          bats under kcov, enforce the floor (Linux only; skips elsewhere)
   lint-actions      actionlint over .github/workflows
@@ -182,6 +183,32 @@ node_modules() {
 pnpm_script() {
   node_modules
   pnpm run --silent "$1"
+}
+
+# `claude plugin validate --strict` over every plugin: Claude Code's own manifest,
+# skill, agent, command and hook check (#1101). CI installs a pinned copy
+# (typescript.yml). Off CI a missing CLI skips, like `coverage` off Linux; under CI
+# it fails, so the gate can't pass by not running.
+validate_plugins() {
+  if ! command -v claude >/dev/null 2>&1; then
+    if [ -n "${CI:-}" ]; then
+      echo "validate-plugins: claude CLI not found on PATH" >&2
+      return 1
+    fi
+    echo "validate-plugins: skipped (claude CLI not on PATH)"
+    return 0
+  fi
+  local d out n=0 rc=0
+  for d in plugins/*/; do
+    n=$((n + 1))
+    out="$(claude plugin validate "$d" --strict 2>&1)" || {
+      echo "✗ $d"
+      echo "$out"
+      rc=1
+    }
+  done
+  [ "$rc" -eq 0 ] && echo "✓ $n plugins validated"
+  return "$rc"
 }
 
 lint_shellcheck() { sh_find | xargs -0 shellcheck; }
@@ -275,7 +302,7 @@ coverage_py() {
 # dependency is exactly how this broke once already.
 check() {
   local t
-  for t in lint-sh lint-py structure typecheck test-sh test-py lint-actions coverage coverage-py \
+  for t in lint-sh lint-py structure validate-plugins typecheck test-sh test-py lint-actions coverage coverage-py \
     lint-ts typecheck-ts check-skills lint-plugin-evals check-vitest-flags check-vitest-v3-names \
     test-ts coverage-ts; do
     echo "==> $t"
@@ -320,6 +347,7 @@ run_target() {
     coverage) coverage ;;
     coverage-py) coverage_py ;;
     lint-actions) actionlint ;;
+    validate-plugins) validate_plugins ;;
     check) check ;;
     *)
       echo "ci.sh: unknown target '$1'" >&2

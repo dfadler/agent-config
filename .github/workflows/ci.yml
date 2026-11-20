@@ -12,7 +12,7 @@ name: CI
 #
 #   shell       shell.yml        shellcheck, shfmt, test-sh, coverage (sh-*.yml)
 #   typescript  typescript.yml   pnpm run lint / typecheck / set-flags / CLAUDE.md size /
-#                                plugin structure / personal data (check-pii) / links / test / coverage
+#                                plugin structure / claude plugin validate / personal data (check-pii) / links / test / coverage
 #   python      python.yml       scripts/ci.sh lint-py / typecheck / test-py / coverage-py
 #
 # actionlint.yml (paths-filtered) and issue-bot.yml stay standalone: a

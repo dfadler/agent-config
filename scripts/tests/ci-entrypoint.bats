@@ -19,6 +19,16 @@ shim() {
   export PATH="$SHIMS:$PATH"
 }
 
+# A `claude` that echoes its arguments and exits with $1, so a test can see
+# exactly what validate-plugins ran.
+claude_shim() {
+  SHIMS="$BATS_TEST_TMPDIR/shims"
+  mkdir -p "$SHIMS"
+  printf '#!/bin/sh\necho "CLAUDE-SHIM $*"\nexit %s\n' "$1" >"$SHIMS/claude"
+  chmod +x "$SHIMS/claude"
+  export PATH="$SHIMS:$PATH"
+}
+
 @test "--help prints usage and exits 0" {
   ci --help
   assert_success
@@ -54,4 +64,33 @@ shim() {
   ci coverage
   assert_failure
   assert_output_contains "KCOV-RAN"
+}
+
+@test "validate-plugins runs claude plugin validate --strict and passes" {
+  claude_shim 0
+  ci validate-plugins
+  assert_success
+  assert_output_contains "plugins validated"
+}
+
+@test "validate-plugins fails and prints the validator output when claude fails" {
+  claude_shim 1
+  ci validate-plugins
+  assert_failure
+  assert_output_contains "CLAUDE-SHIM plugin validate"
+  assert_output_contains "--strict"
+}
+
+@test "validate-plugins skips off CI and fails under CI when claude is missing" {
+  # A PATH with the system tools but, on most machines, no claude. Skip where it has one.
+  if PATH=/usr/bin:/bin command -v claude >/dev/null 2>&1; then
+    skip "claude is in /usr/bin or /bin"
+  fi
+  unset CI
+  run env PATH=/usr/bin:/bin bash "$REPO_ROOT/scripts/ci.sh" validate-plugins
+  assert_success
+  assert_output_contains "skipped"
+  run env CI=true PATH=/usr/bin:/bin bash "$REPO_ROOT/scripts/ci.sh" validate-plugins
+  assert_failure
+  assert_output_contains "claude CLI not found"
 }
