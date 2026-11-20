@@ -56,6 +56,7 @@ export const spawned = (
 export interface Call {
   readonly command: string;
   readonly args: readonly string[];
+  readonly env?: Readonly<Record<string, string | undefined>> | undefined;
 }
 
 export interface FakeIoOptions {
@@ -137,7 +138,7 @@ export const fakeIo = (o: FakeIoOptions = {}): FakeIo => {
     out: (t) => out.push(t),
     err: (t) => err.push(t),
     spawn: (command, args, options?: SpawnOptions) => {
-      calls.push({ command, args });
+      calls.push({ command, args, env: options?.env });
       if (command === "claude" && args[0] === "--version") {
         return Promise.resolve(
           spawned({ stdout: `${o.claudeVersion ?? "2.1.287"} (Claude Code)\n` }),

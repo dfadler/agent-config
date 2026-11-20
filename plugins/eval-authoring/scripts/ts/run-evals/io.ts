@@ -25,6 +25,8 @@ export interface SpawnOptions {
   readonly onStderr?: (chunk: string) => void;
   /** When aborted, the child gets SIGINT, then SIGKILL after `KILL_GRACE_MS` if it is still running. */
   readonly signal?: AbortSignal;
+  /** The child's environment; the parent's when omitted. */
+  readonly env?: Readonly<Record<string, string | undefined>> | undefined;
 }
 
 /** How long an interrupted child gets to exit before SIGKILL; under the workflow's `--kill-after=1m`. */
@@ -101,6 +103,7 @@ export const spawnProcess: Spawner = (command, args, options = {}) =>
   new Promise((resolve) => {
     const child = spawn(command, [...args], {
       stdio: ["inherit", "pipe", "pipe"],
+      ...(options.env === undefined ? {} : { env: options.env }),
     });
     const chunks = { stdout: "", stderr: "" };
     const killTimer: { current?: NodeJS.Timeout } = {};

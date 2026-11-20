@@ -47,8 +47,8 @@ asking only when all three hold:
 
 If any one fails, ask as above; a larger ceiling needs a new approval decision. The cap
 counts only when it was already in the session environment: leave it as the user set it, and
-set no variable or flag yourself to approve a run. A session that is not logged in
-(`claude auth status` fails) hands off either way.
+set no variable or flag yourself to approve a run. A session with no login and no credential
+(`claude auth status` fails, no token variable set) hands off either way.
 
 The wrapper is `${CLAUDE_SKILL_DIR}/../../scripts/ts/run-evals/run-evals.ts`, run with
 a current `node` (see `.nvmrc`). It owns tiers, grants, preflight checks and exit codes; call
@@ -88,7 +88,11 @@ it, do not rebuild any of that.
    do not answer, give the exact non-dry-run command to run in their own shell and stop.
 
    Before starting, check login with `claude auth status`; child runs fail with
-   `Not logged in` otherwise. Hand the command to the user only if that check fails.
+   `Not logged in` otherwise. Hand the command to the user only if that check fails
+   and the session has no credential. In the desktop app (host-managed auth:
+   `CLAUDE_CODE_PROVIDER_MANAGED_BY_HOST=1`) `auth status` reports logged out; if
+   `ANTHROPIC_AUTH_TOKEN` or `ANTHROPIC_API_KEY` is set, the wrapper strips the
+   host-managed variables from the eval child itself, so go ahead and run.
    Do not assume a session cannot authenticate: check. Make progress visible: start it
    in the background (`run_in_background`) with its output going to a file, never piped
    through `tail`, `head` or `grep`, which hide everything until the command exits. Tell
