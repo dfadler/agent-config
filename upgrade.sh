@@ -12,7 +12,8 @@ usage() {
 Usage: ./upgrade.sh [--plan]
 
 Pulls the latest main (fast-forward only), re-runs ./setup.sh, then runs
-./doctor.sh --fix. Stops at the first step that fails.
+./doctor.sh --fix. Stops at the first step that fails. Doctor reports a leftover
+humanizer skill but never removes it, even with --fix.
 
 Refuses to run unless this checkout is on main, has no uncommitted changes,
 and can fast-forward.

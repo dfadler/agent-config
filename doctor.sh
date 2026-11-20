@@ -4,6 +4,9 @@
 # just forwards to it unchanged. doctor owns detection and repair; setup.sh
 # only links and registers.
 #
+# Also reports (never deletes) a leftover humanizer skill; see
+# scripts/check-companions.sh.
+#
 # Usage: ./doctor.sh [--install-deps] [--fix]
 
 set -euo pipefail

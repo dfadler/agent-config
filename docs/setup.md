@@ -58,6 +58,10 @@ Setup also runs `git config core.hooksPath scripts/hooks` for this checkout (the
 overwrites a different value. It is written to the shared `.git/config`, so it covers
 every worktree of the checkout.
 
+Doctor also reports (never deletes) a leftover `humanizer` skill (`~/.claude/skills/humanizer`,
+`~/.agents/skills/humanizer`), which the `unslop` plugin replaces, and prints the removal
+commands. `--fix` does not remove it: it is a global install that other projects may use.
+
 Run from inside a project, doctor also reports (never edits) that project's
 `.claude/settings.local.json` allow rules that are too broad (`git push|stash|checkout *`,
 `gh pr merge *`), name a package manager the lockfile says is unused, point at a vanished

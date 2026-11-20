@@ -71,7 +71,8 @@ automatically, with no per-project copy to keep in sync.
     bugs or are better expressed with a safer API (e.g. `.at()` over indexed reads).
   - `unslop/` — manual `/unslop:unslop` skill that rewrites prose to remove AI-writing
     patterns (filler, stock vocabulary, dashes, chatbot phrases); `check` lists
-    matches without rewriting. Adapted from cursor/plugins `pstack` (MIT).
+    matches without rewriting. Adapted from cursor/plugins `pstack` and extended with
+    patterns from `blader/humanizer` (both MIT); it replaces the `humanizer` skill.
   - `vite/` — skills and agents for authoring, reviewing, testing, and maintaining
     Vite plugins: lifecycle, hook selection, deprecation guards, testing patterns,
     and peer-dependency maintenance.
@@ -177,6 +178,10 @@ to it). Nothing is changed unless `--fix` (or `--install-deps` for the
 `pyte` dependency) is passed explicitly — see
 [`docs/companion-plugins.md`](docs/companion-plugins.md#known-conflict-rtks-git-rewrite-breaks-git-inside-a-worktree-session)
 for the rtk conflict `--fix` currently resolves.
+
+Doctor also reports (never deletes) a leftover `humanizer` skill from the skills CLI, which
+`unslop` replaces, and prints the commands to remove it; see
+[`docs/companion-plugins.md`](docs/companion-plugins.md#bladerhumanizer-retired-replaced-by-unslop).
 
 ## Adding something new
 
