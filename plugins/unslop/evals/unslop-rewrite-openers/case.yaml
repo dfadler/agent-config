@@ -1,0 +1,34 @@
+# Run: claude plugin eval plugins/unslop --case unslop-rewrite-openers --runs 3 --trust-plugin --no-publish
+# Drafted in the session that edited SKILL.md, not by blind-case-writer: it shares that session's reading of U34 to U39.
+# Target: U35, U36, U38 in rewrite mode.
+# good-reply: The parser rejects a bad date and exits with code 2.
+# bad-reply: Let's dive in. The parser rejects a bad date and exits with code 2.
+# EVAL024 is intended where a grader is not_contains: an echo of the prompt FAILS it. "Keeps" graders pass on a no-plugin run by design.
+schema_version: "1.1"
+name: unslop-rewrite-openers
+description: >
+  /unslop on text with a signpost, a fake-candid opener and an authority trope should remove all three and keep
+  the fact. expected_outcome: PASS when the three phrases are gone and code 2 survives; FAIL when any remains.
+tags: [unslop]
+
+execution:
+  prompt: |
+    /unslop:unslop Let's dive in. Honestly? At its core, the parser rejects a bad date and exits with code 2.
+  max_turns: 6
+  allowed_tools:
+    - Skill
+
+graders:
+  - name: openers_removed
+    type: regex
+    pattern: 'let.s dive|honestly|at its core'
+    flags: i
+    match: not_contains
+    weight: 2
+
+  - name: fact_kept
+    type: regex
+    pattern: '\bcode 2\b'
+    flags: i
+    match: contains
+    weight: 1

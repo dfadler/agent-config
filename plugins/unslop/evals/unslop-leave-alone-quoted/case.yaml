@@ -1,0 +1,38 @@
+# Run: claude plugin eval plugins/unslop --case unslop-leave-alone-quoted --runs 3 --trust-plugin --no-publish
+# Drafted in the session that edited SKILL.md, not by blind-case-writer: it shares that session's reading of U34 to U39.
+# Target: Contract "Leave alone". Guard: a no-plugin run likely passes it, so expect no delta.
+# good-reply: The style guide bans phrases such as "serves as" and "pivotal". The paper "Pivotal Moments in Build Systems" is cited in section 3.
+# bad-reply: The style guide bans phrases such as serves as and pivotal. The paper Moments in Build Systems is cited in section 3. Want more?
+# EVAL024 is intended where a grader is not_contains: an echo of the prompt FAILS it. "Keeps" graders pass on a no-plugin run by design.
+schema_version: "1.1"
+name: unslop-leave-alone-quoted
+description: >
+  /unslop on text whose only watched phrases are quoted or inside a title should return it unchanged.
+  expected_outcome: PASS when both quoted strings survive and no question is added; FAIL when either changes.
+tags: [unslop]
+
+execution:
+  prompt: |
+    /unslop:unslop The style guide bans phrases such as "serves as" and "pivotal". The paper "Pivotal Moments in Build Systems" is cited in section 3.
+  max_turns: 6
+  allowed_tools:
+    - Skill
+
+graders:
+  - name: quoted_phrases_kept
+    type: regex
+    pattern: '"serves as" and "pivotal"'
+    match: contains
+    weight: 2
+
+  - name: title_kept
+    type: regex
+    pattern: '"Pivotal Moments in Build Systems"'
+    match: contains
+    weight: 2
+
+  - name: no_commentary
+    type: regex
+    pattern: '\?'
+    match: not_contains
+    weight: 1

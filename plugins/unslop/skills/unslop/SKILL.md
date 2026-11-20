@@ -15,6 +15,11 @@ metadata:
 
 Adapted from [`pstack/skills/unslop`](https://github.com/cursor/plugins/blob/main/pstack/skills/unslop/SKILL.md)
 in cursor/plugins (MIT, copyright Lauren Tan; see `LICENSE` in the plugin root).
+Rules U34 to U39 and the self-check step are derived from
+[`blader/humanizer`](https://github.com/blader/humanizer) (MIT, copyright Siqi Chen; see `LICENSE`),
+which is itself based on Wikipedia's
+[Signs of AI writing](https://en.wikipedia.org/wiki/Wikipedia:Signs_of_AI_writing). The rules are
+restated in new words.
 
 ## Contract
 
@@ -25,7 +30,11 @@ in cursor/plugins (MIT, copyright Lauren Tan; see `LICENSE` in the plugin root).
   line of the rule ids fixed. In check-only mode, only lines of the form `U7: "pivotal"`
   (rule id, colon, quoted match), with no introduction and no rewrite.
 - **Does not:** touch code blocks, inline code, logs, quoted material, or text the user
-  did not hand over. It does not change facts, numbers, names or links.
+  did not hand over. It does not change facts, numbers, names or links. It does not remove an
+  AI-authorship marker or attribution line the text is required to carry (such as the closing line
+  of a PR body or a posted comment): U13 and U18 do not apply to that line.
+- **Leave alone:** text that matches no rule comes back unchanged, with no commentary. A phrase
+  that is quoted, discussed as an example, or part of a title or proper name is not a match.
 
 ## Steps
 
@@ -34,11 +43,15 @@ in cursor/plugins (MIT, copyright Lauren Tan; see `LICENSE` in the plugin root).
 3. In check-only mode, print the matches and stop.
 4. Otherwise rewrite each match, then re-scan the result once and fix any new match. Keep the
    rewrite and report a rule that still matches after that second pass.
+   Then answer once: does the rewrite state a fact, name, number, date or citation that is not in
+   the source? If it does, remove it, or ask for it as in step 5.
 5. When a file was named, edit that file in place and report the rule ids fixed.
    When text was pasted, return the rewritten text and nothing else. The one exception is a
    missing figure (see Example): add a single question after the rewrite asking for it.
 
-Rule ids are stable and other files cite them. A removed rule leaves a gap.
+Rule ids are stable and other files cite them. A removed rule leaves a gap, and ids are never
+renumbered. U1, U2, U4, U6 and U21 are unused: they are gaps, so a new rule takes the next free
+number.
 
 ## Patterns
 
@@ -49,9 +62,9 @@ Rule ids are stable and other files cite them. A removed rule leaves a gap.
 
 ### Language
 
-- **U7 stock vocabulary.** Additionally, crucial, delve, enduring, enhance, fostering, garner, interplay, intricate, landscape (abstract), pivotal, showcase, tapestry (abstract), testament, underscore, vibrant, for example. Any word that adds tone and no meaning counts. Use the plain word.
+- **U7 stock vocabulary.** Additionally, crucial, delve, enduring, enhance, fostering, garner, interplay, intricate, landscape (abstract), pivotal, showcase, tapestry (abstract), testament, underscore, vibrant, for example, actually, "align with", valuable. Any word that adds tone and no meaning counts. Use the plain word.
 - **U8 inflated "is".** "serves as", "stands as", "boasts", "features". Write "is" or "has".
-- **U9 "not just X, but Y".** State the point directly.
+- **U9 "not just X, but Y".** State the point directly. A closing "no guessing, no hassle" tag is the same pattern: cut it.
 - **U10 forced triples.** Use the natural number of items.
 - **U11 synonym cycling.** Pick one term for a thing and repeat it.
 - **U12 false ranges.** "from X to Y" where X and Y are not on one scale. List the topics.
@@ -70,6 +83,8 @@ Rule ids are stable and other files cite them. A removed rule leaves a gap.
 
 - **U20 chatbot phrases.** "I hope this helps!", "Let me know if...", "Certainly!". Delete.
 - **U22 sycophancy.** "Great question!", "You're absolutely right!". Answer directly.
+- **U35 signposting.** "Let's dive in", "Here's what you need to know", "Let's break this down". Delete the announcement and start with the content.
+- **U38 fake-candid openers.** A standalone "Honestly?", "Here's the thing:", "Let's be real". Delete it and state the point.
 
 ### Filler
 
@@ -80,6 +95,13 @@ Rule ids are stable and other files cite them. A removed rule leaves a gap.
 ### Jargon
 
 - **U26 abstract metaphor nouns.** substrate, wedge, vector, locus, nexus, bedrock, paradigm, modality, north star, flywheel, "API surface", metaphorical scaffolding, harness, primitive or ratchet, "gold-plating", "evacuate" for moving code. Use the concrete word (base, add, way, move out, last phase). The list is not complete: any noun used as a metaphor for a plainer thing counts.
+
+### Structure and gaps
+
+- **U34 narrated changes.** Prose that tells the story of an edit ("was added to replace", "previously", "now handles") instead of describing the thing as it is. Describe the current behavior. Changelogs, release notes and migration guides are exempt. For agent files, `agent-writing` AW08 owns this rule.
+- **U36 authority tropes.** "The real question is", "At its core", "What really matters". Delete the frame and state the claim.
+- **U37 restating headers.** A heading followed by a one-line paragraph that repeats it before the real content. Delete the repeat.
+- **U39 speculative gap-filling.** A paragraph that covers missing information with a guess ("likely", "it is believed", "probably maintains"). Say what is unknown, or cut it.
 
 ### Plain speech
 
@@ -93,8 +115,8 @@ Rule ids are stable and other files cite them. A removed rule leaves a gap.
 
 ## Example
 
-Before: "Additionally, this pivotal change serves as a testament to our commitment, ensuring a robust, seamless landscape."
-After: "This change makes the build faster."
+Before: "Additionally, this pivotal change speeds up the build and serves as a testament to our commitment, ensuring a robust, seamless landscape."
+After: "This change speeds up the build."
 Question: "How much faster is it?"
 
 The source gives no figure, so the rewrite carries none, and one question after it asks the user

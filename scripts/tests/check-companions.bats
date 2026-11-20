@@ -1216,3 +1216,41 @@ make_opt_in_fixture() {
   assert_success
   refute_output_contains "opt-in convention(s) available"
 }
+
+@test "humanizer absent: reports a pass" {
+  run_companions
+  assert_success
+  assert_output_contains "the retired humanizer skill is not installed"
+}
+
+@test "humanizer installed: reports it with the removal commands and deletes nothing, even with --fix" {
+  mkdir -p "$HOME/.agents/skills/humanizer" "$HOME/.claude/skills"
+  ln -s ../../.agents/skills/humanizer "$HOME/.claude/skills/humanizer"
+  printf '{"skills":{"humanizer":{}}}\n' > "$HOME/.agents/.skill-lock.json"
+  run_companions
+  assert_success
+  assert_output_contains "the retired humanizer skill is still installed"
+  assert_output_contains "npx skills remove --help"
+  assert_output_contains ".skill-lock.json"
+  # --fix may exit early on unrelated checks; only its effect on humanizer matters here.
+  run_companions --fix
+  [ -L "$HOME/.claude/skills/humanizer" ]
+  [ -d "$HOME/.agents/skills/humanizer" ]
+}
+
+@test "humanizer: only the agents directory left, prints only the commands that apply" {
+  mkdir -p "$HOME/.agents/skills/humanizer"
+  printf '{"skills":{"humanizer":{}}}\n' > "$HOME/.agents/.skill-lock.json"
+  run_companions
+  assert_success
+  assert_output_contains "rm -r \"$HOME/.agents/skills/humanizer\""
+  refute_output_contains "rm \"$HOME/.claude/skills/humanizer\""
+  assert_output_contains "del(.skills.humanizer)"
+}
+
+@test "humanizer: no lock entry, no jq command" {
+  mkdir -p "$HOME/.agents/skills/humanizer"
+  run_companions
+  assert_success
+  refute_output_contains "del(.skills.humanizer)"
+}

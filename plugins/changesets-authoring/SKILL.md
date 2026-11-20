@@ -236,8 +236,7 @@ makes the change, not a separate follow-up PR. Within that PR:
 4. Pick a bump type per package using semver semantics.
 5. Hand-write `.changeset/<slug>.md`: frontmatter block, blank line, then an
    imperative, changelog-facing summary describing the effect of the change
-   — not a narration of the diff or internal implementation details (same
-   spirit as this repo's `humanizer` skill's diff-anchored-writing rule,
-   applied to changelog prose).
+   — not a narration of the diff or internal implementation details (the
+   `unslop` plugin's U34 names the same fault in docs prose).
 6. Commit it alongside the code change, in the same PR (same commit or a
    trailing one — either is fine).

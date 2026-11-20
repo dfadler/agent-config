@@ -1,0 +1,34 @@
+# Run: claude plugin eval plugins/unslop --case unslop-rewrite-gap-filling --runs 3 --trust-plugin --no-publish
+# Drafted in the session that edited SKILL.md, not by blind-case-writer: it shares that session's reading of U34 to U39.
+# Target: U39. no_invented_quantity rejects digits and spelled-out amounts; a usage claim with no amount ("is popular") is not caught by regex.
+# good-reply: The source does not say how widely the library is used.
+# bad-reply: The vendor likely maintains a low profile, and it is believed the library is widely used.
+# EVAL024 is intended where a grader is not_contains: an echo of the prompt FAILS it. "Keeps" graders pass on a no-plugin run by design.
+schema_version: "1.1"
+name: unslop-rewrite-gap-filling
+description: >
+  /unslop on a guess that fills missing information should state what is unknown or cut it. expected_outcome:
+  PASS when the hedged guess words are gone; FAIL when "likely" or "believed" remains.
+tags: [unslop]
+
+execution:
+  prompt: |
+    /unslop:unslop The vendor likely maintains a low profile, and it is believed the library is widely used.
+  max_turns: 6
+  allowed_tools:
+    - Skill
+
+graders:
+  - name: guess_removed
+    type: regex
+    pattern: '\b(?:likely|believed|probably|presumably)\b'
+    flags: i
+    match: not_contains
+    weight: 2
+
+  - name: no_invented_quantity
+    type: regex
+    pattern: '\d|\b(?:ten|twenty|fifty|hundreds?|thousands?|millions?|billions?|dozens|many|most|majority)\b'
+    flags: i
+    match: not_contains
+    weight: 1

@@ -43,6 +43,7 @@ teardown() {
   assert_success
   assert_output_contains "no dangling hook entries or symlinks"
   assert_output_contains "no shell-form hook entries"
+  assert_output_contains "the retired humanizer skill is not installed"
 
   run bash "$FAKE_REPO/teardown.sh"
   assert_success
