@@ -31,7 +31,7 @@ setup() {
   echo "## Convention two (opt-in only)" >"$FAKE_REPO/claude/conventions/two.md"
   printf '# comment\n\none.md\n' >"$FAKE_REPO/claude/conventions/DEFAULT_ENABLED"
   local p
-  for p in collab-retro gh-publish-guide memory-hygiene scratch-guard worktree-core; do
+  for p in collab-retro gh-publish-guide memory-hygiene read-guard scratch-guard worktree-core; do
     mkdir -p "$FAKE_REPO/plugins/$p/.claude-plugin"
     printf '{"name":"%s"}\n' "$p" >"$FAKE_REPO/plugins/$p/.claude-plugin/plugin.json"
   done
@@ -89,6 +89,7 @@ hook_lines() {
   printf 'register-hook\tUserPromptSubmit\tnode\t["%s"]\n' "$CLAUDE/skills/collab-retro/scripts/ts/incident-nudge-hook.ts"
   printf 'register-hook\tStop\tnode\t["%s"]\n' "$CLAUDE/skills/collab-retro/scripts/ts/incident-nudge-hook.ts"
   printf 'register-hook\tPreToolUse\tnode\t["%s"]\tBash\n' "$CLAUDE/skills/gh-publish-guide/scripts/ts/protected-remote-hook.ts"
+  printf 'register-hook\tPreToolUse\tnode\t["%s"]\tRead|Grep|Glob|Bash\n' "$CLAUDE/skills/read-guard/scripts/ts/read-guard-hook.ts"
 }
 
 @test "plan: clean HOME yields the full install plan, in apply order" {
@@ -108,6 +109,7 @@ hook_lines() {
     printf 'link\t%s\t%s\n' "$FAKE_REPO/plugins/collab-retro" "$CLAUDE/skills/collab-retro"
     printf 'link\t%s\t%s\n' "$FAKE_REPO/plugins/gh-publish-guide" "$CLAUDE/skills/gh-publish-guide"
     printf 'link\t%s\t%s\n' "$FAKE_REPO/plugins/memory-hygiene" "$CLAUDE/skills/memory-hygiene"
+    printf 'link\t%s\t%s\n' "$FAKE_REPO/plugins/read-guard" "$CLAUDE/skills/read-guard"
     printf 'link\t%s\t%s\n' "$FAKE_REPO/plugins/scratch-guard" "$CLAUDE/skills/scratch-guard"
     printf 'link\t%s\t%s\n' "$FAKE_REPO/plugins/worktree-core" "$CLAUDE/skills/worktree-core"
     hook_lines
@@ -275,7 +277,7 @@ git_hooks_fixture() {
 @test "plan: --include and --skip selections are the complement of each other" {
   plan --skip=demo,worktree-core,collab-retro
   skip_plan="$output"
-  plan --include=other,memory-hygiene,scratch-guard,gh-publish-guide
+  plan --include=other,memory-hygiene,scratch-guard,read-guard,gh-publish-guide
   # Same actions; only the wording of the informational reason differs.
   [ "${output//not in --include/--skip}" = "$skip_plan" ]
 }

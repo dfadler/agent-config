@@ -539,6 +539,9 @@ _add_worktree_core_fixture() {
   mkdir -p "$FAKE_REPO/plugins/scratch-guard/.claude-plugin"
   printf '{"name":"scratch-guard","version":"0.1.0","description":"fixture"}\n' \
     >"$FAKE_REPO/plugins/scratch-guard/.claude-plugin/plugin.json"
+  mkdir -p "$FAKE_REPO/plugins/read-guard/.claude-plugin"
+  printf '{"name":"read-guard","version":"0.1.0","description":"fixture"}\n' \
+    >"$FAKE_REPO/plugins/read-guard/.claude-plugin/plugin.json"
   mkdir -p "$FAKE_REPO/plugins/gh-publish-guide/.claude-plugin"
   printf '{"name":"gh-publish-guide","version":"0.1.0","description":"fixture"}\n' \
     >"$FAKE_REPO/plugins/gh-publish-guide/.claude-plugin/plugin.json"
@@ -707,7 +710,7 @@ assert 'foreign-stop' in cmds, cmds
 
 @test "hook registration: hooks are registered in exec form (command node + args), not shell form" {
   _add_worktree_core_fixture
-  run_setup_with --skip=scratch-guard,gh-publish-guide
+  run_setup_with --skip=scratch-guard,read-guard,gh-publish-guide
   assert_success
   run python3 -c "
 import json
@@ -729,7 +732,7 @@ json.dump({"hooks": {"PreToolUse": [{"matcher": "Edit|Write", "hooks": [
   {"type": "command", "command": "foreign-before"},
   {"type": "command", "command": sys.argv[2], "timeout": 7}]}]}}, open(sys.argv[1], "w"))
 PY
-  run_setup_with --skip=scratch-guard,gh-publish-guide
+  run_setup_with --skip=scratch-guard,read-guard,gh-publish-guide
   assert_success
   assert_output_contains "Migrated PreToolUse hook to exec form"
   run python3 -c "
@@ -746,7 +749,7 @@ assert len(hooks) == 2, hooks
 "
   [ "$status" -eq 0 ]
   before="$(cat "$HOME/.claude/settings.json")"
-  run_setup_with --skip=scratch-guard,gh-publish-guide
+  run_setup_with --skip=scratch-guard,read-guard,gh-publish-guide
   assert_success
   [ "$(cat "$HOME/.claude/settings.json")" = "$before" ]
 }
@@ -761,7 +764,7 @@ json.dump({"hooks": {"PreToolUse": [{"matcher": "Edit|Write", "hooks": [
   {"type": "command", "command": 'node "%s"' % p},
   {"type": "command", "command": "node", "args": [p]}]}]}}, open(sys.argv[1], "w"))
 PY
-  run_setup_with --skip=worktree-core,scratch-guard,gh-publish-guide
+  run_setup_with --skip=worktree-core,scratch-guard,read-guard,gh-publish-guide
   assert_success
   run python3 -c "
 import json
