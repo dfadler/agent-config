@@ -47,8 +47,7 @@ asking only when all three hold:
 
 If any one fails, ask as above; a larger ceiling needs a new approval decision. The cap
 counts only when it was already in the session environment: leave it as the user set it, and
-set no variable or flag yourself to approve a run. A session that is not logged in
-(`claude auth status` fails) hands off either way.
+set no variable or flag yourself to approve a run.
 
 The wrapper is `${CLAUDE_SKILL_DIR}/../../scripts/ts/run-evals/run-evals.ts`, run with
 a current `node` (see `.nvmrc`). It owns tiers, grants, preflight checks and exit codes; call
@@ -87,9 +86,23 @@ it, do not rebuild any of that.
    in chat for a go-ahead, naming the tier and cost ceiling, and wait. If they decline or
    do not answer, give the exact non-dry-run command to run in their own shell and stop.
 
-   Before starting, check login with `claude auth status`; child runs fail with
-   `Not logged in` otherwise. Hand the command to the user only if that check fails.
-   Do not assume a session cannot authenticate: check. Make progress visible: start it
+   A `claude auth status` that shows `loggedIn: false` does not stop the run: start it and
+   judge by the children's output. When a child prints `Not logged in`, climb this ladder
+   and stop at the first rung that works:
+   - Rerun with the variables named in `EVAL_CHILD_ENV_UNSET` unset, one `-u <NAME>` per
+     name on an `env` prefix, written out in full. The user sets it under "env" in
+     `~/.claude/settings.json` as space-separated names (an empty or missing value skips this
+     rung), for environments whose host or gateway tells the CLI it supplies the credential.
+     Read it with
+     `node -p 'JSON.parse(require("fs").readFileSync(require("os").homedir()+"/.claude/settings.json","utf8")).env?.EVAL_CHILD_ENV_UNSET'`,
+     skip any name that does not match `[A-Za-z_][A-Za-z0-9_]*`, and leave the value as the
+     user wrote it.
+   - Run the same wrapper command in the user's Terminal panel (`run_in_terminal`), which
+     starts their own login shell.
+   - Hand the command to the user, quoting the `Not logged in` log line, only after both
+     rungs fail.
+
+   Make progress visible: start it
    in the background (`run_in_background`) with its output going to a file, never piped
    through `tail`, `head` or `grep`, which hide everything until the command exits. Tell
    the user the output path (or the terminal tab) as soon as it starts, then read that

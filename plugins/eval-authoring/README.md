@@ -82,9 +82,12 @@ tier-specific cost ceiling (`quick` scales with the number of cases); see [run-e
 
 ## What it cannot do
 
-- `claude plugin eval` needs a logged-in shell (`claude auth status`). A logged-in agent
-  session runs evals when you ask it to; with no request it asks you in chat for a go-ahead
-  and waits, so an unattended session stalls on that question.
+- `claude plugin eval` needs a login its child processes can use. An agent session runs
+  evals when you ask it to; with no request it asks you in chat for a go-ahead and waits,
+  so an unattended session stalls on that question. When the children print `Not logged in`
+  (a host or gateway can hide your login from them), the `run-evals` skill retries with
+  the variables in `EVAL_CHILD_ENV_UNSET` unset, then through the Terminal panel, before it
+  hands you the command.
 - Neither the lint nor `case-reviewer` can prove a case is useful: whether it can fail and
   shows a delta needs a paid run.
 - A plugin cannot ship rules, so guidance lives in the lint's messages and the skills.

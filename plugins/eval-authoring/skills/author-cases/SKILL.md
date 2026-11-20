@@ -202,9 +202,10 @@ blind-case-writer agent, second bullet), then stop.
    for the judgment pass, if available (invocation recipe in the agent file), and optionally the
    [grader-red-team agent](../../agents/grader-red-team.md) to try wrong replies on the free
    graders. Then use the
-   [run-evals](../run-evals/SKILL.md) skill (a paid run, so only on the user's ask): check
-   `claude auth status`; if you are logged in and the user asked for a run, run it; otherwise hand them the run command (a
-   hand-off is correct only when that check fails or nobody asked for a run). A PR that adds
+   [run-evals](../run-evals/SKILL.md) skill (a paid run, so only on the user's ask): if
+   the user asked for a run, run it (the skill's login ladder covers a shell that reports
+   logged out); otherwise hand them the run command (a hand-off is correct only when
+   nobody asked for a run, or after that ladder fails). A PR that adds
    or changes cases, or changes a skill or agent that has cases, carries an
    "Eval results" section (the run-evals summary, with the before score from the newest
    `evals/results/` run next to the after score, and a delta claimed only for a plugin with
