@@ -2,7 +2,8 @@ name: TypeScript
 
 # Lints, typechecks and tests the TypeScript scripts under scripts/ts/ and
 # plugins/*/scripts/ts/, and runs the repo gates that are TypeScript checks
-# (set-flags, CLAUDE.md size, plugin structure, markdown links). Vitest
+# (set-flags, CLAUDE.md size, plugin structure, markdown links) and
+# `claude plugin validate --strict` over plugins/* (needs the Claude Code CLI). Vitest
 # enforces the 90% line floor (vitest.config.ts).
 #
 # Calls the package.json scripts (`pnpm run <name>`) that
@@ -22,6 +23,11 @@ on:
 
 permissions:
   contents: read
+
+env:
+  # Runs `claude plugin validate --strict` (#1101). Same pin as plugin-evals.yml, which
+  # also installs from the registry; env does not cross workflow files, so bump both.
+  CLAUDE_CODE_VERSION: 2.1.300
 
 jobs:
   run:
@@ -52,6 +58,12 @@ jobs:
 
       - name: Plugin structure (manifests + frontmatter)
         run: pnpm run check-plugin-structure
+
+      - name: Install Claude Code
+        run: npm install -g "@anthropic-ai/claude-code@$CLAUDE_CODE_VERSION"
+
+      - name: Plugin validate (claude plugin validate --strict)
+        run: bash scripts/ci.sh validate-plugins
 
       - name: Personal data in committed evals
         env:
