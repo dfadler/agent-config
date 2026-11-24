@@ -1,0 +1,9 @@
+schema_version: "1.1"
+name: headless
+execution:
+  prompt: Read tokens.json and list the design token names it defines.
+  allowed_tools: [Skill, Read]
+graders:
+  - type: "regex"
+    name: names-token
+    pattern: "color"

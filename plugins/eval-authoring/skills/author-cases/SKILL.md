@@ -105,7 +105,7 @@ blind-case-writer agent, second bullet), then stop.
    ([docs](https://code.claude.com/docs/en/plugin-evals#compare-against-a-no-plugin-baseline)).
    `arm: both` is for "must not fire" checks (`min: 0`, `max: 0`) that stay in the two-arm
    run as `smoke` guards; a trigger-boundary negative omits it.
-   The prompt must carry its inputs inline: the workspace is empty and a case has no
+   The prompt must carry its inputs inline: each run starts in an empty workspace ([docs](https://code.claude.com/docs/en/plugin-evals#write-a-case-manually)), and a case has no
    `Write` grant by default, so a check that the reply names a file or line number is
    cheap for a no-plugin baseline to pass.
    A trace-level `tool_used` or `tool_order` grader is required beside any `llm` grader
@@ -158,6 +158,7 @@ blind-case-writer agent, second bullet), then stop.
    recorded per case. Faking a CLI or MCP server: [fixtures and
    mocks](references/fixtures-and-mocks.md). Testing a plugin's agents:
    [agents](references/agents.md).
+   `Read` is the only file tool a case gets by default. A skill that must search a repo needs a fixture workspace (`scaffold_script` or `add_dirs`) holding the files, and `Glob` or `Grep` in `allowed_tools`; pasting the files into the prompt only tests a skill that reads them ([grant tools](https://code.claude.com/docs/en/plugin-evals#grant-tools)).
 7. **Check the baseline.** Before trusting a new case, run it once without the plugin. That
    run is paid: the CLI has no without-only mode, so it is a two-arm run
    (`run-evals.ts --case <name>`), both arms charged, and the wrapper stores the without

@@ -1,0 +1,14 @@
+schema_version: "1.1"
+name: inline
+execution:
+  prompt: |
+    Here is tokens.json:
+    ```json
+    {"color": {"brand": "#0a7"}}
+    ```
+    List the design token names it defines.
+  allowed_tools: [Skill, Read]
+graders:
+  - type: "regex"
+    name: names-token
+    pattern: "color"
