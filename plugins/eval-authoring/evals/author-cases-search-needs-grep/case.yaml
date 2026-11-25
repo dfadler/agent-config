@@ -1,0 +1,52 @@
+# Run: node plugins/eval-authoring/scripts/ts/run-evals/run-evals.ts --tier thorough plugins/eval-authoring
+# Stimulus for the Glob/Grep rule (issue #1157): the skill under test has to search a repo that is not in the prompt,
+# so the draft must grant Glob or Grep (or use a fixture) rather than rely on Read alone.
+# Can fail: the draft grants only Read/Skill, or pastes repo files inline; then grants_search_tool or the judge fails.
+# good-reply: The case needs Grep to search the repo, since Read is the only file tool a case gets by default and the repo is
+#   not in the prompt. allowed_tools: [Skill, Read, Grep]. Keep the files out of the prompt.
+# bad-reply: allowed_tools: [Skill, Read]. The prompt says "Find every call site of parseConfig across the repo" and pastes
+#   three sample files into it.
+schema_version: "1.1"
+name: author-cases-search-needs-grep
+description: >
+  A request for an eval case for a skill that searches a whole repo, where the repo is not supplied in the
+  prompt. The model invokes author-cases and the draft grants Grep or Glob so the search can run. expected_outcome:
+  PASS when author-cases is invoked and the draft grants Glob or Grep (or says why a fixture is needed instead);
+  FAIL when the draft grants only Read and Skill or pastes the repo into the prompt.
+tags: [eval-authoring, author-cases, trigger]
+
+execution:
+  prompt: |
+    My plugin has a skill, `repo-search`, described as: "Find every call site of a function across the whole
+    repo and list each with its file and line. Use when asked where a function is called."
+    Write me an eval case for it in the single-file case.yaml format, and show the whole file in your reply.
+    Don't create files or run any commands.
+  max_turns: 8
+  allowed_tools:
+    - Skill
+    - Read
+    - Glob
+    - Grep
+
+graders:
+  # Steps: the skill fired on a prompt that never names it. Indicator only in a two-arm run.
+  - name: skill_fired
+    type: tool_used
+    tool: Skill
+    input_match: '"skill"\s*:\s*"(?:[\w-]+:)?author-cases"'
+    min: 1
+
+  # Deterministic: the draft's allowed_tools lists Glob or Grep beside Skill and Read.
+  - name: grants_search_tool
+    type: regex
+    target: last_message
+    pattern: 'allowed_tools[\s\S]{0,200}\b(?:Glob|Grep)\b|\b(?:Glob|Grep)\b[^.\n]{0,120}allowed_tools'
+    flags: i
+    match: contains
+
+  # Judge: the grant is correct for a repo-wide search, and the repo is not pasted into the prompt.
+  - name: search_grant_judged
+    type: llm
+    criteria: |
+      PASS if the reply's eval case lists Glob or Grep in its allowed_tools.
+      FAIL if the case's allowed_tools lists neither Glob nor Grep.
